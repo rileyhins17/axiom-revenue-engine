@@ -1039,6 +1039,36 @@ function normalizeAutomationSettings(settings: OutreachAutomationSettingRecord) 
   };
 }
 
+function coerceSettingsBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") return value === "1" || value.toLowerCase() === "true";
+  return false;
+}
+
+function coerceSettingsDate(value: unknown) {
+  if (!(typeof value === "string" || value instanceof Date || value === null || value === undefined)) {
+    return null;
+  }
+  const date = coerceDate(value);
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+export function coerceAutomationSettingRecord(row: Record<string, unknown>): OutreachAutomationSettingRecord {
+  return {
+    ...(row as unknown as OutreachAutomationSettingRecord),
+    enabled: coerceSettingsBoolean(row.enabled),
+    globalPaused: coerceSettingsBoolean(row.globalPaused),
+    emergencyPaused: coerceSettingsBoolean(row.emergencyPaused),
+    intakePaused: coerceSettingsBoolean(row.intakePaused),
+    weekdaysOnly: coerceSettingsBoolean(row.weekdaysOnly),
+    emergencyPausedAt: coerceSettingsDate(row.emergencyPausedAt),
+    intakePausedAt: coerceSettingsDate(row.intakePausedAt),
+    createdAt: coerceSettingsDate(row.createdAt) ?? new Date(),
+    updatedAt: coerceSettingsDate(row.updatedAt) ?? new Date(),
+  };
+}
+
 export async function getAutomationSettings(prisma: PrismaLike = getPrisma()) {
   return getSettings(prisma);
 }
@@ -1049,6 +1079,20 @@ export async function isAutomationEmergencyPaused(prisma: PrismaLike = getPrisma
 }
 
 async function getSettings(prisma: PrismaLike) {
+  try {
+    const { getDatabase } = await import("@/lib/cloudflare");
+    const existing = await getDatabase()
+      .prepare(`SELECT * FROM "OutreachAutomationSetting" WHERE "id" = ? LIMIT 1`)
+      .bind("global")
+      .first<Record<string, unknown>>();
+
+    if (existing) {
+      return normalizeAutomationSettings(coerceAutomationSettingRecord(existing));
+    }
+  } catch (error) {
+    console.warn("[scheduler] Raw automation settings read failed; falling back to prisma:", error);
+  }
+
   const existing = await prisma.outreachAutomationSetting.findUnique({
     where: { id: "global" },
   });
@@ -4875,6 +4919,7 @@ async function runAutomationSchedulerUnlocked(options: { immediate?: boolean; on
   };
   let runClosed = false;
   const schedulerDeadline = Date.now() + SCHEDULER_TOTAL_TIMEOUT_MS;
+  const staleRunThreshold = addMinutes(now, -5);
 
   const runPhase = <T>(phase: string, timeoutMs: number, operation: () => Promise<T> | T) => {
     const remainingMs = schedulerDeadline - Date.now();
@@ -4892,6 +4937,11 @@ async function runAutomationSchedulerUnlocked(options: { immediate?: boolean; on
   };
 
   try {
+    await runPhase("recover_stale_runs", 20_000, async () => {
+      const { getDatabase } = await import("@/lib/cloudflare");
+      return recoverStaleSchedulerRuns(getDatabase(), run.id, now, staleRunThreshold);
+    });
+
     const modules = await runPhase("load_modules", 10_000, async () => {
       const [pipelineModule, envModule] = await Promise.all([
         import("@/lib/auto-pipeline"),
@@ -4906,12 +4956,6 @@ async function runAutomationSchedulerUnlocked(options: { immediate?: boolean; on
     const env = await runPhase("load_env", 5_000, () => modules.getServerEnv());
     await runPhase("mailbox_sync", 20_000, () => syncMailboxesForGmailConnections());
     const settings = await runPhase("load_settings", 10_000, () => getSettings(prisma));
-    const staleRunThreshold = addMinutes(now, -5);
-
-    await runPhase("recover_stale_runs", 20_000, async () => {
-      const { getDatabase } = await import("@/lib/cloudflare");
-      return recoverStaleSchedulerRuns(getDatabase(), run.id, now, staleRunThreshold);
-    });
 
     const activeRun = await runPhase("check_active_run", 10_000, () => prisma.outreachRun.findFirst({
       where: {

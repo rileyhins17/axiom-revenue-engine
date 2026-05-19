@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildBounceNotificationSearchQueries,
   buildScheduledTimeline,
+  coerceAutomationSettingRecord,
   extractBounceFailureDetails,
   getAutomationSuppressionDomainsForLead,
   getStepType,
@@ -305,6 +306,36 @@ test("stale scheduler run recovery uses one bounded D1 update", async () => {
   assert.match(query, /UPDATE "OutreachRun"/);
   assert.match(query, /"id" != \?/);
   assert.equal(bindings.at(-1), "current-run");
+});
+
+test("raw automation settings rows coerce D1 booleans for scheduler gates", () => {
+  const coerced = coerceAutomationSettingRecord({
+    id: "global",
+    enabled: 1,
+    globalPaused: 0,
+    emergencyPaused: "0",
+    intakePaused: "false",
+    weekdaysOnly: 0,
+    sendWindowStartHour: 0,
+    sendWindowStartMinute: 0,
+    sendWindowEndHour: 23,
+    sendWindowEndMinute: 59,
+    initialDelayMinMinutes: 1,
+    initialDelayMaxMinutes: 5,
+    followUp1BusinessDays: 2,
+    followUp2BusinessDays: 3,
+    schedulerClaimBatch: 60,
+    replySyncStaleMinutes: 15,
+    createdAt: "2026-05-19T00:00:00.000Z",
+    updatedAt: "2026-05-19T00:00:00.000Z",
+  });
+
+  assert.equal(coerced.enabled, true);
+  assert.equal(coerced.globalPaused, false);
+  assert.equal(coerced.emergencyPaused, false);
+  assert.equal(coerced.intakePaused, false);
+  assert.equal(coerced.weekdaysOnly, false);
+  assert(coerced.updatedAt instanceof Date);
 });
 
 test("claim loop stops after every sendable mailbox has one claim", () => {
