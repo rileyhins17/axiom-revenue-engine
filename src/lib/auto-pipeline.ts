@@ -13,6 +13,7 @@ import { hasValidPipelineEmail } from "@/lib/lead-qualification";
 import { READY_FOR_FIRST_TOUCH_STATUS } from "@/lib/outreach";
 import {
   AUTONOMOUS_QUEUE_BATCH_SIZE,
+  AUTONOMOUS_QUALIFICATION_SCAN_SIZE,
   shouldAutonomouslyQueueLead,
 } from "@/lib/automation-policy";
 import {
@@ -74,7 +75,7 @@ async function findLeadsNeedingQualification(prisma: ReturnType<typeof getPrisma
       isArchived: false,
     },
     orderBy: { axiomScore: "desc" },
-    take: 20,
+    take: AUTONOMOUS_QUALIFICATION_SCAN_SIZE,
   })) as LeadRecord[];
 
   return leads.filter((lead) => lead.enrichmentData && shouldAutonomouslyQueueLead(lead));

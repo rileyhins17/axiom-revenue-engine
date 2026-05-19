@@ -27,6 +27,7 @@ export const AUTONOMOUS_SEND_MIN_SCORE = AUTONOMOUS_INTAKE_MIN_SCORE;
 /** Max leads to queue per scheduler tick. With cron every 5 min this is
  *  600/hour peak which is more than enough headroom. */
 export const AUTONOMOUS_QUEUE_BATCH_SIZE = 50;
+export const AUTONOMOUS_QUALIFICATION_SCAN_SIZE = 250;
 
 /** Hard ceiling on new ADEQUATE leads (axiomScore >= 45, non-D, non-generic
  *  email) intaken per UTC day. Once hit, the autonomous-intake tick stops

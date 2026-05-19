@@ -19,6 +19,7 @@ import {
 import {
   AUTONOMOUS_DAILY_LEAD_INTAKE_CAP,
   AUTONOMOUS_FOLLOW_UP_DAILY_SEND_CAP,
+  AUTONOMOUS_QUALIFICATION_SCAN_SIZE,
   MAILBOX_DAILY_SEND_TARGET,
 } from "./automation-policy";
 import type { LeadRecord, OutreachSequenceStepRecord } from "./prisma";
@@ -298,6 +299,10 @@ test("automation capacity policy reserves daily sends for initial outreach", () 
   assert.equal(totalDailyCapacity, 80);
   assert(AUTONOMOUS_FOLLOW_UP_DAILY_SEND_CAP <= totalDailyCapacity * 0.25);
   assert(AUTONOMOUS_DAILY_LEAD_INTAKE_CAP <= reservedInitialCapacity);
+});
+
+test("qualification scan is deep enough to get past stale already-contacted leads", () => {
+  assert(AUTONOMOUS_QUALIFICATION_SCAN_SIZE >= 200);
 });
 
 test("automation sequence timeline includes initial plus three periodic follow-ups", () => {
