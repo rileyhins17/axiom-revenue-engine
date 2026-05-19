@@ -116,7 +116,7 @@ export const AUTOMATION_SETTINGS_DEFAULTS = {
 /** Government / school / chain / franchise patterns we never email. */
 const HARD_DISQUALIFIER_PATTERNS = [
   /\b(government|gov\.|municipal(ity)?|city of|county of|state of|provincial)\b/i,
-  /\b(school|university|college|academy|district|board of education)\b/i,
+  /\b(university of|college of|public school|school district|district school board|board of education)\b/i,
   /\b(walmart|costco|home depot|lowe'?s|mcdonald'?s|starbucks|target|kroger)\b/i,
   /\b(franchise corporate|hq|head office)\b/i,
 ];

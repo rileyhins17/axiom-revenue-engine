@@ -21,6 +21,7 @@ import {
   AUTONOMOUS_DAILY_LEAD_INTAKE_CAP,
   AUTONOMOUS_FOLLOW_UP_DAILY_SEND_CAP,
   AUTONOMOUS_QUALIFICATION_SCAN_SIZE,
+  isAdequateAutonomousLead,
   MAILBOX_DAILY_SEND_TARGET,
 } from "./automation-policy";
 import type { LeadRecord, OutreachSequenceStepRecord } from "./prisma";
@@ -327,6 +328,33 @@ test("automation capacity policy reserves daily sends for initial outreach", () 
 
 test("qualification scan is deep enough to get past stale already-contacted leads", () => {
   assert(AUTONOMOUS_QUALIFICATION_SCAN_SIZE >= 200);
+});
+
+test("autonomous policy keeps private service academy and university-branded leads eligible", () => {
+  assert.equal(
+    isAdequateAutonomousLead({
+      axiomScore: 78,
+      axiomTier: "B",
+      businessName: "Star Fencing Academy",
+      category: "Fencing Club",
+      email: "owner@starfencingacademy.com",
+      emailType: "owner",
+      isArchived: false,
+    }),
+    true,
+  );
+  assert.equal(
+    isAdequateAutonomousLead({
+      axiomScore: 81,
+      axiomTier: "B",
+      businessName: "University First Class Painters",
+      category: "Painter",
+      email: "owner@ufcp.ca",
+      emailType: "owner",
+      isArchived: false,
+    }),
+    true,
+  );
 });
 
 test("automation sequence timeline includes initial plus three periodic follow-ups", () => {
