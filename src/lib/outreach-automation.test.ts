@@ -10,6 +10,7 @@ import {
   isExpectedReplySender,
   isBounceNotificationMessage,
   orderDueStepsForClaiming,
+  recoverStaleSchedulerRuns,
   runSchedulerRecordedPhase,
   selectAutomationReadyLeads,
   withSchedulerTimeout,
@@ -240,6 +241,43 @@ test("scheduler claim ordering keeps initial outreach ahead of overdue follow-up
     "follow-up-oldest",
     "follow-up-newer",
   ]);
+});
+
+test("stale scheduler run recovery uses one bounded D1 update", async () => {
+  let query = "";
+  let bindings: unknown[] = [];
+  const db = {
+    prepare(sql: string) {
+      query = sql;
+      return {
+        async all() {
+          return { results: [] };
+        },
+        bind(...values: unknown[]) {
+          bindings = values;
+          return this;
+        },
+        async first() {
+          return null;
+        },
+        async run() {
+          return { meta: { changes: 3 } };
+        },
+      };
+    },
+  };
+
+  const recovered = await recoverStaleSchedulerRuns(
+    db,
+    "current-run",
+    new Date("2026-05-19T21:10:00.000Z"),
+    new Date("2026-05-19T21:05:00.000Z"),
+  );
+
+  assert.equal(recovered, 3);
+  assert.match(query, /UPDATE "OutreachRun"/);
+  assert.match(query, /"id" != \?/);
+  assert.equal(bindings.at(-1), "current-run");
 });
 
 test("automation capacity policy reserves daily sends for initial outreach", () => {

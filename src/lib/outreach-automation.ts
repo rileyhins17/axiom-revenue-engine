@@ -37,6 +37,7 @@ import { hasValidPipelineEmail, isLeadOutreachEligible, normalizePipelineEmail }
 import { resolveLeadEnrichment } from "@/lib/outreach-enrichment";
 import { getPrisma } from "@/lib/prisma";
 import { READY_FOR_FIRST_TOUCH_STATUS } from "@/lib/outreach";
+import type { D1DatabaseLike } from "@/lib/cloudflare";
 import type {
   GmailConnectionRecord,
   LeadRecord,
@@ -4035,6 +4036,32 @@ export async function healStaleSchedulerState(prisma: PrismaLike) {
   return healed;
 }
 
+export async function recoverStaleSchedulerRuns(
+  db: Pick<D1DatabaseLike, "prepare">,
+  currentRunId: string,
+  now: Date,
+  staleRunThreshold: Date,
+) {
+  const metadata = JSON.stringify({
+    source: "scheduler",
+    error: "stale running run recovered before scheduler start",
+  });
+  const result = await db
+    .prepare(
+      `UPDATE "OutreachRun"
+       SET "status" = 'FAILED',
+           "finishedAt" = ?,
+           "metadata" = ?
+       WHERE "status" = 'RUNNING'
+         AND datetime("startedAt") <= datetime(?)
+         AND "id" != ?`,
+    )
+    .bind(now.toISOString(), metadata, staleRunThreshold.toISOString(), currentRunId)
+    .run();
+
+  return Number(result.meta?.changes ?? 0);
+}
+
 export async function forceResetAllBlockedState(prisma: PrismaLike) {
   const now = new Date();
   const result = { steps: 0, sequences: 0, claims: 0 };
@@ -4863,25 +4890,8 @@ async function runAutomationSchedulerUnlocked(options: { immediate?: boolean; on
     const staleRunThreshold = addMinutes(now, -5);
 
     await runPhase("recover_stale_runs", 20_000, async () => {
-      const staleRuns = await prisma.outreachRun.findMany({
-        where: {
-          status: "RUNNING",
-          startedAt: { lte: staleRunThreshold },
-          id: { not: run.id },
-        },
-      }) as OutreachRunRecord[];
-      await Promise.all(staleRuns.map((staleRun) => prisma.outreachRun.update({
-        where: { id: staleRun.id },
-        data: {
-          status: "FAILED",
-          finishedAt: now,
-          metadata: JSON.stringify({
-            source: "scheduler",
-            error: "stale running run recovered before scheduler start",
-          }),
-        },
-      })));
-      return staleRuns.length;
+      const { getDatabase } = await import("@/lib/cloudflare");
+      return recoverStaleSchedulerRuns(getDatabase(), run.id, now, staleRunThreshold);
     });
 
     const activeRun = await runPhase("check_active_run", 10_000, () => prisma.outreachRun.findFirst({
