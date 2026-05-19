@@ -984,6 +984,13 @@ export function orderDueStepsForClaiming<T extends Pick<OutreachSequenceStepReco
   });
 }
 
+export function haveAllSendableMailboxesClaimedThisTick(
+  sendableMailboxIds: Set<string>,
+  mailboxClaimCounts: Map<string, number>,
+) {
+  return sendableMailboxIds.size > 0 && [...sendableMailboxIds].every((id) => (mailboxClaimCounts.get(id) || 0) > 0);
+}
+
 function normalizeAutomationSettings(settings: OutreachAutomationSettingRecord) {
   // DB is the source of truth; only fill in missing/invalid values from defaults.
   const pickNumber = (value: unknown, fallback: number) =>
@@ -4475,6 +4482,11 @@ async function claimDueSteps(prisma: PrismaLike, runId: string, batchSize: numbe
     // iteration would only reschedule steps — stop here to save CPU.
     if (sendableMailboxIds.size > 0 && blockedMailboxIds.size >= sendableMailboxIds.size) {
       console.log(`[scheduler] All ${sendableMailboxIds.size} sendable mailbox(es) are rate-limited — stopping claim loop early`);
+      break;
+    }
+
+    if (haveAllSendableMailboxesClaimedThisTick(sendableMailboxIds, mailboxClaimCounts)) {
+      console.log(`[scheduler] All ${sendableMailboxIds.size} sendable mailbox(es) have one claim this tick - stopping claim loop early`);
       break;
     }
 

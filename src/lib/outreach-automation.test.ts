@@ -7,6 +7,7 @@ import {
   extractBounceFailureDetails,
   getAutomationSuppressionDomainsForLead,
   getStepType,
+  haveAllSendableMailboxesClaimedThisTick,
   isExpectedReplySender,
   isBounceNotificationMessage,
   orderDueStepsForClaiming,
@@ -278,6 +279,16 @@ test("stale scheduler run recovery uses one bounded D1 update", async () => {
   assert.match(query, /UPDATE "OutreachRun"/);
   assert.match(query, /"id" != \?/);
   assert.equal(bindings.at(-1), "current-run");
+});
+
+test("claim loop stops after every sendable mailbox has one claim", () => {
+  const sendableMailboxIds = new Set(["aidan", "riley"]);
+  const counts = new Map<string, number>([["aidan", 1]]);
+
+  assert.equal(haveAllSendableMailboxesClaimedThisTick(sendableMailboxIds, counts), false);
+
+  counts.set("riley", 1);
+  assert.equal(haveAllSendableMailboxesClaimedThisTick(sendableMailboxIds, counts), true);
 });
 
 test("automation capacity policy reserves daily sends for initial outreach", () => {
