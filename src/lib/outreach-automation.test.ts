@@ -13,6 +13,7 @@ import {
   orderDueStepsForClaiming,
   recoverStaleSchedulerRuns,
   runSchedulerRecordedPhase,
+  selectDueStepsForClaiming,
   selectAutomationReadyLeads,
   withSchedulerTimeout,
 } from "./outreach-automation";
@@ -243,6 +244,29 @@ test("scheduler claim ordering keeps initial outreach ahead of overdue follow-up
     "follow-up-oldest",
     "follow-up-newer",
   ]);
+});
+
+test("scheduler claim selection ignores follow-up backlog while initial outreach is due", () => {
+  const selected = selectDueStepsForClaiming(
+    [
+      makeStep({
+        id: "initial-due",
+        stepNumber: 1,
+        stepType: "INITIAL",
+        scheduledFor: new Date("2026-01-01T11:00:00.000Z"),
+      }),
+    ],
+    [
+      makeStep({
+        id: "follow-up-overdue",
+        stepNumber: 2,
+        stepType: "FOLLOW_UP_1",
+        scheduledFor: new Date("2026-01-01T08:00:00.000Z"),
+      }),
+    ],
+  );
+
+  assert.deepEqual(selected.map((step) => step.id), ["initial-due"]);
 });
 
 test("stale scheduler run recovery uses one bounded D1 update", async () => {

@@ -984,6 +984,13 @@ export function orderDueStepsForClaiming<T extends Pick<OutreachSequenceStepReco
   });
 }
 
+export function selectDueStepsForClaiming<T extends Pick<OutreachSequenceStepRecord, "id" | "scheduledFor" | "stepNumber">>(
+  initialDueSteps: T[],
+  followUpDueSteps: T[],
+): T[] {
+  return orderDueStepsForClaiming(initialDueSteps.length > 0 ? initialDueSteps : followUpDueSteps);
+}
+
 export function haveAllSendableMailboxesClaimedThisTick(
   sendableMailboxIds: Set<string>,
   mailboxClaimCounts: Map<string, number>,
@@ -4454,7 +4461,7 @@ async function claimDueSteps(prisma: PrismaLike, runId: string, batchSize: numbe
     claimedInitialCount: 0,
     claimedFollowUpCount: 0,
   };
-  const dueSteps = orderDueStepsForClaiming([...initialDueSteps, ...followUpDueSteps]);
+  const dueSteps = selectDueStepsForClaiming(initialDueSteps, followUpDueSteps);
 
   const claims: SchedulerClaim[] = [];
   // Track per-mailbox claims to ensure equal distribution
