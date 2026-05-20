@@ -5,8 +5,10 @@ import { getServerEnv } from "@/lib/env";
 import { getValidAccessToken } from "@/lib/gmail";
 import {
   forceResetAllBlockedState,
+  getAutomationReadyLeadSnapshot,
   healStaleSchedulerState,
   listAutomationOverview,
+  queueLeadsForAutomation,
   runAutomationScheduler,
 } from "@/lib/outreach-automation";
 import { getPrisma } from "@/lib/prisma";
@@ -342,6 +344,54 @@ async function toolForceUnblock() {
   return result;
 }
 
+async function toolQueueLeads(args: Record<string, unknown>) {
+  const leadIds = Array.isArray(args.leadIds)
+    ? args.leadIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+    : [];
+  if (leadIds.length === 0) {
+    return { error: "leadIds (array of positive integers) required" };
+  }
+  // System user id used by auto-pipeline for autonomous queues
+  const SYSTEM_USER_ID = "system";
+  const result = await queueLeadsForAutomation({
+    leadIds,
+    queuedByUserId: SYSTEM_USER_ID,
+  });
+  // Optionally fast-forward step 1 so it fires immediately
+  if (args.immediate === true && result.queued.length > 0) {
+    const prisma = getPrisma();
+    const sequenceIds = result.queued.map((q) => q.sequenceId);
+    const now = new Date();
+    await prisma.outreachSequenceStep.updateMany({
+      where: { sequenceId: { in: sequenceIds }, stepNumber: 1, status: "SCHEDULED" },
+      data: { scheduledFor: now },
+    });
+  }
+  return result;
+}
+
+async function toolDiagnoseQueue() {
+  const prisma = getPrisma();
+  try {
+    const snapshot = await getAutomationReadyLeadSnapshot(prisma);
+    return {
+      eligibleCount: snapshot.leads.length,
+      diagnostics: snapshot.diagnostics,
+      sampleEligible: snapshot.leads.slice(0, 10).map((l) => ({
+        id: l.id,
+        businessName: l.businessName,
+        email: l.email,
+        axiomScore: l.axiomScore,
+      })),
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : null,
+    };
+  }
+}
+
 // ---------- Tool registry ----------
 
 const TOOLS: ToolDefinition[] = [
@@ -461,6 +511,27 @@ const TOOLS: ToolDefinition[] = [
       "Aggressive recovery: clear every BLOCKED step's errorMessage, reschedule for now, and recover stuck CLAIMED/SENDING steps. Use when the queue is wedged.",
     inputSchema: { type: "object", properties: {} },
     handler: () => toolForceUnblock(),
+  },
+  {
+    name: "queue_leads",
+    description:
+      "Manually queue one or more leads for automated outreach. Bypasses auto-pipeline. Set immediate=true to fire on the next cron tick.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        leadIds: { type: "array", items: { type: "number" }, description: "Numeric lead IDs to queue" },
+        immediate: { type: "boolean", description: "Fast-forward step 1 so it fires on the next tick" },
+      },
+      required: ["leadIds"],
+    },
+    handler: (args) => toolQueueLeads(args),
+  },
+  {
+    name: "diagnose_queue",
+    description:
+      "Inspect what getAutomationReadyLeadSnapshot returns RIGHT NOW. Surfaces eligibleCount, diagnostics, and a sample of eligible leads so we can see why the auto-pipeline reports 0 eligible.",
+    inputSchema: { type: "object", properties: {} },
+    handler: () => toolDiagnoseQueue(),
   },
 ];
 
