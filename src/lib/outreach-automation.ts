@@ -2261,13 +2261,21 @@ export async function queueLeadsForAutomation(input: {
       continue;
     }
 
+    // Build the OR clause carefully: an empty businessDomain ("") would
+    // match every OutreachSuppression row whose domain column is "" or
+    // NULL — and there are 27 such rows that were inserted as per-email
+    // suppressions (NO_MX, bounce, etc.) with no domain. Those rows would
+    // then suppress every lead with no resolvable business domain (i.e.
+    // every lead whose website is on facebook/IG/yelp and whose email is
+    // on a shared provider). Result: queueLeadsForAutomation rejected ALL
+    // such leads as "suppressed". Guard against this by only including the
+    // domain clause when we actually have a non-empty business domain.
+    const suppressionBusinessDomain = getAutomationBusinessDomain(lead);
+    const suppressionWhere = suppressionBusinessDomain
+      ? { OR: [{ email: normalizedLeadEmail }, { domain: suppressionBusinessDomain }] }
+      : { email: normalizedLeadEmail };
     const suppression = await prisma.outreachSuppression.findFirst({
-      where: {
-        OR: [
-          { email: normalizedLeadEmail },
-          { domain: getAutomationBusinessDomain(lead) },
-        ],
-      },
+      where: suppressionWhere,
     });
     if (suppression) {
       result.skipped.push({ leadId, reason: "Lead is suppressed from automation" });
