@@ -1536,8 +1536,24 @@ async function hasAnySentEmailForRecipient(recipientEmail: string | null | undef
   if (!recipientEmail) {
     return false;
   }
-
-  return Boolean(await findConflictingSentEmailForRecipient(recipientEmail, ""));
+  // 30-day window mirrors getSentRecipientEmails. queueLeadsForAutomation
+  // uses this to reject duplicates at queue time; without the window it
+  // permanently locked out anyone who had been emailed in the past via a
+  // sibling lead sharing the same contact address. Same rationale as the
+  // snapshot dedupe set.
+  const { getDatabase } = await import("@/lib/cloudflare");
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const row = await getDatabase()
+    .prepare(
+      `SELECT 1 FROM "OutreachEmail"
+       WHERE "status" = 'sent'
+         AND LOWER("recipientEmail") = ?
+         AND datetime("sentAt") >= datetime(?)
+       LIMIT 1`,
+    )
+    .bind(normalizeEmail(recipientEmail) || "", cutoff)
+    .first<{ "1": number }>();
+  return Boolean(row);
 }
 
 /** Emails that received an automated send in the last 30 days. Time-windowed
