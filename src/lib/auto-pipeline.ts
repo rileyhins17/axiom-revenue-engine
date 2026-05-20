@@ -275,14 +275,28 @@ export async function runAutoPipeline(systemUserId: string): Promise<AutoPipelin
     console.log(`[auto-pipeline] Recovered ${recovered} stuck ENRICHING leads`);
   }
 
-  // Step 1: Auto-enrich. Processed 6-wide × 30 per tick so a single minute of
-  // cron drains up to ~30 leads. A 200-lead backlog clears in ~7 min.
-  const { enriched, failed: enrichFailed } = await autoEnrich(prisma, 30, 6);
+  // Steps 1-2 (enrich + qualify) wrapped in their own try/catch so a slow
+  // DeepSeek call cannot starve step 3 (auto-queue). Previously the entire
+  // runAutoPipeline lived inside a single 120s scheduler timeout — if
+  // enrichment of 30 leads ran past 120s the queue step never executed
+  // and the pipeline reported eligibleFirstTouchCount=0 forever.
+  let enriched = 0;
+  let enrichFailed = 0;
+  let qualified = 0;
+  try {
+    const enrichmentResult = await autoEnrich(prisma, 10, 3);
+    enriched = enrichmentResult.enriched;
+    enrichFailed = enrichmentResult.failed;
+  } catch (error) {
+    console.warn("[auto-pipeline] autoEnrich failed (continuing to qualify+queue):", error);
+  }
+  try {
+    qualified = await autoQualify(prisma);
+  } catch (error) {
+    console.warn("[auto-pipeline] autoQualify failed (continuing to queue):", error);
+  }
 
-  // Step 2: Auto-qualify enriched leads
-  const qualified = await autoQualify(prisma);
-
-  // Step 3: Auto-queue qualified leads
+  // Step 3: Auto-queue qualified leads — runs even if enrichment errored.
   const { queued, skipped: queueSkipped, firstTouchDiagnostics } = await autoQueue(systemUserId);
   console.log(`[auto-pipeline] First-touch diagnostics: ${JSON.stringify(firstTouchDiagnostics)}`);
 
