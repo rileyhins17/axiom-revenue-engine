@@ -202,6 +202,9 @@ export type OutreachAutomationSettingRecord = {
   intakePaused: boolean;
   intakePausedAt: Date | null;
   intakePausedBy: string | null;
+  followUpsPaused: boolean;
+  followUpsPausedAt: Date | null;
+  followUpsPausedBy: string | null;
   sendWindowStartHour: number;
   sendWindowStartMinute: number;
   sendWindowEndHour: number;

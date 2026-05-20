@@ -1020,6 +1020,9 @@ function normalizeAutomationSettings(settings: OutreachAutomationSettingRecord) 
     intakePaused: pickBool(settings.intakePaused, AUTOMATION_SETTINGS_DEFAULTS.intakePaused),
     intakePausedAt: coerceDate(settings.intakePausedAt),
     intakePausedBy: pickText(settings.intakePausedBy, AUTOMATION_SETTINGS_DEFAULTS.intakePausedBy),
+    followUpsPaused: pickBool(settings.followUpsPaused, AUTOMATION_SETTINGS_DEFAULTS.followUpsPaused),
+    followUpsPausedAt: coerceDate(settings.followUpsPausedAt),
+    followUpsPausedBy: pickText(settings.followUpsPausedBy, AUTOMATION_SETTINGS_DEFAULTS.followUpsPausedBy),
     sendWindowStartHour: pickNumber(settings.sendWindowStartHour, AUTOMATION_SETTINGS_DEFAULTS.sendWindowStartHour),
     sendWindowStartMinute: pickNumber(settings.sendWindowStartMinute, AUTOMATION_SETTINGS_DEFAULTS.sendWindowStartMinute),
     sendWindowEndHour: pickNumber(settings.sendWindowEndHour, AUTOMATION_SETTINGS_DEFAULTS.sendWindowEndHour),
@@ -1061,9 +1064,11 @@ export function coerceAutomationSettingRecord(row: Record<string, unknown>): Out
     globalPaused: coerceSettingsBoolean(row.globalPaused),
     emergencyPaused: coerceSettingsBoolean(row.emergencyPaused),
     intakePaused: coerceSettingsBoolean(row.intakePaused),
+    followUpsPaused: coerceSettingsBoolean(row.followUpsPaused),
     weekdaysOnly: coerceSettingsBoolean(row.weekdaysOnly),
     emergencyPausedAt: coerceSettingsDate(row.emergencyPausedAt),
     intakePausedAt: coerceSettingsDate(row.intakePausedAt),
+    followUpsPausedAt: coerceSettingsDate(row.followUpsPausedAt),
     createdAt: coerceSettingsDate(row.createdAt) ?? new Date(),
     updatedAt: coerceSettingsDate(row.updatedAt) ?? new Date(),
   };
@@ -1535,15 +1540,22 @@ async function hasAnySentEmailForRecipient(recipientEmail: string | null | undef
   return Boolean(await findConflictingSentEmailForRecipient(recipientEmail, ""));
 }
 
+/** Emails that received an automated send in the last 30 days. Time-windowed
+ * so a lead whose contact email is shared with a previously-contacted sibling
+ * (e.g. multiple JUSTJUNK locations sharing privacy@justjunk.com) is not
+ * blocked from outreach forever. Older entries fall out of the dedupe set. */
 async function getSentRecipientEmails() {
   const { getDatabase } = await import("@/lib/cloudflare");
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const rows = await getDatabase()
     .prepare(
       `SELECT DISTINCT LOWER("recipientEmail") AS email
        FROM "OutreachEmail"
        WHERE "status" = 'sent'
-         AND COALESCE("recipientEmail", '') != ''`,
+         AND COALESCE("recipientEmail", '') != ''
+         AND datetime("sentAt") >= datetime(?)`,
     )
+    .bind(cutoff)
     .all<{ email: string }>();
 
   return new Set((rows.results ?? []).map((row) => normalizeEmail(row.email)).filter(Boolean));
@@ -2730,12 +2742,16 @@ async function canMailboxSend(prisma: PrismaLike, mailbox: OutreachMailboxRecord
   }
 
   if ((_stepNumber || 0) > 1) {
+    // DB-driven kill switch (migration 0041). Replaces broken env-var path:
+    // AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY=0 silently failed because the
+    // module-level env cache in env.ts could capture the schema default (20)
+    // before Cloudflare bindings were attached. Reading from liveSettings is
+    // fresh every tick and observable via SQL or the dashboard.
+    if (liveSettings?.followUpsPaused) {
+      return { allowed: false, reason: "follow_up_daily_cap_reached" as AutomationBlockerReason };
+    }
     const { getServerEnv } = await import("@/lib/env");
     const followUpDailyCap = getServerEnv().AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY;
-    // A cap of 0 means "no follow-ups allowed today" — used as an operator
-    // kill switch when we want a week of pure initial outreach. Any positive
-    // value is a real daily cap. (Negative isn't representable — env schema
-    // is nonnegative.)
     if (followUpDailyCap === 0) {
       return { allowed: false, reason: "follow_up_daily_cap_reached" as AutomationBlockerReason };
     }

@@ -9,6 +9,7 @@ import { runCloudScrapeWorker } from "./src/lib/cloud-scrape-worker";
 import { runAutonomousIntake } from "./src/lib/autonomous-intake";
 import { maybeRunDailyDigest } from "./src/lib/daily-digest";
 import { setCloudflareBindings } from "./src/lib/cloudflare";
+import { clearServerEnvCache } from "./src/lib/env";
 import { getCronTimeoutBudgets } from "./src/lib/cron-timeouts";
 
 const worker = openNextWorkerModule;
@@ -29,10 +30,16 @@ function withTimeout(promise, ms, label) {
 
 export default {
   async fetch(request, env, ctx) {
+    clearServerEnvCache();
     setCloudflareBindings(env);
     return worker.fetch(request, env, ctx);
   },
   async scheduled(_controller, env, ctx) {
+    // Clear env cache so the module-level cachedEnv does not shadow
+    // deploy-time env-var changes on warm isolates. This is the fix
+    // for AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY=0 silently being read
+    // as the schema default 20 after a fresh deploy.
+    clearServerEnvCache();
     setCloudflareBindings(env);
     const timeouts = getCronTimeoutBudgets(env);
     const CRON_WALL_CLOCK_BUDGET_MS = 14 * 60 * 1000;

@@ -43,6 +43,15 @@ export type AppEnv = z.infer<typeof envSchema>;
 
 let cachedEnv: AppEnv | null = null;
 
+/**
+ * Clear the module-level env cache. Called from the Worker cron entrypoint
+ * on every scheduled() invocation so deploy-time env-var changes actually
+ * take effect on the next tick instead of being shadowed by a stale parse.
+ */
+export function clearServerEnvCache() {
+  cachedEnv = null;
+}
+
 export function getServerEnv(): AppEnv {
   if (cachedEnv) return cachedEnv;
 
