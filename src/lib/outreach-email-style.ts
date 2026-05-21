@@ -650,10 +650,14 @@ export function validateColdEmailDraft(draft: ColdEmailDraft, lead: LeadRecord, 
   // Niche-infix fabrication: "while looking at a few <niche> sites tonight" etc.
   const fabricationRegex = [
     /while looking at (a |a few )?\S+ sites/i,
-    /clicked through \S+\.[a-z]{2,}/i,
+    /(clicked|clicking) through \S+\.[a-z]{2,}/i,
     /your (page|hero|nav|navigation|fold|homepage|landing page|service page|contact form|contact path)/i,
     /buried (far|pretty far) (down|below)/i,
     /poking around \S+/i,
+    /took a (quick )?look (at|through)/i,
+    /spent (a |some )?(minute|seconds?|time) on/i,
+    /had a (quick )?look at \S+/i,
+    /the contact path (may|might|seems|looks|feels)/i,
   ];
   const regexHits: string[] = [];
   for (const re of fabricationRegex) {
