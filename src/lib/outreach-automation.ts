@@ -1528,6 +1528,32 @@ async function stopAlreadyContactedSequence(prisma: PrismaLike, sequence: Outrea
     return false;
   }
 
+  // Mark the lead as already contacted at the LEAD level too — otherwise the
+  // next auto-queue tick re-creates a sequence for the same lead, claim hits
+  // already_contacted again, sequence stops again, infinite loop.
+  // We use the prior external send timestamp so reply detection / cooldown
+  // logic uses an honest "when".
+  try {
+    const { getDatabase } = await import("@/lib/cloudflare");
+    const priorSend = await getDatabase()
+      .prepare(
+        `SELECT MAX("sentAt") AS sentAt FROM "OutreachEmail" WHERE "leadId" = ? AND "status" = 'sent'`,
+      )
+      .bind(sequence.leadId)
+      .first<{ sentAt: string | null }>();
+    const sentAt = priorSend?.sentAt ? new Date(priorSend.sentAt) : new Date();
+    await prisma.lead.update({
+      where: { id: sequence.leadId },
+      data: {
+        firstContactedAt: sentAt,
+        lastContactedAt: sentAt,
+        outreachStatus: "OUTREACHED",
+      },
+    }).catch(() => null);
+  } catch {
+    /* non-fatal */
+  }
+
   await stopSequenceInternal(prisma, sequence, "already_contacted").catch(() => null);
   return true;
 }
