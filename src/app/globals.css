@@ -50,8 +50,8 @@
 :root {
   /* Claude Code desktop-style font stack: native system UI font + system mono.
      SF Pro on macOS, Segoe UI Variable on Windows 11, system-ui elsewhere. */
-  --font-app-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-app-mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-app-sans: "Comic Sans MS", "Comic Sans", "Chalkboard SE", "Chalkboard", "ChalkboardSE-Regular", cursive, system-ui, sans-serif;
+  --font-app-mono: "Comic Sans MS", "Comic Sans", "Chalkboard SE", "Chalkboard", cursive, monospace;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
