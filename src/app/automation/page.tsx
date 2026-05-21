@@ -339,8 +339,12 @@ export default async function AutomationPage() {
     .filter((s) => s.bucket === "transient")
     .sort((a, b) => (a.when?.getTime() ?? 0) - (b.when?.getTime() ?? 0));
 
+  const followUpsPaused = Boolean(overview.settings?.followUpsPaused);
   const scheduledSends = classifiedSequences
     .filter((s) => (s.bucket === "sending" || s.bucket === "waiting") && s.when && s.when.getTime() >= Date.now())
+    // Hide follow-up steps from "Next 5" while the kill switch is on —
+    // their nextSendAt is meaningless because canMailboxSend will block.
+    .filter((s) => !(followUpsPaused && ((s as { nextStep?: { stepNumber?: number } }).nextStep?.stepNumber ?? 1) > 1))
     .sort((a, b) => (a.when?.getTime() ?? 0) - (b.when?.getTime() ?? 0));
 
   const nextFive = scheduledSends.slice(0, 5);
@@ -462,7 +466,9 @@ export default async function AutomationPage() {
             <div>
               <h2 className="text-base font-semibold text-white">Next 5 emails going out</h2>
               <p className="mt-0.5 text-sm text-zinc-400">
-                Who's getting an email next, from which inbox, and exactly when.
+                {followUpsPaused
+                  ? "First-touch-only mode. Follow-ups paused and excluded from this list."
+                  : "Who's getting an email next, from which inbox, and exactly when."}
               </p>
             </div>
           </div>
@@ -490,9 +496,25 @@ export default async function AutomationPage() {
                         {formattedWhen}
                       </span>
                     </div>
-                    <div className="mt-1 text-[12px] text-zinc-400">
-                      Sending to <span className="font-mono text-zinc-200">{s.lead?.email || "—"}</span>
-                      {senderInbox ? <> from <span className="font-mono text-zinc-200">{senderInbox}</span></> : null}
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-zinc-400">
+                      <span>Sending to <span className="font-mono text-zinc-200">{s.lead?.email || "—"}</span></span>
+                      {senderInbox ? <span>from <span className="font-mono text-zinc-200">{senderInbox}</span></span> : null}
+                      {(() => {
+                        const sn = (s as { nextStep?: { stepNumber?: number; stepType?: string } }).nextStep?.stepNumber ?? 1;
+                        const st = (s as { nextStep?: { stepNumber?: number; stepType?: string } }).nextStep?.stepType;
+                        if (sn > 1) {
+                          return (
+                            <span className="inline-flex items-center rounded-full border border-amber-400/30 bg-amber-400/[0.08] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-200">
+                              {st === "FOLLOW_UP_1" ? "Follow-up 1" : st === "FOLLOW_UP_2" ? "Follow-up 2" : st === "FOLLOW_UP_3" ? "Follow-up 3" : `Step ${sn}`}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-400/[0.08] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-200">
+                            First touch
+                          </span>
+                        );
+                      })()}
                     </div>
                     <div className="mt-0.5 text-[11px] text-zinc-500">
                       {humanizeStep(s.currentStep)} · {when ? relativeAgo(when) : ""}

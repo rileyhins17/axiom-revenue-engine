@@ -751,6 +751,17 @@ export default async function DashboardPage() {
       <SendsTimeline
         upcoming={
           (automation.sequences ?? [])
+            // Hide sequences whose next step would be blocked. Follow-ups when
+            // followUpsPaused=true do NOT actually send on their nextSendAt, so
+            // surfacing them in "Next 5" gives a false picture of what is about
+            // to leave the engine.
+            .filter((s) => {
+              if (!s.nextSendAt) return false;
+              if (new Date(s.nextSendAt).getTime() < Date.now()) return false;
+              if (automation.settings?.followUpsPaused && (s.nextStep?.stepNumber ?? 1) > 1) return false;
+              if (s.state === "BLOCKED" || s.state === "STOPPED" || s.state === "COMPLETED") return false;
+              return true;
+            })
             .map((s) => ({
               id: s.id,
               leadId: s.leadId,
@@ -758,11 +769,13 @@ export default async function DashboardPage() {
               recipientEmail: s.lead?.email ?? "",
               senderEmail: s.mailbox?.gmailAddress ?? null,
               nextSendAt: s.nextSendAt,
+              stepNumber: s.nextStep?.stepNumber ?? 1,
+              stepType: s.nextStep?.stepType ?? "INITIAL",
             }))
-            .filter((s) => s.nextSendAt && new Date(s.nextSendAt).getTime() >= Date.now())
             .sort((a, b) => new Date(a.nextSendAt as Date).getTime() - new Date(b.nextSendAt as Date).getTime())
             .slice(0, 5)
         }
+        followUpsPaused={Boolean(automation.settings?.followUpsPaused)}
         recent={
           (automation.recentSent ?? []).slice(0, 10).map((e) => ({
             id: e.id,
@@ -1007,6 +1020,8 @@ type UpcomingSend = {
   recipientEmail: string;
   senderEmail: string | null;
   nextSendAt: Date | string | null;
+  stepNumber?: number;
+  stepType?: string;
 };
 
 type RecentSend = {
@@ -1018,7 +1033,7 @@ type RecentSend = {
   businessName: string | null;
 };
 
-function SendsTimeline({ upcoming, recent }: { upcoming: UpcomingSend[]; recent: RecentSend[] }) {
+function SendsTimeline({ upcoming, recent, followUpsPaused }: { upcoming: UpcomingSend[]; recent: RecentSend[]; followUpsPaused?: boolean }) {
   return (
     <section className="grid gap-4 xl:grid-cols-2">
       <div className="v2-card overflow-hidden">
@@ -1029,7 +1044,9 @@ function SendsTimeline({ upcoming, recent }: { upcoming: UpcomingSend[]; recent:
               Next 5 emails
             </div>
             <div className="mt-0.5 text-[11px] text-zinc-500">
-              Who's getting an email next, from which inbox, and exactly when.
+              {followUpsPaused
+                ? "First-touch-only mode. Follow-ups paused, not shown here."
+                : "Who's getting an email next, from which inbox, and exactly when."}
             </div>
           </div>
           <Link href={"/automation" as Route} className="text-[11px] text-zinc-400 hover:text-white inline-flex items-center gap-1">
@@ -1064,9 +1081,18 @@ function SendsTimeline({ upcoming, recent }: { upcoming: UpcomingSend[]; recent:
                           {when ? formatAppDateTime(when, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }, "—") : "—"}
                         </span>
                       </div>
-                      <div className="mt-0.5 text-[11px] text-zinc-400">
-                        Sending to <span className="font-mono text-zinc-300">{s.recipientEmail || "—"}</span>
-                        {s.senderEmail ? <> from <span className="font-mono text-zinc-300">{s.senderEmail}</span></> : null}
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400">
+                        <span>Sending to <span className="font-mono text-zinc-300">{s.recipientEmail || "—"}</span></span>
+                        {s.senderEmail ? <span>from <span className="font-mono text-zinc-300">{s.senderEmail}</span></span> : null}
+                        {s.stepNumber && s.stepNumber > 1 ? (
+                          <span className="inline-flex items-center rounded-full border border-amber-400/30 bg-amber-400/[0.08] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-amber-200">
+                            {s.stepType === "FOLLOW_UP_1" ? "Follow-up 1" : s.stepType === "FOLLOW_UP_2" ? "Follow-up 2" : s.stepType === "FOLLOW_UP_3" ? "Follow-up 3" : `Step ${s.stepNumber}`}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-400/[0.08] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-emerald-200">
+                            First touch
+                          </span>
+                        )}
                       </div>
                       <div className="mt-0.5 text-[10px] text-zinc-600">{when ? relativeFuture(when) : "—"}</div>
                     </div>
