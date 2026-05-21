@@ -284,7 +284,7 @@ export async function runAutoPipeline(systemUserId: string): Promise<AutoPipelin
   let enrichFailed = 0;
   let qualified = 0;
   try {
-    const enrichmentResult = await autoEnrich(prisma, 30, 6);
+    const enrichmentResult = await autoEnrich(prisma, 8, 4);
     enriched = enrichmentResult.enriched;
     enrichFailed = enrichmentResult.failed;
   } catch (error) {
