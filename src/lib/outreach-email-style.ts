@@ -145,15 +145,44 @@ function normalizeLower(value: string | null | undefined) {
   return normalizeText(value).toLowerCase();
 }
 
+// Hosted-site platforms whose domain should never appear in outreach copy.
+// If a lead's websiteUrl is on one of these, treat as no-domain so the email
+// falls back to using businessName rather than e.g. "sites.google.com".
+const PLATFORM_DOMAINS = new Set([
+  "sites.google.com",
+  "wix.com",
+  "squarespace.com",
+  "weebly.com",
+  "godaddysites.com",
+  "shopify.com",
+  "facebook.com",
+  "m.facebook.com",
+  "instagram.com",
+  "linkedin.com",
+  "yelp.com",
+  "yelp.ca",
+  "google.com",
+  "businesssite.com",
+  "site123.com",
+  "carrd.co",
+  "linktr.ee",
+  "tumblr.com",
+  "blogspot.com",
+  "wordpress.com",
+]);
+
 function extractDomain(value: string | null | undefined) {
   const input = normalizeText(value);
   if (!input) return "";
+  let host = "";
   try {
     const url = input.startsWith("http://") || input.startsWith("https://") ? new URL(input) : new URL(`https://${input}`);
-    return url.hostname.replace(/^www\./, "");
+    host = url.hostname.replace(/^www\./, "");
   } catch {
-    return input.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] || "";
+    host = input.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] || "";
   }
+  if (PLATFORM_DOMAINS.has(host.toLowerCase())) return "";
+  return host;
 }
 
 function parseJson<T>(value: string | null | undefined): T | null {
