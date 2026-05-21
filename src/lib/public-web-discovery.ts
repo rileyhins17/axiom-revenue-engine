@@ -12,7 +12,7 @@ type PageSnapshot = {
 };
 
 const WEBSITE_DISCOVERY_CONTACT_PAGE_LIMIT = 4;
-const WEBSITE_DISCOVERY_PAGE_SETTLE_MS = 1500;
+const WEBSITE_DISCOVERY_PAGE_SETTLE_MS = 500;
 
 async function waitForDiscoveryPageReady(page: AutomationPage): Promise<void> {
     await page.waitForSelector("body", { timeout: 8000 }).catch(() => undefined);

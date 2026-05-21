@@ -8,6 +8,7 @@ import { validateContact } from "@/lib/contact-validation";
 import { extractDomain, generateDedupeKey } from "@/lib/dedupe";
 import { checkDisqualifiers } from "@/lib/disqualifiers";
 import {
+  applyScrapeResourceBlocking,
   launchAutomationBrowser,
   type AutomationBrowser,
   type AutomationBrowserContext,
@@ -1947,6 +1948,7 @@ export async function executeScrapeJob(input: ExecuteScrapeJobInput): Promise<Ex
   try {
     browser = await launchAutomationBrowser();
     context = await browser.newContext({ locale: "en-CA" });
+    await applyScrapeResourceBlocking(context);
 
     await input.sendEvent({
       message: `[ENGINE] AXIOM ENGINE initialized for ${input.niche} in ${input.city} (R:${input.radius}km, D:${input.maxDepth})`,

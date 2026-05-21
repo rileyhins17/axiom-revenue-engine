@@ -52,7 +52,7 @@
     "AUTONOMOUS_INTAKE_ENABLED": "true",
     "AUTONOMOUS_QUEUE_ENABLED": "true",
     "AUTONOMOUS_SEND_ENABLED": "true",
-    "AUTONOMOUS_DAILY_LEAD_INTAKE_CAP": "50",
+    "AUTONOMOUS_DAILY_LEAD_INTAKE_CAP": "100",
     "AUTONOMOUS_MAX_SENDS_PER_DAY": "80",
     // Follow-ups capped low so new-lead first-touches dominate outbound mix.
     // 80 total - 10 follow-ups = up to 70 first-touch emails per day.
