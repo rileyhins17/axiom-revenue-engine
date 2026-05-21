@@ -67,7 +67,14 @@ export function isAdequateAutonomousLead(lead: {
   }
 
   const emailType = String(lead.emailType || "").trim().toLowerCase();
-  if (emailType !== "owner" && emailType !== "staff") {
+  // Reject ONLY clearly-generic emailTypes. Owner / staff / unknown / empty
+  // are all allowed because the scraper often cannot classify a personal
+  // local part (e.g. "luc@homekeepers.ca") and labels it unknown. The
+  // isGenericRoleEmail check below still catches info@, contact@, etc., so
+  // letting unknown through here does not lower the actual deliverability
+  // bar — it just stops the autopilot from starving when the top of the
+  // queue is dominated by unclassified personal addresses.
+  if (emailType === "generic") {
     return false;
   }
 
