@@ -4576,10 +4576,12 @@ async function claimDueSteps(prisma: PrismaLike, runId: string, batchSize: numbe
       break;
     }
 
-    if (haveAllSendableMailboxesClaimedThisTick(sendableMailboxIds, mailboxClaimCounts)) {
-      console.log(`[scheduler] All ${sendableMailboxIds.size} sendable mailbox(es) have one claim this tick - stopping claim loop early`);
-      break;
-    }
+    // Removed the old "one claim per mailbox per tick" hard break.
+    // It capped throughput at 2 sends per 5-min cron (24/hr theoretical)
+    // regardless of mailbox capacity. canMailboxSend already enforces
+    // hourly + daily + cooldown limits per attempt, so the loop can
+    // safely keep claiming until the batch is exhausted.
+    void haveAllSendableMailboxesClaimedThisTick;
 
     const sequence = await prisma.outreachSequence.findUnique({
       where: { id: step.sequenceId },
