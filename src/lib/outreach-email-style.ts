@@ -215,9 +215,9 @@ function getObservationFromAssessment(lead: LeadRecord, assessment: WebsiteAsses
     return {
       observedIssue: "The contact or quote path looks more complicated than it needs to be.",
       observationHint: [
-        "Getting a quote looks like it takes more steps than most people will bother with.",
-        "The contact path has a couple of extra steps that might be losing requests.",
-        "Reaching out looks like it takes more effort than most visitors will push through.",
+        "Most {niche} businesses I see lose a chunk of inbound when the quote request takes more than 2 fields.",
+        "In {niche} the biggest leak is usually the quote form. Most owners don't realize how many taps it takes on mobile.",
+        "The pattern I see across {niche} businesses is that the inquiry path quietly costs quote requests.",
       ][s % 3],
       consequenceHint: [
         "Even one extra step at that point makes people bounce.",
@@ -234,9 +234,9 @@ function getObservationFromAssessment(lead: LeadRecord, assessment: WebsiteAsses
     return {
       observedIssue: "The website does not fully surface the trust the business has already built.",
       observationHint: [
-        "The site doesn't really show how established the business is, and the reviews don't come through clearly.",
-        "Someone arriving cold wouldn't get a strong sense of how much work the business has behind it.",
-        "The site undersells how established the business already is.",
+        "What I see most often with {niche} businesses doing this much volume: the website undersells how established the operation actually is.",
+        "A common pattern in {niche}: a new visitor can't tell from the homepage how much work is behind the business.",
+        "The pattern with established {niche} businesses is the website doesn't carry the same weight as the actual operation.",
       ][s % 3],
       consequenceHint: [
         "New visitors comparing options need those signals near the top.",
@@ -253,9 +253,9 @@ function getObservationFromAssessment(lead: LeadRecord, assessment: WebsiteAsses
     return {
       observedIssue: "The site feels slower than it needs to on first load.",
       observationHint: [
-        "First load on mobile took a noticeable few seconds.",
-        "Load time on mobile is a bit slow, and most visitors won't wait for it.",
-        "The page is a bit slow to come up on mobile, which tends to lose people early.",
+        "Mobile load times are the most common silent killer for {niche} sites.",
+        "Across {niche} sites I review, slow mobile loads are the most common drop-off cause.",
+        "Slow mobile loads are the most common reason {niche} sites lose quote requests early.",
       ][s % 3],
       consequenceHint: [
         "Most mobile visitors won't wait more than two seconds.",
@@ -340,7 +340,7 @@ function getObservationFromPainSignals(lead: LeadRecord, painSignals: PainSignal
         observedIssue: "The site may feel slower than it should.",
         observationHint: [
           "The site feels like it may be carrying some speed friction.",
-          "First load on mobile took a noticeable few seconds.",
+          "Mobile load times are the most common silent killer for {niche} sites.",
           "The page is a bit slow coming up, especially on mobile.",
         ][s % 3],
         consequenceHint: [
@@ -486,6 +486,12 @@ function buildConfidenceScore(lead: LeadRecord, observationStrength: number, val
   return clamp(score, 35, 95);
 }
 
+
+function substituteNiche(text: string, lead: LeadRecord): string {
+  const niche = String(lead.niche || "service").trim() || "service";
+  return text.replace(/\{niche\}/g, niche);
+}
+
 export function chooseColdEmailPlan(lead: LeadRecord, _enrichment: EnrichmentResult): ColdEmailPlan {
   void _enrichment;
 
@@ -559,7 +565,7 @@ export function chooseColdEmailPlan(lead: LeadRecord, _enrichment: EnrichmentRes
     personalization_reason: personalizationReason,
     concreteAnchor,
     issueEvidence: observation?.evidence || "Evidence is limited, so the email should stay curiosity-based and permission-oriented.",
-    observationHint: observation?.observationHint || curiosityObservation,
+    observationHint: substituteNiche(observation?.observationHint || curiosityObservation, lead),
     consequenceHint:
       observation?.consequenceHint ||
       "If the website is not doing enough of the trust and clarity work up front, that can create avoidable hesitation.",
