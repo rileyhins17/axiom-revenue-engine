@@ -757,7 +757,8 @@ export default async function DashboardPage() {
             // to leave the engine.
             .filter((s) => {
               if (!s.nextSendAt) return false;
-              if (new Date(s.nextSendAt).getTime() < Date.now()) return false;
+              // Include past-due sequences too — they fire on the next cron tick
+              // and the operator wants to see them as "imminent" in the queue view.
               if (automation.settings?.followUpsPaused && (s.nextStep?.stepNumber ?? 1) > 1) return false;
               if (s.state === "BLOCKED" || s.state === "STOPPED" || s.state === "COMPLETED") return false;
               return true;

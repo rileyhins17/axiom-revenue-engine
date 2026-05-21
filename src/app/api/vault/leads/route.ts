@@ -13,7 +13,14 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const search = url.searchParams.get("search")?.trim();
   const limitParam = url.searchParams.get("limit");
-  const limit = limitParam ? Math.min(Math.max(1, Number(limitParam)), 5000) : null;
+  // Hard cap response size so the Worker does not OOM on 2k+ row payloads.
+  // VaultDataTable now paginates client-side, so 1000 covers the visible page
+  // (max 100/page * a buffer) without dumping the entire 8k+ lead table.
+  const DEFAULT_LIMIT = 1000;
+  const MAX_LIMIT = 5000;
+  const limit = limitParam
+    ? Math.min(Math.max(1, Number(limitParam) || DEFAULT_LIMIT), MAX_LIMIT)
+    : DEFAULT_LIMIT;
 
   const db = getDatabase();
 
@@ -35,8 +42,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ leads: result.results ?? [] });
   }
 
-  const query = limit
-    ? `SELECT id, businessName, niche, city, category, address, phone, email,
+  const query = `SELECT id, businessName, niche, city, category, address, phone, email,
               socialLink, websiteUrl, websiteDomain, rating, reviewCount, websiteStatus,
               contactName, tacticalNote, outreachStatus, outreachChannel,
               firstContactedAt, lastContactedAt, nextFollowUpDue, outreachNotes,
@@ -44,15 +50,7 @@ export async function GET(request: Request) {
        FROM "Lead"
        WHERE COALESCE(isArchived, 0) = 0
        ORDER BY createdAt DESC
-       LIMIT ${limit}`
-    : `SELECT id, businessName, niche, city, category, address, phone, email,
-              socialLink, websiteUrl, websiteDomain, rating, reviewCount, websiteStatus,
-              contactName, tacticalNote, outreachStatus, outreachChannel,
-              firstContactedAt, lastContactedAt, nextFollowUpDue, outreachNotes,
-              createdAt
-       FROM "Lead"
-       WHERE COALESCE(isArchived, 0) = 0
-       ORDER BY createdAt DESC`;
+       LIMIT ${limit}`;
 
   const result = await db.prepare(query).all<Record<string, unknown>>();
   return NextResponse.json({ leads: result.results ?? [] });

@@ -341,7 +341,8 @@ export default async function AutomationPage() {
 
   const followUpsPaused = Boolean(overview.settings?.followUpsPaused);
   const scheduledSends = classifiedSequences
-    .filter((s) => (s.bucket === "sending" || s.bucket === "waiting") && s.when && s.when.getTime() >= Date.now())
+    // Show due-or-future sends; past-due steps fire on next cron tick and operators want to see them.
+    .filter((s) => (s.bucket === "sending" || s.bucket === "waiting") && s.when)
     // Hide follow-up steps from "Next 5" while the kill switch is on —
     // their nextSendAt is meaningless because canMailboxSend will block.
     .filter((s) => !(followUpsPaused && ((s as { nextStep?: { stepNumber?: number } }).nextStep?.stepNumber ?? 1) > 1))
