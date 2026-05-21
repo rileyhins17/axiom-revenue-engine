@@ -249,7 +249,7 @@ function getObservationFromAssessment(lead: LeadRecord, assessment: WebsiteAsses
     };
   }
 
-  if (assessment.speedRisk >= 4) {
+  if (assessment.speedRisk >= 7) {
     return {
       observedIssue: "The site feels slower than it needs to on first load.",
       observationHint: [

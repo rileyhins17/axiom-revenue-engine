@@ -125,12 +125,16 @@ export const AUTOMATION_SETTINGS_DEFAULTS = {
   replySyncStaleMinutes: 15,
 } satisfies Omit<OutreachAutomationSettingRecord, "id" | "createdAt" | "updatedAt">;
 
-/** Government / school / chain / franchise patterns we never email. */
+/** Government / school / chain / franchise / regulator patterns we never email. */
 const HARD_DISQUALIFIER_PATTERNS = [
   /\b(government|gov\.|municipal(ity)?|city of|county of|state of|provincial)\b/i,
   /\b(university of|college of|public school|school district|district school board|board of education)\b/i,
   /\b(walmart|costco|home depot|lowe'?s|mcdonald'?s|starbucks|target|kroger)\b/i,
   /\b(franchise corporate|hq|head office)\b/i,
+  // Regulators / agencies / non-customer entities - never an outreach target.
+  /\b(authority|commission|regulator|ministry|department of|office of|bureau|registrar)\b/i,
+  /\b(chamber of commerce|association|federation|institute|foundation|nonprofit|non-profit|ngo|charity)\b/i,
+  /\b(safety authority|electrical safety|licensing board|tssa|wsib|cra|irs|fda|epa|osha)\b/i,
 ];
 
 /** Free-mail providers used by businesses are usually owner-personal
@@ -144,6 +148,32 @@ const BLOCKED_EMAIL_DOMAINS = new Set([
   ".mil",
   ".k12.us",
 ]);
+
+/** Domain substrings signalling gov/regulator/agency. Match if email domain CONTAINS the token. */
+const BLOCKED_EMAIL_DOMAIN_FRAGMENTS = [
+  "electricalsafety.on.ca",
+  "safety.on.ca",
+  "safety.bc.ca",
+  "safety.ab.ca",
+  "authority.on.ca",
+  "authority.bc.ca",
+  "ministry.on.ca",
+  "ontario.ca",
+  "alberta.ca",
+  "gov.on.ca",
+  "gov.bc.ca",
+  "gov.ab.ca",
+  "gov.qc.ca",
+  "gov.sk.ca",
+  "gov.mb.ca",
+  "gov.ns.ca",
+  "gov.nb.ca",
+  "gov.pe.ca",
+  "gov.nl.ca",
+  "tssa.org",
+  "wsib.ca",
+  "cra-arc.gc.ca",
+];
 
 export function isHardDisqualified(lead: {
   businessName?: string | null;
@@ -162,6 +192,12 @@ export function isHardDisqualified(lead: {
   if (email) {
     for (const suffix of BLOCKED_EMAIL_DOMAINS) {
       if (email.endsWith(suffix)) {
+        return { disqualified: true, reason: "blocked_email_domain" };
+      }
+    }
+    const emailDomain = email.split("@")[1] || "";
+    for (const fragment of BLOCKED_EMAIL_DOMAIN_FRAGMENTS) {
+      if (emailDomain.includes(fragment)) {
         return { disqualified: true, reason: "blocked_email_domain" };
       }
     }
