@@ -1957,12 +1957,18 @@ export async function getAutomationReadyLeadSnapshot(prisma: PrismaLike = getPri
   const suppressedDomains = new Set(
     suppressions.map((suppression) => normalizeDomain(suppression.domain)).filter(Boolean),
   );
+  // Only uncontacted leads can become first-touch sequences;
+  // selectAutomationReadyLeads filters out contacted ones anyway, so loading
+  // them here (with their large enrichment/JSON columns) is pure memory waste
+  // that contributed to the scheduler's 128 MB OOM. Filter + bound the scan.
   const leads = (await prisma.lead.findMany({
     where: {
       enrichedAt: { not: null },
       isArchived: false,
+      firstContactedAt: null,
     },
     orderBy: { enrichedAt: "desc" },
+    take: 1000,
   })) as LeadRecord[];
 
   return selectAutomationReadyLeads({
@@ -4518,7 +4524,7 @@ async function claimDueSteps(prisma: PrismaLike, runId: string, batchSize: numbe
 
   const now = new Date();
   const settings = await getSettings(prisma);
-  const dueStepScanLimit = Math.max(batchSize * 50, 500);
+  const dueStepScanLimit = Math.max(batchSize * 4, 200);
   const [initialDueSteps, followUpDueSteps] = await Promise.all([
     prisma.outreachSequenceStep.findMany({
       where: {
