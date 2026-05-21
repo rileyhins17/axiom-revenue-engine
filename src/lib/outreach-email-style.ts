@@ -305,9 +305,9 @@ function getObservationFromPainSignals(lead: LeadRecord, painSignals: PainSignal
       return {
         observedIssue: "The contact path may be creating more friction than it should.",
         observationHint: [
-          "Getting a quote or reaching out takes more clicks than it probably needs to.",
-          "The path to contact feels a step or two longer than it needs to be.",
-          "Reaching out looks like it takes more effort than most visitors will bother with.",
+          "Most {niche} businesses lose quote requests at the contact step rather than at the homepage.",
+          "In {niche}, the most common silent leak is the contact path needing fewer fields and clearer phone placement.",
+          "Across {niche} businesses, the inquiry-to-reply gap is usually wider than owners realize.",
         ][s % 3],
         consequenceHint: [
           "Even one extra step at that point makes people bounce.",
@@ -322,9 +322,9 @@ function getObservationFromPainSignals(lead: LeadRecord, painSignals: PainSignal
       return {
         observedIssue: "Trust signals feel buried or not surfaced clearly enough.",
         observationHint: [
-          "The site feels like it could bring trust signals forward much earlier.",
-          "The reviews and work history don't come through clearly enough from the homepage.",
-          "Someone landing cold wouldn't get a strong sense of how established the business is.",
+          "In {niche}, getting reviews and project work above the fold matters more than copy does.",
+          "For {niche} businesses, the homepage carries most of the trust weight and is the most common thing under-leveraged.",
+          "Established {niche} businesses often look newer online than they actually are.",
         ][s % 3],
         consequenceHint: [
           "That can slow down new visitors who are trying to decide quickly.",
@@ -337,7 +337,7 @@ function getObservationFromPainSignals(lead: LeadRecord, painSignals: PainSignal
       };
     case "SPEED":
       return {
-        observedIssue: "The site may feel slower than it should.",
+        observedIssue: "Speed on mobile is the quietest dropoff cause for {niche} sites.",
         observationHint: [
           "The site feels like it may be carrying some speed friction.",
           "Mobile load times are the most common silent killer for {niche} sites.",
