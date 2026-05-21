@@ -7,6 +7,7 @@ import openNextWorkerModule, {
 import { runAutomationScheduler } from "./src/lib/outreach-automation";
 import { runCloudScrapeWorker } from "./src/lib/cloud-scrape-worker";
 import { runAutonomousIntake } from "./src/lib/autonomous-intake";
+import { runAutoPipeline } from "./src/lib/auto-pipeline";
 import { maybeRunDailyDigest } from "./src/lib/daily-digest";
 import { setCloudflareBindings } from "./src/lib/cloudflare";
 import { clearServerEnvCache } from "./src/lib/env";
@@ -55,6 +56,10 @@ export default {
         const deadline = Date.now() + CRON_WALL_CLOCK_BUDGET_MS;
         const tasks = [
           { fn: runAutomationScheduler, timeout: timeouts.scheduler, label: "scheduler", minReserveMs: SCHEDULER_MIN_RESERVE_MS },
+          // Auto-pipeline (enrich + qualify + queue) runs as a standalone task so
+          // a hung scheduler send-phase never starves new first-touch supply.
+          // 120s budget mirrors SCHEDULER_PIPELINE_TIMEOUT_MS used previously.
+          { fn: () => runAutoPipeline("system"), timeout: 120_000, label: "pipeline" },
           { fn: runAutonomousIntake, timeout: timeouts.intake, label: "intake" },
           { fn: runCloudScrapeWorker, timeout: timeouts.scrape, label: "scrape" },
           { fn: maybeRunDailyDigest, timeout: timeouts.digest, label: "digest" },
