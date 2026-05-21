@@ -303,7 +303,7 @@ function AddressChip({
 
 function EmailBody({ email }: { email: EmailDetail }) {
   if (email.bodyHtml && email.bodyHtml.trim().length > 0) {
-    const srcDoc = `<base target="_blank"><style>html,body{background:transparent;}body{font:14.5px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#e4e4e7;padding:32px 40px;margin:0;}a{color:#6ee7b7;text-decoration:underline;text-decoration-color:rgba(110,231,183,0.4);text-underline-offset:2px;}a:hover{text-decoration-color:rgba(110,231,183,0.85);}p{margin:0 0 14px;}p:last-child{margin-bottom:0;}img{max-width:100%;height:auto;border-radius:6px;}blockquote{border-left:2px solid rgba(110,231,183,0.35);margin:0 0 14px;padding:2px 0 2px 14px;color:#a1a1aa;}</style>${email.bodyHtml}`;
+    const srcDoc = `<base target="_blank"><style>html,body{background:transparent;}body{font:14.5px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#e4e4e7;padding:40px 56px;margin:0;}a{color:#6ee7b7;text-decoration:underline;text-decoration-color:rgba(110,231,183,0.4);text-underline-offset:2px;}a:hover{text-decoration-color:rgba(110,231,183,0.85);}p{margin:0 0 14px;}p:last-child{margin-bottom:0;}img{max-width:100%;height:auto;border-radius:6px;}blockquote{border-left:2px solid rgba(110,231,183,0.35);margin:0 0 14px;padding:2px 0 2px 14px;color:#a1a1aa;}</style>${email.bodyHtml}`;
     return (
       <iframe
         title={email.subject}
@@ -315,7 +315,7 @@ function EmailBody({ email }: { email: EmailDetail }) {
     );
   }
   return (
-    <pre className="px-10 py-8 text-[14.5px] leading-[1.65] text-zinc-200 whitespace-pre-wrap font-sans">
+    <pre className="px-14 py-10 text-[14.5px] leading-[1.65] text-zinc-200 whitespace-pre-wrap font-sans">
       {email.bodyPlain || "(empty)"}
     </pre>
   );
