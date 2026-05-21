@@ -1,4 +1,4 @@
-export const AXIOM_OUTREACH_MIN_SCORE = 35;
+export const AXIOM_OUTREACH_MIN_SCORE = 29;
 
 export type EmailQualificationInput = {
   email: string | null | undefined;
