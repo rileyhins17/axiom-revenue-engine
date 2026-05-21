@@ -363,8 +363,33 @@ export async function recycleStaleScrapeJobs(staleBefore: Date): Promise<number>
   return Number(result.meta?.changes ?? 0);
 }
 
+/**
+ * Fail scrape jobs that have been pending too long (e.g. blocked indefinitely
+ * by Cloudflare Browser Rendering 429 rate limits). Without this, a single
+ * stuck pending job at concurrency limit 1 prevents autonomous intake from
+ * dispatching any new scrape job at all, wedging the whole supply pipeline.
+ */
+export async function failStuckPendingScrapeJobs(olderThan: Date): Promise<number> {
+  const now = new Date();
+  const result = await runStatement(
+    `UPDATE "ScrapeJob"
+     SET "status" = 'failed',
+         "finishedAt" = ?,
+         "errorMessage" = COALESCE("errorMessage", 'auto-failed: pending too long (likely Browser Rendering rate-limited)'),
+         "updatedAt" = ?
+     WHERE "status" = 'pending'
+       AND "finishedAt" IS NULL
+       AND datetime("createdAt") < datetime(?)`,
+    [now, now, olderThan],
+  );
+  return Number(result.meta?.changes ?? 0);
+}
+
 export async function claimNextScrapeJob(input: ClaimScrapeJobInput): Promise<ScrapeJobRecord | null> {
   await recycleStaleScrapeJobs(input.staleBefore);
+  // 30-minute grace; anything still pending after that is wedged and should
+  // fail so autonomous intake can dispatch a fresh job on the next cron tick.
+  await failStuckPendingScrapeJobs(new Date(Date.now() - 30 * 60 * 1000));
 
   const activeCount = await countActiveScrapeJobs();
   if (activeCount >= input.maxActiveJobs) {

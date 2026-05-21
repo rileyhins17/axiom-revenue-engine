@@ -6,7 +6,7 @@ import {
 } from "@/lib/automation-policy";
 import { getServerEnv } from "@/lib/env";
 import { getAutomationSettings } from "@/lib/outreach-automation";
-import { createScrapeJob } from "@/lib/scrape-jobs";
+import { createScrapeJob, failStuckPendingScrapeJobs } from "@/lib/scrape-jobs";
 import {
   markScrapeTargetDispatched,
   pickNextScrapeTarget,
@@ -85,6 +85,10 @@ export async function runAutonomousIntake(): Promise<IntakeResult> {
     return { dispatched: false, reason: "intake_paused_by_operator" };
   }
 
+  // Auto-fail any pending scrape job older than 30 min so a wedged job
+  // (typically Cloudflare Browser Rendering 429) cannot indefinitely block
+  // new dispatches at concurrency=1.
+  await failStuckPendingScrapeJobs(new Date(Date.now() - 30 * 60 * 1000)).catch(() => 0);
   const activeJobs = await countActiveOrPendingScrapeJobs();
   if (activeJobs > 0) {
     return { dispatched: false, reason: "scrape job already active" };
