@@ -526,23 +526,23 @@ function buildPlanBasedInitialEmail(
   } else if (plan.strategy === "observation_based") {
     if (nicheCity && domain) {
       openingLine = [
-        `I was looking at ${nicheCity} and clicked through ${domain}.`,
-        `Came across ${domain} while browsing ${nicheCity} options.`,
-        `Had a quick look at ${domain} while going through ${nicheCity} listings.`,
-        `Found ${domain} while searching ${nicheCity} and spent a minute on it.`,
-        `Your site came up while I was looking at ${nicheCity} options.`,
-        `Landed on ${domain} from a ${nicheCity} search.`,
-        `Was comparing a few ${nicheCity} sites and ended up on ${domain}.`,
-        `Clicked into ${domain} after searching ${nicheCity}.`,
+        `I work with ${nicheCity} and ${lead.businessName} came up while I was scanning the area.`,
+        `Came across ${lead.businessName} while looking through ${nicheCity}.`,
+        `Saw ${lead.businessName} in some ${nicheCity} listings and wanted to reach out.`,
+        `Was scanning ${nicheCity} businesses and ${lead.businessName} stood out.`,
+        `Noticed ${lead.businessName} while researching ${nicheCity} operators.`,
+        `${lead.businessName} popped up in some ${nicheCity} results.`,
+        `Was going through ${nicheCity} businesses and your name came up.`,
+        `Spotted ${lead.businessName} on the ${nicheCity} list.`,
       ][openerSeed % 8];
     } else if (domain) {
       openingLine = [
-        `I was looking through ${domain} and noticed one thing.`,
-        `Spent a minute on ${domain} today.`,
-        `Had a quick look at ${domain} earlier.`,
-        `Pulled up ${domain} on my phone and noticed something.`,
-        `Took a look at ${domain} and one thing stood out.`,
-        `Browsed ${domain} for a minute and had a thought.`,
+        `${lead.businessName} caught my eye while I was scanning ${niche || "the category"} in the area.`,
+        `Wanted to reach out about ${lead.businessName} directly.`,
+        `Noticed ${lead.businessName} while researching ${niche || "operators"} nearby.`,
+        `Saw ${lead.businessName} on a list of ${niche || "businesses"} worth looking at.`,
+        `${lead.businessName} came up while I was going through the area.`,
+        `Came across ${lead.businessName} and wanted to share a quick thought.`,
       ][openerSeed % 6];
     } else {
       openingLine = [
@@ -554,13 +554,13 @@ function buildPlanBasedInitialEmail(
   } else {
     if (domain && nicheCity) {
       openingLine = [
-        `I came across ${domain} while looking at ${nicheCity}.`,
-        `Ran into ${domain} while browsing ${nicheCity} options.`,
-        `Spent a minute on ${domain} while looking at ${nicheCity} listings.`,
-        `Found ${domain} in some ${nicheCity} results and took a look.`,
-        `Your site popped up while I was browsing ${nicheCity}.`,
-        `Was looking through ${nicheCity} options and landed on ${domain}.`,
-        `Checked out ${domain} after seeing it in ${nicheCity} results.`,
+        `I came across ${lead.businessName} while looking at ${nicheCity}.`,
+        `Ran into ${lead.businessName} while researching ${nicheCity} operators.`,
+        `Saw ${lead.businessName} on a ${nicheCity} list and wanted to reach out.`,
+        `Found ${lead.businessName} in some ${nicheCity} results.`,
+        `Your business came up while I was scanning ${nicheCity}.`,
+        `Was researching ${nicheCity} and ${lead.businessName} stood out.`,
+        `Came across ${lead.businessName} on the ${nicheCity} side.`,
       ][openerSeed % 7];
     } else if (domain) {
       openingLine = [
