@@ -647,8 +647,22 @@ export function validateColdEmailDraft(draft: ColdEmailDraft, lead: LeadRecord, 
   }
 
   const bannedHits = BANNED_EMAIL_PHRASES.filter((phrase) => combinedLower.includes(phrase));
-  if (bannedHits.length > 0) {
-    errors.push(`Banned phrases detected: ${bannedHits.join(", ")}.`);
+  // Niche-infix fabrication: "while looking at a few <niche> sites tonight" etc.
+  const fabricationRegex = [
+    /while looking at (a |a few )?\S+ sites/i,
+    /clicked through \S+\.[a-z]{2,}/i,
+    /your (page|hero|nav|navigation|fold|homepage|landing page|service page|contact form|contact path)/i,
+    /buried (far|pretty far) (down|below)/i,
+    /poking around \S+/i,
+  ];
+  const regexHits: string[] = [];
+  for (const re of fabricationRegex) {
+    if (re.test(combined)) {
+      regexHits.push(re.source);
+    }
+  }
+  if (bannedHits.length > 0 || regexHits.length > 0) {
+    errors.push(`Banned phrases detected: ${[...bannedHits, ...regexHits].join(", ")}.`);
   }
 
   if (/[—–]/.test(combined)) {

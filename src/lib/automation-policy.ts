@@ -135,6 +135,7 @@ const HARD_DISQUALIFIER_PATTERNS = [
   /\b(authority|commission|regulator|ministry|department of|office of|bureau|registrar)\b/i,
   /\b(chamber of commerce|association|federation|institute|foundation|nonprofit|non-profit|ngo|charity)\b/i,
   /\b(safety authority|electrical safety|licensing board|tssa|wsib|cra|irs|fda|epa|osha)\b/i,
+  /\b(museum|education centre|education center|educational|library|church|temple|mosque|synagogue|union|labour council|labor council)\b/i,
 ];
 
 /** Free-mail providers used by businesses are usually owner-personal
