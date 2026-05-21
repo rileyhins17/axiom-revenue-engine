@@ -3576,6 +3576,21 @@ async function sendScheduledStep(
     allowedSentStepIds,
   );
   if (conflictingRecipientSend) {
+    // Mark the LEAD as outreached too — otherwise auto-queue keeps re-creating
+    // sequences for the same lead based on a sibling-lead send.
+    try {
+      const sentAt = conflictingRecipientSend.sentAt ? new Date(conflictingRecipientSend.sentAt) : new Date();
+      await prisma.lead.update({
+        where: { id: claim.sequence.leadId },
+        data: {
+          firstContactedAt: sentAt,
+          lastContactedAt: sentAt,
+          outreachStatus: "OUTREACHED",
+        },
+      }).catch(() => null);
+    } catch {
+      /* non-fatal */
+    }
     await stopSequenceInternal(prisma, claim.sequence, "already_contacted");
     throw new AutomationStoppedError("already_contacted");
   }
