@@ -47,6 +47,25 @@ export const BANNED_EMAIL_PHRASES = [
   "last note",
   "final chance",
   "limited time",
+  // Site-inspection fabrication phrases (added 2026-05-21).
+  "your contact path",
+  "your contact form",
+  "your hero",
+  "your nav",
+  "your homepage",
+  "your landing page",
+  "your fold",
+  "your above the fold",
+  "buried far down",
+  "buried pretty far down",
+  "buried on the page",
+  "while looking at a few sites tonight",
+  "while looking at a few sites",
+  "looking at a few sites tonight",
+  "had a quick look at",
+  "spent a minute on",
+  "poking around",
+  "i was poking around",
 ];
 
 const GENERIC_FALLBACK_PATTERNS = [
