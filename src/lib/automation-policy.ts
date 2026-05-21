@@ -58,9 +58,11 @@ export function isAdequateAutonomousLead(lead: {
     return false;
   }
 
-  if (lead.axiomTier === "D") {
-    return false;
-  }
+  // Tier D rejection lifted intentionally: axiomScore is already the
+  // adequacy floor (>= AUTONOMOUS_INTAKE_MIN_SCORE). Tier is derived from
+  // score, so rejecting D AND requiring score>=30 starved supply (every D
+  // lead is already low-score; the score gate handles it).
+
 
   if (!String(lead.email || "").trim()) {
     return false;
