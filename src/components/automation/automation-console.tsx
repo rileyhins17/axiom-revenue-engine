@@ -92,7 +92,7 @@ export function AutomationConsole({ data }: Props) {
           </div>
         </div>
 
-        <div className="grid gap-px bg-white/[0.06] sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-px bg-white/[0.06] xl:grid-cols-4">
           <MetricTile label="Sent today" value={String(data.metrics.sentToday)} detail="Across active inboxes" />
           <MetricTile label="Left today" value={String(data.metrics.leftToday)} detail="Before daily caps" />
           <MetricTile label="Next send" value={formatDue(data.metrics.nextSendAt, generatedAt)} detail={formatDateTime(data.metrics.nextSendAt)} />
@@ -508,10 +508,10 @@ function Panel({
 
 function MetricTile({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="min-h-[104px] bg-[#0a111c]/72 p-4 sm:p-5">
+    <div className="min-h-[92px] bg-[#0a111c]/72 p-3 sm:min-h-[104px] sm:p-5">
       <div className="text-xs font-medium uppercase tracking-normal text-zinc-500">{label}</div>
-      <div className="mt-3 truncate text-[28px] font-semibold leading-none tracking-normal text-white">{value}</div>
-      <div className="mt-2 min-h-5 truncate text-sm text-zinc-400">{detail}</div>
+      <div className="mt-2 truncate text-[24px] font-semibold leading-none tracking-normal text-white sm:mt-3 sm:text-[28px]">{value}</div>
+      <div className="mt-2 min-h-5 truncate text-xs text-zinc-400 sm:text-sm">{detail}</div>
     </div>
   );
 }
