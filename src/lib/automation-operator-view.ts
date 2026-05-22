@@ -248,9 +248,9 @@ export function humanizeOperatorBlocker(reason: string | null | undefined): Oper
     case "generation_failed_retryable":
     case "send_failed_retryable":
       return {
-        label: "Retry needed",
-        detail: "Run maintenance if this stays stuck.",
-        actionNeeded: true,
+        label: "Retry queued",
+        detail: "No action needed yet. Diagnostics will flag it if it stays stuck.",
+        actionNeeded: false,
       };
     default:
       return {

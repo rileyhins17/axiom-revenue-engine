@@ -61,4 +61,9 @@ test("operator blocker copy hides raw scheduler codes unless action is needed", 
     detail: "Reconnect Gmail before this sequence can send.",
     actionNeeded: true,
   });
+  assert.deepEqual(humanizeOperatorBlocker("generation_failed_retryable"), {
+    label: "Retry queued",
+    detail: "No action needed yet. Diagnostics will flag it if it stays stuck.",
+    actionNeeded: false,
+  });
 });
