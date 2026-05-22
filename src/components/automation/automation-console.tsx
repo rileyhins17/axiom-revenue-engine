@@ -70,7 +70,7 @@ export function AutomationConsole({ data }: Props) {
               </p>
             </div>
 
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row xl:justify-end">
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-row xl:justify-end">
               <button
                 type="button"
                 onClick={refresh}
