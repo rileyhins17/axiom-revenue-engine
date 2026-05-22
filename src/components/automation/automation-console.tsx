@@ -95,7 +95,7 @@ export function AutomationConsole({ data }: Props) {
         <div className="grid gap-px bg-white/[0.06] sm:grid-cols-2 xl:grid-cols-4">
           <MetricTile label="Sent today" value={String(data.metrics.sentToday)} detail="Across active inboxes" />
           <MetricTile label="Left today" value={String(data.metrics.leftToday)} detail="Before daily caps" />
-          <MetricTile label="Next send" value={formatShortRelative(data.metrics.nextSendAt, generatedAt)} detail={formatDateTime(data.metrics.nextSendAt)} />
+          <MetricTile label="Next send" value={formatDue(data.metrics.nextSendAt, generatedAt)} detail={formatDateTime(data.metrics.nextSendAt)} />
           <MetricTile label="Inboxes ready" value={`${data.metrics.inboxesReady}/${data.metrics.inboxesTotal}`} detail={readyDetail(data.mailboxes)} />
         </div>
       </section>
@@ -247,7 +247,7 @@ function SentPanel({ emails, now }: { emails: OperatorRecentEmail[]; now: Date }
                 </div>
               </div>
               <div className="text-left text-xs text-zinc-500 md:text-right">
-                <div>{formatShortRelative(email.sentAt, now)}</div>
+                <div>{formatAgo(email.sentAt, now)}</div>
                 <div className="mt-1 truncate font-mono">{email.senderEmail}</div>
               </div>
             </div>
@@ -318,7 +318,7 @@ function NextEmailList({ emails, now }: { emails: OperatorNextEmail[]; now: Date
             </div>
           </div>
           <div className="text-left md:text-right">
-            <div className="text-sm font-semibold text-zinc-100">{formatShortRelative(email.scheduledFor, now)}</div>
+            <div className="text-sm font-semibold text-zinc-100">{formatDue(email.scheduledFor, now)}</div>
             <div className="mt-1 truncate font-mono text-xs text-zinc-500">{email.senderEmail || "Inbox assigned at send"}</div>
           </div>
         </div>
@@ -345,8 +345,8 @@ function MailboxRow({ mailbox, now }: { mailbox: OperatorMailbox; now: Date }) {
       </div>
 
       <div className="text-sm text-zinc-400">
-        <div>Next available: <span className="text-zinc-200">{formatShortRelative(mailbox.nextAvailableAt, now)}</span></div>
-        <div className="mt-1">Last sent: <span className="text-zinc-300">{formatShortRelativePast(mailbox.lastSentAt, now)}</span></div>
+        <div>Next available: <span className="text-zinc-200">{formatAvailable(mailbox.nextAvailableAt, now)}</span></div>
+        <div className="mt-1">Last sent: <span className="text-zinc-300">{formatAgo(mailbox.lastSentAt, now)}</span></div>
       </div>
 
       <div className="flex justify-start md:justify-end">
@@ -576,6 +576,7 @@ function formatTime(date: Date) {
   return new Intl.DateTimeFormat("en-CA", {
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "America/Toronto",
   }).format(date);
 }
 
@@ -587,30 +588,44 @@ function formatDateTime(value: string | null) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "America/Toronto",
   }).format(date);
 }
 
-function formatShortRelative(value: string | null, now: Date) {
+function formatDue(value: string | null, now: Date) {
   const date = parseDate(value);
   if (!date) return "None";
 
   const diffMs = date.getTime() - now.getTime();
-  if (Math.abs(diffMs) < 45_000) return "Now";
-  const absMinutes = Math.max(1, Math.round(Math.abs(diffMs) / 60_000));
-  const suffix = diffMs > 0 ? "" : " ago";
+  if (diffMs <= 45_000) return "Now";
+  const absMinutes = Math.max(1, Math.round(diffMs / 60_000));
 
-  if (absMinutes < 60) return diffMs > 0 ? `${absMinutes} min` : `${absMinutes} min${suffix}`;
+  if (absMinutes < 60) return `${absMinutes} min`;
   const hours = Math.round(absMinutes / 60);
-  if (hours < 24) return diffMs > 0 ? `${hours} hr` : `${hours} hr${suffix}`;
+  if (hours < 24) return `${hours} hr`;
   const days = Math.round(hours / 24);
-  return diffMs > 0 ? `${days} day` : `${days} day${suffix}`;
+  return `${days} day`;
 }
 
-function formatShortRelativePast(value: string | null, now: Date) {
+function formatAvailable(value: string | null, now: Date) {
+  const date = parseDate(value);
+  if (!date) return "Ready";
+  if (date.getTime() <= now.getTime()) return "Ready";
+  return formatDue(value, now);
+}
+
+function formatAgo(value: string | null, now: Date) {
   const date = parseDate(value);
   if (!date) return "Never";
-  if (date.getTime() > now.getTime()) return formatShortRelative(value, now);
-  return formatShortRelative(value, now);
+
+  const diffMs = now.getTime() - date.getTime();
+  if (diffMs <= 45_000) return "just now";
+  const minutes = Math.max(1, Math.round(diffMs / 60_000));
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
 function parseDate(value: string | null) {
