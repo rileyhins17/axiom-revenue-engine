@@ -184,19 +184,31 @@ async function autoEnrich(
 /**
  * Auto-qualify enriched leads (mark them READY_FOR_FIRST_TOUCH).
  */
+// Cap per-tick qualification work. Workers cron has a 1000 subrequest budget
+// per invocation; qualifying 178 leads in a tight loop burned ~180 subrequests
+// in this single step and starved every downstream maintenance call. 30 keeps
+// the qualified->queued throughput well above the 100/day target while leaving
+// budget for the rest of the cron tasks.
+const AUTONOMOUS_QUALIFY_PER_TICK_LIMIT = 30;
+
 async function autoQualify(prisma: ReturnType<typeof getPrisma>): Promise<number> {
   const leads = await findLeadsNeedingQualification(prisma);
-  let qualified = 0;
+  if (leads.length === 0) return 0;
 
-  for (const lead of leads) {
-    await prisma.lead.update({
-      where: { id: lead.id },
-      data: { outreachStatus: READY_FOR_FIRST_TOUCH_STATUS },
-    });
-    qualified++;
-  }
+  // Batch the status update into a single D1 prepared statement (one subrequest)
+  // instead of one update-per-lead. Workers cron has a 1000 subrequest budget;
+  // qualifying 178 leads sequentially burned ~180 subrequests in this step alone.
+  const ids = leads.slice(0, AUTONOMOUS_QUALIFY_PER_TICK_LIMIT).map((lead) => lead.id);
+  if (ids.length === 0) return 0;
 
-  return qualified;
+  const { getDatabase } = await import("@/lib/cloudflare");
+  const placeholders = ids.map(() => "?").join(",");
+  const result = await getDatabase()
+    .prepare(`UPDATE "Lead" SET "outreachStatus" = ? WHERE "id" IN (${placeholders})`)
+    .bind(READY_FOR_FIRST_TOUCH_STATUS, ...ids)
+    .run();
+
+  return Number(result.meta?.changes ?? ids.length);
 }
 
 /**

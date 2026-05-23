@@ -5436,73 +5436,71 @@ async function runAutomationSchedulerUnlocked(options: { immediate?: boolean; on
       let postReplySync = { checked: 0, stopped: 0 };
       let postBounceSync = { scanned: 0, suppressed: 0 };
       let repairedThirdFollowUps = 0;
-      if (env.AUTONOMOUS_QUEUE_ENABLED) {
+
+      // Auto-pipeline (enrich + qualify + queue) now runs as a separate cron
+      // task in worker.mjs to get its own 1000-subrequest budget. Removed
+      // from scheduler to stop double-execution and subrequest exhaustion.
+
+      // Heavy maintenance (third-follow-up repair, reply sync, bounce sync,
+      // orphan cleanup, task queue purge) only runs once per hour at minute=0.
+      // Each scheduler tick has a hard 1000-subrequest budget; running these
+      // every 5 minutes consumed the budget before post-send writes could
+      // complete, killing the lease release and maintenance metadata update.
+      const maintenanceMinute = new Date().getUTCMinutes();
+      const shouldRunHeavyMaintenance = maintenanceMinute < 5;
+
+      if (shouldRunHeavyMaintenance) {
         try {
-          pipeline = await withSchedulerTimeout(
-            runAutoPipeline("system"),
-            SCHEDULER_PIPELINE_TIMEOUT_MS,
-            "auto-pipeline",
+          repairedThirdFollowUps = await withSchedulerTimeout(
+            ensureThirdFollowUpSteps(prisma, new Date()),
+            20_000,
+            "third follow-up repair",
           );
-        } catch (pipelineError) {
-          console.error("[scheduler] Auto-pipeline error (non-fatal):", pipelineError);
+          if (repairedThirdFollowUps > 0) {
+            console.log(`[scheduler] Ensured third follow-up step for ${repairedThirdFollowUps} sequence(s)`);
+          }
+        } catch (thirdFollowUpError) {
+          console.error("[scheduler] Third follow-up repair error (non-fatal):", thirdFollowUpError);
         }
-      } else {
-        console.log("[scheduler] AUTONOMOUS_QUEUE_ENABLED=false - skipping enrich/qualify/queue");
-      }
 
-      try {
-        repairedThirdFollowUps = await withSchedulerTimeout(
-          ensureThirdFollowUpSteps(prisma, new Date()),
-          20_000,
-          "third follow-up repair",
-        );
-        if (repairedThirdFollowUps > 0) {
-          console.log(`[scheduler] Ensured third follow-up step for ${repairedThirdFollowUps} sequence(s)`);
+        try {
+          postReplySync = await withSchedulerTimeout(
+            syncAutomationReplies(),
+            SCHEDULER_REPLY_SYNC_TIMEOUT_MS,
+            "reply sync",
+          );
+        } catch (replySyncError) {
+          console.error("[scheduler] Reply sync error (non-fatal):", replySyncError);
         }
-      } catch (thirdFollowUpError) {
-        console.error("[scheduler] Third follow-up repair error (non-fatal):", thirdFollowUpError);
-      }
 
-      try {
-        postReplySync = await withSchedulerTimeout(
-          syncAutomationReplies(),
-          SCHEDULER_REPLY_SYNC_TIMEOUT_MS,
-          "reply sync",
-        );
-      } catch (replySyncError) {
-        console.error("[scheduler] Reply sync error (non-fatal):", replySyncError);
-      }
-
-      try {
-        postBounceSync = await withSchedulerTimeout(
-          syncBounceNotifications(),
-          SCHEDULER_BOUNCE_SYNC_TIMEOUT_MS,
-          "bounce sync",
-        );
-      } catch (bounceError) {
-        console.error("[scheduler] Bounce sync error (non-fatal):", bounceError);
-      }
-
-      // Periodic orphan cleanup — runs every scheduler tick but only touches
-      // records that are genuinely orphaned (no parent sequence/lead).
-      try {
-        await withSchedulerTimeout(
-          cleanupOrphanedRecords(prisma),
-          15_000,
-          "orphan cleanup",
-        );
-      } catch (orphanError) {
-        console.error("[scheduler] Orphan cleanup error (non-fatal):", orphanError);
-      }
-
-      // Purge completed/failed task queue entries older than 1 hour.
-      try {
-        const purged = await cleanupCompletedTasks(60);
-        if (purged > 0) {
-          console.log(`[scheduler] Purged ${purged} completed task queue entries`);
+        try {
+          postBounceSync = await withSchedulerTimeout(
+            syncBounceNotifications(),
+            SCHEDULER_BOUNCE_SYNC_TIMEOUT_MS,
+            "bounce sync",
+          );
+        } catch (bounceError) {
+          console.error("[scheduler] Bounce sync error (non-fatal):", bounceError);
         }
-      } catch (taskCleanupError) {
-        console.error("[scheduler] Task queue cleanup error (non-fatal):", taskCleanupError);
+
+        try {
+          await withSchedulerTimeout(
+            cleanupOrphanedRecords(prisma),
+            15_000,
+            "orphan cleanup",
+          );
+        } catch (orphanError) {
+          console.error("[scheduler] Orphan cleanup error (non-fatal):", orphanError);
+        }
+
+        try {
+          const purged = await cleanupCompletedTasks(60);
+          if (purged > 0) {
+            console.log(`[scheduler] Purged ${purged} completed task queue entries`);
+          }
+        } catch (taskCleanupError) {
+          console.error("[scheduler] Task queue cleanup error (non-fatal):", taskCleanupError);
+        }
       }
 
       await prisma.outreachRun.update({
