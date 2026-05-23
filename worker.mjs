@@ -37,11 +37,42 @@ function withTimeout(promise, ms, label) {
 // heavy task per tick, rotated by wall-clock minute. The scheduler (send loop)
 // runs every tick because it gates outbound throughput. Pipeline runs every
 // tick because it is light. Intake/scrape/digest are staggered.
+// Circuit-breaker check. If the last 3 OutreachRuns all FAILED, the worker is
+// in a CPU-exhaustion or subrequest-exhaustion loop. Fall back to minimal mode:
+// run scheduler only (no pipeline, no intake, no scrape) so at least the send
+// loop has a chance to drain. As soon as one tick succeeds, full mode resumes.
+async function shouldRunMinimalMode() {
+  try {
+    const { getDatabase } = await import("./src/lib/cloudflare");
+    const db = getDatabase();
+    const recent = await db
+      .prepare(
+        `SELECT "status" FROM "OutreachRun"
+         WHERE "startedAt" > datetime('now', '-30 minutes')
+         ORDER BY "startedAt" DESC
+         LIMIT 5`,
+      )
+      .all();
+    const rows = recent?.results || [];
+    if (rows.length < 3) return false;
+    const allFailed = rows.slice(0, 3).every((r) => r.status === "FAILED");
+    if (allFailed) {
+      console.warn("[cron] Circuit-breaker tripped — last 3 runs FAILED. Minimal mode.");
+    }
+    return allFailed;
+  } catch (error) {
+    console.warn("[cron] Circuit-breaker check failed (defaulting to full mode):", error);
+    return false;
+  }
+}
+
 async function runCronTasks(env, deadline) {
   const now = new Date();
   const minuteOfHour = now.getUTCMinutes();
   const minuteOfDay = now.getUTCHours() * 60 + minuteOfHour;
   const timeouts = getCronTimeoutBudgets(env);
+
+  const minimalMode = await shouldRunMinimalMode();
 
   const tasks = [];
 
@@ -51,35 +82,37 @@ async function runCronTasks(env, deadline) {
     label: "scheduler",
   });
 
-  tasks.push({
-    fn: () => runAutoPipeline("system"),
-    timeout: 60_000,
-    label: "pipeline",
-    requireRemainingMs: 60_000,
-  });
+  if (!minimalMode) {
+    tasks.push({
+      fn: () => runAutoPipeline("system"),
+      timeout: 60_000,
+      label: "pipeline",
+      requireRemainingMs: 60_000,
+    });
 
-  const slot = minuteOfHour % 15;
-  if (slot === 0) {
-    tasks.push({
-      fn: runAutonomousIntake,
-      timeout: Math.min(timeouts.intake, 90_000),
-      label: "intake",
-      requireRemainingMs: 90_000,
-    });
-  } else if (slot === 5) {
-    tasks.push({
-      fn: runCloudScrapeWorker,
-      timeout: Math.min(timeouts.scrape, 600_000),
-      label: "scrape",
-      requireRemainingMs: 120_000,
-    });
-  } else if (slot === 10 && minuteOfDay % 1440 < 60) {
-    tasks.push({
-      fn: maybeRunDailyDigest,
-      timeout: timeouts.digest,
-      label: "digest",
-      requireRemainingMs: 30_000,
-    });
+    const slot = minuteOfHour % 15;
+    if (slot === 0) {
+      tasks.push({
+        fn: runAutonomousIntake,
+        timeout: Math.min(timeouts.intake, 90_000),
+        label: "intake",
+        requireRemainingMs: 90_000,
+      });
+    } else if (slot === 5) {
+      tasks.push({
+        fn: runCloudScrapeWorker,
+        timeout: Math.min(timeouts.scrape, 600_000),
+        label: "scrape",
+        requireRemainingMs: 120_000,
+      });
+    } else if (slot === 10 && minuteOfDay % 1440 < 60) {
+      tasks.push({
+        fn: maybeRunDailyDigest,
+        timeout: timeouts.digest,
+        label: "digest",
+        requireRemainingMs: 30_000,
+      });
+    }
   }
 
   for (const task of tasks) {
