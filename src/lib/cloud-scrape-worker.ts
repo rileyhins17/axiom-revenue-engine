@@ -332,25 +332,39 @@ async function runClaimedJob(job: ScrapeJobRecord, existingDedupeKeys: string[])
       // don't enter outreach before a human reviews the scrape quality.
       if (qualityGateError) {
         const { getDatabase: _getDb } = await import("@/lib/cloudflare");
-        await _getDb()
-          .prepare(
-            `UPDATE "Lead"
-             SET "outreachStatus" = 'QUARANTINED',
-                 "disqualificationReason" = 'scrape_quality_gate_failed'
-             WHERE "scrapeJobId" = ?
-               AND "outreachStatus" NOT IN ('OUTREACHED', 'REPLIED', 'BOUNCED')`,
-          )
+        const leadEvents = await _getDb()
+          .prepare(`SELECT "payload" FROM "ScrapeJobEvent" WHERE "jobId" = ? AND "eventType" = 'result'`)
           .bind(job.id)
-          .run()
-          .then((r) => {
-            const count = r.meta?.changes ?? 0;
-            if (count > 0) {
-              console.log(`[cloud-scrape] Quarantined ${count} leads from failed QG job ${job.id}`);
-            }
-          })
-          .catch((qErr) => {
-            console.error(`[cloud-scrape] Failed to quarantine leads for ${job.id}:`, qErr);
-          });
+          .all<{ payload: string }>()
+          .catch(() => ({ results: [] as Array<{ payload: string }> }));
+        const leadIds = Array.from(new Set((leadEvents.results ?? []).flatMap((event) => {
+          try {
+            const parsed = JSON.parse(event.payload) as { leadId?: unknown };
+            const id = Number(parsed.leadId);
+            return Number.isInteger(id) && id > 0 ? [id] : [];
+          } catch {
+            return [];
+          }
+        })));
+
+        for (const leadId of leadIds) {
+          await _getDb()
+            .prepare(
+              `UPDATE "Lead"
+               SET "outreachStatus" = 'QUARANTINED',
+                   "disqualifyReason" = 'scrape_quality_gate_failed'
+               WHERE "id" = ?
+                 AND COALESCE("outreachStatus", '') NOT IN ('OUTREACHED', 'REPLIED', 'BOUNCED')`,
+            )
+            .bind(leadId)
+            .run()
+            .catch((qErr) => {
+              console.error(`[cloud-scrape] Failed to quarantine lead ${leadId} for ${job.id}:`, qErr);
+            });
+        }
+        if (leadIds.length > 0) {
+          console.log(`[cloud-scrape] Quarantined ${leadIds.length} leads from failed QG job ${job.id}`);
+        }
       }
 
       if (isTransientCloudBrowserError(message)) {

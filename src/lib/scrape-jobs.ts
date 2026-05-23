@@ -411,11 +411,16 @@ export async function claimNextScrapeJob(input: ClaimScrapeJobInput): Promise<Sc
          AND "finishedAt" IS NULL
        ORDER BY "createdAt" ASC
        LIMIT 1
-     )
-       AND "status" = 'pending'
-       AND "finishedAt" IS NULL
-     RETURNING *`,
-    [input.agentName, now, now, now],
+      )
+        AND "status" = 'pending'
+        AND "finishedAt" IS NULL
+        AND (
+          SELECT COUNT(*)
+          FROM "ScrapeJob"
+          WHERE "status" IN ('claimed', 'running')
+        ) < ?
+      RETURNING *`,
+    [input.agentName, now, now, now, input.maxActiveJobs],
   );
 
   if (!row) {

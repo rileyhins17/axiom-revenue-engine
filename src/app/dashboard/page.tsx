@@ -488,6 +488,7 @@ export default async function DashboardPage() {
   await requireSession();
 
   const prisma = getPrisma();
+  const renderNowMs = new Date().getTime();
   const emptyFollowUps = { overdue: [], dueToday: [], stale: [], risky: [], now: new Date().toISOString() };
 
   const [
@@ -777,6 +778,7 @@ export default async function DashboardPage() {
             .slice(0, 5)
         }
         followUpsPaused={Boolean(automation.settings?.followUpsPaused)}
+        nowMs={renderNowMs}
         recent={
           (automation.recentSent ?? []).slice(0, 10).map((e) => ({
             id: e.id,
@@ -1034,7 +1036,7 @@ type RecentSend = {
   businessName: string | null;
 };
 
-function SendsTimeline({ upcoming, recent, followUpsPaused }: { upcoming: UpcomingSend[]; recent: RecentSend[]; followUpsPaused?: boolean }) {
+function SendsTimeline({ upcoming, recent, followUpsPaused, nowMs }: { upcoming: UpcomingSend[]; recent: RecentSend[]; followUpsPaused?: boolean; nowMs: number }) {
   return (
     <section className="grid gap-4 xl:grid-cols-2">
       <div className="v2-card overflow-hidden">
@@ -1062,7 +1064,7 @@ function SendsTimeline({ upcoming, recent, followUpsPaused }: { upcoming: Upcomi
           ) : (
             upcoming.map((s, idx) => {
               const when = s.nextSendAt ? new Date(s.nextSendAt) : null;
-              const diffMs = when ? when.getTime() - Date.now() : 0;
+              const diffMs = when ? when.getTime() - nowMs : 0;
               const isImminent = diffMs > 0 && diffMs <= 15 * 60_000;
               return (
                 <div key={s.id} className="px-4 py-3">

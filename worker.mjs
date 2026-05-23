@@ -9,6 +9,7 @@ import { runCloudScrapeWorker } from "./src/lib/cloud-scrape-worker";
 import { runAutonomousIntake } from "./src/lib/autonomous-intake";
 import { runAutoPipeline } from "./src/lib/auto-pipeline";
 import { maybeRunDailyDigest } from "./src/lib/daily-digest";
+import { monitorPipelineHealthAndAlert } from "./src/lib/pipeline-alerts";
 import { setCloudflareBindings } from "./src/lib/cloudflare";
 import { clearServerEnvCache } from "./src/lib/env";
 import { getCronTimeoutBudgets } from "./src/lib/cron-timeouts";
@@ -17,11 +18,18 @@ const worker = openNextWorkerModule;
 
 export { BucketCachePurge, DOQueueHandler, DOShardedTagCache };
 
+class CronTaskTimeoutError extends Error {
+  constructor(label, ms) {
+    super(`${label} timed out after ${ms}ms`);
+    this.name = "CronTaskTimeoutError";
+  }
+}
+
 function withTimeout(promise, ms, label) {
   const startedAt = Date.now();
   let timeoutId;
   const timeout = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    timeoutId = setTimeout(() => reject(new CronTaskTimeoutError(label, ms)), ms);
   });
   return Promise.race([promise, timeout]).finally(() => {
     clearTimeout(timeoutId);
@@ -131,6 +139,10 @@ async function runCronTasks(env, deadline) {
       console.log(`[cron:${task.label}] ok`, value);
     } catch (error) {
       console.error(`[cron:${task.label}] failed:`, error);
+      if (error instanceof CronTaskTimeoutError) {
+        console.warn(`[cron:${task.label}] timed out; stopping remaining cron tasks for this tick`);
+        break;
+      }
     }
   }
 }
@@ -150,6 +162,9 @@ export default {
         const deadline = Date.now() + CRON_WALL_CLOCK_BUDGET_MS;
         try {
           await runCronTasks(env, deadline);
+          await withTimeout(monitorPipelineHealthAndAlert(), 20_000, "pipeline-alert").catch((error) => {
+            console.error("[cron:pipeline-alert] failed:", error);
+          });
         } catch (error) {
           console.error("[cron] outer failure:", error);
         }
