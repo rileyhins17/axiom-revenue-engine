@@ -33,8 +33,9 @@ export function getAutonomousDailyLeadCap() {
 /**
  * Counts leads created during the current UTC day that pass the autonomous
  * queue/send predicate.
- * Mirrors `shouldAutonomouslyQueueLead`: axiomScore >= 45, tier != D,
- * non-generic email, has email, not archived. SQL-side for speed.
+ * Mirrors the cheap SQL-safe subset of `shouldAutonomouslyQueueLead`:
+ * axiomScore >= AUTONOMOUS_INTAKE_MIN_SCORE, non-generic email, has email,
+ * not archived. SQL-side for speed.
  */
 export async function countAdequateLeadsToday(): Promise<number> {
   const since = sqlDateTime(startOfUtcDay());

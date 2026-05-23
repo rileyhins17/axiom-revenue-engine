@@ -14,7 +14,7 @@ export const MAILBOX_DAILY_SEND_TARGET = 50;
 /** Hourly cap is aligned to the daily target instead of allowing bursts that
  *  drain the hour and make automation look stopped. */
 export const MAILBOX_HOURLY_SEND_TARGET = 3;
-/** 40/day/mailbox requires one send about every 36 minutes. This keeps the
+/** 50/day/mailbox requires one send about every 29 minutes. This keeps the
  *  engine moving 24/7 at a steady reputation-safe rate instead of bursting. */
 export const MAILBOX_MIN_DELAY_SECONDS = 1728;
 export const MAILBOX_MAX_DELAY_SECONDS = 30 * 60;
@@ -29,10 +29,10 @@ export const AUTONOMOUS_SEND_MIN_SCORE = AUTONOMOUS_INTAKE_MIN_SCORE;
 export const AUTONOMOUS_QUEUE_BATCH_SIZE = 50;
 export const AUTONOMOUS_QUALIFICATION_SCAN_SIZE = 250;
 
-/** Hard ceiling on new ADEQUATE leads (axiomScore >= 45, non-D, non-generic
+/** Hard ceiling on new ADEQUATE leads (axiomScore >= 30, non-generic
  *  email) intaken per UTC day. Once hit, the autonomous-intake tick stops
  *  dispatching new ScrapeJobs until midnight UTC. Combined with two
- *  mailboxes at 40/day each (= 80 sends/day), this keeps a healthy
+ *  mailboxes at 50/day each (= 100 sends/day), this keeps a healthy
  *  intake-to-send ratio without manual gating. */
 export const AUTONOMOUS_DAILY_LEAD_INTAKE_CAP = 50;
 /** Follow-ups are useful, but first-touch volume is the primary growth lever.

@@ -289,14 +289,30 @@ export async function runAutoPipeline(systemUserId: string): Promise<AutoPipelin
     console.log(`[auto-pipeline] Recovered ${recovered} stuck ENRICHING leads`);
   }
 
-  // Steps 1-2 (enrich + qualify) wrapped in their own try/catch so a slow
-  // DeepSeek call cannot starve step 3 (auto-queue). Previously the entire
+  // Queue already-ready leads before slow enrichment so the Worker-level
+  // timeout cannot starve the send queue. Previously the entire
   // runAutoPipeline lived inside a single 120s scheduler timeout — if
   // enrichment of 30 leads ran past 120s the queue step never executed
   // and the pipeline reported eligibleFirstTouchCount=0 forever.
   let enriched = 0;
   let enrichFailed = 0;
   let qualified = 0;
+  let queued = 0;
+  let queueSkipped = 0;
+  let firstTouchDiagnostics = createFirstTouchDiagnostics();
+  try {
+    qualified += await autoQualify(prisma);
+  } catch (error) {
+    console.warn("[auto-pipeline] pre-enrich autoQualify failed (continuing to queue):", error);
+  }
+  try {
+    const initialQueue = await autoQueue(systemUserId);
+    queued += initialQueue.queued;
+    queueSkipped += initialQueue.skipped;
+    firstTouchDiagnostics = initialQueue.firstTouchDiagnostics;
+  } catch (error) {
+    console.warn("[auto-pipeline] pre-enrich autoQueue failed (continuing to enrich):", error);
+  }
   try {
     const enrichmentResult = await autoEnrich(prisma, 8, 4);
     enriched = enrichmentResult.enriched;
@@ -304,14 +320,22 @@ export async function runAutoPipeline(systemUserId: string): Promise<AutoPipelin
   } catch (error) {
     console.warn("[auto-pipeline] autoEnrich failed (continuing to qualify+queue):", error);
   }
-  try {
-    qualified = await autoQualify(prisma);
-  } catch (error) {
-    console.warn("[auto-pipeline] autoQualify failed (continuing to queue):", error);
+  if (enriched > 0) {
+    try {
+      qualified += await autoQualify(prisma);
+    } catch (error) {
+      console.warn("[auto-pipeline] post-enrich autoQualify failed (continuing to queue):", error);
+    }
+    try {
+      const postEnrichQueue = await autoQueue(systemUserId);
+      queued += postEnrichQueue.queued;
+      queueSkipped += postEnrichQueue.skipped;
+      firstTouchDiagnostics = postEnrichQueue.firstTouchDiagnostics;
+    } catch (error) {
+      console.warn("[auto-pipeline] post-enrich autoQueue failed:", error);
+    }
   }
 
-  // Step 3: Auto-queue qualified leads — runs even if enrichment errored.
-  const { queued, skipped: queueSkipped, firstTouchDiagnostics } = await autoQueue(systemUserId);
   console.log(`[auto-pipeline] First-touch diagnostics: ${JSON.stringify(firstTouchDiagnostics)}`);
 
   return {

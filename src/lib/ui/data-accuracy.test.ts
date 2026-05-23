@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  adequateLeadWhereClause,
   calculateReplyRate,
   getProjectMilestoneChecks,
   isAdequateAutonomousLeadRow,
@@ -39,6 +40,15 @@ test("adequate lead row check matches autonomous send policy", () => {
     }),
     false,
   );
+});
+
+test("adequate lead SQL predicate stays aligned with autonomous score/email policy", () => {
+  const clause = adequateLeadWhereClause("$score");
+
+  assert.match(clause, /"axiomScore" >= \$score/);
+  assert.match(clause, /LOWER\(COALESCE\("emailType",''\)\) != 'generic'/);
+  assert.doesNotMatch(clause, /axiomTier/);
+  assert.doesNotMatch(clause, /IN \('owner', 'staff'\)/);
 });
 
 test("calculateReplyRate uses unique replied leads against sent count", () => {

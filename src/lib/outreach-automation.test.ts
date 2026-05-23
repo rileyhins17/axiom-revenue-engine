@@ -13,6 +13,8 @@ import {
   isBounceNotificationMessage,
   orderDueStepsForClaiming,
   recoverStaleSchedulerRuns,
+  resolveAutomationCanonicalStateForOverview,
+  resolveAutomationScheduleForOverview,
   runSchedulerRecordedPhase,
   selectDueStepsForClaiming,
   selectAutomationReadyLeads,
@@ -207,6 +209,83 @@ test("first-touch selection canonicalizes wrapped recipient emails", () => {
   assert.equal(result.diagnostics.skippedGenericEmailCount, 1);
 });
 
+test("overview reports the next capacity time instead of overdue during mailbox cooldown", () => {
+  const now = new Date("2026-05-23T07:58:30.000Z");
+  const result = resolveAutomationScheduleForOverview({
+    now,
+    futureSendAt: null,
+    overdueSendAt: new Date("2026-05-21T22:30:00.000Z"),
+    mailboxes: [
+      {
+        gmailConnectionId: "gmail-1",
+        status: "ACTIVE",
+        dailyLimit: 50,
+        hourlyLimit: 3,
+        sentToday: 6,
+        sentThisHour: 2,
+        nextAvailableAt: new Date("2026-05-23T07:59:01.000Z"),
+      },
+    ],
+  });
+
+  assert.equal(result.nextSendAt?.toISOString(), "2026-05-23T07:59:01.000Z");
+  assert.equal(result.overdueSendAt, null);
+});
+
+test("overview does not classify transient cooldown waits as blocked", () => {
+  assert.equal(
+    resolveAutomationCanonicalStateForOverview({
+      normalizedStatus: "QUEUED",
+      primaryBlocker: "mailbox_cooldown",
+      hasSentAnyStep: false,
+    }),
+    "QUEUED",
+  );
+  assert.equal(
+    resolveAutomationCanonicalStateForOverview({
+      normalizedStatus: "ACTIVE",
+      primaryBlocker: "mailbox_disconnected",
+      hasSentAnyStep: false,
+    }),
+    "BLOCKED",
+  );
+});
+
+test("overview keeps sent sequences with transient waits in waiting state", () => {
+  assert.equal(
+    resolveAutomationCanonicalStateForOverview({
+      normalizedStatus: "ACTIVE",
+      primaryBlocker: "awaiting_follow_up_window",
+      hasSentAnyStep: true,
+    }),
+    "WAITING",
+  );
+});
+
+test("overview keeps overdue when capacity is ready now and due work is not moving", () => {
+  const now = new Date("2026-05-23T08:05:00.000Z");
+  const overdueSendAt = new Date("2026-05-21T22:30:00.000Z");
+  const result = resolveAutomationScheduleForOverview({
+    now,
+    futureSendAt: null,
+    overdueSendAt,
+    mailboxes: [
+      {
+        gmailConnectionId: "gmail-1",
+        status: "ACTIVE",
+        dailyLimit: 50,
+        hourlyLimit: 3,
+        sentToday: 6,
+        sentThisHour: 2,
+        nextAvailableAt: new Date("2026-05-23T08:00:00.000Z"),
+      },
+    ],
+  });
+
+  assert.equal(result.nextSendAt, null);
+  assert.equal(result.overdueSendAt, overdueSendAt);
+});
+
 test("first-touch selection matches sent recipients after canonicalization", () => {
   const wrapped = makeLead({ id: 8, email: "mailto:%20owner@already-sent.ca" });
 
@@ -352,7 +431,7 @@ test("automation capacity policy reserves daily sends for initial outreach", () 
   const totalDailyCapacity = MAILBOX_DAILY_SEND_TARGET * 2;
   const reservedInitialCapacity = totalDailyCapacity - AUTONOMOUS_FOLLOW_UP_DAILY_SEND_CAP;
 
-  assert.equal(totalDailyCapacity, 80);
+  assert.equal(totalDailyCapacity, 100);
   assert(AUTONOMOUS_FOLLOW_UP_DAILY_SEND_CAP <= totalDailyCapacity * 0.25);
   assert(AUTONOMOUS_DAILY_LEAD_INTAKE_CAP <= reservedInitialCapacity);
 });

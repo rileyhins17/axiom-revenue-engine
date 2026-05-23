@@ -2060,6 +2060,96 @@ function getMailboxNextAvailableAt(
   });
 }
 
+export function resolveAutomationCanonicalStateForOverview(input: {
+  normalizedStatus: string;
+  primaryBlocker: string | null;
+  hasSentAnyStep: boolean;
+}): AutomationCanonicalState {
+  if (input.normalizedStatus === "STOPPED" || input.normalizedStatus === "FAILED") {
+    return "STOPPED";
+  }
+  if (input.normalizedStatus === "COMPLETED") {
+    return "COMPLETED";
+  }
+  if (input.normalizedStatus === "SENDING") {
+    return "SENDING";
+  }
+
+  const isTransientWait = Boolean(
+    input.primaryBlocker &&
+      [
+        "mailbox_cooldown",
+        "hourly_cap_reached",
+        "daily_cap_reached",
+        "follow_up_daily_cap_reached",
+        "global_daily_cap_reached",
+        "outside_send_window",
+        "domain_cooldown_active",
+        "awaiting_follow_up_window",
+      ].includes(input.primaryBlocker),
+  );
+  if (
+    input.primaryBlocker &&
+    !isTransientWait &&
+    !(input.primaryBlocker === "awaiting_follow_up_window" && input.hasSentAnyStep)
+  ) {
+    return "BLOCKED";
+  }
+
+  return input.hasSentAnyStep ? "WAITING" : "QUEUED";
+}
+
+type OverviewMailboxCapacity = Pick<
+  OutreachMailboxRecord,
+  "gmailConnectionId" | "status" | "dailyLimit" | "hourlyLimit"
+> & {
+  sentToday: number;
+  sentThisHour: number;
+  nextAvailableAt?: Date | string | null;
+};
+
+export function resolveAutomationScheduleForOverview(input: {
+  futureSendAt: Date | null;
+  overdueSendAt: Date | null;
+  mailboxes: OverviewMailboxCapacity[];
+  now: Date;
+}) {
+  if (input.futureSendAt) {
+    return { nextSendAt: input.futureSendAt, overdueSendAt: null };
+  }
+
+  if (!input.overdueSendAt) {
+    return { nextSendAt: null, overdueSendAt: null };
+  }
+
+  const nextCapacityAt =
+    input.mailboxes
+      .filter((mailbox) =>
+        Boolean(
+          mailbox.gmailConnectionId &&
+            MAILBOX_SENDABLE_STATUSES.includes(mailbox.status as (typeof MAILBOX_SENDABLE_STATUSES)[number]) &&
+            mailbox.sentToday < (mailbox.dailyLimit || MAILBOX_DAILY_SEND_TARGET),
+        ),
+      )
+      .map((mailbox) => {
+        const cooldownReadyAt = coerceDate(mailbox.nextAvailableAt) || input.now;
+        if (mailbox.sentThisHour < (mailbox.hourlyLimit || MAILBOX_HOURLY_SEND_TARGET)) {
+          return cooldownReadyAt;
+        }
+        const nextHour = new Date(input.now);
+        nextHour.setUTCMinutes(0, 0, 0);
+        nextHour.setUTCHours(nextHour.getUTCHours() + 1);
+        return cooldownReadyAt.getTime() > nextHour.getTime() ? cooldownReadyAt : nextHour;
+      })
+      .sort((a, b) => a.getTime() - b.getTime())[0] || null;
+
+  if (nextCapacityAt && nextCapacityAt.getTime() > input.now.getTime()) {
+    return { nextSendAt: nextCapacityAt, overdueSendAt: null };
+  }
+
+  return { nextSendAt: null, overdueSendAt: input.overdueSendAt };
+}
+
 async function getSequenceRuntimeBlockers(
   prisma: PrismaLike,
   sequence: OutreachSequenceSummary,
@@ -2191,21 +2281,11 @@ async function enrichSequenceSummary(
   const nextSendAt = coerceDate(sequence.nextScheduledAt || sequence.nextStep?.scheduledFor || null);
   const hasSentAnyStep = Boolean(sequence.lastSentAt);
   const normalizedStatus = sequence.status.toUpperCase();
-
-  let state: AutomationCanonicalState;
-  if (normalizedStatus === "STOPPED" || normalizedStatus === "FAILED") {
-    state = "STOPPED";
-  } else if (normalizedStatus === "COMPLETED") {
-    state = "COMPLETED";
-  } else if (normalizedStatus === "SENDING") {
-    state = "SENDING";
-  } else if (primaryBlocker && !(primaryBlocker === "awaiting_follow_up_window" && hasSentAnyStep)) {
-    state = "BLOCKED";
-  } else if (hasSentAnyStep) {
-    state = "WAITING";
-  } else {
-    state = "QUEUED";
-  }
+  const state = resolveAutomationCanonicalStateForOverview({
+    normalizedStatus,
+    primaryBlocker,
+    hasSentAnyStep,
+  });
 
   const blockerMeta = primaryBlocker ? getBlockerMeta(primaryBlocker) : null;
 
@@ -2625,12 +2705,12 @@ export async function listAutomationOverview() {
   );
   const finished = summaries.filter((sequence) => sequence.state === "STOPPED" || sequence.state === "COMPLETED");
   const nowMs = now.getTime();
-  const nextSendAt =
+  const sampledFutureSendAt =
     summaries
       .map((sequence) => sequence.nextSendAt)
       .filter((value): value is Date => value instanceof Date && value.getTime() >= nowMs)
       .sort((a, b) => a.getTime() - b.getTime())[0] || null;
-  const overdueSendAt =
+  const sampledOverdueSendAt =
     summaries
       .map((sequence) => sequence.nextSendAt)
       .filter((value): value is Date => value instanceof Date && value.getTime() < nowMs)
@@ -2644,9 +2724,19 @@ export async function listAutomationOverview() {
   ).length;
   const blockedCount = summaries.filter((sequence) => sequence.state === "BLOCKED").length;
   const sendingCount = summaries.filter((sequence) => sequence.state === "SENDING").length;
-  const waitingCount = summaries.filter((sequence) => sequence.state === "WAITING").length;
   const repliedCount = summaries.filter((sequence) => sequence.blockerReason === "reply_detected").length;
   const sendReadyCount = enrichedCount + readyForTouchCount;
+  const [totalQueuedCount, totalWaitingCount, totalScheduledInitialCount] = await Promise.all([
+    prisma.outreachSequence.count({ where: { status: "QUEUED" } }),
+    prisma.outreachSequence.count({ where: { status: "ACTIVE" } }),
+    prisma.outreachSequenceStep.count({ where: { status: "SCHEDULED", stepNumber: 1 } }),
+  ]);
+  const effectiveSchedule = resolveAutomationScheduleForOverview({
+    futureSendAt: sampledFutureSendAt,
+    overdueSendAt: sampledOverdueSendAt,
+    mailboxes: mailboxStats,
+    now,
+  });
 
   return {
     settings,
@@ -2659,14 +2749,14 @@ export async function listAutomationOverview() {
     recentSent,
     engine: {
       mode: !settings.enabled ? "DISABLED" : settings.emergencyPaused ? "DISABLED" : settings.globalPaused ? "PAUSED" : "ACTIVE",
-      nextSendAt,
-      overdueSendAt,
+      nextSendAt: effectiveSchedule.nextSendAt,
+      overdueSendAt: effectiveSchedule.overdueSendAt,
       scheduledToday,
       blockedCount,
       replyStoppedCount: repliedCount,
       readyCount: ready.length,
-      queuedCount: queued.length,
-      waitingCount,
+      queuedCount: Math.max(totalQueuedCount, totalScheduledInitialCount),
+      waitingCount: totalWaitingCount,
       sendingCount,
     },
     pipeline: {
@@ -2678,11 +2768,11 @@ export async function listAutomationOverview() {
     recentRuns,
     stats: {
       ready: ready.length,
-      queued: queued.length,
+      queued: Math.max(totalQueuedCount, totalScheduledInitialCount),
       sending: sendingCount,
-      waiting: waitingCount,
+      waiting: totalWaitingCount,
       blocked: blockedCount,
-      active: sendingCount + waitingCount + blockedCount,
+      active: sendingCount + totalWaitingCount + blockedCount,
       paused: summaries.filter((sequence) => sequence.status === "PAUSED").length,
       stopped: summaries.filter((sequence) => sequence.state === "STOPPED").length,
       completed: summaries.filter((sequence) => sequence.state === "COMPLETED").length,

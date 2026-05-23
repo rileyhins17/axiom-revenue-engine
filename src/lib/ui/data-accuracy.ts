@@ -12,8 +12,7 @@ export function sqlDateTime(date: Date): string {
 
 export function adequateLeadWhereClause(scoreParameter = "?") {
   return `"axiomScore" >= ${scoreParameter}
-         AND COALESCE("axiomTier",'') != 'D'
-         AND LOWER(COALESCE("emailType",'')) IN ('owner', 'staff')
+         AND LOWER(COALESCE("emailType",'')) != 'generic'
          AND COALESCE("email",'') != ''
          AND LOWER("email") NOT LIKE 'info@%'
          AND LOWER("email") NOT LIKE 'sales@%'
