@@ -9,7 +9,6 @@ import { runCloudScrapeWorker } from "./src/lib/cloud-scrape-worker";
 import { runAutonomousIntake } from "./src/lib/autonomous-intake";
 import { runAutoPipeline } from "./src/lib/auto-pipeline";
 import { maybeRunDailyDigest } from "./src/lib/daily-digest";
-import { monitorPipelineHealthAndAlert } from "./src/lib/pipeline-alerts";
 import { setCloudflareBindings } from "./src/lib/cloudflare";
 import { clearServerEnvCache } from "./src/lib/env";
 import { getCronTimeoutBudgets } from "./src/lib/cron-timeouts";
@@ -162,9 +161,6 @@ export default {
         const deadline = Date.now() + CRON_WALL_CLOCK_BUDGET_MS;
         try {
           await runCronTasks(env, deadline);
-          await withTimeout(monitorPipelineHealthAndAlert(), 20_000, "pipeline-alert").catch((error) => {
-            console.error("[cron:pipeline-alert] failed:", error);
-          });
         } catch (error) {
           console.error("[cron] outer failure:", error);
         }
