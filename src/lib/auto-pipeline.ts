@@ -99,20 +99,22 @@ async function resetStuckEnriching(prisma: ReturnType<typeof getPrisma>): Promis
       ],
     },
     select: { id: true },
-    take: 200,
+    take: 50,
   })) as Array<{ id: number }>;
 
   if (stuck.length === 0) return 0;
 
-  await Promise.all(
-    stuck.map((s) =>
-      prisma.lead
-        .update({ where: { id: s.id }, data: { outreachStatus: "NOT_CONTACTED" } })
-        .catch(() => null),
-    ),
-  );
+  // Batch UPDATE in one D1 statement — 200 parallel prisma.update calls
+  // burned ~200 subrequests per cron tick and starved downstream work.
+  const ids = stuck.map((s) => s.id);
+  const { getDatabase } = await import("@/lib/cloudflare");
+  const placeholders = ids.map(() => "?").join(",");
+  await getDatabase()
+    .prepare(`UPDATE "Lead" SET "outreachStatus" = 'NOT_CONTACTED' WHERE "id" IN (${placeholders})`)
+    .bind(...ids)
+    .run();
 
-  return stuck.length;
+  return ids.length;
 }
 
 /**
