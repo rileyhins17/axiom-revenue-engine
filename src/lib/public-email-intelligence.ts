@@ -208,10 +208,21 @@ function normalizeObfuscatedEmails(text: string): string {
         .replace(/([a-z0-9.-])\s+dot\s+([a-z]{2,})/gi, "$1.$2");
 }
 
+function isPlausibleEmail(email: string): boolean {
+    const at = email.indexOf("@");
+    if (at < 1) return false;
+    const local = email.slice(0, at);
+    // Reject malformed concatenations like "consultation705-306-2881info@host.ca"
+    // where phone numbers / scraped page text fused with the real address.
+    if (local.length > 32) return false;
+    if (/\d{6,}/.test(local)) return false;
+    return true;
+}
+
 function extractEmailsFromText(text: string): string[] {
     const normalized = normalizeObfuscatedEmails(text);
     const matches = normalized.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [];
-    return Array.from(new Set(matches.map(canonicalizeEmail)));
+    return Array.from(new Set(matches.map(canonicalizeEmail).filter(isPlausibleEmail)));
 }
 
 function extractEmailsFromHref(href: string): string[] {

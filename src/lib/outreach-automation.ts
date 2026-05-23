@@ -3534,6 +3534,16 @@ async function sendScheduledStep(
     throw new AutomationSkipError("missing_valid_email");
   }
 
+  // Malformed-email guard. Intake regex `[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}`
+  // is lax enough that concatenated page text like "consultation705-306-2881info@host.ca"
+  // matches as a single address. Sending wastes mailbox quota + triggers bounces.
+  // Reject local-parts with >= 6 consecutive digits or > 32 chars.
+  const localPart = recipientEmail.split("@")[0] ?? "";
+  if (localPart.length > 32 || /\d{6,}/.test(localPart)) {
+    await stopSequenceInternal(prisma, claim.sequence, "missing_valid_email");
+    throw new AutomationStoppedError("missing_valid_email");
+  }
+
   const sendEmailType = (context.lead.emailType || "").toLowerCase();
   if (sendEmailType === "generic" || isGenericRoleEmail(recipientEmail)) {
     await stopSequenceInternal(prisma, claim.sequence, "GENERIC_EMAIL");
