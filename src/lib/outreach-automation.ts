@@ -5146,7 +5146,10 @@ async function runAutomationSchedulerUnlocked(options: { immediate?: boolean; on
     });
     runAutoPipeline = modules.runAutoPipeline;
     const env = await runPhase("load_env", 5_000, () => modules.getServerEnv());
-    await runPhase("mailbox_sync", 20_000, () => syncMailboxesForGmailConnections());
+    // mailbox_sync is skipped on every cron tick. Mailbox rows are created on
+    // OAuth connect and updated when the user reconnects; re-upserting them on
+    // every send loop is not necessary and was consistently exceeding the
+    // 30s CPU cap, killing the whole tick before any send could happen.
     const settings = await runPhase("load_settings", 10_000, () => getSettings(prisma));
 
     const activeRun = await runPhase("check_active_run", 10_000, () => prisma.outreachRun.findFirst({
