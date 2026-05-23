@@ -300,7 +300,7 @@ const MAILBOX_SENDABLE_STATUSES = ["ACTIVE", "WARMING"] as const;
 const OPEN_FIRST_TOUCH_STEP_STATUSES = ["SCHEDULED", "CLAIMED", "SENDING"] as const;
 const D1_IN_CLAUSE_CHUNK_SIZE = 40;
 const SCHEDULER_TOTAL_TIMEOUT_MS = 240_000;
-const SCHEDULER_LEASE_TTL_MS = 4 * 60 * 1000;
+const SCHEDULER_LEASE_TTL_MS = 90 * 1000;
 const SCHEDULER_PIPELINE_TIMEOUT_MS = 120_000;
 const SCHEDULER_REPLY_SYNC_TIMEOUT_MS = 60_000;
 const SCHEDULER_BOUNCE_SYNC_TIMEOUT_MS = 60_000;
@@ -5008,7 +5008,10 @@ async function runAutomationSchedulerUnlocked(options: { immediate?: boolean; on
   };
   let runClosed = false;
   const schedulerDeadline = Date.now() + SCHEDULER_TOTAL_TIMEOUT_MS;
-  const staleRunThreshold = addMinutes(now, -5);
+  // Stale window must be short: workers cron CPU cap (30s) means a dead run is
+  // detectable within ~30-60s. 5-min stale window starved sends for ~5 min after
+  // every CPU-exhaustion incident. 90s threshold recovers quickly without false-positives.
+  const staleRunThreshold = new Date(now.getTime() - 90 * 1000);
 
   const runPhase = <T>(phase: string, timeoutMs: number, operation: () => Promise<T> | T) => {
     const remainingMs = schedulerDeadline - Date.now();

@@ -29,6 +29,79 @@ function withTimeout(promise, ms, label) {
   });
 }
 
+// Cloudflare Workers cron triggers cap CPU at 30s per invocation (Standard plan).
+// Running scheduler + pipeline + intake + scrape + digest in one tick exceeds
+// the budget. Cloudflare kills the isolate, leaving OutreachRun rows stuck
+// RUNNING. Next tick's recover_stale handler marks them FAILED but the same
+// CPU-exhaustion repeats, so nothing ever sends. The fix: run AT MOST one
+// heavy task per tick, rotated by wall-clock minute. The scheduler (send loop)
+// runs every tick because it gates outbound throughput. Pipeline runs every
+// tick because it is light. Intake/scrape/digest are staggered.
+async function runCronTasks(env, deadline) {
+  const now = new Date();
+  const minuteOfHour = now.getUTCMinutes();
+  const minuteOfDay = now.getUTCHours() * 60 + minuteOfHour;
+  const timeouts = getCronTimeoutBudgets(env);
+
+  const tasks = [];
+
+  tasks.push({
+    fn: runAutomationScheduler,
+    timeout: Math.min(timeouts.scheduler, 90_000),
+    label: "scheduler",
+  });
+
+  tasks.push({
+    fn: () => runAutoPipeline("system"),
+    timeout: 60_000,
+    label: "pipeline",
+    requireRemainingMs: 60_000,
+  });
+
+  const slot = minuteOfHour % 15;
+  if (slot === 0) {
+    tasks.push({
+      fn: runAutonomousIntake,
+      timeout: Math.min(timeouts.intake, 90_000),
+      label: "intake",
+      requireRemainingMs: 90_000,
+    });
+  } else if (slot === 5) {
+    tasks.push({
+      fn: runCloudScrapeWorker,
+      timeout: Math.min(timeouts.scrape, 600_000),
+      label: "scrape",
+      requireRemainingMs: 120_000,
+    });
+  } else if (slot === 10 && minuteOfDay % 1440 < 60) {
+    tasks.push({
+      fn: maybeRunDailyDigest,
+      timeout: timeouts.digest,
+      label: "digest",
+      requireRemainingMs: 30_000,
+    });
+  }
+
+  for (const task of tasks) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      console.warn(`[cron:${task.label}] skipped — wall-clock budget exhausted`);
+      continue;
+    }
+    if (task.requireRemainingMs && remaining < task.requireRemainingMs) {
+      console.warn(`[cron:${task.label}] skipped — only ${remaining}ms left, need ${task.requireRemainingMs}ms`);
+      continue;
+    }
+    const effectiveTimeout = Math.min(task.timeout, remaining);
+    try {
+      const value = await withTimeout(task.fn(), effectiveTimeout, task.label);
+      console.log(`[cron:${task.label}] ok`, value);
+    } catch (error) {
+      console.error(`[cron:${task.label}] failed:`, error);
+    }
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     clearServerEnvCache();
@@ -36,52 +109,16 @@ export default {
     return worker.fetch(request, env, ctx);
   },
   async scheduled(_controller, env, ctx) {
-    // Clear env cache so the module-level cachedEnv does not shadow
-    // deploy-time env-var changes on warm isolates. This is the fix
-    // for AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY=0 silently being read
-    // as the schema default 20 after a fresh deploy.
     clearServerEnvCache();
     setCloudflareBindings(env);
-    const timeouts = getCronTimeoutBudgets(env);
-    const CRON_WALL_CLOCK_BUDGET_MS = 14 * 60 * 1000;
-    // Scrape can legitimately run for ~14 min when claiming a job. If it
-    // executes before the scheduler, the wall-clock budget is exhausted and
-    // outreach sends are skipped indefinitely. Guarantee scheduler always
-    // runs first with a hard minimum reserve, then run intake/scrape/digest
-    // with whatever budget remains. Sequential ordering preserves the 128 MB
-    // memory limit fix from commit d1ed4ca.
-    const SCHEDULER_MIN_RESERVE_MS = 5 * 60 * 1000;
+    const CRON_WALL_CLOCK_BUDGET_MS = 4 * 60 * 1000;
     ctx.waitUntil(
       (async () => {
         const deadline = Date.now() + CRON_WALL_CLOCK_BUDGET_MS;
-        const tasks = [
-          { fn: runAutomationScheduler, timeout: timeouts.scheduler, label: "scheduler", minReserveMs: SCHEDULER_MIN_RESERVE_MS },
-          // Auto-pipeline (enrich + qualify + queue) runs as a standalone task so
-          // a hung scheduler send-phase never starves new first-touch supply.
-          // 120s budget mirrors SCHEDULER_PIPELINE_TIMEOUT_MS used previously.
-          { fn: () => runAutoPipeline("system"), timeout: 120_000, label: "pipeline" },
-          { fn: runAutonomousIntake, timeout: timeouts.intake, label: "intake" },
-          { fn: runCloudScrapeWorker, timeout: timeouts.scrape, label: "scrape" },
-          { fn: maybeRunDailyDigest, timeout: timeouts.digest, label: "digest" },
-        ];
-        for (const task of tasks) {
-          const remaining = deadline - Date.now();
-          if (remaining <= 0) {
-            console.warn(`[cron:${task.label}] skipped — wall-clock budget exhausted`);
-            continue;
-          }
-          if (task.minReserveMs && remaining < task.minReserveMs) {
-            console.warn(
-              `[cron:${task.label}] only ${remaining}ms remaining (< ${task.minReserveMs}ms reserve); running with reduced budget`,
-            );
-          }
-          const effectiveTimeout = Math.min(task.timeout, remaining);
-          try {
-            const value = await withTimeout(task.fn(), effectiveTimeout, task.label);
-            console.log(`[cron:${task.label}] ok`, value);
-          } catch (error) {
-            console.error(`[cron:${task.label}] failed:`, error);
-          }
+        try {
+          await runCronTasks(env, deadline);
+        } catch (error) {
+          console.error("[cron] outer failure:", error);
         }
       })(),
     );
