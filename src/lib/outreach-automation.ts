@@ -3624,12 +3624,39 @@ async function sendScheduledStep(
     throw new AutomationSkipError("missing_valid_email");
   }
 
-  // Malformed-email guard. Intake regex `[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}`
-  // is lax enough that concatenated page text like "consultation705-306-2881info@host.ca"
-  // matches as a single address. Sending wastes mailbox quota + triggers bounces.
-  // Reject local-parts with >= 6 consecutive digits or > 32 chars.
-  const localPart = recipientEmail.split("@")[0] ?? "";
-  if (localPart.length > 32 || /\d{6,}/.test(localPart)) {
+  // Malformed-email guard mirrors public-email-intelligence.ts isPlausibleEmail.
+  // Sending to scraped junk (consultation705-...-info@host.ca, %20info@..., www.* domains,
+  // placeholder addresses, hex-prefixed handles) wastes mailbox quota and triggers
+  // hard bounces that hurt deliverability. Catch them at send time as a last line
+  // of defence in case anything slipped past intake.
+  const atIdx = recipientEmail.indexOf("@");
+  const localPart = atIdx >= 0 ? recipientEmail.slice(0, atIdx) : "";
+  const domainPart = atIdx >= 0 ? recipientEmail.slice(atIdx + 1).toLowerCase() : "";
+  const localLower = localPart.toLowerCase();
+  const SEND_JUNK_LOCALS = new Set([
+    "accessible", "available", "provided", "resume", "server", "production",
+    "online", "size", "rescue", "equipments", "assistance", "needhelp", "nfo",
+  ]);
+  const SEND_PLACEHOLDER_DOMAINS = new Set([
+    "domain.net", "domain.com", "example.com", "example.net", "example.org",
+    "website.com", "yoursite.com", "mailinator.com",
+  ]);
+  const SEND_FAKE_PROVIDER_DOMAINS = new Set([
+    "gmail.ca", "gmail.co", "yahoo.ca", "hotmail.ca", "outlook.ca",
+  ]);
+
+  const malformed =
+    localPart.length > 32 ||
+    localPart.length < 3 ||
+    /\d{6,}/.test(localPart) ||
+    localPart.includes("%") ||
+    (/^[0-9a-f]{4,}[a-z]+$/i.test(localPart) && /[0-9]/.test(localPart)) ||
+    SEND_JUNK_LOCALS.has(localLower) ||
+    domainPart.startsWith("www.") ||
+    SEND_PLACEHOLDER_DOMAINS.has(domainPart) ||
+    SEND_FAKE_PROVIDER_DOMAINS.has(domainPart);
+
+  if (malformed) {
     await stopSequenceInternal(prisma, claim.sequence, "missing_valid_email");
     throw new AutomationStoppedError("missing_valid_email");
   }

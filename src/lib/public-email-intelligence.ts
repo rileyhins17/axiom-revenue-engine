@@ -208,14 +208,74 @@ function normalizeObfuscatedEmails(text: string): string {
         .replace(/([a-z0-9.-])\s+dot\s+([a-z]{2,})/gi, "$1.$2");
 }
 
+// Common-noun prefixes that get scraped from prose like "for accessible service email…"
+// — they form fake local-parts when concatenated to a real handle.
+const JUNK_LOCAL_PART_PREFIXES = new Set([
+    "accessible",
+    "available",
+    "provided",
+    "resume",
+    "server",
+    "production",
+    "online",
+    "size",
+    "rescue",
+    "equipments",
+    "assistance",
+    "needhelp",
+]);
+
+// Common placeholder/example domains that should never receive real outreach.
+const PLACEHOLDER_DOMAINS = new Set([
+    "domain.net",
+    "domain.com",
+    "example.com",
+    "example.net",
+    "example.org",
+    "website.com",
+    "yoursite.com",
+    "mailinator.com",
+]);
+
+// Two-segment TLDs that look real but don't accept mail (e.g. d5electrical.ltd@gmail.ca).
+const FAKE_PROVIDER_DOMAINS = new Set([
+    "gmail.ca",
+    "gmail.co",
+    "yahoo.ca",
+    "hotmail.ca",
+    "outlook.ca",
+]);
+
 function isPlausibleEmail(email: string): boolean {
     const at = email.indexOf("@");
     if (at < 1) return false;
     const local = email.slice(0, at);
-    // Reject malformed concatenations like "consultation705-306-2881info@host.ca"
-    // where phone numbers / scraped page text fused with the real address.
+    const domain = email.slice(at + 1).toLowerCase();
+
+    // Length / digit guard for concatenated phone numbers (consultation705-306-2881info@host.ca).
     if (local.length > 32) return false;
+    if (local.length < 3) return false;
     if (/\d{6,}/.test(local)) return false;
+
+    // URL-encoded prefix from mailto:%20info@... scrapes.
+    if (local.includes("%")) return false;
+
+    // Hex-id concatenation pattern (b4b9024484743info@host.com, 4894support@host.com).
+    if (/^[0-9a-f]{4,}[a-z]+$/i.test(local) && /[0-9]/.test(local)) return false;
+
+    // Common-noun prefix concatenated onto real handle.
+    if (JUNK_LOCAL_PART_PREFIXES.has(local.toLowerCase())) return false;
+
+    // Typo prefix `nfo@` (missing the 'i' from info@).
+    if (local.toLowerCase() === "nfo") return false;
+
+    // Domain starts with www. — caller scraped a URL as the email host.
+    if (domain.startsWith("www.")) return false;
+
+    // Placeholder / fake provider domains.
+    if (PLACEHOLDER_DOMAINS.has(domain)) return false;
+    if (FAKE_PROVIDER_DOMAINS.has(domain)) return false;
+
     return true;
 }
 
