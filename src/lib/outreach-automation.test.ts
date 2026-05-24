@@ -209,6 +209,48 @@ test("first-touch selection canonicalizes wrapped recipient emails", () => {
   assert.equal(result.diagnostics.skippedGenericEmailCount, 1);
 });
 
+test("first-touch selection excludes low-confidence and unclassified recipients", () => {
+  const lowConfidenceOwner = makeLead({
+    id: 9,
+    email: "owner@low-owner.ca",
+    emailType: "owner",
+    emailConfidence: 0.49,
+  });
+  const lowConfidenceStaff = makeLead({
+    id: 10,
+    email: "sarah@low-staff.ca",
+    emailType: "staff",
+    emailConfidence: 0.64,
+  });
+  const unknownRecipient = makeLead({
+    id: 11,
+    email: "person@unknown.ca",
+    emailType: "unknown",
+    emailConfidence: 0.9,
+  });
+  const qualifiedOwner = makeLead({
+    id: 12,
+    email: "owner@qualified.ca",
+    emailType: "owner",
+    emailConfidence: 0.5,
+  });
+  const qualifiedStaff = makeLead({
+    id: 13,
+    email: "sarah@qualified-staff.ca",
+    emailType: "staff",
+    emailConfidence: 0.65,
+  });
+
+  const result = selectAutomationReadyLeads({
+    leads: [lowConfidenceOwner, lowConfidenceStaff, unknownRecipient, qualifiedOwner, qualifiedStaff],
+  });
+
+  assert.deepEqual(result.leads.map((lead) => lead.id).sort((a, b) => a - b), [
+    qualifiedOwner.id,
+    qualifiedStaff.id,
+  ]);
+});
+
 test("overview reports the next capacity time instead of overdue during mailbox cooldown", () => {
   const now = new Date("2026-05-23T07:58:30.000Z");
   const result = resolveAutomationScheduleForOverview({

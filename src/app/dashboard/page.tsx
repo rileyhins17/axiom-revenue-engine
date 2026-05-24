@@ -804,7 +804,7 @@ export default async function DashboardPage() {
             cap={intakeCap}
             pct={intakePct}
             tone={intakeTone}
-            footnote="score >= 45, non-D, owner/staff non-generic email"
+            footnote="score >= 30, owner >= 0.50 or staff >= 0.65, no role inboxes"
           />
           <Divider />
           <KvRow icon={<Radar className="size-3.5" />} label="Active targets" value={activeTargets.toLocaleString()} />

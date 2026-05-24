@@ -220,7 +220,7 @@ export function SettingsClient({
                   <Bullet>Scrape intake dispatches the next due target every cron tick (capped at {runtimeStatus.intakeDailyLeadCap} adequate leads/day UTC).</Bullet>
                   <Bullet>Cloudflare Browser Rendering executes the scrape and persists leads.</Bullet>
                   <Bullet>Auto-pipeline enriches, qualifies, and queues leads on a rolling basis.</Bullet>
-                  <Bullet>Scheduler sends emails only to non-generic owner/staff inboxes, capped by each mailbox and the {runtimeStatus.globalDailySendCap}/day global limit.</Bullet>
+                  <Bullet>Scheduler sends only to vetted owner/staff inboxes with confidence floors, capped by each mailbox and the {runtimeStatus.globalDailySendCap}/day global limit.</Bullet>
                   <Bullet>Reply detection stops sequences when a recipient replies.</Bullet>
                 </ul>
               </Panel>

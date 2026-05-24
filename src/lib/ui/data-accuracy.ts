@@ -1,4 +1,9 @@
 import { isAdequateAutonomousLead } from "@/lib/automation-policy";
+import {
+  isLeadOutreachEligible,
+  OWNER_EMAIL_MIN_CONFIDENCE,
+  STAFF_EMAIL_MIN_CONFIDENCE,
+} from "@/lib/lead-qualification";
 
 export const SENDABLE_MAILBOX_STATUSES = ["ACTIVE", "WARMING"] as const;
 
@@ -11,28 +16,37 @@ export function sqlDateTime(date: Date): string {
 }
 
 export function adequateLeadWhereClause(scoreParameter = "?") {
+  const localPart = `LOWER(substr(trim("email"), 1, instr(trim("email"), '@') - 1))`;
+
   return `"axiomScore" >= ${scoreParameter}
-         AND LOWER(COALESCE("emailType",'')) != 'generic'
+         AND (
+           (LOWER(COALESCE("emailType",'')) = 'owner' AND COALESCE("emailConfidence", 0) >= ${OWNER_EMAIL_MIN_CONFIDENCE})
+           OR (LOWER(COALESCE("emailType",'')) = 'staff' AND COALESCE("emailConfidence", 0) >= ${STAFF_EMAIL_MIN_CONFIDENCE})
+         )
          AND COALESCE("email",'') != ''
-         AND LOWER("email") NOT LIKE 'info@%'
-         AND LOWER("email") NOT LIKE 'sales@%'
-         AND LOWER("email") NOT LIKE 'hello@%'
-         AND LOWER("email") NOT LIKE 'contact@%'
-         AND LOWER("email") NOT LIKE 'admin@%'
-         AND LOWER("email") NOT LIKE 'support@%'
-         AND LOWER("email") NOT LIKE 'office@%'
-         AND LOWER("email") NOT LIKE 'marketing@%'
-         AND LOWER("email") NOT LIKE 'service@%'
-         AND LOWER("email") NOT LIKE 'enquiries@%'
-         AND LOWER("email") NOT LIKE 'enquiry@%'
-         AND LOWER("email") NOT LIKE 'booking@%'
-         AND LOWER("email") NOT LIKE 'team@%'
-         AND LOWER("email") NOT LIKE 'webmaster@%'
+         AND LOWER(COALESCE("emailFlags",'')) NOT LIKE '%bounced%'
+         AND LOWER(COALESCE("emailFlags",'')) NOT LIKE '%no_mx%'
+         AND LOWER(COALESCE("emailFlags",'')) NOT LIKE '%generic_prefix%'
+         AND ${localPart} NOT IN (
+           'admin', 'appointments', 'booking', 'bookings', 'contact', 'customerservice',
+           'dispatch', 'enquiries', 'enquiry', 'estimate', 'estimates', 'estimating',
+           'frontdesk', 'general', 'hello', 'help', 'info', 'inquiry', 'lead', 'leads',
+           'mail', 'marketing', 'media', 'office', 'operations', 'quote', 'quotes',
+           'reception', 'sales', 'service', 'social', 'support', 'team', 'web',
+           'webmaster', 'website', 'welcome'
+         )
+         AND ${localPart} NOT GLOB 'info.*'
+         AND ${localPart} NOT GLOB 'contact.*'
+         AND ${localPart} NOT GLOB 'sales.*'
+         AND ${localPart} NOT GLOB 'office.*'
+         AND ${localPart} NOT GLOB 'support.*'
          AND COALESCE("isArchived", 0) = 0`;
 }
 
-export function isAdequateAutonomousLeadRow(lead: Parameters<typeof isAdequateAutonomousLead>[0]) {
-  return isAdequateAutonomousLead(lead);
+export function isAdequateAutonomousLeadRow(
+  lead: Parameters<typeof isAdequateAutonomousLead>[0] & Parameters<typeof isLeadOutreachEligible>[0],
+) {
+  return isAdequateAutonomousLead(lead) && isLeadOutreachEligible(lead);
 }
 
 export function calculateReplyRate(sent: number, replied: number): number {

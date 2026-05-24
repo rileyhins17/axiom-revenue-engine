@@ -1,4 +1,6 @@
 export const AXIOM_OUTREACH_MIN_SCORE = 29;
+export const OWNER_EMAIL_MIN_CONFIDENCE = 0.5;
+export const STAFF_EMAIL_MIN_CONFIDENCE = 0.65;
 
 export type EmailQualificationInput = {
   email: string | null | undefined;
@@ -16,9 +18,52 @@ const INVALID_EMAIL_FLAGS = new Set([
   "invalid_format",
   "disposable_domain",
   "noreply",
+  "bounced",
+  "bounce",
+  "no_mx",
+  "no_mx_record",
 ]);
 
 const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+const BLOCKED_ROLE_LOCAL_PARTS = new Set([
+  "admin",
+  "appointments",
+  "booking",
+  "bookings",
+  "contact",
+  "customerservice",
+  "dispatch",
+  "enquiries",
+  "enquiry",
+  "estimate",
+  "estimates",
+  "estimating",
+  "frontdesk",
+  "general",
+  "hello",
+  "help",
+  "info",
+  "inquiry",
+  "lead",
+  "leads",
+  "mail",
+  "marketing",
+  "media",
+  "office",
+  "operations",
+  "quote",
+  "quotes",
+  "reception",
+  "sales",
+  "service",
+  "social",
+  "support",
+  "team",
+  "web",
+  "webmaster",
+  "website",
+  "welcome",
+]);
 
 function decodeEmailCandidate(value: string) {
   try {
@@ -69,6 +114,15 @@ function normalizeFlags(value: string | null | string[] | undefined) {
   return [];
 }
 
+function hasBlockedRoleLocalPart(email: string) {
+  const localPart = email.split("@")[0]?.toLowerCase() || "";
+  if (!localPart) return true;
+  for (const part of BLOCKED_ROLE_LOCAL_PARTS) {
+    if (localPart === part || localPart.startsWith(`${part}.`)) return true;
+  }
+  return false;
+}
+
 export function hasValidPipelineEmail(input: EmailQualificationInput) {
   const normalizedEmail = normalizePipelineEmail(input.email);
   if (!normalizedEmail) return false;
@@ -87,25 +141,11 @@ export function hasValidPipelineEmail(input: EmailQualificationInput) {
   const emailType = (input.emailType || "unknown").toLowerCase();
   const confidence = Number(input.emailConfidence || 0);
 
-  // Owner / staff / unknown are all legitimate recipients. Confidence bars
-  // used to be 0.58 / 0.62 which silently filtered out the majority of the
-  // pipeline (unknowns have confidence=0 even though the email address is
-  // fine). A minimum of 0.2 rejects only truly low-quality guesses and is
-  // still consistent with how the outreach UI displays confidence.
-  if (emailType === "owner" || emailType === "staff" || emailType === "unknown") {
-    return confidence >= 0.2 || emailType === "owner";
-  }
+  if (hasBlockedRoleLocalPart(normalizedEmail)) return false;
+  if (emailType === "owner") return confidence >= OWNER_EMAIL_MIN_CONFIDENCE;
+  if (emailType === "staff") return confidence >= STAFF_EMAIL_MIN_CONFIDENCE;
 
-  // Role inboxes (info@, contact@). Blanket-rejecting them starved the
-  // pipeline of hundreds of otherwise-valid leads. Allow them here so the
-  // user can manually queue them from the outreach UI; `shouldAutonomously
-  // QueueLead` still excludes generic from the autopilot to protect sender
-  // reputation.
-  if (emailType === "generic") {
-    return true;
-  }
-
-  return true;
+  return false;
 }
 
 export function isLeadOutreachEligible(input: LeadQualificationInput) {

@@ -29,7 +29,7 @@ export const AUTONOMOUS_SEND_MIN_SCORE = AUTONOMOUS_INTAKE_MIN_SCORE;
 export const AUTONOMOUS_QUEUE_BATCH_SIZE = 50;
 export const AUTONOMOUS_QUALIFICATION_SCAN_SIZE = 250;
 
-/** Hard ceiling on new ADEQUATE leads (axiomScore >= 30, non-generic
+/** Hard ceiling on new ADEQUATE leads (axiomScore >= 30, trusted owner/staff
  *  email) intaken per UTC day. Once hit, the autonomous-intake tick stops
  *  dispatching new ScrapeJobs until midnight UTC. Combined with two
  *  mailboxes at 50/day each (= 100 sends/day), this keeps a healthy
@@ -69,13 +69,9 @@ export function isAdequateAutonomousLead(lead: {
   }
 
   const emailType = String(lead.emailType || "").trim().toLowerCase();
-  // Reject ONLY clearly-generic emailTypes. Owner / staff / unknown / empty
-  // are all allowed because the scraper often cannot classify a personal
-  // local part (e.g. "luc@homekeepers.ca") and labels it unknown. The
-  // isGenericRoleEmail check below still catches info@, contact@, etc., so
-  // letting unknown through here does not lower the actual deliverability
-  // bar — it just stops the autopilot from starving when the top of the
-  // queue is dominated by unclassified personal addresses.
+  // Confidence/type thresholds live in isLeadOutreachEligible so intake,
+  // queueing, and send-time checks stay aligned. Keep this hard role-inbox
+  // guard here too because generic recipients are never autonomous targets.
   if (emailType === "generic") {
     return false;
   }

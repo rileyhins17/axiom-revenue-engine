@@ -26,6 +26,7 @@ test("adequate lead row check matches autonomous send policy", () => {
       axiomTier: "C",
       email: "owner@example.ca",
       emailType: "owner",
+      emailConfidence: 0.5,
       isArchived: false,
     }),
     true,
@@ -36,6 +37,29 @@ test("adequate lead row check matches autonomous send policy", () => {
       axiomTier: "A",
       email: "info@example.ca",
       emailType: "owner",
+      emailConfidence: 1,
+      isArchived: false,
+    }),
+    false,
+  );
+  assert.equal(
+    isAdequateAutonomousLeadRow({
+      axiomScore: 80,
+      axiomTier: "A",
+      email: "owner@example.ca",
+      emailType: "owner",
+      emailConfidence: 0.49,
+      isArchived: false,
+    }),
+    false,
+  );
+  assert.equal(
+    isAdequateAutonomousLeadRow({
+      axiomScore: 80,
+      axiomTier: "A",
+      email: "staff@example.ca",
+      emailType: "staff",
+      emailConfidence: 0.64,
       isArchived: false,
     }),
     false,
@@ -46,9 +70,11 @@ test("adequate lead SQL predicate stays aligned with autonomous score/email poli
   const clause = adequateLeadWhereClause("$score");
 
   assert.match(clause, /"axiomScore" >= \$score/);
-  assert.match(clause, /LOWER\(COALESCE\("emailType",''\)\) != 'generic'/);
+  assert.match(clause, /LOWER\(COALESCE\("emailType",''\)\) = 'owner'/);
+  assert.match(clause, /COALESCE\("emailConfidence", 0\) >= 0\.5/);
+  assert.match(clause, /LOWER\(COALESCE\("emailType",''\)\) = 'staff'/);
+  assert.match(clause, /COALESCE\("emailConfidence", 0\) >= 0\.65/);
   assert.doesNotMatch(clause, /axiomTier/);
-  assert.doesNotMatch(clause, /IN \('owner', 'staff'\)/);
 });
 
 test("calculateReplyRate uses unique replied leads against sent count", () => {
