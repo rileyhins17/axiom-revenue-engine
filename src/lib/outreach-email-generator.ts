@@ -230,33 +230,42 @@ ABSOLUTE TRUTHFULNESS RULES — violating any of these gets the email rejected:
 - You CAN reference: the enrichment block's PERSONALIZED HOOK and KEY PAIN POINT verbatim or paraphrased, because those were generated from real signals about this business.
 
 HARD RULES — violating any of these kills the conversion:
-1. LENGTH: 50-90 words. Under 95 words, period. Short wins.
-2. SUBJECT: 3-6 words, sentence case (capitalize the first word and proper nouns only — not Title Case, not all-lowercase), no salesy language. Good: "Quick thought for {Business}", "{City} {niche} site idea", "Question about {Business}". Never all-lowercase, never SHOUTY CASE, never: "Exclusive Opportunity", "Unlock Your Potential", "Grow {Business} 10x".
-3. OPENING LINE: Reference niche + city + business name as the concrete anchor. Examples: "Hey {first name}, I work with {niche} businesses in {city} and {Business} caught my eye.", "Hey there, came across {Business} while looking through {niche} in {city}." NEVER claim to have visited the site.
-4. ONE OBSERVATION: Use the PERSONALIZED HOOK from enrichment when present. Otherwise reference an industry pattern relevant to the niche. Frame it as a pattern across SIMILAR businesses, NOT a specific finding about their site. Examples: "Most {niche} owners I talk to in {city} say their biggest leak is X." or "Across {niche} businesses in {city}, the common pattern is Y." NEVER write "in electrician," or "in drywall," — single-word niches must be followed by "businesses" or "owners" or "operators". Soften with "from what I see most", "a lot of {niche} owners are dealing with", "the common pattern is".
-5. ONE CTA: A single low-friction question. Best: "want me to share what I'd build differently?", "open to me sending 2-3 ideas?", "want a quick look at how I'd approach it?". Never: "schedule a call", "book a demo".
-6. SIGNOFF: "Best,
+1. LENGTH: 55-80 words total (counting body only, not greeting/signoff). Shorter wins on mobile.
+2. SUBJECT: 3-6 words, sentence case (capitalize the first word and proper nouns only — not Title Case, not all-lowercase), zero salesy language. Lean toward specific + curious. Strong patterns: "Quick Q on {Business}", "{firstName}, one thought on {Business}", "{City} {niche} site idea", "Noticed something on {Business}", "One tweak for {Business}". Never all-lowercase, never SHOUTY CASE, never: "Exclusive Opportunity", "Unlock Your Potential", "Grow {Business} 10x", and never generic patterns like "Quick site thought" or "Question about the site".
+3. GREETING: Always use the recipient's first name when provided ("Hey {firstName},"). Only fall back to "Hey there," if no name is available. The first name itself is the single biggest reply-rate lever.
+4. OPENING LINE (after greeting): Concrete anchor referencing niche + city + business name. Examples: "I work with {niche} businesses in {city} and {Business} caught my eye.", "Came across {Business} while looking through {niche} operators in {city}." NEVER claim to have visited the site.
+5. ONE OBSERVATION: REQUIRED — anchor on the enrichment's PERSONALIZED HOOK or KEY PAIN POINT (those were generated from real public signals about this business, not fabricated). Paraphrase naturally — do not quote it verbatim if it reads stiff. Frame as a pattern across SIMILAR businesses, NOT a specific finding about their site. If both hook and pain point are weak or generic, fall back to an industry pattern relevant to the niche ("Most {niche} owners I talk to in {city} say their biggest leak is X."). NEVER write "in electrician," or "in drywall," — single-word niches must be followed by "businesses" or "owners" or "operators". Soften with "from what I see most", "a lot of {niche} owners are dealing with", "the common pattern is".
+6. ONE CTA: A single low-friction question that's easy to answer YES to in two seconds. Strong patterns:
+   - "Want me to send the 2 or 3 things I'd change?"
+   - "Want a free 1-page audit?"
+   - "Open to me sharing what I'd tweak?"
+   - "How many quote requests are you getting from the site each week right now?" (when the niche is service-heavy and an open-ended question lands well)
+   Match the recommended CTA from enrichment when it is concrete. NEVER use: "schedule a call", "book a demo", "hop on a call", "let's connect".
+7. OPTIONAL PS LINE: You MAY add a single PS line (max 18 words) when it adds something specific. Use it for a low-friction follow-up question or a tiny piece of context (e.g., "PS — happy to send a 2-min Loom instead if that's easier.", "PS — no pitch, just curious if you've already tried fixing this."). Skip PS if it would feel forced.
+8. SIGNOFF: "Best,
 {First Name}" or "Thanks,
-{First Name}" — nothing else. No title, no company name after the signature.
-7. BANNED PHRASES (never use, even paraphrased): "hope this finds you well", "my name is", "we specialize in", "I help businesses like yours", "would love to", "circle back", "touch base", "unlock growth", "digital transformation", "boost revenue", "online presence", "scale your business", "award-winning", "stellar reputation", "glowing reviews", "high-converting", "best-in-class", "schedule a quick 10-minute call", "hop on a call", "while looking at a few sites tonight", "had a quick look at", "spent a minute on", "your page", "your hero", "your nav", "your contact path".
-8. NO exclamation marks. NO em dashes (—). NO bold. NO HTML. Plain text only.
-9. NO generic compliments ("you have a great business", "stellar reputation"). If you compliment, anchor it in given data: "X years in {city}", "{N} Google reviews", "you focus on {service}".
-10. GOOGLE REVIEWS: Do NOT open with reviews/rating/stars. Only reference reviews if the count is genuinely impressive (>= 25) AND not in the first sentence.
-11. CONVERSION INTENT: Tie the value to a tangible business outcome (more quote requests, fewer dropped bookings, faster reply times) — never agency platitudes like "improve your online presence".
-12. IF the lead is a NON-CUSTOMER entity (government, regulator, authority, commission, ministry, agency, nonprofit, association, foundation, institute, council, board, chamber of commerce), STOP and return {"subject":"","body":"","skip_reason":"non-customer entity"}. Do not write copy for them.
+{First Name}" — nothing else. No title, no company name after the signature. The PS line goes BELOW the signoff if used.
+9. BANNED PHRASES (never use, even paraphrased): "hope this finds you well", "my name is", "we specialize in", "I help businesses like yours", "would love to", "circle back", "touch base", "unlock growth", "digital transformation", "boost revenue", "online presence", "scale your business", "award-winning", "stellar reputation", "glowing reviews", "high-converting", "best-in-class", "schedule a quick 10-minute call", "hop on a call", "while looking at a few sites tonight", "had a quick look at", "spent a minute on", "your page", "your hero", "your nav", "your contact path".
+10. NO exclamation marks. NO em dashes (—). NO bold. NO HTML. Plain text only.
+11. NO generic compliments ("you have a great business", "stellar reputation"). If you compliment, anchor it in given data: "X years in {city}", "{N} Google reviews", "you focus on {service}".
+12. GOOGLE REVIEWS: Do NOT open with reviews/rating/stars. Only reference reviews if the count is genuinely impressive (>= 25) AND not in the first sentence.
+13. CONVERSION INTENT: Tie the value to a tangible business outcome (more quote requests, fewer dropped bookings, faster reply times) — never agency platitudes like "improve your online presence".
+14. TONE: Match the enrichment block's emailTone field when it is set ("casual" = chatty + first-name + contractions, "professional" = composed + complete sentences + no contractions, "urgent" = direct + short sentences + no fluff). If unset, default to casual.
+15. IF the lead is a NON-CUSTOMER entity (government, regulator, authority, commission, ministry, agency, nonprofit, association, foundation, institute, council, board, chamber of commerce), STOP and return {"subject":"","body":"","skip_reason":"non-customer entity"}. Do not write copy for them.
 
 STRUCTURE that converts (follow this exactly):
-  Line 1 — "Hey {first name}," or "Hey there," if no first name.
+  Line 1 — "Hey {first name}," (always use first name when available).
   Line 2 — concrete anchor referencing niche + city + business name. No site claims.
-  Line 3 — ONE industry-pattern observation OR the enrichment PERSONALIZED HOOK. Phrased as something true across similar businesses, not a specific finding about their site.
-  Line 4 — the single low-friction CTA (question format).
+  Line 3 — ONE observation drawn from the enrichment PERSONALIZED HOOK or KEY PAIN POINT, paraphrased into a natural industry-pattern statement.
+  Line 4 — the single low-friction question CTA.
   Line 5 — "Best,
 {first name of sender}"
+  Optional Line 6 — "PS — {one short specific line, max 18 words}." (only when it genuinely adds something)
 
 Return JSON only:
 {
   "subject": "3-6 word sentence-case subject (capitalize first word and proper nouns only)",
-  "body": "plain-text body, no greetings template, exactly the 4-5 lines described",
+  "body": "plain-text body, no greetings template, exactly the 4-6 lines described",
   "personalization_reason": "one sentence on why this email will resonate with this specific lead",
   "observed_issue": "the single issue referenced",
   "CTA_type": "observation_offer | permission_offer | soft_call",
@@ -422,26 +431,26 @@ function stableHashFromLeadId(value: string | number | null | undefined) {
 }
 
 function rotateFallbackSubject(lead: LeadRecord): string {
-  const domainOrName = lead.websiteDomain || lead.businessName;
+  const businessName = lead.businessName;
   const city = lead.city?.trim() || "";
   const niche = lead.niche?.trim() || "";
+  const recipientFirst = lead.contactName?.trim().split(/\s+/)[0] || "";
+  // Skewed toward specific + curious subjects. Removed generic patterns
+  // ("Quick site thought", "Question about the site", "Small site note") that
+  // tested as bland and indistinguishable from spam.
   const pool: string[] = [
-    `Quick thought on ${domainOrName}`,
-    "Quick site thought",
-    "Small site note",
-    "Question about the site",
-    "Noticed one thing",
-    `Quick note on ${domainOrName}`,
-    `Thought on your ${niche || "business"} site`,
-    `Something on ${domainOrName}`,
-    city ? `${city} ${niche || "business"} question` : "Site question",
-    `One thing on ${domainOrName}`,
-    `Idea for ${lead.businessName}`,
-    `${lead.businessName} site thought`,
-    niche ? `${niche} site note` : "Site note",
-    `Thought for ${lead.businessName}`,
-    `Had a look at ${domainOrName}`,
-  ];
+    `Quick Q on ${businessName}`,
+    recipientFirst ? `${recipientFirst}, one thought on ${businessName}` : `One thought on ${businessName}`,
+    `Noticed something on ${businessName}`,
+    `One tweak for ${businessName}`,
+    city && niche ? `${city} ${niche} idea` : "",
+    `Idea for ${businessName}`,
+    `${businessName} — one thing`,
+    `Two minutes for ${businessName}?`,
+    recipientFirst ? `${recipientFirst}, quick question` : "",
+    niche ? `${niche} site question` : "",
+  ].filter(Boolean);
+  if (pool.length === 0) return `Quick Q on ${businessName}`;
   const index = stableHashFromLeadId(lead.id) % pool.length;
   return pool[index];
 }
@@ -592,24 +601,25 @@ function buildPlanBasedInitialEmail(
     ? cleanEmailLine(rawConsequence, "")
     : "";
 
-  // --- CTA: low-friction, rotated across leads ---
+  // --- CTA: low-friction question, rotated across leads ---
+  // Question-form CTAs convert better than statements because they're
+  // answerable in two seconds and feel like a real conversation, not a pitch.
   const ctaLine =
     plan.CTA_type === "soft_call"
       ? [
-          "Open to me walking you through what I'd fix?",
-          "Want me to walk you through it quickly?",
-          "Would a quick walkthrough be useful?",
+          "Open to a quick 5-minute look?",
+          "Want me to walk you through it on a quick call?",
+          "Worth a 5-minute look together?",
         ][openerSeed % 3]
       : [
-          "Worth me sending over the 2 or 3 things I'd change?",
-          "Want me to send over what I'd fix?",
-          "Happy to send a couple of thoughts if that's useful.",
-          "Open to me sharing what I noticed?",
-          "Would it help if I sent a few specific ideas?",
-          "Want me to put together a quick list of what I'd tweak?",
-          "Interested in seeing what I'd do differently?",
-          "Should I send over the couple of things that stood out?",
-        ][openerSeed % 8];
+          "Want me to send the 2 or 3 things I'd change?",
+          "Want a free 1-page audit?",
+          "Open to me sharing what I'd tweak?",
+          "Want the specific ideas in your inbox?",
+          "Should I send a short list of what I'd fix?",
+          "Want me to send a 2-min Loom showing the fix?",
+          "Worth me sending the 3 things that stood out?",
+        ][openerSeed % 7];
 
   // --- Positive line: one specific, earned compliment ---
   const reviewCount = Number(lead.reviewCount || 0);
