@@ -313,17 +313,16 @@ function scoreReachability(input: {
 }
 
 function scoreLocalFit(city: string, reviewContent: string, nicheText: string) {
-  const cityLower = city.toLowerCase().trim();
+  // Geography neutral. Axiom services any location worldwide — a fence company
+  // in Sydney is just as scoreable as one in Kitchener. Reserve points for
+  // growth signals that indicate the business is actively expanding (and
+  // therefore likely to invest in their web infrastructure).
+  void city;
   const text = normalizeText(reviewContent, nicheText);
-  let score = 0;
-
-  if (AXIOM_CORE_CITIES.includes(cityLower)) score += 8;
-  else if (AXIOM_PRIORITY_CITIES.includes(cityLower)) score += 6;
-  else if (cityLower.includes("ontario") || cityLower.includes(", on")) score += 3;
-  else score += 1;
+  let score = 6; // flat baseline so the bucket still contributes meaningfully
 
   const growthSignals = ["new location", "expanding", "hiring", "book now", "book online", "quote"];
-  score += clamp(growthSignals.filter((signal) => text.includes(signal)).length * 2, 0, 7);
+  score += clamp(growthSignals.filter((signal) => text.includes(signal)).length * 2, 0, 9);
 
   return clamp(score, 0, 15);
 }
@@ -381,9 +380,9 @@ function buildReasonSummary(input: {
     codes.push("weak_fit");
   }
 
-  if (input.localFit >= 8) {
-    reasons.push("The location is inside Axiom's preferred operating market.");
-    codes.push("priority_market");
+  if (input.localFit >= 10) {
+    reasons.push("The business is signalling active growth (hiring, expanding, online booking).");
+    codes.push("growth_signal");
   }
 
   if (input.assessment && (input.assessment.conversionRisk >= 3 || input.assessment.trustRisk >= 3)) {

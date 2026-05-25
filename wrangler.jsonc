@@ -40,6 +40,11 @@
     "CLOUD_SCRAPE_ENABLED": "true",
     "CLOUD_SCRAPE_TIMEOUT_MS": "840000",
     "CLOUD_SCRAPE_WORKER_NAME": "cloudflare-browser",
+    // Detail-page extraction is what populates websiteDomain + email + the
+    // WebsiteAssessment block (speedRisk/conversionRisk/trustRisk/seoRisk).
+    // Without this, every scraped lead lands with no email and gets capped
+    // below the outreach threshold by the email gate.
+    "CLOUD_SCRAPE_DETAIL_PAGES_ENABLED": "true",
     "RATE_LIMIT_WINDOW_SECONDS": "60",
     "RATE_LIMIT_MAX_AUTH": "50",
     "RATE_LIMIT_MAX_SCRAPE": "20",
