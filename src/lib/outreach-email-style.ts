@@ -263,14 +263,14 @@ function getObservationFromAssessment(lead: LeadRecord, assessment: WebsiteAsses
     return {
       observedIssue: "The contact or quote path looks more complicated than it needs to be.",
       observationHint: [
-        "Most {niche} businesses I see lose a chunk of inbound when the quote request takes more than 2 fields.",
-        "In {niche} the biggest leak is usually the quote form. Most owners don't realize how many taps it takes on mobile.",
-        "The pattern I see across {niche} businesses is that the inquiry path quietly costs quote requests.",
+        "Most {niche} get more calls when the phone number and quote request are obvious on mobile.",
+        "For {niche}, the site has one main job: make it easy for a ready buyer to call or ask for a quote.",
+        "The best-performing {niche} sites usually make the next step obvious within a few seconds.",
       ][s % 3],
       consequenceHint: [
-        "Even one extra step at that point makes people bounce.",
-        "Most mobile visitors won't push through more than a couple of taps.",
-        "That friction tends to cost more quote requests than most owners expect.",
+        "That is usually where ready-to-book visitors decide whether to call or keep searching.",
+        "Small clarity changes there can turn more of the same traffic into calls.",
+        "A clearer next step helps the good reputation turn into more quote requests.",
       ][s % 3],
       evidence: `Website assessment flagged conversion risk ${assessment.conversionRisk}/10.`,
       strength: 88,
@@ -353,14 +353,14 @@ function getObservationFromPainSignals(lead: LeadRecord, painSignals: PainSignal
       return {
         observedIssue: "The contact path may be creating more friction than it should.",
         observationHint: [
-          "Most {niche} businesses lose quote requests at the contact step rather than at the homepage.",
-          "In {niche}, the most common silent leak is the contact path needing fewer fields and clearer phone placement.",
-          "Across {niche} businesses, the inquiry-to-reply gap is usually wider than owners realize.",
+          "Most {niche} get more calls when the phone number and quote request are obvious on mobile.",
+          "For {niche}, the site has one main job: make it easy for a ready buyer to call or ask for a quote.",
+          "The best-performing {niche} sites usually make the next step obvious within a few seconds.",
         ][s % 3],
         consequenceHint: [
-          "Even one extra step at that point makes people bounce.",
-          "Most people on mobile won't push through more than a couple of steps.",
-          "That friction tends to cost more quote requests than most owners expect.",
+          "That is usually where ready-to-book visitors decide whether to call or keep searching.",
+          "Small clarity changes there can turn more of the same traffic into calls.",
+          "A clearer next step helps the good reputation turn into more quote requests.",
         ][s % 3],
         evidence: strongest.evidence || "Stored pain signals suggest contact or conversion friction.",
         strength: 82,

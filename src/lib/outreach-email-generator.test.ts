@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
 
-import { buildFollowUpContextForTesting } from "./outreach-email-generator";
+import { buildFollowUpContextForTesting, buildInitialEmailForTesting } from "./outreach-email-generator";
 import type { EnrichmentResult } from "./outreach-enrichment";
 import type { LeadRecord } from "./prisma";
 
@@ -119,4 +119,55 @@ test("follow-up context uses current lead intelligence instead of repeating stal
   assert(context.includes("The contact path is buried below project photos."));
   assert(!context.includes("Your 5-star reviews are a strong asset"));
   assert(!context.includes("PREVIOUS EMAIL BODY"));
+});
+
+test("initial fallback copy is professional, concrete, and safe for autonomous sends", () => {
+  const lead = {
+    ...makeLead(),
+    id: 3935,
+    businessName: "Vancouver Green Electric Ltd",
+    niche: "electrician",
+    city: "Vancouver",
+    category: "Electrician",
+    contactName: null,
+    reviewCount: 996558,
+    rating: 5,
+    websiteUrl: "https://vge.limited",
+    websiteDomain: "vge.limited",
+    painSignals: JSON.stringify([
+      {
+        type: "CONTACT",
+        severity: 7,
+        source: "website",
+        evidence: "Quote request path could be clearer for mobile visitors.",
+      },
+    ]),
+    axiomWebsiteAssessment: JSON.stringify({
+      overallGrade: "C",
+      speedRisk: 3,
+      conversionRisk: 7,
+      trustRisk: 4,
+      seoRisk: 3,
+      topFixes: ["Make the quote request easier to find", "Clarify service areas"],
+    }),
+  } satisfies LeadRecord;
+
+  const email = buildInitialEmailForTesting(lead, enrichment, "Aidan Magee");
+  const combined = `${email.subject}\n${email.bodyPlain}`;
+  const lower = combined.toLowerCase();
+
+  assert.match(email.subject, /vancouver green electric|electrical|electrician/i);
+  assert(!/quick q|one tweak|one thing|noticed something|two minutes/i.test(email.subject));
+  assert(!/[&-]\s*$/.test(email.subject));
+
+  assert(email.bodyPlain.includes("Vancouver Green Electric Ltd"));
+  assert(!lower.includes("electrician in vancouver"));
+  assert(!lower.includes("popped up"));
+  assert(!lower.includes("scanning"));
+  assert(!lower.includes("inquiry-to-reply gap"));
+  assert(!lower.includes("friction tends"));
+  assert(!lower.includes("speak for themselves"));
+  assert(!combined.includes("996558"));
+  assert.match(email.bodyPlain, /quote|call|request/i);
+  assert.match(email.bodyPlain, /Best,\nAidan$/);
 });

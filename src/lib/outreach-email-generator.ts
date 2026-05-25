@@ -307,7 +307,7 @@ function sanitizeSubject(subject: string, businessName: string) {
     .trim();
 
   if (trimmed.length > 0) {
-    const shortSubject = trimmed.split(/\s+/).filter(Boolean).slice(0, 6).join(" ");
+    const shortSubject = trimmed.split(/\s+/).filter(Boolean).slice(0, 8).join(" ");
     const normalizedSubject = shortSubject.toLowerCase().startsWith("re:")
       ? `Re: ${toSentenceCase(shortSubject.replace(/^re:\s*/i, ""))}`
       : toSentenceCase(shortSubject);
@@ -435,7 +435,6 @@ function rotateFallbackSubject(lead: LeadRecord): string {
   // ("Quick site thought", "Question about the site", "Small site note") that
   // tested as bland and indistinguishable from spam.
   const pool: string[] = [
-    `Quick Q on ${businessName}`,
     recipientFirst ? `${recipientFirst}, one thought on ${businessName}` : `One thought on ${businessName}`,
     `Noticed something on ${businessName}`,
     `One tweak for ${businessName}`,
@@ -446,7 +445,7 @@ function rotateFallbackSubject(lead: LeadRecord): string {
     recipientFirst ? `${recipientFirst}, quick question` : "",
     niche ? `${niche} site question` : "",
   ].filter(Boolean);
-  if (pool.length === 0) return `Quick Q on ${businessName}`;
+  if (pool.length === 0) return `One thought on ${businessName}`;
   const index = stableHashFromLeadId(lead.id) % pool.length;
   return pool[index];
 }
@@ -465,6 +464,23 @@ function extractLeadDomain(lead: LeadRecord): string {
   return raw.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] || "";
 }
 
+function servicePhraseForCopy(value: string | null | undefined) {
+  const niche = (value || "").trim().toLowerCase();
+  if (!niche) return "local service companies";
+  if (niche.includes("electric")) return "electricians";
+  if (niche.includes("plumb")) return "plumbing companies";
+  if (niche.includes("roof")) return "roofing companies";
+  if (niche.includes("tree")) return "tree service companies";
+  if (niche.includes("mason")) return "masonry contractors";
+  if (niche.includes("drywall")) return "drywall contractors";
+  if (niche.includes("fenc")) return "fencing contractors";
+  if (niche.includes("pressure")) return "pressure washing companies";
+  if (niche.includes("junk")) return "junk removal companies";
+  if (niche.includes("snow")) return "snow removal companies";
+  if (/\b(companies|contractors|services|shops|clinics|firms)\b/.test(niche)) return niche;
+  return `${niche} companies`;
+}
+
 function buildPlanBasedInitialEmail(
   lead: LeadRecord,
   plan: ColdEmailPlan,
@@ -477,10 +493,11 @@ function buildPlanBasedInitialEmail(
   const domain = extractLeadDomain(lead);
   const city = lead.city?.trim() || "";
   const niche = lead.niche?.trim() || "";
-  // "electricians in Kitchener", "custom cabinetry in Guelph", etc.
-  const nicheCity = niche && city
-    ? `${niche.toLowerCase()} in ${city}`
-    : niche.toLowerCase() || (city ? `local businesses in ${city}` : "");
+  
+  const niceNiche = servicePhraseForCopy(niche);
+  const nicheCity = niceNiche && city
+    ? `${niceNiche} in ${city}`
+    : niceNiche || (city ? `local businesses in ${city}` : "");
 
   // --- Opening line: prove you looked at their specific business ---
   const openerSeed = stableHashFromLeadId(lead.id);
@@ -537,12 +554,13 @@ function buildPlanBasedInitialEmail(
       ][openerSeed % 7];
     } else if (domain) {
       openingLine = [
-        `I was looking through ${domain} and had one quick thought.`,
-        `Spent a minute on ${domain} today.`,
-        `Had a quick look at ${domain} earlier.`,
-        `Pulled up ${domain} and had a thought.`,
-        `Took a look at ${domain} earlier today.`,
-      ][openerSeed % 5];
+        `Came across ${lead.businessName} while researching ${niche || 'local businesses'} in ${city || 'the area'}.`,
+        `Wanted to reach out about ${lead.businessName} directly.`,
+        `Noticed ${lead.businessName} while researching ${niche || "operators"} nearby.`,
+        `Saw ${lead.businessName} on a list of ${niche || "businesses"} worth looking at.`,
+        `${lead.businessName} came up while I was going through the area.`,
+        `Came across ${lead.businessName} and wanted to share a quick thought.`,
+      ][openerSeed % 6];
     } else {
       openingLine = [
         `I came across ${lead.businessName} in ${city || "your area"} and had one quick thought.`,
@@ -593,7 +611,7 @@ function buildPlanBasedInitialEmail(
     positiveLine = [
       `${reviewCount} reviews at ${rating} stars says a lot about the work.`,
       `Clearly doing strong work with ${reviewCount} reviews.`,
-      `The ${reviewCount} reviews speak for themselves.`,
+      `Building a reputation like that takes real work.`,
     ][openerSeed % 3];
   } else if (niche && niche.length > 2) {
     positiveLine = [
@@ -787,4 +805,13 @@ export async function generateSequenceStepEmail(
   }
 
   return generateFollowUpEmail(lead, enrichment, senderName, previousEmail, stepType);
+}
+
+export function buildInitialEmailForTesting(
+  lead: LeadRecord,
+  enrichment: EnrichmentResult,
+  senderName: string,
+): GeneratedEmail {
+  const plan = chooseColdEmailPlan(lead, enrichment);
+  return buildPlanBasedInitialEmail(lead, plan, senderName);
 }
