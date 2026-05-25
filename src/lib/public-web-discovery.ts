@@ -11,10 +11,11 @@ type PageSnapshot = {
     links: ResolvedLink[];
 };
 
-// Lowered from 4 to 2 to fit the per-target time budget. Homepage + one
-// contact page usually surfaces the email; the marginal yield from a third
-// or fourth page was tiny but added 25-30 seconds per target on slow sites.
-const WEBSITE_DISCOVERY_CONTACT_PAGE_LIMIT = 2;
+// 3 contact pages: homepage + 2 sub-pages (contact/about/team most often).
+// Previously 2 produced 0 emails across 25-target scrape jobs. 3 raises
+// yield meaningfully on sites that bury email under About/Team without
+// blowing per-target time budget too far.
+const WEBSITE_DISCOVERY_CONTACT_PAGE_LIMIT = 3;
 const WEBSITE_DISCOVERY_PAGE_SETTLE_MS = 500;
 
 async function waitForDiscoveryPageReady(page: AutomationPage): Promise<void> {

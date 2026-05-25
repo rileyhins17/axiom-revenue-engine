@@ -1,6 +1,12 @@
 export const AXIOM_OUTREACH_MIN_SCORE = 29;
 export const OWNER_EMAIL_MIN_CONFIDENCE = 0.5;
-export const STAFF_EMAIL_MIN_CONFIDENCE = 0.65;
+// Lowered from 0.65 → 0.45 so legitimate generic addresses like
+// "purepourconcreteinc@gmail.com" or "info@host.ca" — extracted with the
+// standard 0.48 confidence — pass the gate. Safe because: malformed-address
+// validator rejects junk at extraction time, Gmail bounce sync suppresses
+// hard-bouncers automatically, and the lead score still weights staff
+// lower than owner.
+export const STAFF_EMAIL_MIN_CONFIDENCE = 0.45;
 
 export type EmailQualificationInput = {
   email: string | null | undefined;
