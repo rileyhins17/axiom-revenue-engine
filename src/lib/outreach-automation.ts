@@ -2432,6 +2432,11 @@ export async function queueLeadsForAutomation(input: {
       },
     });
 
+    pendingAssignments.set(
+      allocation.mailbox.id,
+      (pendingAssignments.get(allocation.mailbox.id) || 0) + 1,
+    );
+
     const stepIds: string[] = [];
     for (let index = 0; index < timeline.length; index++) {
       const stepId = crypto.randomUUID();
