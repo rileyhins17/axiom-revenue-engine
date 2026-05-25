@@ -1656,6 +1656,20 @@ async function collectTargets(
 
     await sendEvent({ message: `[MAPS] Detail extraction started` });
 
+    // Cap detail-page work to 25 listings per job. Each detail page is a
+    // browser navigation + per-target website visit (email extraction +
+    // assessment), so the per-job time scales linearly. Without a cap, jobs
+    // routinely exceed the 14-minute CLOUD_SCRAPE_TIMEOUT_MS and Cloudflare
+    // marks them failed. 25 detail visits ~= 12 min wall-clock and still
+    // yields plenty of leads per job.
+    const MAX_DETAIL_LISTINGS = 25;
+    if (placeLinks.length > MAX_DETAIL_LISTINGS) {
+      await sendEvent({
+        message: `[MAPS] Capping detail extraction at ${MAX_DETAIL_LISTINGS}/${placeLinks.length} listings to fit job budget`,
+      });
+      placeLinks = placeLinks.slice(0, MAX_DETAIL_LISTINGS);
+    }
+
     const targets: Target[] = [];
     let directDetailCount = 0;
     let fallbackDetailCount = 0;
