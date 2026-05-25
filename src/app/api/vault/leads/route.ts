@@ -6,12 +6,27 @@ import { requireApiSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
+type ArchiveMode = "active" | "archived" | "all";
+
+function parseArchiveMode(value: string | null): ArchiveMode {
+  if (value === "archived" || value === "all") return value;
+  return "active";
+}
+
+function archiveWhereClause(mode: ArchiveMode) {
+  if (mode === "archived") return "COALESCE(isArchived, 0) = 1";
+  if (mode === "all") return "1 = 1";
+  return "COALESCE(isArchived, 0) = 0";
+}
+
 export async function GET(request: Request) {
   const authResult = await requireApiSession(request);
   if ("response" in authResult) return authResult.response;
 
   const url = new URL(request.url);
   const search = url.searchParams.get("search")?.trim();
+  const archiveMode = parseArchiveMode(url.searchParams.get("archive"));
+  const archiveWhere = archiveWhereClause(archiveMode);
   const limitParam = url.searchParams.get("limit");
   // Hard cap response size so the Worker does not OOM on 2k+ row payloads.
   // VaultDataTable now paginates client-side, so 1000 covers the visible page
@@ -23,6 +38,15 @@ export async function GET(request: Request) {
     : DEFAULT_LIMIT;
 
   const db = getDatabase();
+  const countsRow = await db
+    .prepare(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(CASE WHEN COALESCE(isArchived, 0) = 0 THEN 1 ELSE 0 END) AS active,
+         SUM(CASE WHEN COALESCE(isArchived, 0) = 1 THEN 1 ELSE 0 END) AS archived
+       FROM "Lead"`,
+    )
+    .first<{ total: number; active: number; archived: number }>();
 
   if (search && search.length >= 2) {
     const pattern = `%${search}%`;
@@ -31,29 +55,47 @@ export async function GET(request: Request) {
               socialLink, websiteUrl, websiteDomain, rating, reviewCount, websiteStatus,
               contactName, tacticalNote, outreachStatus, outreachChannel,
               firstContactedAt, lastContactedAt, nextFollowUpDue, outreachNotes,
-              createdAt
+              axiomScore, axiomTier, disqualifyReason, emailType, emailConfidence,
+              isArchived, createdAt
        FROM "Lead"
-       WHERE COALESCE(isArchived, 0) = 0
+       WHERE ${archiveWhere}
          AND ("businessName" LIKE ?1 OR "email" LIKE ?1 OR "city" LIKE ?1 OR "niche" LIKE ?1 OR "contactName" LIKE ?1)
        ORDER BY createdAt DESC
        LIMIT ?2`,
     ).bind(pattern, limit ?? 100);
     const result = await stmt.all<Record<string, unknown>>();
-    return NextResponse.json({ leads: result.results ?? [] });
+    return NextResponse.json({
+      leads: result.results ?? [],
+      counts: {
+        total: countsRow?.total ?? 0,
+        active: countsRow?.active ?? 0,
+        archived: countsRow?.archived ?? 0,
+      },
+      archiveMode,
+    });
   }
 
   const query = `SELECT id, businessName, niche, city, category, address, phone, email,
               socialLink, websiteUrl, websiteDomain, rating, reviewCount, websiteStatus,
               contactName, tacticalNote, outreachStatus, outreachChannel,
               firstContactedAt, lastContactedAt, nextFollowUpDue, outreachNotes,
-              createdAt
+              axiomScore, axiomTier, disqualifyReason, emailType, emailConfidence,
+              isArchived, createdAt
        FROM "Lead"
-       WHERE COALESCE(isArchived, 0) = 0
+       WHERE ${archiveWhere}
        ORDER BY createdAt DESC
        LIMIT ${limit}`;
 
   const result = await db.prepare(query).all<Record<string, unknown>>();
-  return NextResponse.json({ leads: result.results ?? [] });
+  return NextResponse.json({
+    leads: result.results ?? [],
+    counts: {
+      total: countsRow?.total ?? 0,
+      active: countsRow?.active ?? 0,
+      archived: countsRow?.archived ?? 0,
+    },
+    archiveMode,
+  });
 }
 
 export async function POST(request: Request) {

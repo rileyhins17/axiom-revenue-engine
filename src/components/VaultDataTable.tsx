@@ -71,14 +71,32 @@ type Lead = {
     lastContactedAt: string | Date | null;
     nextFollowUpDue: string | Date | null;
     outreachNotes: string | null;
+    axiomScore: number | null;
+    axiomTier: string | null;
+    disqualifyReason: string | null;
+    emailType: string | null;
+    emailConfidence: number | null;
+    isArchived: boolean | number | string | null;
     createdAt: string;
 };
 
 type SortKey = "businessName" | "city" | "rating" | "reviewCount" | "createdAt" | "niche";
 type SortDir = "asc" | "desc";
 type ContactFilter = "ALL" | "YES" | "NO";
+type ArchiveFilter = "active" | "archived" | "all";
 type ExportScope = "filtered" | "all" | "page";
 type ExportFormat = "csv" | "tsv";
+
+type VaultCounts = {
+    total: number;
+    active: number;
+    archived: number;
+};
+
+type VaultLeadsResponse = {
+    leads: Lead[];
+    counts?: VaultCounts;
+};
 
 const PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -96,6 +114,10 @@ const EXPORT_COLUMNS = [
     { key: "rating", label: "Rating", default: true },
     { key: "reviewCount", label: "Reviews", default: true },
     { key: "websiteStatus", label: "Website Status", default: true },
+    { key: "axiomScore", label: "Axiom Score", default: true },
+    { key: "axiomTier", label: "Axiom Tier", default: true },
+    { key: "disqualifyReason", label: "Disqualified Reason", default: false },
+    { key: "isArchived", label: "Archived", default: false },
     { key: "tacticalNote", label: "AI Tactical Note", default: false },
     { key: "createdAt", label: "Date Added", default: false },
 ] as const;
@@ -107,6 +129,10 @@ const defaultExportColumns = () =>
 
 function hasText(value: string | null) {
     return Boolean(value && value.trim());
+}
+
+function isArchivedLead(lead: Lead) {
+    return lead.isArchived === true || lead.isArchived === 1 || lead.isArchived === "1";
 }
 
 function getWebsiteLabel(status: string | null) {
@@ -130,6 +156,19 @@ function StatusBadge({ status }: { status: string | null }) {
         >
             {missing ? <XCircle className="h-3 w-3" /> : active ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
             {getWebsiteLabel(status)}
+        </span>
+    );
+}
+
+function ArchiveStateBadge({ lead }: { lead: Lead }) {
+    if (!isArchivedLead(lead)) return null;
+    return (
+        <span
+            className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 bg-amber-500/[0.08] px-2 py-1 text-[10px] font-medium text-amber-200"
+            title={lead.disqualifyReason || "Archived lead"}
+        >
+            <Archive className="h-3 w-3" />
+            Disqualified
         </span>
     );
 }
@@ -243,17 +282,26 @@ function LeadDetails({ lead }: { lead: Lead }) {
                 <FieldValue label="City" value={lead.city || "Unknown"} />
                 <FieldValue label="Address" value={lead.address || "No address captured"} />
                 <FieldValue label="Category" value={lead.category || "Uncategorized"} />
+                <FieldValue label="Score" value={lead.axiomScore != null ? `${lead.axiomScore}/100 ${lead.axiomTier || ""}`.trim() : "Not scored"} mono />
                 <FieldValue label="Added" value={formatAppDate(lead.createdAt)} mono />
             </div>
 
             <div className="min-w-0 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Notes</div>
-                    <OutreachStatusInline status={lead.outreachStatus} />
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        <ArchiveStateBadge lead={lead} />
+                        <OutreachStatusInline status={lead.outreachStatus} />
+                    </div>
                 </div>
                 <p className="min-w-0 whitespace-pre-wrap break-words text-xs leading-5 text-zinc-300">
                     {lead.tacticalNote || "No tactical note generated."}
                 </p>
+                {isArchivedLead(lead) ? (
+                    <div className="rounded-lg border border-amber-500/15 bg-amber-500/[0.04] p-3">
+                        <FieldValue label="Disqualified reason" value={lead.disqualifyReason || "Archived by operator"} />
+                    </div>
+                ) : null}
                 {isContactedOutreachStatus(lead.outreachStatus) ? (
                     <div className="grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-3 text-[11px] text-zinc-500">
                         <FieldValue label="Channel" value={getOutreachChannelLabel(lead.outreachChannel)} />
@@ -312,6 +360,7 @@ function MobileLeadCard({
                         <ChevronRight className={`mt-0.5 size-4 shrink-0 text-zinc-600 transition ${expanded ? "rotate-90" : ""}`} />
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <ArchiveStateBadge lead={lead} />
                         <StatusBadge status={lead.websiteStatus} />
                         <ContactIndicators lead={lead} />
                         <OutreachStatusInline status={lead.outreachStatus} />
@@ -401,16 +450,32 @@ function TriFilter({ label, value, onChange }: { label: string; value: ContactFi
 export default function VaultDataTable({ totalCount }: { totalCount: number }) {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(true);
+    const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("active");
+    const [vaultCounts, setVaultCounts] = useState<VaultCounts>({
+        total: totalCount,
+        active: totalCount,
+        archived: 0,
+    });
 
     useEffect(() => {
-        fetch("/api/vault/leads")
+        const controller = new AbortController();
+        setLoading(true);
+        fetch(`/api/vault/leads?archive=${archiveFilter}&limit=5000`, { signal: controller.signal })
             .then((r) => r.json())
-            .then((data: { leads: Lead[] }) => {
+            .then((data: VaultLeadsResponse) => {
                 setLeads(data.leads ?? []);
+                if (data.counts) {
+                    setVaultCounts(data.counts);
+                }
             })
-            .catch(() => {})
-            .finally(() => setLoading(false));
-    }, []);
+            .catch((error) => {
+                if ((error as Error).name !== "AbortError") setLeads([]);
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
+        return () => controller.abort();
+    }, [archiveFilter]);
     const [search, setSearch] = useState("");
     const [showFilters, setShowFilters] = useState(false);
     const [statusFilter, setStatusFilter] = useState("ALL");
@@ -449,6 +514,9 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
         [leads],
     );
 
+    const archiveViewTotal = archiveFilter === "archived" ? vaultCounts.archived : archiveFilter === "all" ? vaultCounts.total : vaultCounts.active;
+    const loadedAllRows = leads.length >= archiveViewTotal;
+
     const activeFilterCount = useMemo(() => {
         let count = 0;
         if (statusFilter !== "ALL") count++;
@@ -486,6 +554,8 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                     (lead.contactName || "").toLowerCase().includes(query) ||
                     (lead.category || "").toLowerCase().includes(query) ||
                     (lead.address || "").toLowerCase().includes(query) ||
+                    (lead.axiomTier || "").toLowerCase().includes(query) ||
+                    (lead.disqualifyReason || "").toLowerCase().includes(query) ||
                     (lead.tacticalNote || "").toLowerCase().includes(query) ||
                     (lead.outreachNotes || "").toLowerCase().includes(query) ||
                     (lead.outreachStatus || "").toLowerCase().includes(query);
@@ -526,7 +596,7 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
 
     // React 19 idiom: reset page during render when filter signature changes,
     // and clamp page to valid range. Avoids the cascading-effect anti-pattern.
-    const filterSignature = `${search}|${statusFilter}|${hasEmailFilter}|${hasPhoneFilter}|${hasContactFilter}|${hasSocialFilter}|${nicheFilter}|${cityFilter}|${perPage}`;
+    const filterSignature = `${archiveFilter}|${search}|${statusFilter}|${hasEmailFilter}|${hasPhoneFilter}|${hasContactFilter}|${hasSocialFilter}|${nicheFilter}|${cityFilter}|${perPage}`;
     const [prevFilterSignature, setPrevFilterSignature] = useState(filterSignature);
     if (prevFilterSignature !== filterSignature) {
         setPrevFilterSignature(filterSignature);
@@ -677,8 +747,16 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
     }, [selectedIds]);
 
     const handleLeadCreated = useCallback((lead: Record<string, unknown>) => {
-        setLeads((prev) => [lead as unknown as Lead, ...prev]);
-    }, []);
+        const createdLead = lead as unknown as Lead;
+        setVaultCounts((prev) => ({
+            total: prev.total + 1,
+            active: prev.active + (isArchivedLead(createdLead) ? 0 : 1),
+            archived: prev.archived + (isArchivedLead(createdLead) ? 1 : 0),
+        }));
+        if (archiveFilter !== "archived" || isArchivedLead(createdLead)) {
+            setLeads((prev) => [createdLead, ...prev]);
+        }
+    }, [archiveFilter]);
 
     const selectedExportColumnCount = Object.values(exportColumns).filter(Boolean).length;
     const exportRowCount = exportScope === "all" ? leads.length : exportScope === "page" ? pagedLeads.length : processedLeads.length;
@@ -732,7 +810,29 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                     </Button>
                     <div className="h-5 w-px bg-white/[0.08]" />
                     {[
-                        { key: "ALL", label: "All", count: statusCounts.all },
+                        { key: "active" as const, label: "Active", count: vaultCounts.active },
+                        { key: "archived" as const, label: "Disqualified", count: vaultCounts.archived },
+                        { key: "all" as const, label: "All", count: vaultCounts.total },
+                    ].map((option) => (
+                        <Button
+                            key={option.key}
+                            type="button"
+                            variant={archiveFilter === option.key ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setArchiveFilter(option.key)}
+                            className={`h-8 gap-2 px-3 text-[11px] ${
+                                archiveFilter === option.key
+                                    ? "bg-amber-200 text-black hover:bg-amber-100"
+                                    : "border-white/[0.08] text-zinc-500 hover:text-white"
+                            }`}
+                        >
+                            {option.label}
+                            <span className="font-mono tabular-nums opacity-70">{option.count.toLocaleString()}</span>
+                        </Button>
+                    ))}
+                    <div className="h-5 w-px bg-white/[0.08]" />
+                    {[
+                        { key: "ALL", label: "Any site", count: statusCounts.all },
                         { key: "MISSING", label: "No site", count: statusCounts.missing },
                         { key: "ACTIVE", label: "Verified", count: statusCounts.active },
                     ].map((status) => (
@@ -786,7 +886,11 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                     {loading ? <span className="animate-pulse">Loading…</span> : `${processedLeads.length.toLocaleString()} shown`}
                 </span>
                 <span className="text-zinc-700">/</span>
-                <span>{loading ? `${totalCount.toLocaleString()} total` : `${statusCounts.all.toLocaleString()} total`}</span>
+                <span>
+                    {loading
+                        ? `${archiveViewTotal.toLocaleString()} total`
+                        : `${leads.length.toLocaleString()} loaded${loadedAllRows ? "" : ` of ${archiveViewTotal.toLocaleString()}`}`}
+                </span>
                 {!loading ? (
                     <>
                         <span className="text-zinc-700">/</span>
@@ -1125,6 +1229,11 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                                                     <CopyCheck className="h-3 w-3" />
                                                     <span>Added {formatAppDate(lead.createdAt)}</span>
                                                 </div>
+                                                {isArchivedLead(lead) ? (
+                                                    <div className="mt-2">
+                                                        <ArchiveStateBadge lead={lead} />
+                                                    </div>
+                                                ) : null}
                                             </div>
                                         </TableCell>
                                         <TableCell className="max-w-[180px]">
@@ -1239,7 +1348,7 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                         </Button>
                     ))}
                     <span className="ml-1 text-xs text-zinc-600">
-                        {processedLeads.length.toLocaleString()} of {loading ? totalCount.toLocaleString() : leads.length.toLocaleString()}
+                        {processedLeads.length.toLocaleString()} shown from {leads.length.toLocaleString()} loaded
                     </span>
                 </div>
 

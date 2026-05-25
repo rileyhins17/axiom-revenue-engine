@@ -95,7 +95,7 @@ export default async function VaultPage() {
               Lead database
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-              Source of truth for every lead. Search, verify, segment, and export records — outreach status is secondary here.
+              Active leads by default. Switch to Disqualified to inspect auto-archived scrape output; outreach status is secondary here.
             </p>
           </div>
 
