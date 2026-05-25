@@ -28,7 +28,7 @@ Autonomous outreach should only send to qualified recipients:
 - owner email confidence must be at least `0.50`
 - staff email confidence must be at least `0.65`
 - generic, role, scraper-artifact, and malformed addresses are blocked
-- chain/non-customer entities are hard-disqualified before autonomous send
+- chain/non-customer entities and businesses with >800 reviews are hard-disqualified before autonomous send
 - follow-up sends remain disabled until deliberately re-enabled
 
 The dashboard and automation queue show projected effective send times based on mailbox cooldown and capacity. They should not show stale scheduled dates as if they were live next-send times.
