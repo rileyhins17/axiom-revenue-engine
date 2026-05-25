@@ -1,5 +1,6 @@
 import { isAdequateAutonomousLead } from "@/lib/automation-policy";
 import {
+  BLOCKED_ROLE_LOCAL_PARTS,
   isLeadOutreachEligible,
   OWNER_EMAIL_MIN_CONFIDENCE,
   STAFF_EMAIL_MIN_CONFIDENCE,
@@ -17,6 +18,9 @@ export function sqlDateTime(date: Date): string {
 
 export function adequateLeadWhereClause(scoreParameter = "?") {
   const localPart = `LOWER(substr(trim("email"), 1, instr(trim("email"), '@') - 1))`;
+  const blockedLocalParts = Array.from(BLOCKED_ROLE_LOCAL_PARTS)
+    .map((part) => `'${part.replaceAll("'", "''")}'`)
+    .join(", ");
 
   return `"axiomScore" >= ${scoreParameter}
          AND (
@@ -27,14 +31,7 @@ export function adequateLeadWhereClause(scoreParameter = "?") {
          AND LOWER(COALESCE("emailFlags",'')) NOT LIKE '%bounced%'
          AND LOWER(COALESCE("emailFlags",'')) NOT LIKE '%no_mx%'
          AND LOWER(COALESCE("emailFlags",'')) NOT LIKE '%generic_prefix%'
-         AND ${localPart} NOT IN (
-           'admin', 'appointments', 'booking', 'bookings', 'contact', 'customerservice',
-           'dispatch', 'enquiries', 'enquiry', 'estimate', 'estimates', 'estimating',
-           'frontdesk', 'general', 'hello', 'help', 'info', 'inquiry', 'lead', 'leads',
-           'mail', 'marketing', 'media', 'office', 'operations', 'quote', 'quotes',
-           'reception', 'sales', 'service', 'social', 'support', 'team', 'web',
-           'webmaster', 'website', 'welcome'
-         )
+         AND ${localPart} NOT IN (${blockedLocalParts})
          AND ${localPart} NOT GLOB 'info.*'
          AND ${localPart} NOT GLOB 'contact.*'
          AND ${localPart} NOT GLOB 'sales.*'

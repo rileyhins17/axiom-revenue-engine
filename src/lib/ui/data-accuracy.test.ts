@@ -74,6 +74,8 @@ test("adequate lead SQL predicate stays aligned with autonomous score/email poli
   assert.match(clause, /COALESCE\("emailConfidence", 0\) >= 0\.5/);
   assert.match(clause, /LOWER\(COALESCE\("emailType",''\)\) = 'staff'/);
   assert.match(clause, /COALESCE\("emailConfidence", 0\) >= 0\.65/);
+  assert.match(clause, /'payment'/);
+  assert.match(clause, /'arborist'/);
   assert.doesNotMatch(clause, /axiomTier/);
 });
 

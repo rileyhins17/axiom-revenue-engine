@@ -126,6 +126,7 @@ const HARD_DISQUALIFIER_PATTERNS = [
   /\b(government|gov\.|municipal(ity)?|city of|county of|state of|provincial)\b/i,
   /\b(university of|college of|public school|school district|district school board|board of education)\b/i,
   /\b(walmart|costco|home depot|lowe'?s|mcdonald'?s|starbucks|target|kroger)\b/i,
+  /\b(marriott|mr\.?\s+rooter|kent building supplies|superior propane|help international)\b/i,
   /\b(franchise corporate|hq|head office)\b/i,
   // Regulators / agencies / non-customer entities - never an outreach target.
   /\b(authority|commission|regulator|ministry|department of|office of|bureau|registrar)\b/i,

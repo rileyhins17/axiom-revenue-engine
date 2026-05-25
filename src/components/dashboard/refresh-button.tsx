@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2Icon, RefreshCwIcon } from "lucide-react";
 
@@ -15,6 +15,14 @@ export function RefreshButton() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
+  const refreshData = useCallback(() => {
+    setRefreshing(true);
+    router.refresh();
+    setTimeout(() => {
+      setLastUpdated(formatLastUpdated(new Date()));
+      setRefreshing(false);
+    }, 1500);
+  }, [router]);
 
   // Server-rendered data is "current as of" the page load.
   useEffect(() => {
@@ -25,6 +33,15 @@ export function RefreshButton() {
     });
     return () => window.cancelAnimationFrame(handle);
   }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        refreshData();
+      }
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, [refreshData]);
 
   return (
     <div className="flex items-center gap-2">
@@ -38,14 +55,7 @@ export function RefreshButton() {
         disabled={refreshing}
         aria-label={refreshing ? "Refreshing data" : "Refresh data"}
         title="Re-run all dashboard queries"
-        onClick={() => {
-          setRefreshing(true);
-          router.refresh();
-          setTimeout(() => {
-            setLastUpdated(formatLastUpdated(new Date()));
-            setRefreshing(false);
-          }, 1500);
-        }}
+        onClick={refreshData}
         className="v2-focus-ring inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 py-1.5 text-[11px] font-medium text-zinc-400 transition hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white disabled:opacity-50 cursor-pointer"
       >
         {refreshing ? (

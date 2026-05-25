@@ -5,7 +5,7 @@
  * and phone formatting with area code verification.
  */
 
-import { isPipelineEmailFormat, normalizePipelineEmail } from "./lead-qualification";
+import { BLOCKED_ROLE_LOCAL_PARTS, isPipelineEmailFormat, normalizePipelineEmail } from "./lead-qualification";
 
 export interface ContactValidation {
     emailType: "owner" | "staff" | "generic" | "unknown";
@@ -20,15 +20,7 @@ export interface ValidateEmailOptions {
     businessWebsite?: string | null;
 }
 
-export const GENERIC_ROLE_PREFIXES = [
-    "info", "contact", "hello", "office", "admin", "support",
-    "sales", "enquiry", "inquiry", "mail", "team", "service",
-    "general", "help", "customerservice", "reception",
-    "bookings", "booking", "appointments", "frontdesk", "dispatch",
-    "operations", "welcome", "marketing", "market", "web", "website",
-    "quote", "quotes", "estimate", "estimates", "estimating",
-    "leads", "lead", "media", "social",
-];
+export const GENERIC_ROLE_PREFIXES = Array.from(BLOCKED_ROLE_LOCAL_PARTS);
 
 const STAFF_PREFIXES = [
     "marketing", "events", "billing", "accounts", "finance",

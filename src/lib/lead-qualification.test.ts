@@ -27,3 +27,30 @@ test("pipeline email validation rejects generic and unclassified recipients", ()
   assert.equal(hasValidPipelineEmail({ email: "contact@example.ca", emailType: "owner", emailConfidence: 1 }), false);
   assert.equal(hasValidPipelineEmail({ email: "person@example.ca", emailType: "unknown", emailConfidence: 1 }), false);
 });
+
+test("pipeline email validation rejects business role mailboxes that scraper mislabels as owners", () => {
+  for (const email of [
+    "arborist@tree133.com",
+    "trees@boughennurseries.com",
+    "payment@littlecreektreefarm.com",
+    "ltd@eclipse-electrical.ca",
+    "privacy@example.ca",
+    "created@example.ca",
+    "services@example.ca",
+    "ontact@example.ca",
+    "rinfo@example.ca",
+    "ads@example.ca",
+    "excellent@example.ca",
+    "metroflow@example.ca",
+    "showroom@example.ca",
+    "located@example.ca",
+    "user@example.ca",
+    "atinfo@example.ca",
+    "customersupport@example.ca",
+    "dmin@example.ca",
+    "billing@example.ca",
+    "accounts@example.ca",
+  ]) {
+    assert.equal(hasValidPipelineEmail({ email, emailType: "owner", emailConfidence: 0.95 }), false, email);
+  }
+});

@@ -12,6 +12,18 @@ test("sales and marketing style inboxes are treated as generic role addresses", 
     "estimating@example.ca",
     "booking@example.ca",
     "web@example.ca",
+    "arborist@example.ca",
+    "trees@example.ca",
+    "payment@example.ca",
+    "ltd@example.ca",
+    "privacy@example.ca",
+    "created@example.ca",
+    "services@example.ca",
+    "ontact@example.ca",
+    "excellent@example.ca",
+    "metroflow@example.ca",
+    "showroom@example.ca",
+    "user@example.ca",
   ]) {
     const validation = validateEmail(email, { businessWebsite: "https://example.ca" });
     assert.equal(validation.type, "generic", email);

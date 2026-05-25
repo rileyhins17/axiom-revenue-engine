@@ -1,7 +1,16 @@
-import { AUTOMATION_SETTINGS_DEFAULTS, MAILBOX_DAILY_SEND_TARGET, MAILBOX_HOURLY_SEND_TARGET, MAILBOX_MIN_DELAY_SECONDS } from "@/lib/automation-policy";
+import { AUTOMATION_SETTINGS_DEFAULTS, isAdequateAutonomousLead, MAILBOX_DAILY_SEND_TARGET, MAILBOX_HOURLY_SEND_TARGET, MAILBOX_MIN_DELAY_SECONDS } from "@/lib/automation-policy";
 import { getDatabase, type D1DatabaseLike } from "@/lib/cloudflare";
+import { isLeadOutreachEligible, normalizePipelineEmail } from "@/lib/lead-qualification";
 
 type Tone = "running" | "waiting" | "paused" | "stopped" | "action";
+type QueueState = "ready" | "waiting_for_inbox" | "scheduled" | "unassigned";
+
+const MAILBOX_SENDABLE_STATUS_VALUES = new Set(["active", "warming"]);
+
+export type NextEmailScheduleRow = {
+  scheduledFor: string | null;
+  mailboxId: string | null;
+};
 
 export type OperatorStatus = {
   label: string;
@@ -42,6 +51,10 @@ export type OperatorNextEmail = {
   recipientEmail: string | null;
   senderEmail: string | null;
   scheduledFor: string | null;
+  effectiveSendAt: string | null;
+  queueState: QueueState;
+  queueStateLabel: string;
+  queueStateDetail: string | null;
   stepType: string;
 };
 
@@ -272,7 +285,7 @@ export async function getAutomationOperatorConsole(now = new Date(), db: D1Datab
     sequenceBlockerRows,
   ] = await Promise.all([
     readSettings(db),
-    readMailboxes(db),
+    readMailboxes(db, now),
     readQueueCounts(db),
     readNextEmails(db),
     readRecentSent(db),
@@ -286,7 +299,8 @@ export async function getAutomationOperatorConsole(now = new Date(), db: D1Datab
   const sentToday = mailboxes.reduce((sum, mailbox) => sum + mailbox.sentToday, 0);
   const leftToday = mailboxes.reduce((sum, mailbox) => sum + mailbox.leftToday, 0);
   const waitingToSend = getCanonicalWaitingCount(queueRow);
-  const nextSendAt = estimateNextSendAt(nextEmailRows[0]?.scheduledFor ?? null, mailboxes, now);
+  const nextEmailSchedule = projectNextEmailSchedule(nextEmailRows, mailboxes, now);
+  const nextSendAt = nextEmailSchedule[0]?.effectiveSendAt ?? null;
   const actions = buildActionItems(settings, mailboxes, stepBlockerRows, sequenceBlockerRows);
   const status = buildOperatorStatus({
     now,
@@ -312,16 +326,20 @@ export async function getAutomationOperatorConsole(now = new Date(), db: D1Datab
       waitingToSend,
     },
     mailboxes,
-    nextEmails: nextEmailRows.map((row) => ({
+    nextEmails: nextEmailRows.map((row, index) => ({
       id: String(row.id),
       sequenceId: String(row.sequenceId),
       leadId: Number(row.leadId),
       businessName: cleanString(row.businessName) || "Unknown business",
       city: cleanString(row.city),
       niche: cleanString(row.niche),
-      recipientEmail: cleanString(row.recipientEmail),
+      recipientEmail: normalizePipelineEmail(row.recipientEmail) || cleanString(row.recipientEmail),
       senderEmail: cleanString(row.senderEmail),
       scheduledFor: toIsoString(row.scheduledFor),
+      effectiveSendAt: toIsoString(nextEmailSchedule[index]?.effectiveSendAt ?? null),
+      queueState: nextEmailSchedule[index]?.state ?? "scheduled",
+      queueStateLabel: nextEmailSchedule[index]?.label ?? "Scheduled",
+      queueStateDetail: nextEmailSchedule[index]?.detail ?? null,
       stepType: cleanString(row.stepType) || "INITIAL",
     })),
     recentSent: recentSentRows.map((row) => ({
@@ -366,10 +384,18 @@ type NextEmailRow = {
   id: string;
   sequenceId: string;
   leadId: number | string;
+  mailboxId: string | null;
   businessName: string | null;
+  category: string | null;
   city: string | null;
   niche: string | null;
   recipientEmail: string | null;
+  emailType: string | null;
+  emailConfidence: number | string | null;
+  emailFlags: string | null;
+  axiomScore: number | string | null;
+  isArchived: number | string | boolean | null;
+  enrichmentData: string | null;
   senderEmail: string | null;
   scheduledFor: string | null;
   stepType: string | null;
@@ -408,7 +434,9 @@ async function readSettings(db: D1DatabaseLike) {
   ).first<SettingsRow>().catch(() => null);
 }
 
-async function readMailboxes(db: D1DatabaseLike) {
+async function readMailboxes(db: D1DatabaseLike, now: Date) {
+  const todayStart = startOfDay(now).toISOString();
+  const hourStart = startOfHour(now).toISOString();
   const rows = await db.prepare(
     `SELECT
        m."id",
@@ -424,20 +452,20 @@ async function readMailboxes(db: D1DatabaseLike) {
          FROM "OutreachEmail" e
          WHERE e."mailboxId" = m."id"
            AND e."status" IN ('sent', 'delivered')
-           AND datetime(e."sentAt") >= datetime('now', 'start of day')
+           AND datetime(e."sentAt") >= datetime(?)
        ) AS "sentToday",
        (
          SELECT COUNT(*)
          FROM "OutreachEmail" e
          WHERE e."mailboxId" = m."id"
            AND e."status" IN ('sent', 'delivered')
-           AND datetime(e."sentAt") >= datetime('now', '-1 hour')
+           AND datetime(e."sentAt") >= datetime(?)
        ) AS "sentThisHour"
      FROM "OutreachMailbox" m
      WHERE m."gmailAddress" IN ('riley@getaxiom.ca', 'aidan@getaxiom.ca')
         OR m."gmailConnectionId" IS NOT NULL
      ORDER BY lower(m."gmailAddress") ASC`,
-  ).all<MailboxRow>().catch(() => ({ results: [] as MailboxRow[] }));
+  ).bind(todayStart, hourStart).all<MailboxRow>().catch(() => ({ results: [] as MailboxRow[] }));
 
   return rows.results ?? [];
 }
@@ -493,10 +521,18 @@ async function readNextEmails(db: D1DatabaseLike) {
        st."stepType",
        st."scheduledFor",
        seq."leadId",
+       seq."assignedMailboxId" AS "mailboxId",
        l."businessName",
+       l."category",
        l."city",
        l."niche",
        l."email" AS "recipientEmail",
+       l."emailType",
+       l."emailConfidence",
+       l."emailFlags",
+       l."axiomScore",
+       l."isArchived",
+       l."enrichmentData",
        m."gmailAddress" AS "senderEmail"
      FROM "OutreachSequenceStep" st
      JOIN "OutreachSequence" seq ON seq."id" = st."sequenceId"
@@ -504,12 +540,28 @@ async function readNextEmails(db: D1DatabaseLike) {
      LEFT JOIN "OutreachMailbox" m ON m."id" = seq."assignedMailboxId"
      WHERE st."status" = 'SCHEDULED'
        AND st."stepNumber" = 1
-       AND seq."status" IN ('QUEUED', 'ACTIVE', 'WAITING', 'BLOCKED', 'SENDING')
+       AND seq."status" IN ('QUEUED', 'ACTIVE', 'WAITING', 'SENDING')
      ORDER BY datetime(st."scheduledFor") ASC
-     LIMIT 5`,
+     LIMIT 80`,
   ).all<NextEmailRow>().catch(() => ({ results: [] as NextEmailRow[] }));
 
-  return rows.results ?? [];
+  return (rows.results ?? []).filter(isNextEmailRowSendable).slice(0, 5);
+}
+
+function isNextEmailRowSendable(row: NextEmailRow) {
+  const lead = {
+    axiomScore: toNumber(row.axiomScore),
+    axiomTier: null,
+    businessName: row.businessName,
+    category: row.category,
+    email: row.recipientEmail,
+    emailType: row.emailType,
+    emailConfidence: toNumber(row.emailConfidence),
+    emailFlags: row.emailFlags,
+    isArchived: toBool(row.isArchived),
+  };
+
+  return Boolean(row.enrichmentData) && isLeadOutreachEligible(lead) && isAdequateAutonomousLead(lead);
 }
 
 async function readRecentSent(db: D1DatabaseLike) {
@@ -597,11 +649,14 @@ function normalizeMailbox(row: MailboxRow, now: Date): OperatorMailbox {
   const lastSentAt = toDate(row.lastSentAt);
   const status = cleanString(row.status) || "unknown";
   const connected = Boolean(cleanString(row.gmailConnectionId));
-  const nextAvailableAt = lastSentAt ? new Date(lastSentAt.getTime() + minDelaySeconds * 1000) : null;
-  const belowCaps = sentToday < dailyLimit && sentThisHour < hourlyLimit;
-  const cooledDown = !nextAvailableAt || nextAvailableAt.getTime() <= now.getTime();
-  const statusAllowsSending = !["disabled", "paused", "error", "disconnected"].includes(status.toLowerCase());
-  const readyNow = connected && belowCaps && cooledDown && statusAllowsSending;
+  const cooldownReadyAt = lastSentAt ? new Date(lastSentAt.getTime() + minDelaySeconds * 1000) : null;
+  const belowDailyCap = sentToday < dailyLimit;
+  const belowHourlyCap = sentThisHour < hourlyLimit;
+  const hourlyReadyAt = belowHourlyCap ? null : nextHourStart(now);
+  const nextAvailableAt = maxDate([cooldownReadyAt, hourlyReadyAt]);
+  const availableNow = !nextAvailableAt || nextAvailableAt.getTime() <= now.getTime();
+  const statusAllowsSending = MAILBOX_SENDABLE_STATUS_VALUES.has(status.toLowerCase());
+  const readyNow = connected && belowDailyCap && belowHourlyCap && availableNow && statusAllowsSending;
 
   return {
     id: row.id,
@@ -617,32 +672,97 @@ function normalizeMailbox(row: MailboxRow, now: Date): OperatorMailbox {
     lastSentAt: lastSentAt ? lastSentAt.toISOString() : null,
     nextAvailableAt: nextAvailableAt ? nextAvailableAt.toISOString() : null,
     readyNow,
-    stateLabel: mailboxStateLabel({ connected, status, belowCaps, cooledDown }),
+    stateLabel: mailboxStateLabel({ connected, status, belowDailyCap, belowHourlyCap, availableNow }),
   };
 }
 
-function mailboxStateLabel(input: { connected: boolean; status: string; belowCaps: boolean; cooledDown: boolean }) {
+function mailboxStateLabel(input: { connected: boolean; status: string; belowDailyCap: boolean; belowHourlyCap: boolean; availableNow: boolean }) {
   if (!input.connected) return "Needs reconnect";
   const lowerStatus = input.status.toLowerCase();
-  if (["disabled", "paused"].includes(lowerStatus)) return "Paused";
-  if (["error", "disconnected"].includes(lowerStatus)) return "Needs reconnect";
-  if (!input.belowCaps) return "Limit reached";
-  if (!input.cooledDown) return "Cooling down";
+  if (["paused", "disabled"].includes(lowerStatus)) return "Paused";
+  if (!MAILBOX_SENDABLE_STATUS_VALUES.has(lowerStatus)) return "Needs reconnect";
+  if (!input.belowDailyCap) return "Daily limit";
+  if (!input.belowHourlyCap) return "Hourly limit";
+  if (!input.availableNow) return "Cooling down";
   return "Ready";
 }
 
-function estimateNextSendAt(firstScheduledAt: string | null, mailboxes: OperatorMailbox[], now: Date) {
+export function estimateNextSendAt(firstScheduledAt: string | null, mailboxes: OperatorMailbox[], now: Date) {
   if (!firstScheduledAt) return null;
 
   const scheduled = toDate(firstScheduledAt) ?? now;
   const availableMailboxes = mailboxes
-    .filter((mailbox) => mailbox.connected && mailbox.leftToday > 0 && mailbox.sentThisHour < mailbox.hourlyLimit)
+    .filter((mailbox) => isMailboxUsableForProjection(mailbox))
     .map((mailbox) => toDate(mailbox.nextAvailableAt) ?? now)
     .sort((a, b) => a.getTime() - b.getTime());
   const earliestMailbox = availableMailboxes[0] ?? null;
-  if (!earliestMailbox) return scheduled;
+  if (!earliestMailbox) return null;
 
   return new Date(Math.max(scheduled.getTime(), earliestMailbox.getTime(), now.getTime()));
+}
+
+export function projectNextEmailSchedule(
+  rows: NextEmailScheduleRow[],
+  mailboxes: OperatorMailbox[],
+  now: Date,
+) {
+  const mailboxById = new Map(mailboxes.map((mailbox) => [mailbox.id, mailbox]));
+  const availabilityByMailboxId = new Map<string, Date>();
+
+  for (const mailbox of mailboxes) {
+    if (!isMailboxUsableForProjection(mailbox)) continue;
+    availabilityByMailboxId.set(mailbox.id, toDate(mailbox.nextAvailableAt) ?? now);
+  }
+
+  return rows.map((row) => {
+    const mailboxId = cleanString(row.mailboxId);
+    const mailbox = mailboxId ? mailboxById.get(mailboxId) ?? null : null;
+    const projectedMailboxId = mailbox && availabilityByMailboxId.has(mailbox.id)
+      ? mailbox.id
+      : (!mailboxId ? getEarliestAvailableMailboxId(availabilityByMailboxId) : null);
+
+    if (!projectedMailboxId) {
+      return {
+        effectiveSendAt: null,
+        state: "unassigned" as QueueState,
+        label: mailbox ? "Inbox unavailable" : "No inbox assigned",
+        detail: "Connect or reactivate a sending inbox before this can leave.",
+      };
+    }
+
+    const projectedMailbox = mailboxById.get(projectedMailboxId);
+    const scheduled = toDate(row.scheduledFor) ?? now;
+    const mailboxAvailableAt = availabilityByMailboxId.get(projectedMailboxId) ?? now;
+    const effectiveSendAt = new Date(Math.max(scheduled.getTime(), mailboxAvailableAt.getTime(), now.getTime()));
+    const waitingOnMailbox = effectiveSendAt.getTime() > Math.max(scheduled.getTime(), now.getTime());
+    const state: QueueState = effectiveSendAt.getTime() <= now.getTime() + 45_000
+      ? "ready"
+      : waitingOnMailbox
+        ? "waiting_for_inbox"
+        : "scheduled";
+
+    if (projectedMailbox) {
+      availabilityByMailboxId.set(
+        projectedMailboxId,
+        new Date(effectiveSendAt.getTime() + projectedMailbox.minDelaySeconds * 1000),
+      );
+    }
+
+    return {
+      effectiveSendAt,
+      state,
+      label: state === "ready" ? "Ready now" : state === "waiting_for_inbox" ? "Waiting for inbox" : "Scheduled",
+      detail: waitingOnMailbox ? "Mailbox cooldown/caps set the actual send time." : null,
+    };
+  });
+}
+
+function isMailboxUsableForProjection(mailbox: OperatorMailbox) {
+  return mailbox.connected && MAILBOX_SENDABLE_STATUS_VALUES.has(mailbox.status.toLowerCase()) && mailbox.leftToday > 0;
+}
+
+function getEarliestAvailableMailboxId(availabilityByMailboxId: Map<string, Date>) {
+  return Array.from(availabilityByMailboxId.entries()).sort((a, b) => a[1].getTime() - b[1].getTime())[0]?.[0] ?? null;
 }
 
 function buildActionItems(
@@ -722,6 +842,26 @@ function toNumber(value: unknown) {
 function positiveNumber(value: unknown, fallback: number) {
   const parsed = toNumber(value);
   return parsed > 0 ? parsed : fallback;
+}
+
+function startOfDay(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0));
+}
+
+function startOfHour(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), date.getUTCHours(), 0, 0));
+}
+
+function nextHourStart(date: Date) {
+  const next = startOfHour(date);
+  next.setUTCHours(next.getUTCHours() + 1);
+  return next;
+}
+
+function maxDate(values: Array<Date | null>) {
+  const dates = values.filter((value): value is Date => Boolean(value));
+  if (dates.length === 0) return null;
+  return dates.reduce((max, value) => (value.getTime() > max.getTime() ? value : max), dates[0]);
 }
 
 function toDate(value: Date | string | null | undefined) {

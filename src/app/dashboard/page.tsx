@@ -38,6 +38,7 @@ import {
 import { countAdequateLeadsToday, getAutonomousDailyLeadCap } from "@/lib/autonomous-intake";
 import { getDatabase } from "@/lib/cloudflare";
 import { getServerEnv } from "@/lib/env";
+import { getAutomationOperatorConsole } from "@/lib/automation-operator-view";
 import { listAutomationOverview } from "@/lib/outreach-automation";
 import { getPrisma } from "@/lib/prisma";
 import { listScrapeJobs } from "@/lib/scrape-jobs";
@@ -493,6 +494,7 @@ export default async function DashboardPage() {
 
   const [
     automation,
+    operatorConsole,
     scrapeJobs,
     leadCount,
     repliedCount,
@@ -513,6 +515,7 @@ export default async function DashboardPage() {
     scrapeTargetList,
   ] = await Promise.all([
     listAutomationOverview().catch(() => emptyAutomationOverview()),
+    getAutomationOperatorConsole().catch(() => null),
     listScrapeJobs(8).catch(() => []),
     prisma.lead.count({ where: { isArchived: false } }),
     prisma.lead.count({ where: { outreachStatus: "REPLIED", isArchived: false } }),
@@ -582,6 +585,15 @@ export default async function DashboardPage() {
   const mailboxGapCount = EXPECTED_MAILBOX_COUNT - connectedMailboxCount;
   const followUpAttentionCount = followUps.overdue.length + followUps.dueToday.length;
   const sendCapacityRemaining = Math.max(0, globalSendCap - sendsToday.total);
+  const nextQueueEmails = operatorConsole?.nextEmails ?? [];
+  const nextQueueEmail = nextQueueEmails[0] ?? null;
+  const effectiveNextSendAt = operatorConsole?.metrics.nextSendAt ?? automation.engine.nextSendAt;
+  const nextSendTarget = nextQueueEmail
+    ? [
+        nextQueueEmail.businessName,
+        [nextQueueEmail.niche, nextQueueEmail.city].filter(Boolean).join(" / "),
+      ].filter(Boolean).join(" · ")
+    : "No email queued";
   const operatingMode = automation.settings.emergencyPaused
     ? "Emergency stop"
     : automation.engine.mode === "ACTIVE"
@@ -687,9 +699,9 @@ export default async function DashboardPage() {
         queued={automation.engine.queuedCount}
         waiting={automation.engine.waitingCount}
         blocked={automation.engine.blockedCount}
-        nextSendAt={automation.engine.nextSendAt}
-        overdueSendAt={automation.engine.overdueSendAt ?? null}
-        nextTarget={nextTarget ? `${nextTarget.niche} in ${nextTarget.city}` : "No active target"}
+        nextSendAt={effectiveNextSendAt}
+        overdueSendAt={effectiveNextSendAt ? null : automation.engine.overdueSendAt ?? null}
+        nextTarget={nextSendTarget}
         runbookItems={runbookItems}
       />
 
@@ -751,31 +763,18 @@ export default async function DashboardPage() {
 
       <SendsTimeline
         upcoming={
-          (automation.sequences ?? [])
-            // Hide sequences whose next step would be blocked. Follow-ups when
-            // followUpsPaused=true do NOT actually send on their nextSendAt, so
-            // surfacing them in "Next 5" gives a false picture of what is about
-            // to leave the engine.
-            .filter((s) => {
-              if (!s.nextSendAt) return false;
-              // Include past-due sequences too — they fire on the next cron tick
-              // and the operator wants to see them as "imminent" in the queue view.
-              if (automation.settings?.followUpsPaused && (s.nextStep?.stepNumber ?? 1) > 1) return false;
-              if (s.state === "BLOCKED" || s.state === "STOPPED" || s.state === "COMPLETED") return false;
-              return true;
-            })
-            .map((s) => ({
-              id: s.id,
-              leadId: s.leadId,
-              businessName: s.lead?.businessName ?? `Lead #${s.leadId}`,
-              recipientEmail: s.lead?.email ?? "",
-              senderEmail: s.mailbox?.gmailAddress ?? null,
-              nextSendAt: s.nextSendAt,
-              stepNumber: s.nextStep?.stepNumber ?? 1,
-              stepType: s.nextStep?.stepType ?? "INITIAL",
-            }))
-            .sort((a, b) => new Date(a.nextSendAt as Date).getTime() - new Date(b.nextSendAt as Date).getTime())
-            .slice(0, 5)
+          nextQueueEmails.map((s) => ({
+            id: s.id,
+            leadId: s.leadId,
+            businessName: s.businessName,
+            recipientEmail: s.recipientEmail ?? "",
+            senderEmail: s.senderEmail,
+            nextSendAt: s.effectiveSendAt ?? s.scheduledFor,
+            scheduledFor: s.scheduledFor,
+            queueStateLabel: s.queueStateLabel,
+            stepNumber: 1,
+            stepType: s.stepType,
+          }))
         }
         followUpsPaused={Boolean(automation.settings?.followUpsPaused)}
         nowMs={renderNowMs}
@@ -1023,6 +1022,8 @@ type UpcomingSend = {
   recipientEmail: string;
   senderEmail: string | null;
   nextSendAt: Date | string | null;
+  scheduledFor?: Date | string | null;
+  queueStateLabel?: string | null;
   stepNumber?: number;
   stepType?: string;
 };
@@ -1064,8 +1065,16 @@ function SendsTimeline({ upcoming, recent, followUpsPaused, nowMs }: { upcoming:
           ) : (
             upcoming.map((s, idx) => {
               const when = s.nextSendAt ? new Date(s.nextSendAt) : null;
+              const rawScheduledAt = s.scheduledFor ? new Date(s.scheduledFor) : null;
               const diffMs = when ? when.getTime() - nowMs : 0;
               const isImminent = diffMs > 0 && diffMs <= 15 * 60_000;
+              const wasBacklogged = Boolean(
+                rawScheduledAt &&
+                  when &&
+                  Number.isFinite(rawScheduledAt.getTime()) &&
+                  rawScheduledAt.getTime() < nowMs - 60_000 &&
+                  rawScheduledAt.getTime() !== when.getTime(),
+              );
               return (
                 <div key={s.id} className="px-4 py-3">
                   <div className="flex items-start gap-3">
@@ -1081,7 +1090,7 @@ function SendsTimeline({ upcoming, recent, followUpsPaused, nowMs }: { upcoming:
                           {s.businessName}
                         </Link>
                         <span className={`shrink-0 font-mono text-[11px] tabular-nums ${isImminent ? "text-emerald-300" : "text-zinc-200"}`}>
-                          {when ? formatAppDateTime(when, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }, "—") : "—"}
+                          {when ? relativeFuture(when) : "—"}
                         </span>
                       </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400">
@@ -1096,8 +1105,16 @@ function SendsTimeline({ upcoming, recent, followUpsPaused, nowMs }: { upcoming:
                             First touch
                           </span>
                         )}
+                        {s.queueStateLabel ? (
+                          <span className="inline-flex items-center rounded-full border border-white/[0.09] bg-white/[0.035] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-zinc-300">
+                            {s.queueStateLabel}
+                          </span>
+                        ) : null}
                       </div>
-                      <div className="mt-0.5 text-[10px] text-zinc-600">{when ? relativeFuture(when) : "—"}</div>
+                      <div className="mt-0.5 text-[10px] text-zinc-600">
+                        {when ? formatAppDateTime(when, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }, "—") : "—"}
+                        {wasBacklogged && rawScheduledAt ? ` | queued ${relativeAgo(rawScheduledAt)}` : ""}
+                      </div>
                     </div>
                   </div>
                 </div>

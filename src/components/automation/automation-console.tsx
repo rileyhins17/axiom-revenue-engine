@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
@@ -44,10 +44,25 @@ export function AutomationConsole({ data }: Props) {
   const [activeTab, setActiveTab] = useState<TabValue>("today");
   const [refreshing, startRefresh] = useTransition();
   const generatedAt = useMemo(() => new Date(data.generatedAt), [data.generatedAt]);
+  const [now, setNow] = useState(() => new Date());
 
   function refresh() {
     startRefresh(() => router.refresh());
   }
+
+  useEffect(() => {
+    const tick = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
+    const refreshInterval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        startRefresh(() => router.refresh());
+      }
+    }, 30_000);
+    return () => window.clearInterval(refreshInterval);
+  }, [router, startRefresh]);
 
   return (
     <div className="mx-auto flex w-full max-w-[1540px] flex-col gap-5">
@@ -95,7 +110,7 @@ export function AutomationConsole({ data }: Props) {
         <div className="grid grid-cols-2 gap-px bg-white/[0.06] xl:grid-cols-4">
           <MetricTile label="Sent today" value={String(data.metrics.sentToday)} detail="Across active inboxes" />
           <MetricTile label="Left today" value={String(data.metrics.leftToday)} detail="Before daily caps" />
-          <MetricTile label="Next send" value={formatDue(data.metrics.nextSendAt, generatedAt)} detail={formatDateTime(data.metrics.nextSendAt)} />
+          <MetricTile label="Next send" value={formatDue(data.metrics.nextSendAt, now)} detail={formatDateTime(data.metrics.nextSendAt)} />
           <MetricTile label="Inboxes ready" value={`${data.metrics.inboxesReady}/${data.metrics.inboxesTotal}`} detail={readyDetail(data.mailboxes)} />
         </div>
       </section>
@@ -112,19 +127,19 @@ export function AutomationConsole({ data }: Props) {
         </div>
 
         <TabsContent value="today" className="mt-0">
-          <TodayPanel data={data} now={generatedAt} setTab={setActiveTab} />
+          <TodayPanel data={data} now={now} setTab={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="queue" className="mt-0">
-          <QueuePanel data={data} now={generatedAt} />
+          <QueuePanel data={data} now={now} />
         </TabsContent>
 
         <TabsContent value="inboxes" className="mt-0">
-          <InboxPanel data={data} now={generatedAt} />
+          <InboxPanel data={data} now={now} />
         </TabsContent>
 
         <TabsContent value="sent" className="mt-0">
-          <SentPanel emails={data.recentSent} now={generatedAt} />
+          <SentPanel emails={data.recentSent} now={now} />
         </TabsContent>
 
         <TabsContent value="diagnostics" className="mt-0">
@@ -318,7 +333,11 @@ function NextEmailList({ emails, now }: { emails: OperatorNextEmail[]; now: Date
             </div>
           </div>
           <div className="text-left md:text-right">
-            <div className="text-sm font-semibold text-zinc-100">{formatDue(email.scheduledFor, now)}</div>
+            <div className="text-sm font-semibold text-zinc-100">{formatDue(email.effectiveSendAt ?? email.scheduledFor, now)}</div>
+            <div className={email.queueState === "unassigned" ? "mt-1 text-xs font-medium text-amber-300" : "mt-1 text-xs font-medium text-zinc-400"}>
+              {email.queueStateLabel}
+            </div>
+            <div className="mt-1 truncate text-xs text-zinc-500">{formatDateTime(email.effectiveSendAt ?? email.scheduledFor)}</div>
             <div className="mt-1 truncate font-mono text-xs text-zinc-500">{email.senderEmail || "Inbox assigned at send"}</div>
           </div>
         </div>
