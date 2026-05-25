@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -161,7 +160,7 @@
 }
 
 /* ============================================================
-   THE OMNISCIENT v3 — DESIGN SYSTEM
+   AXIOM PIPELINE ENGINE v3 — DESIGN SYSTEM
    ============================================================ */
 
 /* ========== AMBIENT AURORA BACKGROUND ========== */

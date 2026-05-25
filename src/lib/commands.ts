@@ -1,5 +1,4 @@
 import {
-  Download,
   FileText,
   Keyboard,
   Mail,
@@ -33,7 +32,7 @@ export type CommandAction =
   | { type: "run"; task: string }
   | { type: "modal"; modal: string };
 
-export const CATEGORY_META: Record<CommandCategory, { label: string; order: number }> = {
+const CATEGORY_META: Record<CommandCategory, { label: string; order: number }> = {
   navigate: { label: "Navigation", order: 0 },
   filter: { label: "Quick Filters", order: 1 },
   export: { label: "Export", order: 2 },
@@ -41,7 +40,7 @@ export const CATEGORY_META: Record<CommandCategory, { label: string; order: numb
   system: { label: "System", order: 4 },
 };
 
-export const COMMANDS: Command[] = [
+const COMMANDS: Command[] = [
   ...APP_NAV_ITEMS.map((item) => ({
     id: `nav-${item.url.replace("/", "")}`,
     category: "navigate" as const,
@@ -87,15 +86,6 @@ export const COMMANDS: Command[] = [
     icon: Star,
     keywords: ["rating", "stars", "quality"],
     action: { type: "navigate-filter", path: "/vault", params: { minRating: "4" } },
-  },
-  {
-    id: "export-xlsx-sab",
-    category: "export",
-    label: "Export S/A/B as XLSX",
-    description: "Download qualified leads as spreadsheet",
-    icon: Download,
-    keywords: ["download", "spreadsheet", "xlsx", "excel"],
-    action: { type: "export", format: "xlsx", tiers: "S,A,B" },
   },
   {
     id: "export-csv-all",

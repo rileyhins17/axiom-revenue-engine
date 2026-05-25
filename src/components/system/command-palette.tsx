@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { COMMANDS, searchCommands, groupByCategory, type Command } from "@/lib/commands";
+import { searchCommands, groupByCategory, type Command } from "@/lib/commands";
 import { usePerformance } from "@/lib/ui/performance";
 import { Building2, Search, CornerDownLeft, ArrowUp, ArrowDown } from "lucide-react";
 
@@ -118,7 +118,7 @@ export function CommandPalette({ open, onClose, onOpenShortcuts }: CommandPalett
 
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [open, selectedIndex, flatResults, executeCommand, onClose]);
+    }, [open, selectedIndex, flatResults, leadResults, executeCommand, onClose, router, totalItems]);
 
     // Scroll selected item into view
     useEffect(() => {

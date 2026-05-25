@@ -61,7 +61,7 @@ function SignInForm() {
           <div className="relative max-w-xl">
             <span className="v2-pill v2-pill-accent">
               <span className="v2-dot text-emerald-400" />
-              Axiom Pipeline Engine · v2
+              Axiom Pipeline Engine · v3
             </span>
             <h1 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-[-0.025em] text-white md:text-[44px]">
               Command access for{" "}

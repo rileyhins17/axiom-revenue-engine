@@ -14,7 +14,7 @@ const PerformanceContext = createContext<PerformanceCtx>({
     toggle: () => { },
 });
 
-const STORAGE_KEY = "omniscient-perf-mode";
+const STORAGE_KEY = "axiom-pipeline-perf-mode";
 
 export function PerformanceProvider({ children }: { children: ReactNode }) {
     const [reducedMotion, setReducedMotion] = useState(() => {

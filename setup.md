@@ -1,50 +1,45 @@
 # Local Setup
 
-## 1. Create local env files
+This repo is the Axiom Pipeline Engine. Local setup is for UI, unit tests, and Cloudflare-shaped smoke tests. Do not use local setup to send Gmail, sync inboxes, or run production cron tasks.
 
-- Copy [`.env.example`](./.env.example) to `.env.development`
-- Copy [`.dev.vars.example`](./.dev.vars.example) to `.dev.vars`
-
-## 2. Prepare the local D1 database
+## 1. Install dependencies
 
 ```bash
-wrangler d1 migrations apply axiom-ops-omniscient --local
+npm install
 ```
 
-## 3. Start the app
+## 2. Create local env files
+
+```bash
+copy .env.example .env.development
+copy .dev.vars.example .dev.vars
+```
+
+Fill in local-safe values. Keep production secrets in Cloudflare, not Git.
+
+## 3. Prepare local D1
+
+```bash
+npm run db:migrate:local
+```
+
+The Cloudflare resource name is still `axiom-ops-omniscient` for database continuity.
+
+## 4. Start development
 
 ```bash
 npm run dev
 ```
 
-`npm run dev` uses plain Next.js with webpack for fast UI work. Use `npm run preview` when you need OpenNext Cloudflare bindings and local D1.
+Open `http://localhost:3000/sign-in` and sign in with an email listed in `AUTH_ALLOWED_EMAILS`.
 
-## 4. Sign in
-
-Use an email listed in `AUTH_ALLOWED_EMAILS`. Admin-only pages and routes require the signed-in user to also be in `AUTH_ADMIN_EMAILS`.
-
-## 5. Cloudflare preview
+## 5. Verify safely
 
 ```bash
-$env:BETTER_AUTH_SECRET='replace-with-at-least-32-characters'
-npm run preview
+npm test
+npm run typecheck
+npm run lint
+npm run build:cloudflare
 ```
 
-## 6. Worker Studio
-
-For the live scraping worker, use the native desktop launcher instead of `next dev`:
-
-```powershell
-.\worker-desktop.cmd
-```
-
-This opens the local Axiom Worker Studio UI and points the worker at the live control plane by default.
-
-Inside the app you can:
-
-- start and stop the worker
-- rename the worker and save it to `.env.worker`
-- create an `Axiom Worker.lnk` file on your Desktop for one-click relaunches
-- change the repo location if you move the workspace to another folder or another Windows device
-
-If you prefer the cleanest launcher, use the Desktop `Axiom Worker.lnk` shortcut created by the app. The older `start-worker.cmd` file is a fallback only.
+Use `npm run preview` only when you need OpenNext and local Cloudflare bindings. Do not use live Gmail or inbox actions as a test.

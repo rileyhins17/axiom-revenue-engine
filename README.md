@@ -1,184 +1,129 @@
-# The Omniscient
+# Axiom Pipeline Engine
 
-Private internal Axiom lead-finding and enrichment dashboard, prepared for deployment on Cloudflare Workers via OpenNext.
+Private Axiom operations app for lead intake, enrichment, autonomous first-touch outreach, reply tracking, and CRM movement.
 
-## What Changed
+The live app runs at `https://operations.getaxiom.ca`. The Cloudflare Worker and D1 resources still use the legacy resource name `axiom-ops-omniscient` so the production domain, bindings, and database stay stable. The npm package name is `axiom-pipeline-engine`.
 
-- Session auth is enforced for the app and API surface, with admin-only protection on scraping, export, deletion, backfill, and settings.
-- Secrets are server-side only. The settings page now reports runtime status instead of storing API keys in the browser.
-- Production persistence is set up for Cloudflare D1, with SQL migrations in [`migrations`](./migrations).
-- Scraping no longer writes to local disk. Exports are generated in-memory and require authenticated admin access.
-- Cloudflare deployment config lives in [`wrangler.jsonc`](./wrangler.jsonc) and [`open-next.config.ts`](./open-next.config.ts).
+## Current Production Shape
 
-## Local Development
+- Next.js 16 app deployed to Cloudflare Workers through OpenNext.
+- Cloudflare D1 is the production database. SQL migrations live in `migrations/`.
+- Cloudflare Browser Rendering powers cloud scraping. Local dev can fall back to Playwright.
+- Better Auth gates the app and API. Admin-only routes protect export, settings, and automation controls.
+- Gmail OAuth connections are used by the sending engine. Tests and local verification must not send mail or call inbox actions.
+- The autonomous pipeline is first-touch only right now. Follow-ups are intentionally paused in settings and capped at zero in `wrangler.jsonc`.
 
-1. Copy [`.env.example`](./.env.example) to `.env.development` and fill in real values.
-2. Copy [`.dev.vars.example`](./.dev.vars.example) to `.dev.vars`. This selects the `.env.development` runtime for OpenNext/Wrangler local preview.
-3. Apply the local D1 schema used by Wrangler-backed local dev:
+## Main Surfaces
+
+- `/dashboard` - operator command center: send capacity, queue load, next effective sends, recent sends, and lead supply.
+- `/automation` - sending console: mailbox readiness, first-touch queue, sent log, diagnostics, intake pause, and emergency stop.
+- `/vault` - source of truth for leads, filtering, CSV export, and manual lead entry.
+- `/clients` - reply and deal pipeline board.
+- `/settings` - authenticated operator profile and mailbox/runtime visibility.
+
+## Pipeline Rules
+
+Autonomous outreach should only send to qualified recipients:
+
+- owner email confidence must be at least `0.50`
+- staff email confidence must be at least `0.65`
+- generic, role, scraper-artifact, and malformed addresses are blocked
+- chain/non-customer entities are hard-disqualified before autonomous send
+- follow-up sends remain disabled until deliberately re-enabled
+
+The dashboard and automation queue show projected effective send times based on mailbox cooldown and capacity. They should not show stale scheduled dates as if they were live next-send times.
+
+## Local Setup
 
 ```bash
-wrangler d1 migrations apply axiom-ops-omniscient --local
-```
-
-4. Start the fast Next.js dev server:
-
-```bash
+npm install
+copy .env.example .env.development
+copy .dev.vars.example .dev.vars
+npm run db:migrate:local
 npm run dev
 ```
 
-5. Open [http://localhost:3000/sign-in](http://localhost:3000/sign-in).
+Open `http://localhost:3000/sign-in`.
 
-For a production-shaped local smoke test with Cloudflare bindings and local D1, run:
+Use `npm run preview` only when you need a Cloudflare-shaped local run with OpenNext bindings and local D1.
 
-```bash
-npm run preview
-```
+## Environment
 
-## Worker Studio
-
-Use the native desktop launcher when you want the local worker to control the live site:
-
-```powershell
-.\worker-desktop.cmd
-```
-
-or:
-
-```powershell
-.\start-worker.cmd
-```
-
-That opens the local Axiom Worker Studio, which can:
-
-- start and stop the local scraper process
-- rename the worker from the UI and persist it into `.env.worker`
-- open the live hunt page on `operations.getaxiom.ca`
-- remember the repo root if you move the workspace to another folder
-- create an `Axiom Worker.lnk` shortcut on your Desktop for one-click relaunches
-
-The Desktop shortcut is the no-console launcher. Use that instead of the older `start-worker.cmd` file if you want the clean native app feel.
-
-The studio defaults to the live control plane, not localhost, so the worker pushes results to the web app instead of a dev server.
-
-Notes:
-
-- Local auth requires `BETTER_AUTH_SECRET`.
-- Sign-up is restricted to `AUTH_ALLOWED_EMAILS`.
-- Admin permissions are granted to emails listed in `AUTH_ADMIN_EMAILS`.
-- `npm run dev` uses plain Next.js with webpack for fast UI work. Use `npm run preview` when you need OpenNext Cloudflare bindings and local D1.
-- Local scraping falls back to Playwright. Cloudflare deploys use the Browser Rendering binding instead.
-- The app runtime reads the Cloudflare `DB` binding directly. There is no Prisma client generation step anymore.
-- On this Windows host, OpenNext still warns that WSL/Linux is the safer environment for production-style builds, even though the validated build path now succeeds locally.
-- If you move the repo to another folder or another Windows device, use the **Change repo** button in Worker Studio once and the app will remember it.
-
-## Required Environment Variables
-
-App/runtime:
+Required app/runtime values:
 
 - `APP_BASE_URL`
 - `BETTER_AUTH_SECRET`
 - `AUTH_ALLOWED_EMAILS`
 - `AUTH_ADMIN_EMAILS`
+- `MCP_API_TOKEN`
 
 Server-only secrets:
 
 - `GEMINI_API_KEY`
+- Gmail OAuth client secrets used by the existing auth/Gmail flow
 
-Operational limits:
+Operational controls in `wrangler.jsonc`:
 
-- `RATE_LIMIT_WINDOW_SECONDS`
-- `RATE_LIMIT_MAX_AUTH`
-- `RATE_LIMIT_MAX_EXPORT`
-- `RATE_LIMIT_MAX_SCRAPE`
-- `SCRAPE_CONCURRENCY_LIMIT`
-- `SCRAPE_TIMEOUT_MS`
+- `AUTONOMOUS_INTAKE_ENABLED`
+- `AUTONOMOUS_QUEUE_ENABLED`
+- `AUTONOMOUS_SEND_ENABLED`
+- `AUTONOMOUS_MAX_SENDS_PER_DAY`
+- `AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY`
+- scrape/runtime rate limits
 
-## Cloudflare Deployment
+## Cloudflare Operations
 
-### 1. Create the D1 database
+Apply remote migrations:
 
 ```bash
-wrangler d1 create axiom-ops-omniscient
+npm run db:migrate:remote
 ```
 
-Copy the returned `database_id` into [`wrangler.jsonc`](./wrangler.jsonc).
-
-### 2. Apply D1 migrations
+Generate Cloudflare types:
 
 ```bash
-wrangler d1 migrations apply axiom-ops-omniscient --remote
+npm run cf:typegen
 ```
 
-For local Wrangler preview:
+Build for Cloudflare:
 
 ```bash
-wrangler d1 migrations apply axiom-ops-omniscient --local
-```
-
-### 3. Configure Cloudflare secrets
-
-```bash
-wrangler secret put BETTER_AUTH_SECRET
-wrangler secret put GEMINI_API_KEY
-```
-
-### 4. Configure Cloudflare vars
-
-Set these in the Worker environment or keep them in [`wrangler.jsonc`](./wrangler.jsonc) and override per environment as needed:
-
-- `APP_BASE_URL=https://ops.getaxiom.ca`
-- `AUTH_ALLOWED_EMAILS`
-- `AUTH_ADMIN_EMAILS`
-- rate-limit and scrape limit values
-
-### 5. Enable Browser Rendering
-
-In Cloudflare, enable Browser Rendering for the Worker and keep the `BROWSER` binding name.
-
-### 6. Build and preview
-
-```bash
-$env:BETTER_AUTH_SECRET='replace-with-at-least-32-characters'
-npm run build:next
 npm run build:cloudflare
-npm run preview
 ```
 
-If you want Wrangler preview secrets locally, copy [`.dev.vars.example`](./.dev.vars.example) to `.dev.vars`.
-
-### 7. Deploy
+Deploy manually:
 
 ```bash
 npm run deploy
 ```
 
-### 8. Attach the domain
-
-Attach `ops.getaxiom.ca` to the deployed Worker in Cloudflare and update `APP_BASE_URL` to the final HTTPS origin.
-
-Recommended:
-
-- Put the Worker behind Cloudflare Access for an extra network-level gate.
-- Restrict admin emails to the two internal operators who should control scraping/export.
-
-## Validation Commands
-
-Next production build:
+Check recent deployments:
 
 ```bash
-$env:BETTER_AUTH_SECRET='replace-with-at-least-32-characters'
-npm run build:next
+npx wrangler deployments list --json
 ```
 
-Cloudflare/OpenNext build:
+Do not run live cron, scheduler, Gmail send, or inbox-sync actions as a test. Use unit tests, typecheck, lint, build, and dry-run deploy checks for maintenance work.
+
+## Verification
+
+Run these before merging operational changes:
 
 ```bash
-$env:BETTER_AUTH_SECRET='replace-with-at-least-32-characters'
+npm test
+npm run typecheck
+npm run lint
 npm run build:cloudflare
+npx wrangler deploy --dry-run
+npm audit --omit=dev
 ```
 
-Generate Cloudflare env typings:
+`npm run typecheck` clears stale generated Next route types before TypeScript runs. This prevents deleted routes from poisoning source-only checks.
 
-```bash
-npm run cf:typegen
-```
+## Notes For Maintainers
+
+- Keep production secrets out of Git. Use Cloudflare secrets or local `.dev.vars`.
+- Keep autonomous send policy and dashboard SQL predicates aligned.
+- If a feature is removed from the API, remove matching UI buttons, command-palette entries, cron budget fields, tests, and README references in the same change.
+- Prefer CSV export. XLSX export was removed to reduce dependency weight and the transitive `uuid` audit surface.
+- Cloudflare may print "preview database" for D1 because the configured preview and production D1 IDs are the same. Verify `served_by: v3-prod` in command metadata when checking production D1.

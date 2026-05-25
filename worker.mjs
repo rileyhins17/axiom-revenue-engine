@@ -12,7 +12,7 @@ const worker = openNextWorkerModule;
 export { BucketCachePurge, DOQueueHandler, DOShardedTagCache };
 
 // Each fetch invocation gets its own 30s CPU budget on Workers Standard. The
-// cron handler used to run scheduler + pipeline + intake + scrape + digest in
+// cron handler used to run scheduler + pipeline + intake + scrape in
 // a single invocation and consistently hit the CPU cap, killing sends. Now the
 // cron handler only fires fetch() calls into the same worker — each runs in a
 // fresh invocation with its own CPU budget. Cron itself uses near-zero CPU.
@@ -63,21 +63,16 @@ async function dispatchInternalTask(env, task, options = {}) {
 async function runCronTasks(env) {
   const now = new Date();
   const minuteOfHour = now.getUTCMinutes();
-  const minuteOfDay = now.getUTCHours() * 60 + minuteOfHour;
-
   const tasks = ["scheduler", "pipeline"];
 
   const slot = minuteOfHour % 15;
   if (slot === 0) tasks.push("intake");
   else if (slot === 5) tasks.push("scrape");
-  // digest task removed — daily summary email is no longer sent.
-  void minuteOfDay;
-
   // Dispatch in parallel — each is its own fetch invocation with its own CPU.
   await Promise.allSettled(tasks.map((task) => dispatchInternalTask(env, task)));
 }
 
-export default {
+const exportedWorker = {
   async fetch(request, env, ctx) {
     clearServerEnvCache();
     setCloudflareBindings(env);
@@ -93,3 +88,5 @@ export default {
     );
   },
 };
+
+export default exportedWorker;

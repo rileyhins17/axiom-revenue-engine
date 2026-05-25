@@ -22,7 +22,7 @@ import {
     type WebsiteAssessment,
 } from "../src/lib/axiom-scoring";
 
-import { validateEmail, validatePhone, validateContact } from "../src/lib/contact-validation";
+import { validateEmail, validatePhone } from "../src/lib/contact-validation";
 import { generateDedupeKey, normalizeName, extractDomain, normalizePhone } from "../src/lib/dedupe";
 import { checkDisqualifiers } from "../src/lib/disqualifiers";
 

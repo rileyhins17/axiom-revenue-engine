@@ -245,7 +245,6 @@ export function buildPainSummary(lead: Lead): string {
         "TRACKING": 6
     };
 
-    let topPain = pains[0];
     let bestPriority = 999;
 
     for (const p of pains) {
@@ -261,7 +260,6 @@ export function buildPainSummary(lead: Lead): string {
 
         if (currentPriority < bestPriority) {
             bestPriority = currentPriority;
-            topPain = p;
         }
     }
 

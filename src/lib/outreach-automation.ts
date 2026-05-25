@@ -3925,7 +3925,7 @@ async function sendScheduledStep(
           }
         : undefined,
     );
-  } catch (genError) {
+  } catch {
     const latestGenStep = await prisma.outreachSequenceStep.findUnique({
       where: { id: claim.step.id },
     }) as OutreachSequenceStepRecord | null;
@@ -4419,7 +4419,7 @@ export async function forceResetAllBlockedState(prisma: PrismaLike) {
   return result;
 }
 
-export async function cleanupOrphanedRecords(prisma: PrismaLike) {
+export async function cleanupOrphanedRecords() {
   const { getDatabase } = await import("@/lib/cloudflare");
   const db = getDatabase();
   const result = { orphanedSteps: 0, orphanedEmails: 0 };
@@ -5615,7 +5615,7 @@ async function runAutomationSchedulerUnlocked(options: { immediate?: boolean; on
 
         try {
           await withSchedulerTimeout(
-            cleanupOrphanedRecords(prisma),
+            cleanupOrphanedRecords(),
             15_000,
             "orphan cleanup",
           );

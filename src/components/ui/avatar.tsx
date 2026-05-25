@@ -45,6 +45,7 @@ function Avatar({
       )}
     >
       {showImage ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Avatar URLs can be user-provided remote images; this keeps fallback error handling simple.
         <img
           src={src}
           alt={alt || fallback}

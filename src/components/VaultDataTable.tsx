@@ -574,7 +574,7 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
         const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
-        const filename = `omniscient_leads_${new Date().toISOString().slice(0, 10)}.${extension}`;
+        const filename = `axiom_pipeline_leads_${new Date().toISOString().slice(0, 10)}.${extension}`;
         anchor.href = url;
         anchor.download = filename;
         anchor.click();

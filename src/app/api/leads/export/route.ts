@@ -21,8 +21,8 @@ type ExportFilters = {
   tier?: string[] | null;
 };
 
-function getFilename(presetName: string, filters: ExportFilters, format = "csv"): string {
-  const parts = ["omniscient_export_v4", presetName];
+function getFilename(presetName: string, filters: ExportFilters): string {
+  const parts = ["axiom_pipeline_export", presetName];
   if (filters.tier && filters.tier.length > 0) {
     parts.push(`tier-${sanitizeFilenamePart(filters.tier.join("-"))}`);
   }
@@ -33,14 +33,12 @@ function getFilename(presetName: string, filters: ExportFilters, format = "csv")
     parts.push(`niche-${sanitizeFilenamePart(filters.niche)}`);
   }
 
-  if (format !== "xlsx") {
-    if (filters.delimiter === "tab") {
-      parts.push("delim-tab");
-    } else if (filters.delimiter === "semicolon") {
-      parts.push("delim-semicolon");
-    } else {
-      parts.push("delim-comma");
-    }
+  if (filters.delimiter === "tab") {
+    parts.push("delim-tab");
+  } else if (filters.delimiter === "semicolon") {
+    parts.push("delim-semicolon");
+  } else {
+    parts.push("delim-comma");
   }
 
   const timestamp = new Date().toISOString();
@@ -48,7 +46,6 @@ function getFilename(presetName: string, filters: ExportFilters, format = "csv")
   const timePart = timestamp.slice(11, 16).replace(":", "");
   parts.push(`${datePart}_${timePart}`);
 
-  if (format === "xlsx") return `${parts.join("__")}.xlsx`;
   if (filters.delimiter === "tab") return `${parts.join("__")}.tsv`;
   return `${parts.join("__")}.csv`;
 }
@@ -83,6 +80,10 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const format = searchParams.get("format") || "csv";
   const presetName = searchParams.get("preset") || "call_sheet";
+
+  if (!["csv", "jsonl"].includes(format)) {
+    return NextResponse.json({ error: "Unsupported export format. Use csv or jsonl." }, { status: 400 });
+  }
 
   const tierFilterString = searchParams.get("tier");
   const tierFilter = tierFilterString ? tierFilterString.split(",") : ["S", "A", "B", "C"];
@@ -207,40 +208,6 @@ export async function GET(request: Request) {
       });
     }
 
-    if (format === "xlsx") {
-      const { generateXlsx } = await import("@/lib/export/xlsx");
-      const preset = exportPresets[presetName] || exportPresets.call_sheet;
-      const filtersInfo = {
-        tier: tierFilterString ? tierFilter : null,
-        city: cityFilter,
-        niche: nicheFilter,
-      };
-      const filename = getFilename(preset.name, filtersInfo, "xlsx");
-      const xlsxBuffer = await generateXlsx(leads, preset.name, filtersInfo);
-
-      await writeAuditEvent({
-        action: "lead.export",
-        actorUserId: authResult.session.user.id,
-        ipAddress,
-        metadata: {
-          filename,
-          format,
-          presetName,
-          rowCount: leads.length,
-        },
-      });
-
-      return new Response(new Uint8Array(xlsxBuffer), {
-        status: 200,
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-          "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
-          "Content-Length": xlsxBuffer.byteLength.toString(),
-          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-      });
-    }
-
     const preset = exportPresets[presetName] || exportPresets.call_sheet;
     let targetColumns: CsvColumnDef[] | undefined;
     const warnings: string[] = [];
@@ -277,7 +244,7 @@ export async function GET(request: Request) {
       niche: nicheFilter,
       delimiter: delimiterParam,
     };
-    const filename = getFilename(preset.name, filtersInfo, "csv");
+    const filename = getFilename(preset.name, filtersInfo);
 
     await writeAuditEvent({
       action: "lead.export",

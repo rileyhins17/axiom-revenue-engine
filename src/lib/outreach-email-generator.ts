@@ -417,10 +417,6 @@ function finalizeGeneratedEmail(
   };
 }
 
-function getRecipientName(lead: LeadRecord) {
-  return lead.contactName?.trim().split(/\s+/)[0] || lead.businessName || "there";
-}
-
 function stableHashFromLeadId(value: string | number | null | undefined) {
   const source = String(value ?? "");
   let hash = 0;
@@ -453,38 +449,6 @@ function rotateFallbackSubject(lead: LeadRecord): string {
   if (pool.length === 0) return `Quick Q on ${businessName}`;
   const index = stableHashFromLeadId(lead.id) % pool.length;
   return pool[index];
-}
-
-function buildFallbackInitialEmail(
-  lead: LeadRecord,
-  enrichment: EnrichmentResult,
-  senderName: string,
-): GeneratedEmail {
-  const senderFirst = firstName(senderName);
-  const recipientName = getRecipientName(lead);
-  const bodyPlain = buildPlainTextEmail(
-    [
-      lead.contactName ? `Hey ${recipientName},` : "Hi,",
-      "",
-      enrichment.personalizedHook,
-      `The main thing I noticed is that ${enrichment.keyPainPoint.toLowerCase()}`,
-      "Worth me sending over the 2 or 3 fixes I'd make?",
-      "",
-      "Best,",
-      senderFirst,
-    ].join("\n"),
-    senderFirst,
-  );
-
-  return {
-    subject: sanitizeSubject(rotateFallbackSubject(lead), lead.businessName),
-    bodyPlain,
-    bodyHtml: buildHtmlEmail(bodyPlain),
-    personalization_reason: enrichment.personalizedHook,
-    observed_issue: enrichment.keyPainPoint,
-    CTA_type: "permission_offer",
-    confidence_score: 48,
-  };
 }
 
 function cleanEmailLine(value: string, fallback: string, maxLength = 180) {

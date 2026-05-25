@@ -153,8 +153,6 @@ export const AXIOM_PRIORITY_CITIES = [
   "toronto",
 ];
 
-const AXIOM_CORE_CITIES = ["kitchener", "waterloo", "cambridge", "guelph"];
-
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }

@@ -806,7 +806,6 @@ async function collectMapsListings(page: AutomationPage): Promise<MapsListing[]>
     });
   }
 
-  const seen = new Set<string>();
   return normalizeMapsListings(listings);
 }
 
@@ -1492,7 +1491,6 @@ async function collectTargets(
     let lastListings: MapsListing[] = [];
     let scrollAttempts = 0;
     let stableScrollAttempts = 0;
-    const scrollStartTime = Date.now();
     // Adaptive timeout: abort scrolling if we've spent > 60s without new listings
     const ADAPTIVE_SCROLL_STALL_MS = 60_000;
     let lastNewListingTime = Date.now();

@@ -84,7 +84,7 @@ class FakeContext implements AutomationBrowserContext {
   }
 }
 
-test("collectWebsiteDiscoveryPages scans four relevant subpages and lets pages settle", async () => {
+test("collectWebsiteDiscoveryPages scans the highest-signal subpages within the runtime budget", async () => {
   const homepageLinks = [
     { href: "https://example.ca/contact", text: "Contact" },
     { href: "https://example.ca/request-a-quote", text: "Request a quote" },
@@ -105,16 +105,14 @@ test("collectWebsiteDiscoveryPages scans four relevant subpages and lets pages s
     if (event.message) events.push(event.message);
   });
 
-  assert.equal(result.pages.length, 5);
-  assert.equal(events.length, 4);
-  assert.equal(context.pages.filter((page) => page.settled > 0).length, 5);
+  assert.equal(result.pages.length, 3);
+  assert.equal(events.length, 2);
+  assert.equal(context.pages.filter((page) => page.settled > 0).length, 3);
   assert.deepEqual(
     new Set(result.pages.slice(1).map((page) => page.url)),
     new Set([
       "https://example.ca/contact",
       "https://example.ca/request-a-quote",
-      "https://example.ca/team",
-      "https://example.ca/about",
     ]),
   );
 });

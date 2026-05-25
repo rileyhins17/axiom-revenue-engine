@@ -12,7 +12,7 @@ import { dirname } from "node:path";
 let cachedDb: D1DatabaseLike | null = null;
 
 export function getLocalDatabasePath(): string {
-  return process.env.DATABASE_PATH || "./data/omniscient.db";
+  return process.env.DATABASE_PATH || "./data/axiom-pipeline.db";
 }
 
 export function ensureLocalDatabaseDirectory(dbPath: string): void {
@@ -38,7 +38,7 @@ function createBetterSqliteStatement(
       return { results };
     },
 
-    async first<T = Record<string, unknown>>(_column?: string): Promise<T | null> {
+    async first<T = Record<string, unknown>>(): Promise<T | null> {
       const stmt = db.prepare(query);
       const row = (boundValues.length > 0 ? stmt.get(...boundValues) : stmt.get()) as T | undefined;
       return row ?? null;
