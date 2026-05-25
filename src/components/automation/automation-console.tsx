@@ -14,13 +14,10 @@ import {
   Power,
   RefreshCcw,
   ShieldAlert,
-  SlidersHorizontal,
-  Wrench,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { MailboxReactivateButton } from "@/components/mailbox-reactivate-button";
-import { SchedulerHealthCard } from "@/components/scheduler-health-card";
 import { SentEmailViewerTrigger } from "@/components/sent-email-viewer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AutomationOperatorConsoleData, OperatorMailbox, OperatorNextEmail, OperatorRecentEmail } from "@/lib/automation-operator-view";
@@ -34,7 +31,6 @@ const TAB_ITEMS = [
   { value: "queue", label: "Queue" },
   { value: "inboxes", label: "Inboxes" },
   { value: "sent", label: "Sent" },
-  { value: "diagnostics", label: "Diagnostics" },
 ] as const;
 
 type TabValue = (typeof TAB_ITEMS)[number]["value"];
@@ -95,14 +91,6 @@ export function AutomationConsole({ data }: Props) {
                 <RefreshCcw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
                 Refresh
               </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("diagnostics")}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-emerald-400/25 bg-emerald-400/[0.08] px-4 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/[0.14]"
-              >
-                <SlidersHorizontal className="size-4" />
-                Diagnostics
-              </button>
             </div>
           </div>
         </div>
@@ -140,10 +128,6 @@ export function AutomationConsole({ data }: Props) {
 
         <TabsContent value="sent" className="mt-0">
           <SentPanel emails={data.recentSent} now={now} />
-        </TabsContent>
-
-        <TabsContent value="diagnostics" className="mt-0">
-          <DiagnosticsPanel data={data} mounted={activeTab === "diagnostics"} />
         </TabsContent>
       </Tabs>
     </div>
@@ -271,39 +255,6 @@ function SentPanel({ emails, now }: { emails: OperatorRecentEmail[]; now: Date }
         {emails.length === 0 ? <EmptyMessage title="No sent emails yet" detail="Sent emails will appear here after the next successful send." /> : null}
       </div>
     </Panel>
-  );
-}
-
-function DiagnosticsPanel({ data, mounted }: { data: AutomationOperatorConsoleData; mounted: boolean }) {
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="space-y-5">
-        {mounted ? <SchedulerHealthCard /> : null}
-      </div>
-
-      <div className="space-y-5">
-        <Panel title="Maintenance" icon={<Wrench className="size-4" />}>
-          <div className="space-y-3 text-sm leading-6 text-zinc-400">
-            <p>Use repair or run-now only when the engine is stuck or a diagnostic tells you to.</p>
-            <div className="rounded-lg border border-white/[0.06] bg-white/[0.025] p-3">
-              <SummaryRow label="Follow-ups" value={data.settings.followUpsPaused ? "Off" : "On"} />
-              <SummaryRow label="Intake" value={data.settings.intakePaused ? "Paused" : "Active"} />
-              <SummaryRow label="Emergency stop" value={data.settings.emergencyPaused ? "On" : "Off"} />
-            </div>
-          </div>
-        </Panel>
-
-        <Panel title="Diagnostics counts" icon={<SlidersHorizontal className="size-4" />}>
-          <div className="space-y-3">
-            <SummaryRow label="Waiting to send" value={data.queue.waitingToSend} />
-            <SummaryRow label="Active sequences" value={data.queue.queuedSequences} />
-            <SummaryRow label="Scheduled steps" value={data.queue.scheduledRawSteps} />
-            <SummaryRow label="Sending now" value={data.queue.sendingNow} />
-            <SummaryRow label="Blocked/paused" value={data.queue.blocked} />
-          </div>
-        </Panel>
-      </div>
-    </div>
   );
 }
 

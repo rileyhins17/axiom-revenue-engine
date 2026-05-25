@@ -1,55 +1,9 @@
 "use client";
 
-import type { ComponentType, ReactNode } from "react";
-import { CheckCircle2, Mail, Monitor, ShieldCheck, TimerReset, UserIcon, UsersIcon, XCircle } from "lucide-react";
+import type { ReactNode } from "react";
+import { CheckCircle2, Mail, XCircle } from "lucide-react";
 
 import { EmergencyControlCard } from "@/components/emergency-control-card";
-import { ProfileSection } from "@/components/profile-section";
-import { UserManagement } from "@/components/settings/user-management";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-type RuntimeStatus = {
-  currentUserEmail: string;
-  appBaseUrl: string;
-  browserRenderingConfigured: boolean;
-  databaseTarget: "cloudflare-d1" | "binding-missing";
-  deepSeekBalance: {
-    available: boolean | null;
-    balances: Array<{
-      currency: string;
-      grantedBalance: string;
-      toppedUpBalance: string;
-      totalBalance: string;
-    }>;
-    checkedAt: string | null;
-    configured: boolean;
-    error: string | null;
-  };
-  deepSeekConfigured: boolean;
-  globalDailySendCap: number;
-  intakeDailyLeadCap: number;
-  intakePaused: boolean;
-  scrapeHealth: {
-    criticalRecent: number;
-    latest: {
-      city: string;
-      errorMessage: string | null;
-      id: string;
-      niche: string;
-      qualityStatus: string;
-      status: string;
-      targetsFound: number;
-      targetsWithCategory: number;
-      targetsWithWebsite: number;
-      updatedAt: string | null;
-      withEmail: number;
-    } | null;
-    warningRecent: number;
-  };
-  scrapeConcurrencyLimit: number;
-  scrapeTimeoutMs: number;
-  cloudScrapeEnabled: string;
-};
 
 type MailboxStatus = {
   email: string;
@@ -64,26 +18,17 @@ type EmergencyState = {
   emergencyPauseReason: string | null;
 };
 
-function StatusPill({ label, state }: { label: string; state: "ready" | "attention" }) {
-  return (
-    <span
-      className={`rounded-md border px-2 py-1 text-[10px] font-mono uppercase tracking-widest ${
-        state === "ready"
-          ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
-          : "border-amber-400/25 bg-amber-400/10 text-amber-300"
-      }`}
-    >
-      {label}
-    </span>
-  );
-}
-
 type UserProfile = {
   id: string;
   name: string;
   email: string;
   image: string | null;
   role: string | null;
+};
+
+type RuntimeStatus = {
+  currentUserEmail: string;
+  globalDailySendCap: number;
 };
 
 export function SettingsClient({
@@ -99,6 +44,8 @@ export function SettingsClient({
   mailboxes: MailboxStatus[];
   emergencyControl: EmergencyState;
 }) {
+  void userProfile;
+
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <header className="v2-card p-4 sm:p-5">
@@ -107,7 +54,7 @@ export function SettingsClient({
             <p className="v2-eyebrow">Settings</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-[-0.022em] text-white sm:text-[32px]">Settings</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-              Manage your profile, mailbox connections, and system configuration.
+              Sender mailboxes and kill switches.
             </p>
           </div>
           <div className="v2-pill max-w-full self-start">
@@ -116,167 +63,20 @@ export function SettingsClient({
         </div>
       </header>
 
-      <Tabs defaultValue="profile">
-        <TabsList className="w-full justify-start overflow-x-auto" aria-label="Settings sections">
-          <TabsTrigger value="profile" title="Your account and password">
-            <UserIcon className="size-3.5" aria-hidden="true" />
-            Profile
-          </TabsTrigger>
-          <TabsTrigger value="mailboxes" title="Sender mailbox connections and limits">
-            <Mail className="size-3.5" aria-hidden="true" />
-            Mailboxes
-          </TabsTrigger>
-          {isAdmin && (
-            <TabsTrigger value="system" title="Runtime posture and scrape engine">
-              <Monitor className="size-3.5" aria-hidden="true" />
-              System
-            </TabsTrigger>
-          )}
-          {isAdmin && (
-            <TabsTrigger value="users" title="Manage team access">
-              <UsersIcon className="size-3.5" aria-hidden="true" />
-              Users
-            </TabsTrigger>
-          )}
-          {isAdmin && (
-            <TabsTrigger value="security" title="Emergency stop and audit controls">
-              <ShieldCheck className="size-3.5" aria-hidden="true" />
-              Security
-            </TabsTrigger>
-          )}
-        </TabsList>
+      <Panel>
+        <SectionTitle
+          title="Sender mailboxes"
+          detail={`Connect once via Google OAuth. Runtime cap: ${runtimeStatus.globalDailySendCap}/day total.`}
+        />
+        <div className="space-y-3">
+          {mailboxes.map((mailbox) => (
+            <MailboxRow key={mailbox.email} mailbox={mailbox} />
+          ))}
+        </div>
+      </Panel>
 
-        <TabsContent value="profile">
-          <Panel>
-            <ProfileSection user={userProfile} />
-          </Panel>
-        </TabsContent>
-
-        <TabsContent value="mailboxes">
-          <Panel>
-            <SectionTitle
-              icon={Mail}
-              title="Sender mailboxes"
-              detail={`Connect once via Google OAuth. Runtime cap: ${runtimeStatus.globalDailySendCap}/day total.`}
-            />
-            <div className="space-y-3">
-              {mailboxes.map((mailbox) => (
-                <MailboxRow key={mailbox.email} mailbox={mailbox} />
-              ))}
-            </div>
-          </Panel>
-        </TabsContent>
-
-        {isAdmin && (
-          <TabsContent value="system">
-            <div className="space-y-4">
-              <section className="grid gap-4 lg:grid-cols-2">
-                <Panel>
-                  <SectionTitle icon={ShieldCheck} title="Runtime posture" detail="Read-only signals from Cloudflare bindings." />
-                  <div className="space-y-2 text-sm">
-                    <StatusRow label="Database target">
-                      <StatusPill
-                        label={runtimeStatus.databaseTarget === "cloudflare-d1" ? "D1" : "Missing"}
-                        state={runtimeStatus.databaseTarget === "cloudflare-d1" ? "ready" : "attention"}
-                      />
-                    </StatusRow>
-                    <StatusRow label="Browser rendering">
-                      <StatusPill
-                        label={runtimeStatus.browserRenderingConfigured ? "Bound" : "Missing"}
-                        state={runtimeStatus.browserRenderingConfigured ? "ready" : "attention"}
-                      />
-                    </StatusRow>
-                    <StatusRow label="DeepSeek API key">
-                      <StatusPill
-                        label={runtimeStatus.deepSeekConfigured ? "Configured" : "Missing"}
-                        state={runtimeStatus.deepSeekConfigured ? "ready" : "attention"}
-                      />
-                    </StatusRow>
-                    <StatusRow label="DeepSeek credits">
-                      <DeepSeekBalance balance={runtimeStatus.deepSeekBalance} />
-                    </StatusRow>
-                    <StatusRow label="App base URL">
-                      <span className="max-w-[14rem] truncate font-mono text-xs text-muted-foreground">{runtimeStatus.appBaseUrl}</span>
-                    </StatusRow>
-                  </div>
-                </Panel>
-
-                <Panel>
-                  <SectionTitle icon={TimerReset} title="Scrape engine" detail="Cloudflare cron runs every 5m." />
-                  <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                    <Limit label="Cloud scrape" value={runtimeStatus.cloudScrapeEnabled} />
-                    <Limit label="Intake" value={runtimeStatus.intakePaused ? "paused" : "active"} />
-                    <Limit label="Concurrency" value={String(runtimeStatus.scrapeConcurrencyLimit)} />
-                    <Limit label="Timeout" value={`${Math.round(runtimeStatus.scrapeTimeoutMs / 1000)}s`} />
-                    <Limit label="Quality" value={formatScrapeQuality(runtimeStatus.scrapeHealth)} />
-                    <Limit label="Last scrape" value={formatLastScrape(runtimeStatus.scrapeHealth.latest)} />
-                  </div>
-                </Panel>
-              </section>
-
-              <Panel>
-                <SectionTitle icon={Monitor} title="What runs autonomously" detail="No human input is required after Gmail OAuth." />
-                <ul className="space-y-2 text-sm text-zinc-400">
-                  <Bullet>Scrape intake dispatches the next due target every cron tick (capped at {runtimeStatus.intakeDailyLeadCap} adequate leads/day UTC).</Bullet>
-                  <Bullet>Cloudflare Browser Rendering executes the scrape and persists leads.</Bullet>
-                  <Bullet>Auto-pipeline enriches, qualifies, and queues leads on a rolling basis.</Bullet>
-                  <Bullet>Scheduler sends only to vetted owner/staff inboxes with confidence floors, capped by each mailbox and the {runtimeStatus.globalDailySendCap}/day global limit.</Bullet>
-                  <Bullet>Reply detection stops sequences when a recipient replies.</Bullet>
-                </ul>
-              </Panel>
-            </div>
-          </TabsContent>
-        )}
-
-        {isAdmin && (
-          <TabsContent value="users">
-            <Panel>
-              <UserManagement />
-            </Panel>
-          </TabsContent>
-        )}
-
-        {isAdmin && (
-          <TabsContent value="security">
-            <EmergencyControlCard initialState={emergencyControl} />
-          </TabsContent>
-        )}
-      </Tabs>
+      {isAdmin ? <EmergencyControlCard initialState={emergencyControl} /> : null}
     </div>
-  );
-}
-
-function formatScrapeQuality(scrapeHealth: RuntimeStatus["scrapeHealth"]) {
-  if (scrapeHealth.criticalRecent > 0) return `${scrapeHealth.criticalRecent} critical`;
-  if (scrapeHealth.warningRecent > 0) return `${scrapeHealth.warningRecent} warnings`;
-  return "healthy";
-}
-
-function formatLastScrape(latest: RuntimeStatus["scrapeHealth"]["latest"]) {
-  if (!latest) return "none";
-  const quality = latest.qualityStatus || latest.status;
-  const website = latest.targetsFound > 0 ? `${latest.targetsWithWebsite}/${latest.targetsFound} sites` : "0 targets";
-  return `${quality} - ${website}`;
-}
-
-function DeepSeekBalance({ balance }: { balance: RuntimeStatus["deepSeekBalance"] }) {
-  if (!balance.configured) {
-    return <span className="font-mono text-xs text-amber-300">not configured</span>;
-  }
-
-  if (balance.error) {
-    return <span className="max-w-[16rem] truncate font-mono text-xs text-amber-300">{balance.error}</span>;
-  }
-
-  const total = balance.balances
-    .filter((entry) => entry.totalBalance || entry.currency)
-    .map((entry) => `${entry.totalBalance} ${entry.currency}`.trim())
-    .join(", ");
-
-  return (
-    <span className={balance.available === false ? "font-mono text-xs text-amber-300" : "font-mono text-xs text-emerald-300"}>
-      {total || (balance.available ? "available" : "unavailable")}
-    </span>
   );
 }
 
@@ -324,49 +124,11 @@ function Panel({ children }: { children: ReactNode }) {
   return <div className="v2-card p-4 sm:p-5">{children}</div>;
 }
 
-function SectionTitle({
-  icon: Icon,
-  title,
-  detail,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  title: string;
-  detail: string;
-}) {
+function SectionTitle({ title, detail }: { title: string; detail: string }) {
   return (
     <div className="mb-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-        <Icon className="h-4 w-4 text-emerald-300" />
-        {title}
-      </div>
+      <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">{title}</div>
       <p className="mt-1 text-xs leading-5 text-zinc-500">{detail}</p>
     </div>
-  );
-}
-
-function StatusRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-2 rounded-xl border border-white/[0.06] bg-black/25 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-      <span className="text-zinc-300">{label}</span>
-      {children}
-    </div>
-  );
-}
-
-function Limit({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/[0.06] bg-black/25 p-3">
-      <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">{label}</div>
-      <div className="mt-1 font-mono text-sm text-zinc-200">{value}</div>
-    </div>
-  );
-}
-
-function Bullet({ children }: { children: ReactNode }) {
-  return (
-    <li className="flex items-start gap-2">
-      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-      <span>{children}</span>
-    </li>
   );
 }

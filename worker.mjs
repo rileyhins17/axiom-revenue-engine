@@ -70,7 +70,8 @@ async function runCronTasks(env) {
   const slot = minuteOfHour % 15;
   if (slot === 0) tasks.push("intake");
   else if (slot === 5) tasks.push("scrape");
-  else if (slot === 10 && minuteOfDay % 1440 < 60) tasks.push("digest");
+  // digest task removed — daily summary email is no longer sent.
+  void minuteOfDay;
 
   // Dispatch in parallel — each is its own fetch invocation with its own CPU.
   await Promise.allSettled(tasks.map((task) => dispatchInternalTask(env, task)));

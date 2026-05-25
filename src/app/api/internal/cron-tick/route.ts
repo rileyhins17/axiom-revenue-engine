@@ -4,7 +4,6 @@ import { runAutomationScheduler } from "@/lib/outreach-automation";
 import { runCloudScrapeWorker } from "@/lib/cloud-scrape-worker";
 import { runAutonomousIntake } from "@/lib/autonomous-intake";
 import { runAutoPipeline } from "@/lib/auto-pipeline";
-import { maybeRunDailyDigest } from "@/lib/daily-digest";
 import { getServerEnv } from "@/lib/env";
 
 /**
@@ -44,9 +43,6 @@ export async function POST(request: Request) {
         break;
       case "scrape":
         result = await runCloudScrapeWorker();
-        break;
-      case "digest":
-        result = await maybeRunDailyDigest();
         break;
       default:
         return NextResponse.json({ error: `unknown task ${task}` }, { status: 400 });
