@@ -234,7 +234,7 @@ HARD RULES — violating any of these kills the conversion:
 2. SUBJECT: 3-6 words, sentence case (capitalize the first word and proper nouns only — not Title Case, not all-lowercase), zero salesy language. Lean toward specific + curious. Strong patterns: "Quick Q on {Business}", "{firstName}, one thought on {Business}", "{City} {niche} site idea", "Noticed something on {Business}", "One tweak for {Business}". Never all-lowercase, never SHOUTY CASE, never: "Exclusive Opportunity", "Unlock Your Potential", "Grow {Business} 10x", and never generic patterns like "Quick site thought" or "Question about the site".
 3. GREETING: Always use the recipient's first name when provided ("Hey {firstName},"). Only fall back to "Hey there," if no name is available. The first name itself is the single biggest reply-rate lever.
 4. OPENING LINE (after greeting): Concrete anchor referencing niche + city + business name. Examples: "I work with {niche} businesses in {city} and {Business} caught my eye.", "Came across {Business} while looking through {niche} operators in {city}." NEVER claim to have visited the site.
-5. ONE OBSERVATION: REQUIRED — anchor on the enrichment's PERSONALIZED HOOK or KEY PAIN POINT (those were generated from real public signals about this business, not fabricated). Paraphrase naturally — do not quote it verbatim if it reads stiff. Frame as a pattern across SIMILAR businesses, NOT a specific finding about their site. If both hook and pain point are weak or generic, fall back to an industry pattern relevant to the niche ("Most {niche} owners I talk to in {city} say their biggest leak is X."). NEVER write "in electrician," or "in drywall," — single-word niches must be followed by "businesses" or "owners" or "operators". Soften with "from what I see most", "a lot of {niche} owners are dealing with", "the common pattern is".
+5. ONE OBSERVATION: REQUIRED — anchor on the enrichment's PERSONALIZED HOOK or KEY PAIN POINT (those were generated from real public signals about this business, not fabricated). Paraphrase naturally — do not quote it verbatim if it reads stiff. Frame as a pattern across SIMILAR businesses, NOT a specific finding about their site. If both hook and pain point are weak or generic, fall back to an industry pattern relevant to the niche ("Most {niche} owners I talk to in {city} say their biggest leak is X."). NEVER write "in electrician," / "in drywall," / "For electrician," / "For roofing," — single-word niches must ALWAYS be followed by "businesses" or "owners" or "operators" when used as a noun phrase. Same for the niche as a service category in any preposition: "across roofing businesses", "in electrician operations", "for plumbing owners". Soften with "from what I see most", "a lot of {niche} owners are dealing with", "the common pattern is". ALSO never write "the site has one main job", "your site has", or any phrasing that implies you've seen the actual site — same fabrication ban as the explicit phrases above.
 6. ONE CTA: A single low-friction question that's easy to answer YES to in two seconds. Strong patterns:
    - "Want me to send the 2 or 3 things I'd change?"
    - "Want a free 1-page audit?"
@@ -299,6 +299,19 @@ function toSentenceCase(value: string) {
   return lower.replace(/^(\W*)([a-z])/, (_match, lead, first) => `${lead}${first.toUpperCase()}`);
 }
 
+// Restore the original casing of the business name + any other proper nouns
+// the LLM/template wrote, after toSentenceCase has lowercased everything.
+// Matches case-insensitively so "raptor roofing" gets fixed back to
+// "Raptor Roofing" when businessName = "Raptor Roofing".
+function preserveProperNouns(subject: string, businessName: string) {
+  if (!businessName) return subject;
+  const name = businessName.trim();
+  if (!name) return subject;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`\\b${escaped}\\b`, "i");
+  return subject.replace(pattern, name);
+}
+
 function sanitizeSubject(subject: string, businessName: string) {
   const trimmed = subject
     .replace(/[!]/g, "")
@@ -311,10 +324,11 @@ function sanitizeSubject(subject: string, businessName: string) {
     const normalizedSubject = shortSubject.toLowerCase().startsWith("re:")
       ? `Re: ${toSentenceCase(shortSubject.replace(/^re:\s*/i, ""))}`
       : toSentenceCase(shortSubject);
-    return normalizedSubject.slice(0, 78);
+    const withProperNouns = preserveProperNouns(normalizedSubject, businessName);
+    return withProperNouns.slice(0, 78);
   }
 
-  return toSentenceCase(`quick thought on ${businessName}`).slice(0, 78);
+  return preserveProperNouns(toSentenceCase(`quick thought on ${businessName}`), businessName).slice(0, 78);
 }
 
 function stripHtmlTags(value: string) {
@@ -604,8 +618,21 @@ function buildPlanBasedInitialEmail(
         ][openerSeed % 7];
 
   // --- Positive line: one specific, earned compliment ---
-  const reviewCount = Number(lead.reviewCount || 0);
+  // Review counts above 1000 are almost always scraping artifacts (phone
+  // number fragments, postal codes, etc.). Cap the displayed count and skip
+  // the review-flavored line if the number isn't credible for a local
+  // service business.
+  const rawReviewCount = Number(lead.reviewCount || 0);
+  const reviewCount = Number.isFinite(rawReviewCount) && rawReviewCount > 0 && rawReviewCount <= 1000
+    ? rawReviewCount
+    : 0;
   const rating = Number(lead.rating || 0);
+  const nicheLower = niche.toLowerCase();
+  // Single-word niches need a noun ("electrician" -> "electrician operation"
+  // reads wrong; "electrical operation" reads worse). Treat the niche as a
+  // noun phrase by appending " business" when it's a single word, which
+  // resolves "For electrician," / "solid electrician operation" awkwardness.
+  const nicheNoun = /\s/.test(nicheLower) ? nicheLower : `${nicheLower} business`;
   let positiveLine = "";
   if (reviewCount >= 10 && rating >= 4.0) {
     positiveLine = [
@@ -615,8 +642,8 @@ function buildPlanBasedInitialEmail(
     ][openerSeed % 3];
   } else if (niche && niche.length > 2) {
     positiveLine = [
-      `Looks like you've built a solid ${niche.toLowerCase()} operation.`,
-      `The ${niche.toLowerCase()} focus comes through clearly.`,
+      `Looks like you've built a solid ${nicheNoun} operation.`,
+      `The ${nicheLower} focus comes through clearly.`,
     ][openerSeed % 2];
   }
 
