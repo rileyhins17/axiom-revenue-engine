@@ -40,14 +40,12 @@
     "CLOUD_SCRAPE_ENABLED": "true",
     "CLOUD_SCRAPE_TIMEOUT_MS": "840000",
     "CLOUD_SCRAPE_WORKER_NAME": "cloudflare-browser",
-    // Detail-page extraction is what populates websiteDomain + email + the
-    // WebsiteAssessment block. Currently disabled because every job that
-    // attempted detail-page extraction in this code path either hung past
-    // CLOUD_SCRAPE_TIMEOUT_MS or failed within 5 minutes producing 0 leads.
-    // Rollback until the per-target detail-navigation logic is debugged in
-    // a sandbox; flipping this back to "true" without fixing the underlying
-    // hang will silently kill new-lead intake again.
-    "CLOUD_SCRAPE_DETAIL_PAGES_ENABLED": "false",
+    // Detail-page extraction populates websiteDomain + email + the
+    // WebsiteAssessment block. The per-target discovery loop in scrape-engine
+    // is now wrapped with a 40s outer timeout (commit 461c6244+) plus a
+    // 25-listing cap, so a single slow business site can no longer wedge an
+    // entire scrape job past CLOUD_SCRAPE_TIMEOUT_MS.
+    "CLOUD_SCRAPE_DETAIL_PAGES_ENABLED": "true",
     "RATE_LIMIT_WINDOW_SECONDS": "60",
     "RATE_LIMIT_MAX_AUTH": "50",
     "RATE_LIMIT_MAX_SCRAPE": "20",

@@ -11,7 +11,10 @@ type PageSnapshot = {
     links: ResolvedLink[];
 };
 
-const WEBSITE_DISCOVERY_CONTACT_PAGE_LIMIT = 4;
+// Lowered from 4 to 2 to fit the per-target time budget. Homepage + one
+// contact page usually surfaces the email; the marginal yield from a third
+// or fourth page was tiny but added 25-30 seconds per target on slow sites.
+const WEBSITE_DISCOVERY_CONTACT_PAGE_LIMIT = 2;
 const WEBSITE_DISCOVERY_PAGE_SETTLE_MS = 500;
 
 async function waitForDiscoveryPageReady(page: AutomationPage): Promise<void> {

@@ -2078,23 +2078,38 @@ export async function executeScrapeJob(input: ExecuteScrapeJobInput): Promise<Ex
           break;
         }
 
-        if (target.website) {
-          websiteStatus = "ACTIVE";
-          await input.sendEvent({ message: `[WEB] Deep scan ${target.website.substring(0, 70)}` });
-          const discovery = await collectWebsiteDiscoveryPages(context, target.website, input.sendEvent);
-          rawFootprint = discovery.rawFootprint;
-          discoveryPages = discovery.pages;
-          socialLink = pickBestSocialLink(discovery.pages);
-        } else {
+        // Hard per-target discovery budget. Without this, a single slow
+        // business website (think static-asset CDN timing out, redirect loops,
+        // or sites that never fire DOMContentLoaded) can wedge the entire
+        // scrape job past CLOUD_SCRAPE_TIMEOUT_MS. 40s covers homepage +
+        // 1-2 contact pages comfortably on healthy sites; slow ones get
+        // skipped with partial data so the rest of the targets still finish.
+        const PER_TARGET_DISCOVERY_TIMEOUT_MS = 40_000;
+
+        const discoveryRun = (async () => {
+          if (target.website) {
+            websiteStatus = "ACTIVE";
+            await input.sendEvent({ message: `[WEB] Deep scan ${target.website.substring(0, 70)}` });
+            return collectWebsiteDiscoveryPages(context, target.website, input.sendEvent);
+          }
           await input.sendEvent({ message: "[WEB] No website. Searching public footprint..." });
           const searchQuery = `"${target.businessName}" ${input.city} email OR owner OR founder OR facebook OR linkedin`;
-          const discovery = await collectSearchDiscoveryPage(context, searchQuery);
-          rawFootprint = discovery.rawFootprint;
-          discoveryPages = discovery.pages;
-          socialLink = pickBestSocialLink(discovery.pages);
-        }
-      } catch {
-        // Continue with partial discovery data when a crawl step fails.
+          return collectSearchDiscoveryPage(context, searchQuery);
+        })();
+
+        const discovery = await withMapsOperationTimeout(
+          discoveryRun,
+          PER_TARGET_DISCOVERY_TIMEOUT_MS,
+          `discovery for ${target.businessName}`,
+        );
+        rawFootprint = discovery.rawFootprint;
+        discoveryPages = discovery.pages;
+        socialLink = pickBestSocialLink(discovery.pages);
+      } catch (error) {
+        // Continue with partial discovery data when a crawl step fails or times out.
+        await input.sendEvent({
+          message: `[WEB] Discovery skipped for ${target.businessName}: ${error instanceof Error ? error.message : String(error)}`,
+        });
       }
 
       let emailResolution = resolvePublicBusinessEmail({
