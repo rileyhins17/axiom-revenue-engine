@@ -1429,6 +1429,24 @@ EMAIL RULES:
 - Never choose role inboxes such as info@, contact@, sales@, marketing@, office@, admin@, support@, service@, quotes@, estimates@, booking@, or web@.
 - Never invent, normalize, or guess an email.
 
+TOP FIXES MUST BE SPECIFIC. Every topFix is a concrete observation a real visitor would make in under 10 seconds on the page — not a generic UX cliche. Always produce 2 or 3. NEVER use generic placeholders like "Improve homepage" or "Keep the main offer and next step easy to scan".
+
+Good topFixes (concrete, observable, peer-voice):
+- "Phone number sits in tiny grey text in the footer instead of the header"
+- "Service area is only mentioned once, halfway down the about page"
+- "Quote button is below three full screens of scrolling on mobile"
+- "Reviews show ratings but no customer names or photos, so they feel weak"
+- "Homepage hero image takes 4+ seconds to load on mobile"
+- "Two of three service pages are placeholder text"
+
+Bad topFixes (banned — never produce these):
+- "Improve conversions"
+- "Optimize SEO"
+- "Make the site faster"
+- "Keep the main offer easy to scan"
+- "Improve the user experience"
+- Anything that could apply to any site on the internet
+
 Return a JSON object (no markdown, no code fences):
 {
   "email": "Exact email from the vetted candidate list or empty string",
@@ -1440,7 +1458,7 @@ Return a JSON object (no markdown, no code fences):
     "trustRisk": 0-5,
     "seoRisk": 0-5,
     "overallGrade": "A through F",
-    "topFixes": ["Fix 1", "Fix 2", "Fix 3"]
+    "topFixes": ["Specific concrete fix 1", "Specific concrete fix 2", "Optional fix 3"]
   },
   "painSignals": [
     {"type": "CONVERSION|SPEED|TRUST|SEO|DESIGN|FUNCTIONALITY", "severity": 1-5, "evidence": "Specific evidence from the site", "source": "site_scan"}
@@ -1906,12 +1924,21 @@ async function enrichWithAi(input: {
     hasSocialMessaging = aiData.hasSocialMessaging === true || hasSocialMessaging;
 
     if (aiData.websiteAssessment) {
+      // Drop generic / boilerplate topFixes — only keep concrete, observable
+      // findings. Generic fixes get echoed verbatim by the email generator
+      // and produce identical-sounding emails across leads.
+      const GENERIC_FIX_RE = /(improve (the )?(homepage|user experience|conversions?|seo|site speed)|make the (site|page) (faster|cleaner)|keep the (main offer|next step)|optimi[sz]e (your )?site|enhance (the )?ux|streamline (the )?navigation|polish the design)/i;
+      const filteredTopFixes = (aiData.websiteAssessment.topFixes || [])
+        .filter((f): f is string => Boolean(f && typeof f === "string" && f.trim().length > 6))
+        .filter((f) => !GENERIC_FIX_RE.test(f))
+        .slice(0, 3);
+
       assessment = {
         conversionRisk: Math.min(aiData.websiteAssessment.conversionRisk || 0, 5),
         overallGrade: aiData.websiteAssessment.overallGrade || "C",
         seoRisk: Math.min(aiData.websiteAssessment.seoRisk || 0, 5),
         speedRisk: Math.min(aiData.websiteAssessment.speedRisk || 0, 5),
-        topFixes: (aiData.websiteAssessment.topFixes || []).slice(0, 3),
+        topFixes: filteredTopFixes,
         trustRisk: Math.min(aiData.websiteAssessment.trustRisk || 0, 5),
       };
     }
