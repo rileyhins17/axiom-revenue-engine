@@ -379,7 +379,9 @@ async function generateColdEmailAttempt(
     `- If evidence is limited, stay curiosity-based and ask permission to send ideas.`,
     "- Do not over-compliment the business.",
     "- Every sentence must be a complete thought ending in a period or question mark. Never trail off after a verb like \"noticed\" or \"saw\".",
-    "- The opening observation must reference at least one concrete detail from the PAIN SIGNALS or WEBSITE ASSESSMENT (a specific page, contact path, missing element, review pattern, or domain), not a generic statement.",
+    "- Frame the observation as an industry pattern across SIMILAR businesses, not a specific finding about this site (you have not looked at it).",
+    "- Do NOT stack noun forms on the niche. If the niche field already contains a noun (\"plumbing companies\", \"roofers\", \"med-spas\"), use it as-is — never write \"plumbing companies businesses\", \"roofers operators\", \"in roofers operations\". If the niche is a bare service like \"plumbing\" or \"roofing\", you may add \"businesses\" or \"owners\" when needed.",
+    "- Match subject and verb. Plural subjects need plural verbs. \"11 reviews say a lot\" (not \"says\"). \"Most plumbing businesses get more calls\" (not \"Most plumbing get\").",
     "- Do not write the email as if you are following a template — vary phrasing, do not start with \"I had a quick look\" or \"I looked through\" if those exact phrases appear in the personalized hook.",
     retryInstructions ? `\n${retryInstructions}` : "",
   ]
@@ -389,7 +391,10 @@ async function generateColdEmailAttempt(
   return chatCompletionJson<RawGeneratedColdEmail>({
     systemPrompt: COLD_EMAIL_SYSTEM_PROMPT,
     userPrompt,
-    temperature: retryInstructions ? 0.28 : 0.4,
+    // Lower temperature: less creative wandering = fewer subject-verb
+    // agreement slips and fewer phrase invention attempts that violate
+    // the truthfulness rules.
+    temperature: retryInstructions ? 0.18 : 0.25,
     maxTokens: 1100,
   });
 }

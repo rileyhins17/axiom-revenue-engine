@@ -487,36 +487,49 @@ function buildPersonalizationReason(lead: LeadRecord, observation: ReturnType<ty
  * website grade, contact name — so hooks rotate naturally and review counts
  * are just one option among many, never a guaranteed mention.
  */
+// Normalize a niche field that may be plural ("plumbing companies", "Roofers",
+// "Med-Spas") into a bare singular form so prompt templates that need to add
+// a noun ("businesses", "owners") don't end up stacking ("plumbing companies
+// businesses"). Returns the original if no plural form is detected.
+function normalizeNicheForPrompt(rawNiche: string): { bare: string; alreadyHasNoun: boolean } {
+  const trimmed = rawNiche.trim().toLowerCase();
+  if (!trimmed) return { bare: "service", alreadyHasNoun: false };
+  // Strip common plural-noun suffixes that mean "companies in the niche".
+  const stripSuffixes = [" companies", " operators", " services", " shops", " contractors", " businesses", " providers"];
+  for (const suffix of stripSuffixes) {
+    if (trimmed.endsWith(suffix)) {
+      return { bare: trimmed.slice(0, -suffix.length).trim(), alreadyHasNoun: true };
+    }
+  }
+  // Single-token plurals like "roofers" → "roofing", "plumbers" → "plumbing",
+  // "electricians" → "electrical". Heuristic: if it ends with -ers/-ans/-s,
+  // treat it as already noun-equivalent and don't append "businesses" later.
+  if (/(ers|ans|ists)$/.test(trimmed)) return { bare: trimmed, alreadyHasNoun: true };
+  // Hyphenated "Med-Spas" or "med-spas".
+  if (trimmed.includes("-")) return { bare: trimmed, alreadyHasNoun: true };
+  return { bare: trimmed, alreadyHasNoun: false };
+}
+
 function buildConcreteAnchor(lead: LeadRecord) {
-  const domain = extractDomain(lead.websiteUrl);
   const city = lead.city?.trim() || "";
-  const niche = lead.niche?.trim() || "";
+  const rawNiche = lead.niche?.trim() || "";
+  const { bare: niche } = normalizeNicheForPrompt(rawNiche);
   const category = lead.category?.trim() || "";
   const name = lead.businessName?.trim() || "their site";
-  const grade = lead.websiteGrade?.trim() || "";
-  const contactFirst = (lead.contactName || "").trim().split(/\s+/)[0] || "";
-  const reviewCount = Number(lead.reviewCount || 0);
 
+  // All candidates are industry-pattern phrasings only — NEVER reference
+  // having clicked through, poked at, or visited the recipient's site.
+  // The system prompt bans those phrases explicitly, so feeding them as
+  // anchor candidates produced contradictory guidance and the LLM stitched
+  // awkward grammar trying to avoid the banned wording.
   const candidates: string[] = [];
-  if (domain) candidates.push(`while clicking through ${domain}`);
-  if (domain && niche) candidates.push(`poking around ${domain} looking at ${niche} shops in ${city || "the area"}`);
-  if (niche && city) candidates.push(`while looking at ${niche} in ${city}`);
-  if (category && city) candidates.push(`while scanning ${category} around ${city}`);
-  if (domain && grade && /[DE]/i.test(grade)) candidates.push(`after poking at ${domain} for a minute on mobile`);
-  if (domain && contactFirst) candidates.push(`while clicking around ${domain} and spotting ${contactFirst}'s name`);
-  if (niche) candidates.push(`while looking at a few ${niche} sites tonight`);
-  if (city) candidates.push(`while digging through local businesses in ${city}`);
-  // Review count is allowed but only as one candidate among many, and only
-  // when it is actually notable (10+). Prevents "X Google reviews" from
-  // being forced into every email.
-  if (domain && reviewCount >= 10) {
-    candidates.push(`while looking through ${domain} (saw ${reviewCount} reviews too)`);
-  }
-  // Ultimate fallback: nothing specific, but still feels casual.
-  candidates.push(`while looking at ${name} in ${city || "your area"}`);
+  if (niche && city) candidates.push(`while looking through ${niche} businesses in ${city}`);
+  if (niche && city) candidates.push(`while scanning ${niche} operators around ${city}`);
+  if (category && city) candidates.push(`while researching ${category} around ${city}`);
+  if (niche) candidates.push(`while researching ${niche} businesses online`);
+  if (city) candidates.push(`while looking at local businesses in ${city}`);
+  candidates.push(`while researching ${name}`);
 
-  // Deterministic pick so the same lead always gets the same anchor (stable
-  // across retries / regenerations), but anchors vary across leads.
   const seed = Number(lead.id || 0) || name.length + city.length;
   return candidates[seed % candidates.length];
 }
