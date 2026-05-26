@@ -100,54 +100,31 @@ function buildGenerationContext(
   senderName: string,
   plan: ColdEmailPlan,
 ): string {
+  // Trimmed context. Previous version sent ~30 fields plus strategy hints
+  // and observation/consequence/CTA hints — the model got overloaded and
+  // started stitching pieces awkwardly. Now we send only the fields the
+  // model actually needs to write a good email.
   const lines: string[] = [];
 
-  lines.push(`SENDER: ${senderName} from Axiom Web`);
   lines.push(`SENDER FIRST NAME: ${firstName(senderName)}`);
   lines.push(`BUSINESS: ${lead.businessName}`);
-  lines.push(`CITY: ${lead.city}`);
-  lines.push(`NICHE: ${lead.niche}`);
-  if (lead.category) lines.push(`CATEGORY: ${lead.category}`);
-  if (lead.contactName) lines.push(`CONTACT NAME: ${lead.contactName}`);
-  if (lead.email) lines.push(`EMAIL: ${lead.email}`);
-  if (lead.emailType) lines.push(`EMAIL TYPE: ${lead.emailType}`);
-  if (lead.emailConfidence != null) lines.push(`EMAIL CONFIDENCE: ${lead.emailConfidence}`);
-  if (lead.callOpener) lines.push(`CALL OPENER CANDIDATE: ${lead.callOpener}`);
-  if (lead.followUpQuestion) lines.push(`FOLLOW-UP QUESTION CANDIDATE: ${lead.followUpQuestion}`);
-  lines.push(`WEBSITE STATUS: ${lead.websiteStatus || "UNKNOWN"}`);
-  if (lead.websiteUrl) lines.push(`WEBSITE URL: ${lead.websiteUrl}`);
-  if (lead.websiteGrade) lines.push(`WEBSITE GRADE: ${lead.websiteGrade}`);
-  if (lead.rating != null) lines.push(`GOOGLE RATING: ${lead.rating}`);
-  if (lead.reviewCount != null) lines.push(`REVIEW COUNT: ${lead.reviewCount}`);
-  if (lead.axiomScore != null) lines.push(`AXIOM SCORE: ${lead.axiomScore}`);
-  if (lead.axiomTier) lines.push(`AXIOM TIER: ${lead.axiomTier}`);
-  if (lead.tacticalNote) lines.push(`TACTICAL NOTE: ${lead.tacticalNote}`);
+  lines.push(`CITY: ${lead.city || "unknown"}`);
+  lines.push(`NICHE: ${lead.niche || "service business"}`);
+  if (lead.contactName) lines.push(`RECIPIENT FIRST NAME: ${lead.contactName.trim().split(/\s+/)[0]}`);
+  if (lead.websiteUrl) lines.push(`WEBSITE: ${lead.websiteUrl}`);
+  if (Number(lead.reviewCount || 0) > 0 && Number(lead.reviewCount || 0) <= 1000) {
+    lines.push(`GOOGLE REVIEWS: ${lead.reviewCount} at ${lead.rating ?? "?"} stars`);
+  }
   lines.push("");
   lines.push(buildWebsiteAssessmentContext(lead));
   lines.push("");
-  lines.push(buildPainSignalContext(lead));
-  lines.push("");
-  lines.push("ENRICHMENT INTELLIGENCE:");
-  lines.push(`- Value proposition: ${enrichment.valueProposition}`);
-  lines.push(`- Pitch angle: ${enrichment.pitchAngle}`);
+  lines.push("ENRICHMENT (from real public data):");
   lines.push(`- Key pain point: ${enrichment.keyPainPoint}`);
   lines.push(`- Personalized hook: ${enrichment.personalizedHook}`);
   lines.push(`- Recommended CTA: ${enrichment.recommendedCTA}`);
   lines.push(`- Tone: ${enrichment.emailTone}`);
-  lines.push(`- Summary: ${enrichment.enrichmentSummary}`);
   lines.push("");
-  lines.push("SELECTED EMAIL STRATEGY:");
-  lines.push(`- Strategy: ${plan.strategy}`);
-  lines.push(`- CTA type: ${plan.CTA_type}`);
-  lines.push(`- Confidence score: ${plan.confidence_score}`);
-  lines.push(`- Personalization reason: ${plan.personalization_reason}`);
-  lines.push(`- Concrete anchor to reference: ${plan.concreteAnchor}`);
-  lines.push(`- Observed issue: ${plan.observed_issue}`);
-  lines.push(`- Evidence: ${plan.issueEvidence}`);
-  lines.push(`- Preferred observation framing: ${plan.observationHint}`);
-  lines.push(`- Preferred soft consequence: ${plan.consequenceHint}`);
-  lines.push(`- Preferred CTA: ${plan.ctaHint}`);
-  lines.push(`- Use softened language: ${plan.softened ? "yes" : "no"}`);
+  lines.push(`CTA TYPE TO USE: ${plan.CTA_type}`);
 
   return lines.join("\n");
 }
@@ -218,56 +195,49 @@ export function buildFollowUpContextForTesting(
   return buildFollowUpContext(lead, enrichment, senderName, previousEmail, stepType);
 }
 
-const COLD_EMAIL_SYSTEM_PROMPT = `You write cold emails for Axiom Web, a small studio that builds and rebuilds websites for local service businesses so they get more quote requests. Your only job is to earn a reply.
+const COLD_EMAIL_SYSTEM_PROMPT = `You write short cold emails for Axiom Web, a studio that builds and rebuilds websites for local service businesses. Goal: earn a reply.
 
-These emails go to owners and managers on their phones. They take 2 seconds to judge. You have ONE shot to sound like a real human peer who works with their type of business, NOT an auditor pretending to have inspected their site.
+DATA YOU HAVE — TREAT AS GROUND TRUTH:
+- Our scraper visited their site and produced the WEBSITE ASSESSMENT block (speedRisk, conversionRisk, trustRisk, seoRisk, topFixes). Reference it specifically when it has signal — that's the point of having it. Example: if topFixes says "no visible phone on mobile hero", you can write "the phone isn't easy to find on mobile" because that came from a real scan.
+- ENRICHMENT INTELLIGENCE block (keyPainPoint, personalizedHook) is also from real public data about this business.
+- BUSINESS / CITY / NICHE / CONTACT NAME / REVIEW COUNT / RATING / WEBSITE URL — all real.
 
-ABSOLUTE TRUTHFULNESS RULES — violating any of these gets the email rejected:
-- You have NOT visited their website. You have NOT looked at their page, layout, contact form, navigation, hero section, mobile experience, load speed, fold, hierarchy, or anything else specific to their site.
-- NEVER write phrases like: "I was looking at your site", "I noticed on your page", "your contact path", "buried far down the page", "site loads slow", "first load", "above the fold", "your hero", "your navigation". Even softeners like "looks like" or "from a visitor's eye" do NOT make a fabricated site claim acceptable.
-- You CAN reference: their business name, their city, their niche, their Google review count if provided, their listed services if provided, their contact name if provided.
-- You CAN reference: a pattern you see in their industry generally ("most {niche} sites in {city} lose quote requests when the phone number isn't in the header").
-- You CAN reference: the enrichment block's PERSONALIZED HOOK and KEY PAIN POINT verbatim or paraphrased, because those were generated from real signals about this business.
+DO NOT INVENT beyond what's in the data. If the assessment is empty or generic, fall back to an industry-pattern observation instead of making up a site detail.
 
-HARD RULES — violating any of these kills the conversion:
-1. LENGTH: 55-80 words total (counting body only, not greeting/signoff). Shorter wins on mobile.
-2. SUBJECT: 3-6 words, sentence case (capitalize the first word and proper nouns only — not Title Case, not all-lowercase), zero salesy language. Lean toward specific + curious. Strong patterns: "Quick Q on {Business}", "{firstName}, one thought on {Business}", "{City} {niche} site idea", "Noticed something on {Business}", "One tweak for {Business}". Never all-lowercase, never SHOUTY CASE, never: "Exclusive Opportunity", "Unlock Your Potential", "Grow {Business} 10x", and never generic patterns like "Quick site thought" or "Question about the site".
-3. GREETING: Always use the recipient's first name when provided ("Hey {firstName},"). Only fall back to "Hey there," if no name is available. The first name itself is the single biggest reply-rate lever.
-4. OPENING LINE (after greeting): Concrete anchor referencing niche + city + business name. Examples: "I work with {niche} businesses in {city} and {Business} caught my eye.", "Came across {Business} while looking through {niche} operators in {city}." NEVER claim to have visited the site.
-5. ONE OBSERVATION: REQUIRED — anchor on the enrichment's PERSONALIZED HOOK or KEY PAIN POINT (those were generated from real public signals about this business, not fabricated). Paraphrase naturally — do not quote it verbatim if it reads stiff. Frame as a pattern across SIMILAR businesses, NOT a specific finding about their site. If both hook and pain point are weak or generic, fall back to an industry pattern relevant to the niche ("Most {niche} owners I talk to in {city} say their biggest leak is X."). NEVER write "in electrician," / "in drywall," / "For electrician," / "For roofing," — single-word niches must ALWAYS be followed by "businesses" or "owners" or "operators" when used as a noun phrase. Same for the niche as a service category in any preposition: "across roofing businesses", "in electrician operations", "for plumbing owners". Soften with "from what I see most", "a lot of {niche} owners are dealing with", "the common pattern is". ALSO never write "the site has one main job", "your site has", or any phrasing that implies you've seen the actual site — same fabrication ban as the explicit phrases above.
-6. ONE CTA: A single low-friction question that's easy to answer YES to in two seconds. Strong patterns:
-   - "Want me to send the 2 or 3 things I'd change?"
-   - "Want a free 1-page audit?"
-   - "Open to me sharing what I'd tweak?"
-   - "How many quote requests are you getting from the site each week right now?" (when the niche is service-heavy and an open-ended question lands well)
-   Match the recommended CTA from enrichment when it is concrete. NEVER use: "schedule a call", "book a demo", "hop on a call", "let's connect".
-7. OPTIONAL PS LINE: You MAY add a single PS line (max 18 words) when it adds something specific. Use it for a low-friction follow-up question or a tiny piece of context (e.g., "PS — happy to send a 2-min Loom instead if that's easier.", "PS — no pitch, just curious if you've already tried fixing this."). Skip PS if it would feel forced.
-8. SIGNOFF: "Best,
-{First Name}" or "Thanks,
-{First Name}" — nothing else. No title, no company name after the signature. The PS line goes BELOW the signoff if used.
-9. BANNED PHRASES (never use, even paraphrased): "hope this finds you well", "my name is", "we specialize in", "I help businesses like yours", "would love to", "circle back", "touch base", "unlock growth", "digital transformation", "boost revenue", "online presence", "scale your business", "award-winning", "stellar reputation", "glowing reviews", "high-converting", "best-in-class", "schedule a quick 10-minute call", "hop on a call", "while looking at a few sites tonight", "had a quick look at", "spent a minute on", "your page", "your hero", "your nav", "your contact path".
-10. NO exclamation marks. NO em dashes (—). NO bold. NO HTML. Plain text only.
-11. NO generic compliments ("you have a great business", "stellar reputation"). If you compliment, anchor it in given data: "X years in {city}", "{N} Google reviews", "you focus on {service}".
-12. GOOGLE REVIEWS: Do NOT open with reviews/rating/stars. Only reference reviews if the count is genuinely impressive (>= 25) AND not in the first sentence.
-13. CONVERSION INTENT: Tie the value to a tangible business outcome (more quote requests, fewer dropped bookings, faster reply times) — never agency platitudes like "improve your online presence".
-14. TONE: Match the enrichment block's emailTone field when it is set ("casual" = chatty + first-name + contractions, "professional" = composed + complete sentences + no contractions, "urgent" = direct + short sentences + no fluff). If unset, default to casual.
-15. IF the lead is a NON-CUSTOMER entity (government, regulator, authority, commission, ministry, agency, nonprofit, association, foundation, institute, council, board, chamber of commerce), STOP and return {"subject":"","body":"","skip_reason":"non-customer entity"}. Do not write copy for them.
+OUTPUT STRUCTURE (6 lines max):
+  Line 1: "Hey {firstName}," (or "Hey there," only if no name)
+  Line 2: One concrete opener referencing business name + city + niche.
+  Line 3: One observation — either a specific finding from the WEBSITE ASSESSMENT topFixes OR a sharp industry pattern. Frame as something a peer who works with similar businesses would notice. Plain language, not jargon.
+  Line 4: One low-friction question CTA. Strong patterns:
+    - "Want me to send the 2 or 3 things I'd change?"
+    - "Want a free 1-page audit?"
+    - "Open to me sharing what I'd tweak?"
+  Line 5: "Best,\n{senderFirstName}"
+  Line 6 (optional): "PS — {one short specific line}" if it adds something concrete.
 
-STRUCTURE that converts (follow this exactly):
-  Line 1 — "Hey {first name}," (always use first name when available).
-  Line 2 — concrete anchor referencing niche + city + business name. No site claims.
-  Line 3 — ONE observation drawn from the enrichment PERSONALIZED HOOK or KEY PAIN POINT, paraphrased into a natural industry-pattern statement.
-  Line 4 — the single low-friction question CTA.
-  Line 5 — "Best,
-{first name of sender}"
-  Optional Line 6 — "PS — {one short specific line, max 18 words}." (only when it genuinely adds something)
+LENGTH: 55-80 words body. Mobile-readable.
+
+SUBJECT: 3-6 words. Sentence case (first word + proper nouns capitalized). Strong patterns: "Quick Q on {Business}", "{firstName}, one thought on {Business}", "Noticed something on {Business}", "One tweak for {Business}". NEVER all-lowercase, NEVER Title Case, NEVER salesy ("Exclusive Opportunity"), NEVER generic ("Quick site thought", "Question about the site").
+
+GRAMMAR CHECKS (these slip often, double-check):
+- Subject-verb agreement: "11 reviews say a lot" (NOT "says"). "Most plumbing businesses get more calls" (NOT "Most plumbing get").
+- Niche noun stacking: if the niche field already contains a noun ("plumbing companies", "roofers", "med-spas"), use it AS-IS — never "plumbing companies businesses" or "roofers operators". If niche is bare ("plumbing", "roofing"), add "businesses" / "owners" only when grammar needs it.
+
+HARD BANS:
+- "hope this finds you well", "my name is", "we specialize in", "I help businesses like yours", "would love to", "circle back", "touch base", "unlock growth", "digital transformation", "boost revenue", "online presence", "scale your business", "schedule a call", "book a demo", "hop on a call", "let's connect".
+- No exclamation marks. No em dashes. No HTML, bold, or markdown. Plain text only.
+- NEVER quote exact review counts above 1000 (those are scrape artifacts).
+
+NON-CUSTOMER LEADS: if the business is a government agency, regulator, nonprofit, association, foundation, institute, council, chamber of commerce, or similar non-customer entity, return {"subject":"","body":"","skip_reason":"non-customer entity"}.
+
+TONE: Match emailTone field — "casual" (chatty, contractions), "professional" (composed, no contractions), "urgent" (direct, short). Default casual.
 
 Return JSON only:
 {
-  "subject": "3-6 word sentence-case subject (capitalize first word and proper nouns only)",
-  "body": "plain-text body, no greetings template, exactly the 4-6 lines described",
-  "personalization_reason": "one sentence on why this email will resonate with this specific lead",
-  "observed_issue": "the single issue referenced",
+  "subject": "string",
+  "body": "string",
+  "personalization_reason": "string",
+  "observed_issue": "string",
   "CTA_type": "observation_offer | permission_offer | soft_call",
   "confidence_score": 0
 }`;
@@ -365,24 +335,14 @@ async function generateColdEmailAttempt(
   retryInstructions?: string,
 ): Promise<RawGeneratedColdEmail> {
   const userPrompt = [
-    "Generate one cold email using the selected strategy and context below.",
-    "The email must feel human, specific, low-friction, and reply-worthy.",
-    "Ground every line in the PAIN SIGNALS, WEBSITE ASSESSMENT, and ENRICHMENT INTELLIGENCE below — reference a real signal that someone could only know by looking at this specific business. Do not generalize, do not paraphrase into vague advice, and do not echo the strategy or rules back at the reader.",
+    "Write one cold email using the data below. Follow the system rules.",
     "",
     context,
     "",
-    "Additional rules:",
-    `- Keep CTA type as ${plan.CTA_type}.`,
-    `- Strategy is ${plan.strategy}.`,
-    `- Use this concrete anchor somewhere naturally: ${plan.concreteAnchor}.`,
-    `- Observed issue to anchor around: ${plan.observed_issue}.`,
-    `- If evidence is limited, stay curiosity-based and ask permission to send ideas.`,
-    "- Do not over-compliment the business.",
-    "- Every sentence must be a complete thought ending in a period or question mark. Never trail off after a verb like \"noticed\" or \"saw\".",
-    "- Frame the observation as an industry pattern across SIMILAR businesses, not a specific finding about this site (you have not looked at it).",
-    "- Do NOT stack noun forms on the niche. If the niche field already contains a noun (\"plumbing companies\", \"roofers\", \"med-spas\"), use it as-is — never write \"plumbing companies businesses\", \"roofers operators\", \"in roofers operations\". If the niche is a bare service like \"plumbing\" or \"roofing\", you may add \"businesses\" or \"owners\" when needed.",
-    "- Match subject and verb. Plural subjects need plural verbs. \"11 reviews say a lot\" (not \"says\"). \"Most plumbing businesses get more calls\" (not \"Most plumbing get\").",
-    "- Do not write the email as if you are following a template — vary phrasing, do not start with \"I had a quick look\" or \"I looked through\" if those exact phrases appear in the personalized hook.",
+    "Reminders for THIS lead:",
+    "- If WEBSITE ASSESSMENT topFixes has a specific item, reference it plainly (it came from a real scan).",
+    "- If topFixes is empty or generic, use the ENRICHMENT key pain point or fall back to an industry pattern.",
+    "- Re-read the GRAMMAR CHECKS before returning JSON.",
     retryInstructions ? `\n${retryInstructions}` : "",
   ]
     .filter(Boolean)

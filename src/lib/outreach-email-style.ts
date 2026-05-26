@@ -47,18 +47,11 @@ export const BANNED_EMAIL_PHRASES = [
   "last note",
   "final chance",
   "limited time",
-  // Site-inspection fabrication phrases (added 2026-05-21).
-  "your contact path",
-  "your contact form",
-  "your hero",
-  "your nav",
-  "your homepage",
-  "your landing page",
-  "your fold",
-  "your above the fold",
-  "buried far down",
-  "buried pretty far down",
-  "buried on the page",
+  // Tonal / forced-casual phrases. These read like fake-casual cold-email
+  // templates regardless of whether we visited the site. Specific site
+  // references like "your contact form" or "your homepage" are now ALLOWED
+  // because the scraper actually visits the site and produces a real
+  // WebsiteAssessment block the model can cite from.
   "while looking at a few sites tonight",
   "while looking at a few sites",
   "looking at a few sites tonight",
@@ -660,17 +653,16 @@ export function validateColdEmailDraft(draft: ColdEmailDraft, lead: LeadRecord, 
   }
 
   const bannedHits = BANNED_EMAIL_PHRASES.filter((phrase) => combinedLower.includes(phrase));
-  // Niche-infix fabrication: "while looking at a few <niche> sites tonight" etc.
+  // Forced-casual tonal regex. The scraper DOES visit the site so references
+  // to specific page elements (homepage, contact form, hero, nav) are allowed
+  // as long as they aren't paired with the template-y casual phrasings below.
   const fabricationRegex = [
     /while looking at (a |a few )?\S+ sites/i,
     /(clicked|clicking) through \S+\.[a-z]{2,}/i,
-    /your (page|hero|nav|navigation|fold|homepage|landing page|service page|contact form|contact path)/i,
-    /buried (far|pretty far) (down|below)/i,
     /poking around \S+/i,
     /took a (quick )?look (at|through)/i,
     /spent (a |some )?(minute|seconds?|time) on/i,
     /had a (quick )?look at \S+/i,
-    /the contact path (may|might|seems|looks|feels)/i,
   ];
   const regexHits: string[] = [];
   for (const re of fabricationRegex) {
