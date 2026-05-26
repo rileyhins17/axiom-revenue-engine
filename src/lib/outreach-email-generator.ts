@@ -271,15 +271,31 @@ function toSentenceCase(value: string) {
 
 // Restore the original casing of the business name + any other proper nouns
 // the LLM/template wrote, after toSentenceCase has lowercased everything.
-// Matches case-insensitively so "raptor roofing" gets fixed back to
-// "Raptor Roofing" when businessName = "Raptor Roofing".
-function preserveProperNouns(subject: string, businessName: string) {
-  if (!businessName) return subject;
+// Also re-capitalizes any standalone single-letter caps from the original
+// (Q, I, A) since toSentenceCase strips them: "Quick Q on X" → "Quick q on X".
+function preserveProperNouns(subject: string, businessName: string, original?: string) {
+  let result = subject;
+
+  // Restore single-letter uppercase tokens from the original subject (Q, I, A).
+  if (original) {
+    const origTokens = original.split(/\s+/);
+    const resultTokens = result.split(/\s+/);
+    for (let i = 0; i < Math.min(origTokens.length, resultTokens.length); i++) {
+      const origTok = origTokens[i].replace(/[^A-Za-z]/g, "");
+      const resTok = resultTokens[i].replace(/[^A-Za-z]/g, "");
+      if (origTok.length === 1 && origTok === origTok.toUpperCase() && resTok.length === 1) {
+        resultTokens[i] = resultTokens[i].replace(/[a-z]/i, origTok);
+      }
+    }
+    result = resultTokens.join(" ");
+  }
+
+  if (!businessName) return result;
   const name = businessName.trim();
-  if (!name) return subject;
+  if (!name) return result;
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = new RegExp(`\\b${escaped}\\b`, "i");
-  return subject.replace(pattern, name);
+  return result.replace(pattern, name);
 }
 
 function sanitizeSubject(subject: string, businessName: string) {
@@ -294,11 +310,12 @@ function sanitizeSubject(subject: string, businessName: string) {
     const normalizedSubject = shortSubject.toLowerCase().startsWith("re:")
       ? `Re: ${toSentenceCase(shortSubject.replace(/^re:\s*/i, ""))}`
       : toSentenceCase(shortSubject);
-    const withProperNouns = preserveProperNouns(normalizedSubject, businessName);
+    const withProperNouns = preserveProperNouns(normalizedSubject, businessName, shortSubject);
     return withProperNouns.slice(0, 78);
   }
 
-  return preserveProperNouns(toSentenceCase(`quick thought on ${businessName}`), businessName).slice(0, 78);
+  const fallback = `quick thought on ${businessName}`;
+  return preserveProperNouns(toSentenceCase(fallback), businessName, fallback).slice(0, 78);
 }
 
 function stripHtmlTags(value: string) {

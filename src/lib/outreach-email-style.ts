@@ -846,16 +846,20 @@ function ensureReadableLineBreaks(value: string) {
 
 export function buildPlainTextEmail(body: string, senderFirstName: string) {
   const escapedSender = senderFirstName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Match signature anywhere (mid-body or at end). Previously only matched at
+  // string end ($), so when the model emitted "Best,\nAidan\nPS - ..." the
+  // existing signoff slipped past, and the code appended another "Best,
+  // Aidan" at the very end producing a duplicate signoff.
   const signaturePattern = new RegExp(
-    `(?:\\n\\s*)?(?:best|thanks|thank you|regards),?\\s*\\n?\\s*${escapedSender}(?:\\s+hinsperger)?(?:\\s+axiom\\s+infrastructure)?\\s*$`,
-    "i",
+    `(?:\\n\\s*)?(?:best|thanks|thank you|regards),?\\s*\\n?\\s*${escapedSender}(?:\\s+hinsperger)?(?:\\s+axiom\\s+infrastructure)?\\s*`,
+    "gi",
   );
   const inlineSignaturePattern = new RegExp(
-    `\\s+${escapedSender}(?:\\s+hinsperger)?\\s+axiom\\s+infrastructure\\s*$`,
-    "i",
+    `\\s+${escapedSender}(?:\\s+hinsperger)?\\s+axiom\\s+infrastructure\\s*`,
+    "gi",
   );
 
-  const sanitized = body
+  let sanitized = body
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n\n")
     .replace(/<[^>]+>/g, " ")
@@ -875,13 +879,25 @@ export function buildPlainTextEmail(body: string, senderFirstName: string) {
     .replace(/\n{3,}/g, "\n\n")
     .trim()
     .replace(/\n?---\s*\nFrom Axiom Infrastructure\s*\ngetaxiom\.ca\s*$/i, "")
-    .replace(/\s*From Axiom Infrastructure\s+getaxiom\.ca\s*$/i, "")
-    .replace(signaturePattern, "")
-    .replace(inlineSignaturePattern, "")
-    .trim()
-    .replace(/\n{3,}/g, "\n\n");
+    .replace(/\s*From Axiom Infrastructure\s+getaxiom\.ca\s*$/i, "");
 
-  return `${ensureReadableLineBreaks(sanitized)}\n\nBest,\n${senderFirstName}`.trim();
+  // Strip ALL occurrences of the signoff, even mid-body (so a PS line after
+  // a model-emitted "Best,\nName" doesn't strand the signoff in the middle).
+  sanitized = sanitized.replace(signaturePattern, "\n\n");
+  sanitized = sanitized.replace(inlineSignaturePattern, " ");
+  sanitized = sanitized.trim().replace(/\n{3,}/g, "\n\n");
+
+  // Extract PS line if present so it can be placed AFTER the signoff.
+  let psLine = "";
+  const psMatch = sanitized.match(/\n\s*(P\.?S\.?[^\n]*)\s*$/i);
+  if (psMatch) {
+    psLine = psMatch[1].trim();
+    sanitized = sanitized.slice(0, psMatch.index).trim();
+  }
+
+  const signoff = `Best,\n${senderFirstName}`;
+  const psSuffix = psLine ? `\n\n${psLine}` : "";
+  return `${ensureReadableLineBreaks(sanitized)}\n\n${signoff}${psSuffix}`.trim();
 }
 
 function escapeHtml(value: string) {
