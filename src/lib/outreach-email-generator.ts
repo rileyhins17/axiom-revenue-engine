@@ -173,6 +173,16 @@ function restoreCasing(subject: string, original: string, businessName: string):
   return resultTokens.join(" ");
 }
 
+const MAX_SUBJECT_CHARS = 78;
+
+function trimAtWordBoundary(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  // Find the last space at or before maxChars so we don't slice mid-word.
+  const candidate = value.slice(0, maxChars);
+  const lastSpace = candidate.lastIndexOf(" ");
+  return (lastSpace > maxChars * 0.5 ? candidate.slice(0, lastSpace) : candidate).trim();
+}
+
 function sanitizeSubject(raw: string, businessName: string): string {
   const trimmed = (raw || "")
     .replace(/[!]/g, "")
@@ -181,11 +191,15 @@ function sanitizeSubject(raw: string, businessName: string): string {
     .trim();
 
   const source = trimmed.length > 0 ? trimmed : `quick thought on ${businessName}`;
-  const short = source.split(/\s+/).filter(Boolean).slice(0, 8).join(" ");
-  const sentence = short.toLowerCase().startsWith("re:")
-    ? `Re: ${toSentenceCase(short.replace(/^re:\s*/i, ""))}`
-    : toSentenceCase(short);
-  return restoreCasing(sentence, short, businessName).slice(0, 78);
+  // Cap by character length, not word count, so legitimate 8-12 word subjects
+  // like "30 reviews at 5 stars and a site that doesn't quite do that justice"
+  // (67 chars) don't get sliced mid-sentence. Trim at the nearest preceding
+  // word boundary if we have to cut.
+  const sized = trimAtWordBoundary(source, MAX_SUBJECT_CHARS);
+  const sentence = sized.toLowerCase().startsWith("re:")
+    ? `Re: ${toSentenceCase(sized.replace(/^re:\s*/i, ""))}`
+    : toSentenceCase(sized);
+  return restoreCasing(sentence, sized, businessName);
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -200,6 +214,16 @@ function validateEmailDraft(draft: RawLlmEmail, lead: LeadRecord): ValidationRes
   if (!subject) return { valid: false, reason: "subject is empty" };
   if (!body) return { valid: false, reason: "body is empty" };
   if (subject.length > 80) return { valid: false, reason: `subject too long (${subject.length} chars)` };
+  const subjectWords = countWords(subject);
+  if (subjectWords > 8) {
+    return {
+      valid: false,
+      reason: `subject is ${subjectWords} words — must be 3 to 7 words. Use a short header, not a full sentence.`,
+    };
+  }
+  if (subjectWords < 2) {
+    return { valid: false, reason: `subject is ${subjectWords} word — must be 3 to 7 words` };
+  }
 
   const wordCount = countWords(body);
   if (wordCount < 35) return { valid: false, reason: `body too short (${wordCount} words)` };
@@ -277,10 +301,11 @@ Line 4: One soft-question CTA. Pick fresh each time: "Want me to send the 2 or 3
 Line 5: "Best,\\n{senderFirstName}"
 Optional Line 6: PS line with one concrete extra. Max 18 words. Only when it genuinely adds something.
 
-SUBJECT (3-7 words):
+SUBJECT (HARD LIMIT 3-7 words, max 70 chars):
+The subject is a short header, NOT a sentence from the body. Never reuse the body opener as the subject.
 Sentence case (first word + proper nouns capitalized). Always capitalize the business name and any city.
-Good: "Quick thought on {Business}", "{firstName}, one thing on {Business}", "{City} {niche} site idea", "Noticed something on {Business}", "One tweak for {Business}".
-Bad: "Quick question", "Question about your business", anything all-lowercase, anything Title Case, anything salesy.
+Good: "Quick thought on {Business}", "{firstName}, one thing on {Business}", "{City} {niche} site idea", "Noticed something on {Business}", "One tweak for {Business}", "30 reviews and one tweak", "Slow on mobile, {Business}".
+Bad: "Quick question", "Question about your business", anything 8+ words, anything that reads like a sentence, anything all-lowercase, anything Title Case, anything salesy.
 
 HARD RULES:
 - Plain text only. No HTML, no markdown, no emoji.
