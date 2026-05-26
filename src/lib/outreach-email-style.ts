@@ -59,6 +59,13 @@ export const BANNED_EMAIL_PHRASES = [
   "spent a minute on",
   "poking around",
   "i was poking around",
+  // Placeholder/boilerplate observations. These dominated 11 of 12 sent
+  // emails when the website assessment fell back to the generic fix and
+  // the model echoed it verbatim. Force the model to phrase its own
+  // observation in its own words instead of quoting the placeholder.
+  "main offer and next step could be easier to scan",
+  "main offer and next step easy to scan",
+  "main offer and next step take too many seconds",
 ];
 
 const GENERIC_FALLBACK_PATTERNS = [

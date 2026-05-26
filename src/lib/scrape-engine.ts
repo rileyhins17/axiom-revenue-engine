@@ -1312,19 +1312,62 @@ function scoreWebsiteRiskFromSignals(input: {
   const speedRisk = contentLength > 18000 ? 4 : contentLength > 10000 ? 3 : 2;
   const totalRisk = speedRisk + conversionRisk + trustRisk + seoRisk;
   const overallGrade = totalRisk <= 5 ? "A" : totalRisk <= 8 ? "B" : totalRisk <= 11 ? "C" : totalRisk <= 14 ? "D" : "F";
-  const topFixes = [
-    !hasQuotePath ? "Make the quote/contact path obvious above the fold" : "",
+  const explicitFixes = [
+    !hasQuotePath ? "Make the quote or contact path obvious above the fold" : "",
     !hasTrustSignals ? "Bring reviews, proof, or project examples higher on the page" : "",
     !hasServiceDetail || !hasLocalContext ? "Add clearer service and local-area detail" : "",
     !hasForm && !hasPhone ? "Add a simple direct contact option" : "",
-  ].filter(Boolean).slice(0, 3);
+  ].filter(Boolean);
+
+  // When nothing trips the explicit checks, derive a fix from the highest
+  // numerical risk so the LLM has something specific to work with instead of
+  // boilerplate. Each phrasing is a concrete observation a real person would
+  // make rather than a placeholder.
+  const derivedFixes: string[] = [];
+  if (explicitFixes.length === 0) {
+    const risks: Array<{ key: string; score: number; fix: string }> = [
+      {
+        key: "speed",
+        score: speedRisk,
+        fix: "The homepage feels heavy and likely loads slowly on phones",
+      },
+      {
+        key: "trust",
+        score: trustRisk,
+        fix: "Trust signals like reviews, photos, and credentials sit too far down the page",
+      },
+      {
+        key: "seo",
+        score: seoRisk,
+        fix: "Service detail is thin for what local customers actually search for",
+      },
+      {
+        key: "conversion",
+        score: conversionRisk,
+        fix: "The main offer and next step take too many seconds to find",
+      },
+    ].sort((a, b) => b.score - a.score);
+
+    // Take the top 2 risks above a threshold so we get specific findings
+    // even on healthy-looking sites instead of identical boilerplate.
+    for (const r of risks) {
+      if (r.score >= 2 && derivedFixes.length < 2) derivedFixes.push(r.fix);
+    }
+    if (derivedFixes.length === 0) {
+      // Truly clean site — give the model something honest and specific
+      // tied to the niche/category so we don't get identical openers.
+      derivedFixes.push("The site reads cleanly, but the quote step could be one tap closer");
+    }
+  }
+
+  const topFixes = (explicitFixes.length > 0 ? explicitFixes : derivedFixes).slice(0, 3);
 
   return {
     conversionRisk,
     overallGrade,
     seoRisk,
     speedRisk,
-    topFixes: topFixes.length > 0 ? topFixes : ["Keep the main offer and next step easy to scan"],
+    topFixes,
     trustRisk,
   };
 }

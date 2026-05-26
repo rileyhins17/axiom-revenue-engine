@@ -124,12 +124,15 @@ function toSentenceCase(value: string): string {
   return lower.replace(/^(\W*)([a-z])/, (_m, lead, first) => `${lead}${first.toUpperCase()}`);
 }
 
-function restoreCasing(subject: string, original: string, businessName: string): string {
-  let result = subject;
+function letterCore(token: string): string {
+  return token.replace(/[^\p{L}\p{N}]/gu, "").toLowerCase();
+}
 
-  // Restore standalone single-letter uppercase tokens (Q, I, A).
+function restoreCasing(subject: string, original: string, businessName: string): string {
+  const resultTokens = subject.split(/\s+/);
+
+  // 1. Restore standalone single-letter uppercase tokens (Q, I, A) from original.
   const origTokens = original.split(/\s+/);
-  const resultTokens = result.split(/\s+/);
   for (let i = 0; i < Math.min(origTokens.length, resultTokens.length); i++) {
     const origLetters = origTokens[i].replace(/[^A-Za-z]/g, "");
     const resLetters = resultTokens[i].replace(/[^A-Za-z]/g, "");
@@ -137,17 +140,37 @@ function restoreCasing(subject: string, original: string, businessName: string):
       resultTokens[i] = resultTokens[i].replace(/[a-z]/i, origLetters);
     }
   }
-  result = resultTokens.join(" ");
 
-  // Restore business-name casing.
+  // 2. Restore business-name casing. Search for the longest contiguous
+  //    subsequence of business-name tokens that appears in the subject
+  //    (case-insensitive, ignoring punctuation) and overlay the original
+  //    casing of each matched token.
   if (businessName) {
-    const name = businessName.trim();
-    if (name) {
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      result = result.replace(new RegExp(`\\b${escaped}\\b`, "i"), name);
+    const nameTokens = businessName.trim().split(/\s+/).filter(Boolean);
+    const nameLower = nameTokens.map(letterCore);
+    const subjectLower = resultTokens.map(letterCore);
+
+    outer:
+    for (let runLen = nameTokens.length; runLen >= 1; runLen--) {
+      for (let nameStart = 0; nameStart + runLen <= nameTokens.length; nameStart++) {
+        const slice = nameLower.slice(nameStart, nameStart + runLen);
+        if (slice.some((s) => !s)) continue;
+        for (let subjStart = 0; subjStart + runLen <= resultTokens.length; subjStart++) {
+          const subSlice = subjectLower.slice(subjStart, subjStart + runLen);
+          if (subSlice.every((s, idx) => s === slice[idx])) {
+            for (let j = 0; j < runLen; j++) {
+              const cur = resultTokens[subjStart + j];
+              const trailingMatch = cur.match(/[^\p{L}\p{N}]+$/u);
+              const trailing = trailingMatch ? trailingMatch[0] : "";
+              resultTokens[subjStart + j] = nameTokens[nameStart + j] + trailing;
+            }
+            break outer;
+          }
+        }
+      }
     }
   }
-  return result;
+  return resultTokens.join(" ");
 }
 
 function sanitizeSubject(raw: string, businessName: string): string {
@@ -222,25 +245,40 @@ const INITIAL_SYSTEM_PROMPT = `You write 1:1 cold emails for Axiom Web — a sma
 You are NOT an agency robot. You write like a real person who works with similar service businesses and noticed something on this one. Conversational. Short. Direct.
 
 WHAT MAKES A GOOD EMAIL:
-1. Specific. Says one true thing about THIS business pulled from the data below.
+1. Specific. Says one true thing about THIS business pulled from the data below — in YOUR OWN WORDS, never verbatim quotes from the data block.
 2. Short. 55-80 words body. Under 6 short lines.
 3. Conversational. Contractions OK. No agency speak.
 4. One ask. A question that's easy to say yes to in 2 seconds.
 5. Earns the reply by being interesting, not pushy.
+6. Sounds different from every other cold email this lead receives. Vary opener structure, observation angle, and CTA — never reuse the same template.
 
 THE DATA YOU'LL GET IS REAL:
-The website assessment came from an actual scrape — speedRisk / conversionRisk / trustRisk / seoRisk are 0-10 scores and topFixes is a real list. You can reference what's in topFixes plainly. Don't invent UX details that aren't there.
+The website assessment came from an actual scrape — speedRisk / conversionRisk / trustRisk / seoRisk are 0-10 scores and topFixes is a real list. You can reference what's in topFixes — but PARAPHRASE in your own peer voice. Do not echo the topFix text word-for-word. Do not invent UX details that aren't supported by the data.
+
+PRIORITY OF SIGNALS (pick the strongest one available, in this order):
+1. A specific topFix item that names a concrete UX problem (use it — but rewrite into your own peer phrasing).
+2. The enrichment keyPainPoint when it's specific.
+3. The dominant numerical risk (e.g. speed 4/10 → "site felt slow on my phone").
+4. A review-count signal when reviewCount >= 25 ("X reviews at Y stars — clearly doing the work").
+5. An industry pattern tied to the niche + city.
+Never default to a generic observation. If signal 1 is the placeholder "Keep the main offer and next step easy to scan", treat it as NO findings and use signal 2 or 3.
 
 OUTPUT STRUCTURE:
 Line 1: Greeting. "Hey {firstName}," if recipient first name known, else "Hey,"
-Line 2: One opener that names the business and references one specific real fact (a topFix item, the niche+city, or the review count if it's >= 25).
-Line 3: One observation. Pull from topFixes when populated — say it plainly like a peer would ("the contact form takes three taps to find on mobile" or "the homepage takes 6+ seconds to load on a phone"). If topFixes is empty, paraphrase the enrichment keyPainPoint into one peer observation. If neither is solid, use an industry pattern relevant to the niche.
-Line 4: One soft-question CTA. Strong patterns: "Want me to send the 2 or 3 things I'd change?", "Open to a quick audit?", "Want a 2-minute Loom showing what I mean?", "How are you handling that now?"
+Line 2-3: Opener + observation in 1-2 lines. PICK ONE opener pattern at random each time:
+  A. Start with a question. "Is the quote button on {Business}'s site supposed to be that small on mobile?"
+  B. Start with the observation directly. "The first thing I'd change on {Business} is how far the reviews sit from the fold."
+  C. Start with niche pattern. "Most {niche} sites I look at have one shared weak spot — and {Business}'s is the same."
+  D. Start with city + niche. "Working with a few {niche} businesses in {City} this month, and {Business} caught my eye."
+  E. Start with review count when >= 25. "{X} reviews at {Y} stars and a site that doesn't quite do that justice."
+  F. Start by naming what works. "{Business}'s service list is clear, but the path to ask for a quote takes more steps than it should."
+Rotate these — never use pattern A two emails in a row.
+Line 4: One soft-question CTA. Pick fresh each time: "Want me to send the 2 or 3 things I'd change?", "Open to a quick audit?", "Want a 2-minute Loom showing what I mean?", "How are you handling that now?", "Should I put a short list together?"
 Line 5: "Best,\\n{senderFirstName}"
 Optional Line 6: PS line with one concrete extra. Max 18 words. Only when it genuinely adds something.
 
 SUBJECT (3-7 words):
-Sentence case (first word + proper nouns capitalized).
+Sentence case (first word + proper nouns capitalized). Always capitalize the business name and any city.
 Good: "Quick thought on {Business}", "{firstName}, one thing on {Business}", "{City} {niche} site idea", "Noticed something on {Business}", "One tweak for {Business}".
 Bad: "Quick question", "Question about your business", anything all-lowercase, anything Title Case, anything salesy.
 
@@ -250,8 +288,9 @@ HARD RULES:
 - Subject-verb agreement: "11 reviews say" not "11 reviews says". "Most plumbing businesses get" not "Most plumbing get".
 - The niche field may already be plural ("plumbing companies", "roofers", "med-spas"). Use it as-is — NEVER stack "businesses" / "operators" on top.
 - Do not invent specific UX claims outside the WEBSITE ASSESSMENT topFixes.
+- Do not echo topFix or enrichment text verbatim — paraphrase in peer voice.
 - Do not over-compliment. If you cite reviews, use the actual number — and only if >= 25.
-- Never use: "hope this finds you well", "we specialize in", "I help businesses like yours", "would love to", "circle back", "touch base", "schedule a call", "book a demo", "hop on a call", "let's connect", "boost revenue", "scale your business", "unlock growth", "online presence", "digital transformation".
+- Never use: "hope this finds you well", "we specialize in", "I help businesses like yours", "would love to", "circle back", "touch base", "schedule a call", "book a demo", "hop on a call", "let's connect", "boost revenue", "scale your business", "unlock growth", "online presence", "digital transformation", "main offer and next step".
 
 SKIP CONDITIONS:
 If the business looks like a non-customer (government agency, regulator, nonprofit, foundation, association, institute, council, chamber of commerce, museum, library, church), respond with:
@@ -274,9 +313,19 @@ RULES:
 OUTPUT JSON ONLY:
 {"subject":"...", "body":"..."}`;
 
+const GENERIC_FIX_MARKERS = [
+  "keep the main offer and next step easy to scan",
+  "main offer and next step",
+];
+
+function isGenericFix(text: string): boolean {
+  const lower = text.toLowerCase();
+  return GENERIC_FIX_MARKERS.some((m) => lower.includes(m));
+}
+
 function buildAssessmentBlock(lead: LeadRecord): string {
   const assessment = parseJson<WebsiteAssessment>(lead.axiomWebsiteAssessment);
-  if (!assessment) return "WEBSITE ASSESSMENT: not scraped yet";
+  if (!assessment) return "WEBSITE ASSESSMENT: not scraped yet — use enrichment and niche pattern for the observation.";
 
   const lines = [
     "WEBSITE ASSESSMENT (real scrape data):",
@@ -287,14 +336,38 @@ function buildAssessmentBlock(lead: LeadRecord): string {
     `- SEO risk: ${assessment.seoRisk}/10`,
   ];
 
-  const fixes = (assessment.topFixes || []).slice(0, 4).filter((f) => f && f.trim());
-  if (fixes.length > 0) {
-    lines.push(`- topFixes: ${fixes.join("; ")}`);
+  const rawFixes = (assessment.topFixes || []).slice(0, 4).filter((f) => f && f.trim());
+  const specificFixes = rawFixes.filter((f) => !isGenericFix(f));
+
+  if (specificFixes.length > 0) {
+    lines.push(`- topFixes (specific findings — paraphrase, don't quote): ${specificFixes.join("; ")}`);
   } else {
-    lines.push("- topFixes: (none identified)");
+    // Generic placeholder or empty — tell the model not to lean on it.
+    lines.push("- topFixes: (no specific UX problems flagged — DO NOT invent one; instead use enrichment.keyPainPoint or the dominant risk score as your angle)");
+
+    // Surface the dominant risk axis so the model has a concrete angle.
+    const risks = [
+      { key: "speed", score: assessment.speedRisk, hint: "Site likely feels slow on mobile" },
+      { key: "trust", score: assessment.trustRisk, hint: "Reviews/proof/credentials not surfaced enough" },
+      { key: "seo", score: assessment.seoRisk, hint: "Service detail thin for what people search" },
+      { key: "conversion", score: assessment.conversionRisk, hint: "Quote/contact path takes effort to find" },
+    ].sort((a, b) => b.score - a.score);
+    const top = risks[0];
+    if (top && top.score >= 2) {
+      lines.push(`- dominant risk: ${top.key} (${top.score}/10) — ${top.hint}`);
+    }
   }
 
   return lines.join("\n");
+}
+
+// Deterministic opener rotation. Lead id seed → pattern letter A-F so a given
+// lead always gets the same opener pattern, but the pattern varies across the
+// queue and emails don't all read identically.
+function pickOpenerPattern(lead: LeadRecord): string {
+  const seed = Number(lead.id || 0) || (lead.businessName?.length || 0);
+  const patterns = ["A", "B", "C", "D", "E", "F"];
+  return patterns[seed % patterns.length];
 }
 
 function buildPainBlock(lead: LeadRecord): string {
@@ -346,6 +419,9 @@ function buildInitialContext(
   lines.push(`- Personalized hook: ${enrichment.personalizedHook}`);
   lines.push(`- Suggested CTA flavor: ${enrichment.recommendedCTA}`);
   lines.push(`- Tone: ${enrichment.emailTone}`);
+
+  lines.push("");
+  lines.push(`OPENER PATTERN TO USE FOR THIS EMAIL: ${pickOpenerPattern(lead)} (see system prompt patterns A-F). Do not use a different pattern.`);
 
   return lines.join("\n");
 }

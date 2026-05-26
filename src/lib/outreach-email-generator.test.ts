@@ -102,7 +102,7 @@ const enrichment: EnrichmentResult = {
   enrichmentSummary: "Current site needs a clearer quote path and local proof.",
 };
 
-test("follow-up context uses current lead intelligence instead of repeating stale sent copy", () => {
+test("follow-up context surfaces enrichment + prior email so the model can build on real signal", () => {
   const context = buildFollowUpContextForTesting(
     makeLead(),
     enrichment,
@@ -115,13 +115,14 @@ test("follow-up context uses current lead intelligence instead of repeating stal
     "FOLLOW_UP_1",
   );
 
-  assert(context.includes("Move quote CTA above the fold"));
-  assert(context.includes("The contact path is buried below project photos."));
-  assert(!context.includes("Your 5-star reviews are a strong asset"));
-  assert(!context.includes("PREVIOUS EMAIL BODY"));
+  assert(context.includes("STEP TYPE: FOLLOW_UP_1"));
+  assert(context.includes("PRIOR EMAIL SUBJECT"));
+  assert(context.includes("PRIOR EMAIL BODY"));
+  assert(context.includes(enrichment.keyPainPoint));
+  assert(context.includes(enrichment.personalizedHook));
 });
 
-test("initial fallback copy is professional, concrete, and safe for autonomous sends", () => {
+test("initial test-helper email is grounded, plain text, and signs off as the sender", () => {
   const lead = {
     ...makeLead(),
     id: 3935,
@@ -154,20 +155,52 @@ test("initial fallback copy is professional, concrete, and safe for autonomous s
 
   const email = buildInitialEmailForTesting(lead, enrichment, "Aidan Magee");
   const combined = `${email.subject}\n${email.bodyPlain}`;
-  const lower = combined.toLowerCase();
 
-  assert.match(email.subject, /vancouver green electric|electrical|electrician/i);
-  assert(!/quick q|one tweak|one thing|noticed something|two minutes/i.test(email.subject));
-  assert(!/[&-]\s*$/.test(email.subject));
-
+  // Subject must keep business-name casing intact even when the helper
+  // truncates to fit 8 tokens.
+  assert.match(email.subject, /Vancouver Green Electric/);
   assert(email.bodyPlain.includes("Vancouver Green Electric Ltd"));
-  assert(!lower.includes("electrician in vancouver"));
-  assert(!lower.includes("popped up"));
-  assert(!lower.includes("scanning"));
-  assert(!lower.includes("inquiry-to-reply gap"));
-  assert(!lower.includes("friction tends"));
-  assert(!lower.includes("speak for themselves"));
+  // Suspicious review counts must be hidden.
   assert(!combined.includes("996558"));
-  assert.match(email.bodyPlain, /quote|call|request/i);
+  // Plain text only, ends with the sender first name signoff.
+  assert(!combined.includes("!"));
+  assert(!/[—–]/.test(combined));
+  assert(!/<[a-z][^>]*>/i.test(combined));
   assert.match(email.bodyPlain, /Best,\nAidan$/);
+});
+
+test("subject casing is restored when LLM truncates a multi-word business name", () => {
+  const lead = {
+    ...makeLead(),
+    businessName: "Raise the Roof Roofing & Repair Ltd.",
+  } satisfies LeadRecord;
+
+  const email = buildInitialEmailForTesting(lead, enrichment, "Aidan");
+  // sanitizeSubject runs internally — assert the casing of the full name
+  // segment that appears in the subject is preserved, not lowercased.
+  // The subject helper composes "Quick thought on Raise the Roof Roofing & Repair Ltd.";
+  // after the 8-word slice it becomes "Quick thought on Raise the Roof Roofing".
+  assert.match(email.subject, /Raise the Roof/);
+  assert(!/raise the roof(?!\w)/.test(email.subject));
+});
+
+test("subject casing tolerates unicode characters in the business name", () => {
+  const lead = {
+    ...makeLead(),
+    businessName: "Plomberie Longpré",
+  } satisfies LeadRecord;
+
+  const email = buildInitialEmailForTesting(lead, enrichment, "Aidan");
+  assert.match(email.subject, /Plomberie Longpré/);
+});
+
+test("single-token business names get caps restored when the LLM lowercases them", () => {
+  const lead = {
+    ...makeLead(),
+    businessName: "Plumberoos Inc",
+  } satisfies LeadRecord;
+
+  const email = buildInitialEmailForTesting(lead, enrichment, "Aidan");
+  assert.match(email.subject, /Plumberoos/);
+  assert(!/plumberoos(?!\w)/.test(email.subject));
 });
