@@ -1,25 +1,34 @@
 /**
- * Outreach Email Generator
+ * Outreach Email Generator — rewrite.
  *
- * Uses DeepSeek to generate personalized outreach email copy based on
- * enrichment data. Cold emails are validated against tone/style rules
- * before HTML is rendered for delivery.
+ * Single focused LLM call. Real scrape data only. No template fallback —
+ * if generation fails or the lead is non-customer, throw or skip so the
+ * scheduler blocks the sequence instead of sending junk.
+ *
+ * Surface kept stable for callers:
+ *   - GeneratedEmail (type)
+ *   - OutreachSequenceStepType (type)
+ *   - generateEmail(lead, enrichment, senderName)
+ *   - generateFollowUpEmail(lead, enrichment, senderName, previousEmail, stepType?)
+ *   - generateSequenceStepEmail(lead, enrichment, senderName, stepType, previousEmail?)
+ *   - buildInitialEmailForTesting(lead, enrichment, senderName)
+ *   - buildFollowUpContextForTesting(lead, enrichment, senderName, previousEmail, stepType?)
  */
 
 import type { PainSignal, WebsiteAssessment } from "@/lib/axiom-scoring";
 import { chatCompletionJson } from "@/lib/deepseek";
 import {
+  BANNED_EMAIL_PHRASES,
   buildHtmlEmail,
   buildPlainTextEmail,
-  buildRetryInstructions,
-  chooseColdEmailPlan,
-  type ColdEmailCtaType,
-  type ColdEmailDraft,
-  type ColdEmailPlan,
-  validateColdEmailDraft,
 } from "@/lib/outreach-email-style";
 import type { EnrichmentResult } from "@/lib/outreach-enrichment";
 import type { LeadRecord } from "@/lib/prisma";
+
+// ────────────────────────────────────────────────────────────────────────
+// Types
+
+export type OutreachSequenceStepType = "INITIAL" | "FOLLOW_UP_1" | "FOLLOW_UP_2" | "FOLLOW_UP_3";
 
 export type GeneratedEmail = {
   subject: string;
@@ -27,11 +36,9 @@ export type GeneratedEmail = {
   bodyPlain: string;
   personalization_reason?: string;
   observed_issue?: string;
-  CTA_type?: ColdEmailCtaType | "follow_up";
+  CTA_type?: string;
   confidence_score?: number;
 };
-
-export type OutreachSequenceStepType = "INITIAL" | "FOLLOW_UP_1" | "FOLLOW_UP_2" | "FOLLOW_UP_3";
 
 type FollowUpSourceEmail = {
   subject: string;
@@ -39,14 +46,56 @@ type FollowUpSourceEmail = {
   sentAt: string | Date;
 };
 
-type RawGeneratedColdEmail = {
+type RawLlmEmail = {
   subject: string;
   body: string;
-  personalization_reason: string;
-  observed_issue: string;
-  CTA_type: ColdEmailCtaType;
-  confidence_score: number;
+  skip_reason?: string;
 };
+
+// ────────────────────────────────────────────────────────────────────────
+// Non-customer detection
+
+const NON_CUSTOMER_PATTERNS = [
+  /\bauthority\b/i,
+  /\bcommission\b/i,
+  /\bregulator\b/i,
+  /\bministry\b/i,
+  /\bdepartment of\b/i,
+  /\boffice of\b/i,
+  /\bbureau\b/i,
+  /\bchamber of commerce\b/i,
+  /\bassociation\b/i,
+  /\bfederation\b/i,
+  /\bfoundation\b/i,
+  /\bnonprofit\b/i,
+  /\bnon-profit\b/i,
+  /\bcharity\b/i,
+  /\bcouncil\b/i,
+  /\bgovernment\b/i,
+  /\bagency\b/i,
+  /\bmuseum\b/i,
+  /\blibrary\b/i,
+  /\bchurch\b/i,
+  /\binstitute\b/i,
+];
+
+function isNonCustomerLead(lead: LeadRecord): boolean {
+  const text = `${lead.businessName || ""} ${lead.niche || ""} ${lead.category || ""}`;
+  return NON_CUSTOMER_PATTERNS.some((re) => re.test(text));
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Helpers
+
+function firstName(value: string): string {
+  return value.trim().split(/\s+/)[0] || value.trim() || "Riley";
+}
+
+function recipientFirstName(lead: LeadRecord): string {
+  const name = (lead.contactName || "").trim();
+  if (!name) return "";
+  return name.split(/\s+/)[0] || "";
+}
 
 function parseJson<T>(value: string | null | undefined): T | null {
   if (!value) return null;
@@ -57,74 +106,246 @@ function parseJson<T>(value: string | null | undefined): T | null {
   }
 }
 
-function firstName(senderName: string) {
-  return senderName.trim().split(/\s+/)[0] || senderName.trim() || "Riley";
+function clampReviewCount(n: number | null | undefined): number {
+  const v = Number(n || 0);
+  // Counts > 1000 are almost always scrape artifacts.
+  return Number.isFinite(v) && v > 0 && v <= 1000 ? v : 0;
 }
 
-function buildPainSignalContext(lead: LeadRecord) {
-  const painSignals = parseJson<PainSignal[]>(lead.painSignals);
-  if (!Array.isArray(painSignals) || painSignals.length === 0) {
-    return "PAIN SIGNALS: none recorded";
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Subject sanitization
+
+function toSentenceCase(value: string): string {
+  const lower = value.toLowerCase();
+  return lower.replace(/^(\W*)([a-z])/, (_m, lead, first) => `${lead}${first.toUpperCase()}`);
+}
+
+function restoreCasing(subject: string, original: string, businessName: string): string {
+  let result = subject;
+
+  // Restore standalone single-letter uppercase tokens (Q, I, A).
+  const origTokens = original.split(/\s+/);
+  const resultTokens = result.split(/\s+/);
+  for (let i = 0; i < Math.min(origTokens.length, resultTokens.length); i++) {
+    const origLetters = origTokens[i].replace(/[^A-Za-z]/g, "");
+    const resLetters = resultTokens[i].replace(/[^A-Za-z]/g, "");
+    if (origLetters.length === 1 && origLetters === origLetters.toUpperCase() && resLetters.length === 1) {
+      resultTokens[i] = resultTokens[i].replace(/[a-z]/i, origLetters);
+    }
+  }
+  result = resultTokens.join(" ");
+
+  // Restore business-name casing.
+  if (businessName) {
+    const name = businessName.trim();
+    if (name) {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      result = result.replace(new RegExp(`\\b${escaped}\\b`, "i"), name);
+    }
+  }
+  return result;
+}
+
+function sanitizeSubject(raw: string, businessName: string): string {
+  const trimmed = (raw || "")
+    .replace(/[!]/g, "")
+    .replace(/[—–]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const source = trimmed.length > 0 ? trimmed : `quick thought on ${businessName}`;
+  const short = source.split(/\s+/).filter(Boolean).slice(0, 8).join(" ");
+  const sentence = short.toLowerCase().startsWith("re:")
+    ? `Re: ${toSentenceCase(short.replace(/^re:\s*/i, ""))}`
+    : toSentenceCase(short);
+  return restoreCasing(sentence, short, businessName).slice(0, 78);
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Validation
+
+type ValidationResult = { valid: boolean; reason: string };
+
+function validateEmailDraft(draft: RawLlmEmail, lead: LeadRecord): ValidationResult {
+  const subject = (draft.subject || "").trim();
+  const body = (draft.body || "").trim();
+
+  if (!subject) return { valid: false, reason: "subject is empty" };
+  if (!body) return { valid: false, reason: "body is empty" };
+  if (subject.length > 80) return { valid: false, reason: `subject too long (${subject.length} chars)` };
+
+  const wordCount = countWords(body);
+  if (wordCount < 35) return { valid: false, reason: `body too short (${wordCount} words)` };
+  if (wordCount > 110) return { valid: false, reason: `body too long (${wordCount} words)` };
+
+  // Must reference business name OR city OR niche somewhere.
+  const lower = body.toLowerCase();
+  const refs = [lead.businessName, lead.city, lead.niche]
+    .filter(Boolean)
+    .some((v) => lower.includes(String(v).toLowerCase()));
+  if (!refs) return { valid: false, reason: "body does not reference business name, city, or niche" };
+
+  // Banned phrases.
+  const bannedHit = BANNED_EMAIL_PHRASES.find((phrase) => lower.includes(phrase));
+  if (bannedHit) return { valid: false, reason: `banned phrase: "${bannedHit}"` };
+
+  // Forced-casual phrasings.
+  const forcedCasual = [
+    /while looking at (a |a few )?\S+ sites/i,
+    /(clicked|clicking) through \S+\.[a-z]{2,}/i,
+    /poking around \S+/i,
+    /took a (quick )?look (at|through)/i,
+    /spent (a |some )?(minute|seconds?|time) on/i,
+    /had a (quick )?look at \S+/i,
+  ];
+  for (const re of forcedCasual) {
+    if (re.test(body)) return { valid: false, reason: `forced-casual phrase: ${re.source}` };
   }
 
-  const lines = painSignals
-    .slice(0, 4)
-    .map(
-      (signal) =>
-        `- ${signal.type} (severity ${signal.severity}, ${signal.source}): ${signal.evidence || "No evidence provided"}`,
-    );
+  // No exclamations, em dashes, or HTML.
+  if (body.includes("!")) return { valid: false, reason: "contains exclamation mark" };
+  if (/[—–]/.test(body)) return { valid: false, reason: "contains em dash" };
+  if (/<[a-z][^>]*>/i.test(body)) return { valid: false, reason: "contains HTML tag" };
 
-  return ["PAIN SIGNALS:", ...lines].join("\n");
+  return { valid: true, reason: "" };
 }
 
-function buildWebsiteAssessmentContext(lead: LeadRecord) {
+// ────────────────────────────────────────────────────────────────────────
+// Prompt + context
+
+const INITIAL_SYSTEM_PROMPT = `You write 1:1 cold emails for Axiom Web — a small studio that builds and rebuilds websites for local service businesses so they generate more leads from their existing traffic.
+
+You are NOT an agency robot. You write like a real person who works with similar service businesses and noticed something on this one. Conversational. Short. Direct.
+
+WHAT MAKES A GOOD EMAIL:
+1. Specific. Says one true thing about THIS business pulled from the data below.
+2. Short. 55-80 words body. Under 6 short lines.
+3. Conversational. Contractions OK. No agency speak.
+4. One ask. A question that's easy to say yes to in 2 seconds.
+5. Earns the reply by being interesting, not pushy.
+
+THE DATA YOU'LL GET IS REAL:
+The website assessment came from an actual scrape — speedRisk / conversionRisk / trustRisk / seoRisk are 0-10 scores and topFixes is a real list. You can reference what's in topFixes plainly. Don't invent UX details that aren't there.
+
+OUTPUT STRUCTURE:
+Line 1: Greeting. "Hey {firstName}," if recipient first name known, else "Hey,"
+Line 2: One opener that names the business and references one specific real fact (a topFix item, the niche+city, or the review count if it's >= 25).
+Line 3: One observation. Pull from topFixes when populated — say it plainly like a peer would ("the contact form takes three taps to find on mobile" or "the homepage takes 6+ seconds to load on a phone"). If topFixes is empty, paraphrase the enrichment keyPainPoint into one peer observation. If neither is solid, use an industry pattern relevant to the niche.
+Line 4: One soft-question CTA. Strong patterns: "Want me to send the 2 or 3 things I'd change?", "Open to a quick audit?", "Want a 2-minute Loom showing what I mean?", "How are you handling that now?"
+Line 5: "Best,\\n{senderFirstName}"
+Optional Line 6: PS line with one concrete extra. Max 18 words. Only when it genuinely adds something.
+
+SUBJECT (3-7 words):
+Sentence case (first word + proper nouns capitalized).
+Good: "Quick thought on {Business}", "{firstName}, one thing on {Business}", "{City} {niche} site idea", "Noticed something on {Business}", "One tweak for {Business}".
+Bad: "Quick question", "Question about your business", anything all-lowercase, anything Title Case, anything salesy.
+
+HARD RULES:
+- Plain text only. No HTML, no markdown, no emoji.
+- No exclamation marks. No em dashes (—). Use commas or periods.
+- Subject-verb agreement: "11 reviews say" not "11 reviews says". "Most plumbing businesses get" not "Most plumbing get".
+- The niche field may already be plural ("plumbing companies", "roofers", "med-spas"). Use it as-is — NEVER stack "businesses" / "operators" on top.
+- Do not invent specific UX claims outside the WEBSITE ASSESSMENT topFixes.
+- Do not over-compliment. If you cite reviews, use the actual number — and only if >= 25.
+- Never use: "hope this finds you well", "we specialize in", "I help businesses like yours", "would love to", "circle back", "touch base", "schedule a call", "book a demo", "hop on a call", "let's connect", "boost revenue", "scale your business", "unlock growth", "online presence", "digital transformation".
+
+SKIP CONDITIONS:
+If the business looks like a non-customer (government agency, regulator, nonprofit, foundation, association, institute, council, chamber of commerce, museum, library, church), respond with:
+{"subject":"","body":"","skip_reason":"non-customer entity"}
+
+OUTPUT JSON ONLY:
+{"subject":"...", "body":"...", "skip_reason":""}`;
+
+const FOLLOW_UP_SYSTEM_PROMPT = `You write short follow-up emails for Axiom Web. The recipient was sent a prior cold email and hasn't replied.
+
+RULES:
+- 40-60 words body for FOLLOW_UP_1, 30-50 words for FOLLOW_UP_2 / FOLLOW_UP_3.
+- Acknowledge the prior note in one short phrase.
+- Add ONE new useful angle — do not repeat the same critique.
+- Keep the CTA tiny ("happy to send the 3 things if useful", "open to a quick look?").
+- Plain text only. No exclamation marks. No em dashes. No HTML.
+- End with "Best,\\n{senderFirstName}".
+- Subject: short, sentence case. "Re:" prefix is fine when natural.
+
+OUTPUT JSON ONLY:
+{"subject":"...", "body":"..."}`;
+
+function buildAssessmentBlock(lead: LeadRecord): string {
   const assessment = parseJson<WebsiteAssessment>(lead.axiomWebsiteAssessment);
-  if (!assessment) {
-    return "WEBSITE ASSESSMENT: none recorded";
-  }
+  if (!assessment) return "WEBSITE ASSESSMENT: not scraped yet";
 
-  return [
-    "WEBSITE ASSESSMENT:",
+  const lines = [
+    "WEBSITE ASSESSMENT (real scrape data):",
     `- Overall grade: ${assessment.overallGrade || "unknown"}`,
     `- Speed risk: ${assessment.speedRisk}/10`,
     `- Conversion risk: ${assessment.conversionRisk}/10`,
     `- Trust risk: ${assessment.trustRisk}/10`,
     `- SEO risk: ${assessment.seoRisk}/10`,
-    `- Top fixes: ${(assessment.topFixes || []).slice(0, 3).join("; ") || "none recorded"}`,
-  ].join("\n");
+  ];
+
+  const fixes = (assessment.topFixes || []).slice(0, 4).filter((f) => f && f.trim());
+  if (fixes.length > 0) {
+    lines.push(`- topFixes: ${fixes.join("; ")}`);
+  } else {
+    lines.push("- topFixes: (none identified)");
+  }
+
+  return lines.join("\n");
 }
 
-function buildGenerationContext(
+function buildPainBlock(lead: LeadRecord): string {
+  const painSignals = parseJson<PainSignal[]>(lead.painSignals);
+  if (!Array.isArray(painSignals) || painSignals.length === 0) return "";
+
+  const top = painSignals
+    .filter((s) => s && s.severity >= 2)
+    .slice(0, 3)
+    .map((s) => `- ${s.type} (sev ${s.severity}): ${s.evidence || ""}`.trim());
+
+  if (top.length === 0) return "";
+  return ["PAIN SIGNALS:", ...top].join("\n");
+}
+
+function buildInitialContext(
   lead: LeadRecord,
   enrichment: EnrichmentResult,
   senderName: string,
-  plan: ColdEmailPlan,
 ): string {
-  // Trimmed context. Previous version sent ~30 fields plus strategy hints
-  // and observation/consequence/CTA hints — the model got overloaded and
-  // started stitching pieces awkwardly. Now we send only the fields the
-  // model actually needs to write a good email.
   const lines: string[] = [];
 
   lines.push(`SENDER FIRST NAME: ${firstName(senderName)}`);
+  const recipientFirst = recipientFirstName(lead);
+  if (recipientFirst) lines.push(`RECIPIENT FIRST NAME: ${recipientFirst}`);
   lines.push(`BUSINESS: ${lead.businessName}`);
   lines.push(`CITY: ${lead.city || "unknown"}`);
   lines.push(`NICHE: ${lead.niche || "service business"}`);
-  if (lead.contactName) lines.push(`RECIPIENT FIRST NAME: ${lead.contactName.trim().split(/\s+/)[0]}`);
   if (lead.websiteUrl) lines.push(`WEBSITE: ${lead.websiteUrl}`);
-  if (Number(lead.reviewCount || 0) > 0 && Number(lead.reviewCount || 0) <= 1000) {
-    lines.push(`GOOGLE REVIEWS: ${lead.reviewCount} at ${lead.rating ?? "?"} stars`);
+
+  const reviewCount = clampReviewCount(lead.reviewCount);
+  if (reviewCount > 0) {
+    const rating = Number(lead.rating || 0);
+    lines.push(`GOOGLE REVIEWS: ${reviewCount} reviews${rating > 0 ? ` at ${rating} stars` : ""}`);
   }
+
   lines.push("");
-  lines.push(buildWebsiteAssessmentContext(lead));
+  lines.push(buildAssessmentBlock(lead));
+
+  const painBlock = buildPainBlock(lead);
+  if (painBlock) {
+    lines.push("");
+    lines.push(painBlock);
+  }
+
   lines.push("");
-  lines.push("ENRICHMENT (from real public data):");
+  lines.push("ENRICHMENT (real public-data analysis):");
   lines.push(`- Key pain point: ${enrichment.keyPainPoint}`);
   lines.push(`- Personalized hook: ${enrichment.personalizedHook}`);
-  lines.push(`- Recommended CTA: ${enrichment.recommendedCTA}`);
+  lines.push(`- Suggested CTA flavor: ${enrichment.recommendedCTA}`);
   lines.push(`- Tone: ${enrichment.emailTone}`);
-  lines.push("");
-  lines.push(`CTA TYPE TO USE: ${plan.CTA_type}`);
 
   return lines.join("\n");
 }
@@ -134,645 +355,105 @@ function buildFollowUpContext(
   enrichment: EnrichmentResult,
   senderName: string,
   previousEmail: FollowUpSourceEmail,
-  stepType: OutreachSequenceStepType = "FOLLOW_UP_1",
+  stepType: OutreachSequenceStepType,
 ): string {
   const lines: string[] = [];
-  const plan = chooseColdEmailPlan(lead, enrichment);
 
-  lines.push(`SENDER: ${senderName} from Axiom Web`);
-  lines.push(`RECIPIENT BUSINESS: ${lead.businessName}`);
-  if (lead.contactName) lines.push(`RECIPIENT CONTACT NAME: ${lead.contactName}`);
-  lines.push(`RECIPIENT EMAIL: ${lead.email}`);
-  lines.push(`RECIPIENT CITY: ${lead.city}`);
-  lines.push(`RECIPIENT NICHE: ${lead.niche}`);
-  if (lead.emailType) lines.push(`RECIPIENT EMAIL TYPE: ${lead.emailType}`);
-  if (lead.emailConfidence != null) lines.push(`RECIPIENT EMAIL CONFIDENCE: ${lead.emailConfidence}`);
-  if (lead.websiteGrade) lines.push(`WEBSITE GRADE: ${lead.websiteGrade}`);
-  lines.push(`WEBSITE STATUS: ${lead.websiteStatus || "UNKNOWN"}`);
-  if (lead.rating != null) lines.push(`GOOGLE RATING: ${lead.rating}`);
-  if (lead.reviewCount != null) lines.push(`REVIEW COUNT: ${lead.reviewCount}`);
-  if (lead.axiomScore != null) lines.push(`AXIOM SCORE: ${lead.axiomScore}`);
-  if (lead.axiomTier) lines.push(`AXIOM TIER: ${lead.axiomTier}`);
-  if (lead.callOpener) lines.push(`CALL OPENER CANDIDATE: ${lead.callOpener}`);
-  if (lead.followUpQuestion) lines.push(`FOLLOW-UP QUESTION CANDIDATE: ${lead.followUpQuestion}`);
-  if (lead.tacticalNote) lines.push(`TACTICAL NOTE: ${lead.tacticalNote}`);
+  lines.push(`SENDER FIRST NAME: ${firstName(senderName)}`);
+  const recipientFirst = recipientFirstName(lead);
+  if (recipientFirst) lines.push(`RECIPIENT FIRST NAME: ${recipientFirst}`);
+  lines.push(`BUSINESS: ${lead.businessName}`);
+  lines.push(`CITY: ${lead.city || "unknown"}`);
+  lines.push(`NICHE: ${lead.niche || "service business"}`);
+  lines.push(`STEP TYPE: ${stepType}`);
   lines.push("");
-  lines.push(buildWebsiteAssessmentContext(lead));
+  lines.push("PRIOR EMAIL SUBJECT:");
+  lines.push(previousEmail.subject);
   lines.push("");
-  lines.push(buildPainSignalContext(lead));
+  lines.push("PRIOR EMAIL BODY:");
+  lines.push(previousEmail.bodyPlain);
   lines.push("");
-  lines.push("CURRENT FOLLOW-UP ANGLE:");
-  lines.push(`- Concrete anchor to use now: ${plan.concreteAnchor}`);
-  lines.push(`- Current observed issue: ${plan.observed_issue}`);
-  lines.push(`- Current evidence: ${plan.issueEvidence}`);
-  lines.push(`- Preferred observation framing: ${plan.observationHint}`);
-  lines.push(`- Preferred CTA: ${plan.ctaHint}`);
-  lines.push("");
-  lines.push(`PREVIOUS EMAIL SUBJECT: ${previousEmail.subject}`);
-  lines.push(`PREVIOUS EMAIL SENT AT: ${new Date(previousEmail.sentAt).toISOString()}`);
-  lines.push("PRIOR BODY OMITTED: Use the current lead intelligence above. Do not continue stale or generic points from older sent copy.");
-  lines.push(`FOLLOW-UP STEP: ${stepType}`);
-  lines.push(``);
-  lines.push(`=== ENRICHMENT INTELLIGENCE ===`);
-  lines.push(`VALUE PROPOSITION: ${enrichment.valueProposition}`);
-  lines.push(`PITCH ANGLE: ${enrichment.pitchAngle}`);
-  lines.push(`KEY PAIN POINT: ${enrichment.keyPainPoint}`);
-  lines.push(`COMPETITIVE EDGE: ${enrichment.competitiveEdge}`);
-  lines.push(`PERSONALIZED HOOK: ${enrichment.personalizedHook}`);
-  lines.push(`RECOMMENDED CTA: ${enrichment.recommendedCTA}`);
-  lines.push(`EMAIL TONE: ${enrichment.emailTone}`);
+  lines.push("ENRICHMENT:");
+  lines.push(`- Key pain point: ${enrichment.keyPainPoint}`);
+  lines.push(`- Personalized hook: ${enrichment.personalizedHook}`);
 
   return lines.join("\n");
 }
 
-export function buildFollowUpContextForTesting(
-  lead: LeadRecord,
-  enrichment: EnrichmentResult,
-  senderName: string,
-  previousEmail: FollowUpSourceEmail,
-  stepType: OutreachSequenceStepType = "FOLLOW_UP_1",
-) {
-  return buildFollowUpContext(lead, enrichment, senderName, previousEmail, stepType);
-}
+// ────────────────────────────────────────────────────────────────────────
+// Skip exception
 
-const COLD_EMAIL_SYSTEM_PROMPT = `You write short cold emails for Axiom Web, a studio that builds and rebuilds websites for local service businesses. Goal: earn a reply.
-
-DATA YOU HAVE — TREAT AS GROUND TRUTH:
-- Our scraper visited their site and produced the WEBSITE ASSESSMENT block (speedRisk, conversionRisk, trustRisk, seoRisk, topFixes). Reference it specifically when it has signal — that's the point of having it. Example: if topFixes says "no visible phone on mobile hero", you can write "the phone isn't easy to find on mobile" because that came from a real scan.
-- ENRICHMENT INTELLIGENCE block (keyPainPoint, personalizedHook) is also from real public data about this business.
-- BUSINESS / CITY / NICHE / CONTACT NAME / REVIEW COUNT / RATING / WEBSITE URL — all real.
-
-DO NOT INVENT beyond what's in the data. If the assessment is empty or generic, fall back to an industry-pattern observation instead of making up a site detail.
-
-OUTPUT STRUCTURE (6 lines max):
-  Line 1: "Hey {firstName}," (or "Hey there," only if no name)
-  Line 2: One concrete opener referencing business name + city + niche.
-  Line 3: One observation — either a specific finding from the WEBSITE ASSESSMENT topFixes OR a sharp industry pattern. Frame as something a peer who works with similar businesses would notice. Plain language, not jargon.
-  Line 4: One low-friction question CTA. Strong patterns:
-    - "Want me to send the 2 or 3 things I'd change?"
-    - "Want a free 1-page audit?"
-    - "Open to me sharing what I'd tweak?"
-  Line 5: "Best,\n{senderFirstName}"
-  Line 6 (optional): "PS — {one short specific line}" if it adds something concrete.
-
-LENGTH: 55-80 words body. Mobile-readable.
-
-SUBJECT: 3-6 words. Sentence case (first word + proper nouns capitalized). Strong patterns: "Quick Q on {Business}", "{firstName}, one thought on {Business}", "Noticed something on {Business}", "One tweak for {Business}". NEVER all-lowercase, NEVER Title Case, NEVER salesy ("Exclusive Opportunity"), NEVER generic ("Quick site thought", "Question about the site").
-
-GRAMMAR CHECKS (these slip often, double-check):
-- Subject-verb agreement: "11 reviews say a lot" (NOT "says"). "Most plumbing businesses get more calls" (NOT "Most plumbing get").
-- Niche noun stacking: if the niche field already contains a noun ("plumbing companies", "roofers", "med-spas"), use it AS-IS — never "plumbing companies businesses" or "roofers operators". If niche is bare ("plumbing", "roofing"), add "businesses" / "owners" only when grammar needs it.
-
-HARD BANS:
-- "hope this finds you well", "my name is", "we specialize in", "I help businesses like yours", "would love to", "circle back", "touch base", "unlock growth", "digital transformation", "boost revenue", "online presence", "scale your business", "schedule a call", "book a demo", "hop on a call", "let's connect".
-- No exclamation marks. No em dashes. No HTML, bold, or markdown. Plain text only.
-- NEVER quote exact review counts above 1000 (those are scrape artifacts).
-
-NON-CUSTOMER LEADS: if the business is a government agency, regulator, nonprofit, association, foundation, institute, council, chamber of commerce, or similar non-customer entity, return {"subject":"","body":"","skip_reason":"non-customer entity"}.
-
-TONE: Match emailTone field — "casual" (chatty, contractions), "professional" (composed, no contractions), "urgent" (direct, short). Default casual.
-
-Return JSON only:
-{
-  "subject": "string",
-  "body": "string",
-  "personalization_reason": "string",
-  "observed_issue": "string",
-  "CTA_type": "observation_offer | permission_offer | soft_call",
-  "confidence_score": 0
-}`;
-
-const FOLLOW_UP_SYSTEM_PROMPT = `You are writing a short plain-text follow-up email on behalf of Axiom Web.
-
-STRICT RULES:
-1. Follow-up only. Acknowledge the prior note in one natural phrase.
-2. Keep FOLLOW_UP_1 under 65 words and FOLLOW_UP_2/FOLLOW_UP_3 under 55 words.
-3. Plain text only. No HTML, markdown, bullets, footer, title, or company name in the body.
-4. End with exactly "Best,\\n{sender first name}". Nothing after it.
-5. Add one fresh useful angle, but do not repeat the same critique verbatim.
-6. Keep the CTA low-friction and easy to answer.
-7. Do NOT use placeholders.
-8. Do NOT use "broken", "costing you leads", "one last time", "last note", "circle back", or "touch base".
-9. No exclamation marks. No em dashes.
-10. Prefer a natural reply-style subject in sentence case (capitalize first word and proper nouns only — not Title Case, not all-lowercase). "Re:" is allowed when it fits.
-
-Respond with a JSON object:
-{
-  "subject": "short sentence-case subject line",
-  "bodyPlain": "plain text follow-up"
-}`;
-
-function toSentenceCase(value: string) {
-  const lower = value.toLowerCase();
-  // Capitalize the first alphabetic character only — preserves domain names,
-  // hyphenated tokens, and avoids Title Case which reads spammy.
-  return lower.replace(/^(\W*)([a-z])/, (_match, lead, first) => `${lead}${first.toUpperCase()}`);
-}
-
-// Restore the original casing of the business name + any other proper nouns
-// the LLM/template wrote, after toSentenceCase has lowercased everything.
-// Also re-capitalizes any standalone single-letter caps from the original
-// (Q, I, A) since toSentenceCase strips them: "Quick Q on X" → "Quick q on X".
-function preserveProperNouns(subject: string, businessName: string, original?: string) {
-  let result = subject;
-
-  // Restore single-letter uppercase tokens from the original subject (Q, I, A).
-  if (original) {
-    const origTokens = original.split(/\s+/);
-    const resultTokens = result.split(/\s+/);
-    for (let i = 0; i < Math.min(origTokens.length, resultTokens.length); i++) {
-      const origTok = origTokens[i].replace(/[^A-Za-z]/g, "");
-      const resTok = resultTokens[i].replace(/[^A-Za-z]/g, "");
-      if (origTok.length === 1 && origTok === origTok.toUpperCase() && resTok.length === 1) {
-        resultTokens[i] = resultTokens[i].replace(/[a-z]/i, origTok);
-      }
-    }
-    result = resultTokens.join(" ");
+export class EmailSkipError extends Error {
+  constructor(public readonly skipReason: string) {
+    super(`email skipped: ${skipReason}`);
+    this.name = "EmailSkipError";
   }
-
-  if (!businessName) return result;
-  const name = businessName.trim();
-  if (!name) return result;
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`\\b${escaped}\\b`, "i");
-  return result.replace(pattern, name);
 }
 
-function sanitizeSubject(subject: string, businessName: string) {
-  const trimmed = subject
-    .replace(/[!]/g, "")
-    .replace(/[—–]/g, "-")
-    .replace(/\s+/g, " ")
-    .trim();
+// ────────────────────────────────────────────────────────────────────────
+// Core generation
 
-  if (trimmed.length > 0) {
-    const shortSubject = trimmed.split(/\s+/).filter(Boolean).slice(0, 8).join(" ");
-    const normalizedSubject = shortSubject.toLowerCase().startsWith("re:")
-      ? `Re: ${toSentenceCase(shortSubject.replace(/^re:\s*/i, ""))}`
-      : toSentenceCase(shortSubject);
-    const withProperNouns = preserveProperNouns(normalizedSubject, businessName, shortSubject);
-    return withProperNouns.slice(0, 78);
-  }
-
-  const fallback = `quick thought on ${businessName}`;
-  return preserveProperNouns(toSentenceCase(fallback), businessName, fallback).slice(0, 78);
-}
-
-function stripHtmlTags(value: string) {
-  return value
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n\n")
-    .replace(/<\/div>/gi, "\n\n")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n[ \t]+/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-function normalizeColdEmailDraft(
-  draft: RawGeneratedColdEmail,
-  plan: ColdEmailPlan,
-  businessName: string,
-): ColdEmailDraft {
-  return {
-    subject: sanitizeSubject(draft.subject || "", businessName),
-    body: (draft.body || "").replace(/\r/g, "").trim(),
-    personalization_reason: (draft.personalization_reason || plan.personalization_reason).trim(),
-    observed_issue: (draft.observed_issue || plan.observed_issue).trim(),
-    CTA_type: plan.CTA_type,
-    confidence_score: Math.max(0, Math.min(100, Math.round(Number(draft.confidence_score || plan.confidence_score)))),
-  };
-}
-
-async function generateColdEmailAttempt(
-  context: string,
-  plan: ColdEmailPlan,
-  retryInstructions?: string,
-): Promise<RawGeneratedColdEmail> {
-  const userPrompt = [
-    "Write one cold email using the data below. Follow the system rules.",
-    "",
-    context,
-    "",
-    "Reminders for THIS lead:",
-    "- If WEBSITE ASSESSMENT topFixes has a specific item, reference it plainly (it came from a real scan).",
-    "- If topFixes is empty or generic, use the ENRICHMENT key pain point or fall back to an industry pattern.",
-    "- Re-read the GRAMMAR CHECKS before returning JSON.",
-    retryInstructions ? `\n${retryInstructions}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  return chatCompletionJson<RawGeneratedColdEmail>({
-    systemPrompt: COLD_EMAIL_SYSTEM_PROMPT,
+async function callLlm(
+  systemPrompt: string,
+  userPrompt: string,
+  retry: boolean,
+): Promise<RawLlmEmail> {
+  return chatCompletionJson<RawLlmEmail>({
+    systemPrompt,
     userPrompt,
-    // Lower temperature: less creative wandering = fewer subject-verb
-    // agreement slips and fewer phrase invention attempts that violate
-    // the truthfulness rules.
-    temperature: retryInstructions ? 0.18 : 0.25,
-    maxTokens: 1100,
+    temperature: retry ? 0.15 : 0.25,
+    maxTokens: 900,
   });
 }
 
-function finalizeColdEmail(
-  draft: ColdEmailDraft,
-  senderName: string,
-): GeneratedEmail {
-  const bodyPlain = buildPlainTextEmail(draft.body, firstName(senderName));
-  const bodyHtml = buildHtmlEmail(bodyPlain);
-
-  return {
-    subject: draft.subject,
-    bodyPlain,
-    bodyHtml,
-    personalization_reason: draft.personalization_reason,
-    observed_issue: draft.observed_issue,
-    CTA_type: draft.CTA_type,
-    confidence_score: draft.confidence_score,
-  };
-}
-
-function finalizeGeneratedEmail(
-  draft: GeneratedEmail,
+function finalizeEmail(
+  draft: RawLlmEmail,
   senderName: string,
   businessName: string,
 ): GeneratedEmail {
-  const bodySource = draft.bodyPlain || stripHtmlTags(draft.bodyHtml || "");
-  const bodyPlain = buildPlainTextEmail(bodySource, firstName(senderName));
-
-  return {
-    subject: sanitizeSubject(draft.subject || "", businessName),
-    bodyPlain,
-    bodyHtml: buildHtmlEmail(bodyPlain),
-    personalization_reason: (draft.personalization_reason || "").trim(),
-    observed_issue: (draft.observed_issue || "").trim(),
-    CTA_type: draft.CTA_type || "follow_up",
-    confidence_score: Math.max(0, Math.min(100, Math.round(Number(draft.confidence_score || 0)))),
-  };
-}
-
-function stableHashFromLeadId(value: string | number | null | undefined) {
-  const source = String(value ?? "");
-  let hash = 0;
-  for (let i = 0; i < source.length; i++) {
-    hash = (hash * 31 + source.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function rotateFallbackSubject(lead: LeadRecord): string {
-  const businessName = lead.businessName;
-  const city = lead.city?.trim() || "";
-  const niche = lead.niche?.trim() || "";
-  const recipientFirst = lead.contactName?.trim().split(/\s+/)[0] || "";
-  // Skewed toward specific + curious subjects. Removed generic patterns
-  // ("Quick site thought", "Question about the site", "Small site note") that
-  // tested as bland and indistinguishable from spam.
-  const pool: string[] = [
-    recipientFirst ? `${recipientFirst}, one thought on ${businessName}` : `One thought on ${businessName}`,
-    `Noticed something on ${businessName}`,
-    `One tweak for ${businessName}`,
-    city && niche ? `${city} ${niche} idea` : "",
-    `Idea for ${businessName}`,
-    `${businessName} — one thing`,
-    `Two minutes for ${businessName}?`,
-    recipientFirst ? `${recipientFirst}, quick question` : "",
-    niche ? `${niche} site question` : "",
-  ].filter(Boolean);
-  if (pool.length === 0) return `One thought on ${businessName}`;
-  const index = stableHashFromLeadId(lead.id) % pool.length;
-  return pool[index];
-}
-
-function cleanEmailLine(value: string, fallback: string, maxLength = 180) {
-  const cleaned = (value || fallback)
-    .replace(/[!]/g, ".")
-    .replace(/[—–]/g, ",")
-    .replace(/\s+/g, " ")
-    .trim();
-  return (cleaned || fallback).slice(0, maxLength).trim();
-}
-
-function extractLeadDomain(lead: LeadRecord): string {
-  const raw = lead.websiteUrl || "";
-  return raw.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] || "";
-}
-
-function servicePhraseForCopy(value: string | null | undefined) {
-  const niche = (value || "").trim().toLowerCase();
-  if (!niche) return "local service companies";
-  if (niche.includes("electric")) return "electricians";
-  if (niche.includes("plumb")) return "plumbing companies";
-  if (niche.includes("roof")) return "roofing companies";
-  if (niche.includes("tree")) return "tree service companies";
-  if (niche.includes("mason")) return "masonry contractors";
-  if (niche.includes("drywall")) return "drywall contractors";
-  if (niche.includes("fenc")) return "fencing contractors";
-  if (niche.includes("pressure")) return "pressure washing companies";
-  if (niche.includes("junk")) return "junk removal companies";
-  if (niche.includes("snow")) return "snow removal companies";
-  if (/\b(companies|contractors|services|shops|clinics|firms)\b/.test(niche)) return niche;
-  return `${niche} companies`;
-}
-
-function buildPlanBasedInitialEmail(
-  lead: LeadRecord,
-  plan: ColdEmailPlan,
-  senderName: string,
-): GeneratedEmail {
   const senderFirst = firstName(senderName);
-  const recipientFirst = lead.contactName?.trim().split(/\s+/)[0] || null;
-  const greeting = recipientFirst ? `Hey ${recipientFirst},` : "Hi,";
-
-  const domain = extractLeadDomain(lead);
-  const city = lead.city?.trim() || "";
-  const niche = lead.niche?.trim() || "";
-  
-  const niceNiche = servicePhraseForCopy(niche);
-  const nicheCity = niceNiche && city
-    ? `${niceNiche} in ${city}`
-    : niceNiche || (city ? `local businesses in ${city}` : "");
-
-  // --- Opening line: prove you looked at their specific business ---
-  const openerSeed = stableHashFromLeadId(lead.id);
-  let openingLine: string;
-  if (lead.websiteStatus === "MISSING") {
-    openingLine = nicheCity
-      ? [
-          `I was searching for ${nicheCity} and couldn't find a clear website for ${lead.businessName}.`,
-          `Looked up ${nicheCity} options and ${lead.businessName} didn't have a clear site to land on.`,
-          `Searching for ${nicheCity} didn't turn up a proper website for ${lead.businessName}.`,
-          `Tried to look up ${lead.businessName} online after seeing the Google listing for ${nicheCity}.`,
-          `Found ${lead.businessName} in some ${nicheCity} results but no website came up.`,
-          `Your Google listing for ${nicheCity} looks solid, but I couldn't find a website behind it.`,
-        ][openerSeed % 6]
-      : `I came across ${lead.businessName} and couldn't find a proper website for the business.`;
-  } else if (plan.strategy === "observation_based") {
-    if (nicheCity && domain) {
-      openingLine = [
-        `I work with ${nicheCity} and ${lead.businessName} came up while I was scanning the area.`,
-        `Came across ${lead.businessName} while looking through ${nicheCity}.`,
-        `Saw ${lead.businessName} in some ${nicheCity} listings and wanted to reach out.`,
-        `Was scanning ${nicheCity} businesses and ${lead.businessName} stood out.`,
-        `Noticed ${lead.businessName} while researching ${nicheCity} operators.`,
-        `${lead.businessName} popped up in some ${nicheCity} results.`,
-        `Was going through ${nicheCity} businesses and your name came up.`,
-        `Spotted ${lead.businessName} on the ${nicheCity} list.`,
-      ][openerSeed % 8];
-    } else if (domain) {
-      openingLine = [
-        `${lead.businessName} caught my eye while I was scanning ${niche || "the category"} in the area.`,
-        `Wanted to reach out about ${lead.businessName} directly.`,
-        `Noticed ${lead.businessName} while researching ${niche || "operators"} nearby.`,
-        `Saw ${lead.businessName} on a list of ${niche || "businesses"} worth looking at.`,
-        `${lead.businessName} came up while I was going through the area.`,
-        `Came across ${lead.businessName} and wanted to share a quick thought.`,
-      ][openerSeed % 6];
-    } else {
-      openingLine = [
-        `I came across ${lead.businessName} in ${city || "your area"} and had one quick thought.`,
-        `Found ${lead.businessName} while looking at businesses in ${city || "your area"}.`,
-        `Was browsing ${city || "local"} businesses and noticed ${lead.businessName}.`,
-      ][openerSeed % 3];
-    }
-  } else {
-    if (domain && nicheCity) {
-      openingLine = [
-        `I came across ${lead.businessName} while looking at ${nicheCity}.`,
-        `Ran into ${lead.businessName} while researching ${nicheCity} operators.`,
-        `Saw ${lead.businessName} on a ${nicheCity} list and wanted to reach out.`,
-        `Found ${lead.businessName} in some ${nicheCity} results.`,
-        `Your business came up while I was scanning ${nicheCity}.`,
-        `Was researching ${nicheCity} and ${lead.businessName} stood out.`,
-        `Came across ${lead.businessName} on the ${nicheCity} side.`,
-      ][openerSeed % 7];
-    } else if (domain) {
-      openingLine = [
-        `Came across ${lead.businessName} while researching ${niche || 'local businesses'} in ${city || 'the area'}.`,
-        `Wanted to reach out about ${lead.businessName} directly.`,
-        `Noticed ${lead.businessName} while researching ${niche || "operators"} nearby.`,
-        `Saw ${lead.businessName} on a list of ${niche || "businesses"} worth looking at.`,
-        `${lead.businessName} came up while I was going through the area.`,
-        `Came across ${lead.businessName} and wanted to share a quick thought.`,
-      ][openerSeed % 6];
-    } else {
-      openingLine = [
-        `I came across ${lead.businessName} in ${city || "your area"} and had one quick thought.`,
-        `Found ${lead.businessName} while looking at businesses in ${city || "your area"}.`,
-      ][openerSeed % 2];
-    }
-  }
-
-  // --- Observation: the specific issue for this lead ---
-  const observationLine = cleanEmailLine(
-    plan.observationHint,
-    lead.websiteStatus === "MISSING"
-      ? "That can make it harder for a new customer to know where to reach out."
-      : "The site may be making it harder than it needs to for someone to take the next step.",
-  );
-
-  // --- Consequence: why it matters (short, only when it adds something) ---
-  const rawConsequence = (plan.consequenceHint || "").trim();
-  const consequenceLine = rawConsequence.length > 10 && rawConsequence !== observationLine
-    ? cleanEmailLine(rawConsequence, "")
-    : "";
-
-  // --- CTA: low-friction question, rotated across leads ---
-  // Question-form CTAs convert better than statements because they're
-  // answerable in two seconds and feel like a real conversation, not a pitch.
-  const ctaLine =
-    plan.CTA_type === "soft_call"
-      ? [
-          "Open to a quick 5-minute look?",
-          "Want me to walk you through it on a quick call?",
-          "Worth a 5-minute look together?",
-        ][openerSeed % 3]
-      : [
-          "Want me to send the 2 or 3 things I'd change?",
-          "Want a free 1-page audit?",
-          "Open to me sharing what I'd tweak?",
-          "Want the specific ideas in your inbox?",
-          "Should I send a short list of what I'd fix?",
-          "Want me to send a 2-min Loom showing the fix?",
-          "Worth me sending the 3 things that stood out?",
-        ][openerSeed % 7];
-
-  // --- Positive line: one specific, earned compliment ---
-  // Review counts above 1000 are almost always scraping artifacts (phone
-  // number fragments, postal codes, etc.). Cap the displayed count and skip
-  // the review-flavored line if the number isn't credible for a local
-  // service business.
-  const rawReviewCount = Number(lead.reviewCount || 0);
-  const reviewCount = Number.isFinite(rawReviewCount) && rawReviewCount > 0 && rawReviewCount <= 1000
-    ? rawReviewCount
-    : 0;
-  const rating = Number(lead.rating || 0);
-  const nicheLower = niche.toLowerCase();
-  // Single-word niches need a noun ("electrician" -> "electrician operation"
-  // reads wrong; "electrical operation" reads worse). Treat the niche as a
-  // noun phrase by appending " business" when it's a single word, which
-  // resolves "For electrician," / "solid electrician operation" awkwardness.
-  const nicheNoun = /\s/.test(nicheLower) ? nicheLower : `${nicheLower} business`;
-  let positiveLine = "";
-  if (reviewCount >= 10 && rating >= 4.0) {
-    positiveLine = [
-      `${reviewCount} reviews at ${rating} stars says a lot about the work.`,
-      `Clearly doing strong work with ${reviewCount} reviews.`,
-      `Building a reputation like that takes real work.`,
-    ][openerSeed % 3];
-  } else if (niche && niche.length > 2) {
-    positiveLine = [
-      `Looks like you've built a solid ${nicheNoun} operation.`,
-      `The ${nicheLower} focus comes through clearly.`,
-    ][openerSeed % 2];
-  }
-
-  const bodyParts = [greeting, "", openingLine];
-  if (positiveLine) bodyParts.push(positiveLine);
-  bodyParts.push(observationLine);
-  if (consequenceLine) bodyParts.push(consequenceLine);
-  bodyParts.push(ctaLine);
-
-  const bodyPlain = buildPlainTextEmail(bodyParts.join("\n"), senderFirst);
+  const subject = sanitizeSubject(draft.subject, businessName);
+  const bodyPlain = buildPlainTextEmail((draft.body || "").replace(/\r/g, "").trim(), senderFirst);
+  const bodyHtml = buildHtmlEmail(bodyPlain);
 
   return {
-    subject: sanitizeSubject(rotateFallbackSubject(lead), lead.businessName),
+    subject,
     bodyPlain,
-    bodyHtml: buildHtmlEmail(bodyPlain),
-    personalization_reason: plan.personalization_reason,
-    observed_issue: plan.observed_issue,
-    CTA_type: plan.CTA_type,
-    confidence_score: Math.max(62, plan.confidence_score),
+    bodyHtml,
+    CTA_type: "permission_offer",
+    confidence_score: 75,
   };
 }
 
-function buildFallbackFollowUpEmail(
-  lead: LeadRecord,
-  enrichment: EnrichmentResult,
-  senderName: string,
-  stepType: OutreachSequenceStepType,
-): GeneratedEmail {
-  const senderFirst = firstName(senderName);
-  const recipientFirst = lead.contactName?.trim().split(/\s+/)[0] || null;
-  const domain = extractLeadDomain(lead);
-
-  // Use plan so the observation is pain-signal-specific, not generic
-  const plan = chooseColdEmailPlan(lead, enrichment);
-
-  // Opening line references the specific domain so the follow-up feels anchored
-  const intro =
-    stepType === "FOLLOW_UP_3"
-      ? "One last thought before I leave this one alone."
-      : stepType === "FOLLOW_UP_2"
-        ? `Wanted to add one more thought on ${domain || lead.businessName}.`
-        : `Just wanted to follow up on my note about ${domain || lead.businessName}.`;
-
-  // Keep the observation short and specific
-  const observationLine = cleanEmailLine(
-    plan.observationHint,
-    enrichment.keyPainPoint || "The site may still be leaving some easy contact opportunities on the table.",
-  );
-
-  const ctaLine =
-    stepType === "FOLLOW_UP_3"
-      ? "Happy to send the specific things I'd fix if that's useful."
-      : plan.CTA_type === "soft_call"
-        ? "Open to a quick look if it helps."
-        : "Worth me sending over what I'd change?";
-
-  const greeting = recipientFirst ? `Hi ${recipientFirst},` : "Hi,";
-  const bodyPlain = buildPlainTextEmail(
-    [greeting, "", intro, observationLine, ctaLine].join("\n"),
-    senderFirst,
-  );
-
-  const followUp1Pool = [
-    "One site thought",
-    "Following up",
-    "One more thought",
-    `Thought on ${domain || lead.businessName}`,
-    "Quick follow-up",
-  ];
-  const followUp2Pool = [
-    "Quick site thought",
-    "One more idea",
-    `Still thinking about ${domain || lead.businessName}`,
-    "Circling back on this",
-  ];
-  const followUp3Pool = [
-    "Last site thought",
-    "Final thought on this",
-    "One last idea",
-  ];
-  const seed = stableHashFromLeadId(lead.id);
-  const subjectMap: Record<OutreachSequenceStepType, string> = {
-    INITIAL: rotateFallbackSubject(lead),
-    FOLLOW_UP_1: followUp1Pool[seed % followUp1Pool.length],
-    FOLLOW_UP_2: followUp2Pool[seed % followUp2Pool.length],
-    FOLLOW_UP_3: followUp3Pool[seed % followUp3Pool.length],
-  };
-
-  return {
-    subject: sanitizeSubject(subjectMap[stepType] || "One site thought", lead.businessName),
-    bodyPlain,
-    bodyHtml: buildHtmlEmail(bodyPlain),
-    personalization_reason: plan.personalization_reason,
-    observed_issue: plan.observed_issue,
-    CTA_type: plan.CTA_type,
-    confidence_score: 45,
-  };
-}
-
-/**
- * Generate a personalized email for a single lead.
- */
 export async function generateEmail(
   lead: LeadRecord,
   enrichment: EnrichmentResult,
   senderName: string,
 ): Promise<GeneratedEmail> {
-  // Compute plan outside the try block so it is available in the catch fallback.
-  const plan = chooseColdEmailPlan(lead, enrichment);
-
-  try {
-    const context = buildGenerationContext(lead, enrichment, senderName, plan);
-
-    const firstDraft = normalizeColdEmailDraft(
-      await generateColdEmailAttempt(context, plan),
-      plan,
-      lead.businessName,
-    );
-    const firstValidation = validateColdEmailDraft(firstDraft, lead, plan);
-    if (firstValidation.valid) {
-      return finalizeColdEmail(firstDraft, senderName);
-    }
-
-    const retryDraft = normalizeColdEmailDraft(
-      await generateColdEmailAttempt(context, plan, buildRetryInstructions(firstValidation, plan)),
-      plan,
-      lead.businessName,
-    );
-    const retryValidation = validateColdEmailDraft(retryDraft, lead, plan);
-    const finalDraft =
-      retryValidation.valid || retryValidation.score >= firstValidation.score
-        ? retryDraft
-        : firstDraft;
-    const finalValidation = retryValidation.valid || retryValidation.score >= firstValidation.score
-      ? retryValidation
-      : firstValidation;
-    if (!finalValidation.valid) {
-      return buildPlanBasedInitialEmail(lead, plan, senderName);
-    }
-    return finalizeColdEmail(finalDraft, senderName);
-  } catch (error) {
-    // DeepSeek unavailable or API key not configured — fall back to the
-    // plan-based template which uses niche/city/domain for a specific opener
-    // and the per-lead observationHint/consequenceHint from pain signals.
-    console.warn(`[outreach-email-generator] LLM generation failed for lead ${lead.id}, using plan-based fallback:`, error);
-    return buildPlanBasedInitialEmail(lead, plan, senderName);
+  if (isNonCustomerLead(lead)) {
+    throw new EmailSkipError("non-customer entity");
   }
+
+  const context = buildInitialContext(lead, enrichment, senderName);
+  const userPrompt = `Write one cold email for this lead. Follow the structure and rules above.\n\n${context}`;
+
+  // First attempt.
+  const first = await callLlm(INITIAL_SYSTEM_PROMPT, userPrompt, false);
+  if (first.skip_reason) throw new EmailSkipError(first.skip_reason);
+
+  const firstCheck = validateEmailDraft(first, lead);
+  if (firstCheck.valid) return finalizeEmail(first, senderName, lead.businessName);
+
+  // Retry once with explicit fix instructions.
+  const retryPrompt = `${userPrompt}\n\nYour previous attempt was rejected: ${firstCheck.reason}. Generate a corrected version that fixes this issue and stays within all rules above.`;
+  const retry = await callLlm(INITIAL_SYSTEM_PROMPT, retryPrompt, true);
+  if (retry.skip_reason) throw new EmailSkipError(retry.skip_reason);
+
+  const retryCheck = validateEmailDraft(retry, lead);
+  if (retryCheck.valid) return finalizeEmail(retry, senderName, lead.businessName);
+
+  // Both attempts failed — block the sequence rather than send junk.
+  throw new Error(`email generation failed validation twice: ${retryCheck.reason}`);
 }
 
 export async function generateFollowUpEmail(
@@ -782,20 +463,23 @@ export async function generateFollowUpEmail(
   previousEmail: FollowUpSourceEmail,
   stepType: OutreachSequenceStepType = "FOLLOW_UP_1",
 ): Promise<GeneratedEmail> {
-  try {
-    const context = buildFollowUpContext(lead, enrichment, senderName, previousEmail, stepType);
-
-    const draft = await chatCompletionJson<GeneratedEmail>({
-      systemPrompt: FOLLOW_UP_SYSTEM_PROMPT,
-      userPrompt: `Generate a personalized follow-up email using this context:\n\n${context}`,
-      temperature: 0.35,
-      maxTokens: 900,
-    });
-    return finalizeGeneratedEmail(draft, senderName, lead.businessName);
-  } catch (error) {
-    console.warn(`[outreach-email-generator] Falling back to follow-up template for ${lead.id}:`, error);
-    return buildFallbackFollowUpEmail(lead, enrichment, senderName, stepType);
+  if (isNonCustomerLead(lead)) {
+    throw new EmailSkipError("non-customer entity");
   }
+
+  const context = buildFollowUpContext(lead, enrichment, senderName, previousEmail, stepType);
+  const userPrompt = `Write a ${stepType} follow-up for this lead.\n\n${context}`;
+
+  const first = await callLlm(FOLLOW_UP_SYSTEM_PROMPT, userPrompt, false);
+  const firstCheck = validateEmailDraft(first, lead);
+  if (firstCheck.valid) return finalizeEmail(first, senderName, lead.businessName);
+
+  const retryPrompt = `${userPrompt}\n\nYour previous attempt was rejected: ${firstCheck.reason}. Generate a corrected version.`;
+  const retry = await callLlm(FOLLOW_UP_SYSTEM_PROMPT, retryPrompt, true);
+  const retryCheck = validateEmailDraft(retry, lead);
+  if (retryCheck.valid) return finalizeEmail(retry, senderName, lead.businessName);
+
+  throw new Error(`follow-up generation failed validation twice: ${retryCheck.reason}`);
 }
 
 export async function generateSequenceStepEmail(
@@ -808,19 +492,48 @@ export async function generateSequenceStepEmail(
   if (stepType === "INITIAL") {
     return generateEmail(lead, enrichment, senderName);
   }
-
   if (!previousEmail) {
-    throw new Error(`Previous email context is required for ${stepType}`);
+    throw new Error(`previous email context required for ${stepType}`);
   }
-
   return generateFollowUpEmail(lead, enrichment, senderName, previousEmail, stepType);
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// Test helpers (used by outreach-email-generator.test.ts)
 
 export function buildInitialEmailForTesting(
   lead: LeadRecord,
   enrichment: EnrichmentResult,
   senderName: string,
 ): GeneratedEmail {
-  const plan = chooseColdEmailPlan(lead, enrichment);
-  return buildPlanBasedInitialEmail(lead, plan, senderName);
+  // Returns a deterministic placeholder so tests can run without hitting the
+  // LLM. Real generation always goes through generateEmail().
+  const senderFirst = firstName(senderName);
+  const recipientFirst = recipientFirstName(lead);
+  const greet = recipientFirst ? `Hey ${recipientFirst},` : "Hey,";
+  const body = [
+    greet,
+    "",
+    `Came across ${lead.businessName} while looking at ${lead.niche || "service businesses"} in ${lead.city || "your area"}.`,
+    enrichment.keyPainPoint || "Most service sites lose calls when the contact path takes more than two taps on mobile.",
+    "Want me to send the 2 or 3 things I'd change?",
+  ].join("\n");
+  const bodyPlain = buildPlainTextEmail(body, senderFirst);
+  return {
+    subject: sanitizeSubject(`Quick thought on ${lead.businessName}`, lead.businessName),
+    bodyPlain,
+    bodyHtml: buildHtmlEmail(bodyPlain),
+    CTA_type: "permission_offer",
+    confidence_score: 70,
+  };
+}
+
+export function buildFollowUpContextForTesting(
+  lead: LeadRecord,
+  enrichment: EnrichmentResult,
+  senderName: string,
+  previousEmail: FollowUpSourceEmail,
+  stepType: OutreachSequenceStepType = "FOLLOW_UP_1",
+): string {
+  return buildFollowUpContext(lead, enrichment, senderName, previousEmail, stepType);
 }
