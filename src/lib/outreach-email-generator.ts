@@ -258,6 +258,33 @@ function validateEmailDraft(draft: RawLlmEmail, lead: LeadRecord): ValidationRes
   if (/[—–]/.test(body)) return { valid: false, reason: "contains em dash" };
   if (/<[a-z][^>]*>/i.test(body)) return { valid: false, reason: "contains HTML tag" };
 
+  // Hedging language. One soft modifier is forgivable but multiple weaken the
+  // pitch into mush. Count total hits and reject when >= 2.
+  const hedgePatterns: RegExp[] = [
+    /\ba bit\b/i,
+    /\ba little\b/i,
+    /\bkind of\b/i,
+    /\bsort of\b/i,
+    /\bsomewhat\b/i,
+    /\bperhaps\b/i,
+    /\bmight\b/i,
+    /\bmay\b/i,
+    /\btends to\b/i,
+    /\bseems to\b/i,
+    /\bfeels like\b/i,
+    /\bin some cases\b/i,
+    /\bfor some visitors\b/i,
+    /\bpossibly\b/i,
+    /\bquite\b/i,
+  ];
+  const hedgeHits = hedgePatterns.filter((re) => re.test(body));
+  if (hedgeHits.length >= 2) {
+    return {
+      valid: false,
+      reason: `too much hedging (${hedgeHits.length} soft modifiers: ${hedgeHits.map((r) => r.source).join(", ")}). Drop the qualifiers and state the observation directly.`,
+    };
+  }
+
   return { valid: true, reason: "" };
 }
 
@@ -288,17 +315,16 @@ PRIORITY OF SIGNALS (pick the strongest one available, in this order):
 Never default to a generic observation. If signal 1 is the placeholder "Keep the main offer and next step easy to scan", treat it as NO findings and use signal 2 or 3.
 
 OUTPUT STRUCTURE:
-Line 1: Greeting. "Hey {firstName}," if recipient first name known, else "Hey,"
-Line 2-3: Opener + observation in 1-2 lines. PICK ONE opener pattern at random each time:
-  A. Start with a question. "Is the quote button on {Business}'s site supposed to be that small on mobile?"
-  B. Start with the observation directly. "The first thing I'd change on {Business} is how far the reviews sit from the fold."
-  C. Start with niche pattern. "Most {niche} sites I look at have one shared weak spot — and {Business}'s is the same."
-  D. Start with city + niche. "Working with a few {niche} businesses in {City} this month, and {Business} caught my eye."
-  E. Start with review count when >= 25. "{X} reviews at {Y} stars and a site that doesn't quite do that justice."
-  F. Start by naming what works. "{Business}'s service list is clear, but the path to ask for a quote takes more steps than it should."
-Rotate these — never use pattern A two emails in a row.
-Line 4: One soft-question CTA. Pick fresh each time: "Want me to send the 2 or 3 things I'd change?", "Open to a quick audit?", "Want a 2-minute Loom showing what I mean?", "How are you handling that now?", "Should I put a short list together?"
-Line 5: "Best,\\n{senderFirstName}"
+Line 1: Greeting — use the EXACT greeting string supplied in the user-prompt context block.
+Line 2-3: Opener + observation in 1-2 lines. Use the opener pattern letter (A-F) supplied in the context:
+  A. Start with a direct question. "Is the quote button on {Business}'s site supposed to be that hard to find on mobile?"
+  B. Start with the observation directly. "First thing I'd change on {Business}: reviews sit four screens below the fold on mobile."
+  C. Start with niche pattern. "Most {niche} sites have the same gap — and {Business}'s is the contact path."
+  D. Start with city + niche. "Working with a few {niche} businesses in {City}, and {Business} stood out for one reason."
+  E. Start with review count when >= 25. "{X} reviews at {Y} stars, and a homepage that doesn't quite reflect that."
+  F. Start by naming what works. "{Business}'s service detail is solid. The friction point is mobile."
+Line 4: CTA — use the EXACT CTA string supplied in the user-prompt context block.
+Line 5: Signoff — use the EXACT signoff line supplied in the user-prompt context block.
 Optional Line 6: PS line with one concrete extra. Max 18 words. Only when it genuinely adds something.
 
 SUBJECT (HARD LIMIT 3-7 words, max 70 chars):
@@ -316,6 +342,23 @@ HARD RULES:
 - Do not echo topFix or enrichment text verbatim — paraphrase in peer voice.
 - Do not over-compliment. If you cite reviews, use the actual number — and only if >= 25.
 - Never use: "hope this finds you well", "we specialize in", "I help businesses like yours", "would love to", "circle back", "touch base", "schedule a call", "book a demo", "hop on a call", "let's connect", "boost revenue", "scale your business", "unlock growth", "online presence", "digital transformation", "main offer and next step".
+
+NO HEDGING. The observation must land. Drop these soft adverbs:
+- "a bit", "a little", "kind of", "sort of", "somewhat"
+- "might", "may", "could possibly", "perhaps"
+- "tends to", "seems to", "feels like it may"
+- "in some cases", "for some visitors"
+WRITE THIS: "the quote button is below three screens on mobile"
+NOT THIS:  "the quote button might be a bit hard to find on mobile"
+
+CONCRETE IMPACT. Tie the observation to an outcome someone running the business actually cares about:
+- "→ loses calls from mobile" not "→ might not be ideal"
+- "→ buyers go to the next result" not "→ could create some friction"
+- "→ 30+ second load on 4G" not "→ feels slow"
+
+OPENER + OBSERVATION QUALITY BAR:
+- Reference at least ONE concrete data point from the context (review count, risk score, city, niche, a specific topFix paraphrase).
+- The observation must be something a real visitor would notice in under 10 seconds, not an abstract UX cliche.
 
 SKIP CONDITIONS:
 If the business looks like a non-customer (government agency, regulator, nonprofit, foundation, association, institute, council, chamber of commerce, museum, library, church), respond with:
@@ -386,13 +429,75 @@ function buildAssessmentBlock(lead: LeadRecord): string {
   return lines.join("\n");
 }
 
+// Deterministic seed from lead id so picks are stable per lead.
+function leadSeed(lead: LeadRecord): number {
+  return Number(lead.id || 0) || (lead.businessName?.length || 0);
+}
+
 // Deterministic opener rotation. Lead id seed → pattern letter A-F so a given
 // lead always gets the same opener pattern, but the pattern varies across the
 // queue and emails don't all read identically.
 function pickOpenerPattern(lead: LeadRecord): string {
-  const seed = Number(lead.id || 0) || (lead.businessName?.length || 0);
   const patterns = ["A", "B", "C", "D", "E", "F"];
-  return patterns[seed % patterns.length];
+  return patterns[leadSeed(lead) % patterns.length];
+}
+
+const CTA_POOL = [
+  "Want me to send the 2 or 3 things I'd change?",
+  "Open to a 2-minute Loom showing what I mean?",
+  "Should I put a short list together?",
+  "How are you handling that now?",
+  "Want the specifics?",
+  "Worth me sending what I'd tweak?",
+  "Want me to show you on a quick call?",
+];
+
+const SIGNOFF_POOL = ["Best", "Thanks", "Cheers"];
+
+const GREETING_POOL = ["Hey", "Hi", "Hey there", "Hi there"];
+
+function pickCta(lead: LeadRecord): string {
+  return CTA_POOL[leadSeed(lead) % CTA_POOL.length];
+}
+
+function pickSignoff(lead: LeadRecord): string {
+  // Offset seed so signoff differs from opener pattern roll.
+  return SIGNOFF_POOL[(leadSeed(lead) + 1) % SIGNOFF_POOL.length];
+}
+
+function pickGreeting(lead: LeadRecord): string {
+  const recipientFirst = recipientFirstName(lead);
+  if (recipientFirst) return `Hey ${recipientFirst}`;
+  // Offset seed so greeting flavor varies from opener/signoff.
+  return GREETING_POOL[(leadSeed(lead) + 2) % GREETING_POOL.length];
+}
+
+// Niche-specific industry intuition. The model otherwise writes every email
+// like every niche is the same generic "service business". Surfacing one
+// honest pattern per niche gives the model real-world texture to lean on
+// when no specific topFix is available.
+const NICHE_INDUSTRY_HOOKS: Array<{ match: RegExp; hook: string }> = [
+  { match: /roof/i, hook: "Roofing buyers usually search after a storm or visible damage — urgency is high and trust signals matter more than copy." },
+  { match: /plumb/i, hook: "Plumbing leads are mostly urgent — emergency repairs and water damage. People grab the first number that's easy to find." },
+  { match: /hvac|heating|cooling|furnace|air conditioning/i, hook: "HVAC buying cycles spike in summer heatwaves and winter cold snaps. Same-day availability messaging beats most copy." },
+  { match: /electric/i, hook: "Electrical buyers want licensed/insured visible up front. Code compliance and same-day availability are the real differentiators." },
+  { match: /tree/i, hook: "Tree service buyers care about insurance and safety claims more than price. Storm-damage urgency drives a lot of clicks." },
+  { match: /landscap|lawn|garden/i, hook: "Landscaping buyers shop seasonal — gallery photos and clear before/after work matter more than service copy." },
+  { match: /clean/i, hook: "Cleaning service buyers compare on trust and reliability. Recurring booking is the biggest revenue lever." },
+  { match: /paint/i, hook: "Painting buyers shop on portfolio first. Quote turnaround speed is the second decision point." },
+  { match: /concrete|mason/i, hook: "Concrete/masonry buyers want to see real project photos from their city. Portfolio depth converts." },
+  { match: /pest/i, hook: "Pest control buyers are urgent and trust-sensitive. Speed-to-quote and credentials win." },
+  { match: /pool/i, hook: "Pool buyers shop seasonal and high-ticket. Long sales cycle, photo-heavy decision." },
+  { match: /spa|salon/i, hook: "Spa/salon buyers book on visual aesthetic and reviews. Booking-button placement on mobile is everything." },
+  { match: /renovat|remodel|kitchen|bathroom/i, hook: "Renovation buyers shop slowly and high-stakes. Project galleries and budget-range transparency matter." },
+];
+
+function getNicheHook(lead: LeadRecord): string {
+  const niche = `${lead.niche || ""} ${lead.category || ""}`.toLowerCase();
+  for (const { match, hook } of NICHE_INDUSTRY_HOOKS) {
+    if (match.test(niche)) return hook;
+  }
+  return "";
 }
 
 function buildPainBlock(lead: LeadRecord): string {
@@ -445,8 +550,19 @@ function buildInitialContext(
   lines.push(`- Suggested CTA flavor: ${enrichment.recommendedCTA}`);
   lines.push(`- Tone: ${enrichment.emailTone}`);
 
+  const nicheHook = getNicheHook(lead);
+  if (nicheHook) {
+    lines.push("");
+    lines.push(`NICHE INTUITION (use as background, do not quote): ${nicheHook}`);
+  }
+
   lines.push("");
-  lines.push(`OPENER PATTERN TO USE FOR THIS EMAIL: ${pickOpenerPattern(lead)} (see system prompt patterns A-F). Do not use a different pattern.`);
+  lines.push("WRITE THIS EMAIL WITH:");
+  lines.push(`- Greeting: "${pickGreeting(lead)},"`);
+  lines.push(`- Opener pattern: ${pickOpenerPattern(lead)} (see system prompt patterns A-F). Use exactly this pattern.`);
+  lines.push(`- CTA: "${pickCta(lead)}"`);
+  lines.push(`- Signoff line: "${pickSignoff(lead)},\\n${firstName(senderName)}"`);
+  lines.push("Use these exact strings for greeting, CTA, and signoff. Do not substitute.");
 
   return lines.join("\n");
 }
@@ -511,10 +627,11 @@ function finalizeEmail(
   draft: RawLlmEmail,
   senderName: string,
   businessName: string,
+  signoffWord: string = "Best",
 ): GeneratedEmail {
   const senderFirst = firstName(senderName);
   const subject = sanitizeSubject(draft.subject, businessName);
-  const bodyPlain = buildPlainTextEmail((draft.body || "").replace(/\r/g, "").trim(), senderFirst);
+  const bodyPlain = buildPlainTextEmail((draft.body || "").replace(/\r/g, "").trim(), senderFirst, signoffWord);
   const bodyHtml = buildHtmlEmail(bodyPlain);
 
   return {
@@ -543,7 +660,7 @@ export async function generateEmail(
   if (first.skip_reason) throw new EmailSkipError(first.skip_reason);
 
   const firstCheck = validateEmailDraft(first, lead);
-  if (firstCheck.valid) return finalizeEmail(first, senderName, lead.businessName);
+  if (firstCheck.valid) return finalizeEmail(first, senderName, lead.businessName, pickSignoff(lead));
 
   // Retry once with explicit fix instructions.
   const retryPrompt = `${userPrompt}\n\nYour previous attempt was rejected: ${firstCheck.reason}. Generate a corrected version that fixes this issue and stays within all rules above.`;
@@ -551,7 +668,7 @@ export async function generateEmail(
   if (retry.skip_reason) throw new EmailSkipError(retry.skip_reason);
 
   const retryCheck = validateEmailDraft(retry, lead);
-  if (retryCheck.valid) return finalizeEmail(retry, senderName, lead.businessName);
+  if (retryCheck.valid) return finalizeEmail(retry, senderName, lead.businessName, pickSignoff(lead));
 
   // Both attempts failed — block the sequence rather than send junk.
   throw new Error(`email generation failed validation twice: ${retryCheck.reason}`);
@@ -573,12 +690,12 @@ export async function generateFollowUpEmail(
 
   const first = await callLlm(FOLLOW_UP_SYSTEM_PROMPT, userPrompt, false);
   const firstCheck = validateEmailDraft(first, lead);
-  if (firstCheck.valid) return finalizeEmail(first, senderName, lead.businessName);
+  if (firstCheck.valid) return finalizeEmail(first, senderName, lead.businessName, pickSignoff(lead));
 
   const retryPrompt = `${userPrompt}\n\nYour previous attempt was rejected: ${firstCheck.reason}. Generate a corrected version.`;
   const retry = await callLlm(FOLLOW_UP_SYSTEM_PROMPT, retryPrompt, true);
   const retryCheck = validateEmailDraft(retry, lead);
-  if (retryCheck.valid) return finalizeEmail(retry, senderName, lead.businessName);
+  if (retryCheck.valid) return finalizeEmail(retry, senderName, lead.businessName, pickSignoff(lead));
 
   throw new Error(`follow-up generation failed validation twice: ${retryCheck.reason}`);
 }

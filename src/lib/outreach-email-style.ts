@@ -851,14 +851,14 @@ function ensureReadableLineBreaks(value: string) {
   return [firstLine, middle, lastLine].filter(Boolean).join("\n\n");
 }
 
-export function buildPlainTextEmail(body: string, senderFirstName: string) {
+export function buildPlainTextEmail(body: string, senderFirstName: string, signoffWord: string = "Best") {
   const escapedSender = senderFirstName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Match signature anywhere (mid-body or at end). Previously only matched at
   // string end ($), so when the model emitted "Best,\nAidan\nPS - ..." the
   // existing signoff slipped past, and the code appended another "Best,
   // Aidan" at the very end producing a duplicate signoff.
   const signaturePattern = new RegExp(
-    `(?:\\n\\s*)?(?:best|thanks|thank you|regards),?\\s*\\n?\\s*${escapedSender}(?:\\s+hinsperger)?(?:\\s+axiom\\s+infrastructure)?\\s*`,
+    `(?:\\n\\s*)?(?:best|thanks|thank you|regards|cheers)(?:\\s+regards)?,?\\s*\\n?\\s*${escapedSender}(?:\\s+hinsperger)?(?:\\s+axiom\\s+infrastructure)?\\s*`,
     "gi",
   );
   const inlineSignaturePattern = new RegExp(
@@ -902,7 +902,7 @@ export function buildPlainTextEmail(body: string, senderFirstName: string) {
     sanitized = sanitized.slice(0, psMatch.index).trim();
   }
 
-  const signoff = `Best,\n${senderFirstName}`;
+  const signoff = `${signoffWord},\n${senderFirstName}`;
   const psSuffix = psLine ? `\n\n${psLine}` : "";
   return `${ensureReadableLineBreaks(sanitized)}\n\n${signoff}${psSuffix}`.trim();
 }
