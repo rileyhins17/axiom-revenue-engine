@@ -284,6 +284,19 @@ function validateEmailDraft(draft: RawLlmEmail, lead: LeadRecord): ValidationRes
     };
   }
 
+  // Business name should appear at most once in the body — repetition reads
+  // like a mail-merge artifact.
+  if (lead.businessName) {
+    const escapedName = lead.businessName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const nameMatches = body.match(new RegExp(`\\b${escapedName}(?:'s)?\\b`, "gi")) || [];
+    if (nameMatches.length > 2) {
+      return {
+        valid: false,
+        reason: `business name "${lead.businessName}" appears ${nameMatches.length} times — use it once, then "the site" or pronouns.`,
+      };
+    }
+  }
+
   return { valid: true, reason: "" };
 }
 
@@ -315,16 +328,20 @@ Never default to a generic observation. If signal 1 is the placeholder "Keep the
 
 OUTPUT STRUCTURE:
 Line 1: Greeting — use the EXACT greeting string supplied in the user-prompt context block.
-Line 2-3: Opener + observation in 1-2 lines. Use the opener pattern letter (A-F) supplied in the context:
-  A. Start with a direct question. "Is the quote button on {Business}'s site supposed to be that hard to find on mobile?"
-  B. Start with the observation directly. "First thing I'd change on {Business}: reviews sit four screens below the fold on mobile."
-  C. Start with niche pattern. "Most {niche} sites have the same gap — and {Business}'s is the contact path."
-  D. Start with city + niche. "Working with a few {niche} businesses in {City}, and {Business} stood out for one reason."
-  E. Start with review count when >= 25. "{X} reviews at {Y} stars, and a homepage that doesn't quite reflect that."
-  F. Start by naming what works. "{Business}'s service detail is solid. The friction point is mobile."
+Line 2-3: Opener + observation in 1-2 lines. Use the opener pattern letter (A-F) supplied in the context. The pattern is structural — write FRESH prose each time. Never reuse the same phrasing across emails:
+  A. Open with a direct, specific question about one UX element on the site. The question reveals you noticed something concrete. Vary phrasing.
+  B. Lead with the single most concrete observation you can defensibly make from the data, stated as fact. No preamble.
+  C. Open with a pattern about businesses in this niche, then name one way THIS business fits the pattern. Vary the framing.
+  D. Open with you working with businesses in this city or niche and one thing about THIS business that stood out. Vary how "stood out".
+  E. Open with the review count and rating, then a contrast — site does/doesn't match. Only when reviewCount >= 25.
+  F. Open by naming one thing the site DOES well, then pivot to the one friction point. Genuine compliment, not flattery.
 Line 4: CTA — use the EXACT CTA string supplied in the user-prompt context block.
 Line 5: Signoff — use the EXACT signoff line supplied in the user-prompt context block.
-Optional Line 6: PS line with one concrete extra. Max 18 words. Only when it genuinely adds something.
+Optional Line 6: PS line with one concrete extra. Max 18 words. Use roughly 30% of the time — only when you have a second specific finding worth surfacing.
+
+NAME ECONOMY: mention the business name ONCE in the body. Twice is repetitive, three times is weird. Use "the site", "the homepage", or pronouns after the first mention.
+
+LENGTH TARGET: the user-prompt context block will supply a TARGET word count (between 40 and 85). Hit within 10 words of it.
 
 SUBJECT (HARD LIMIT 3-7 words, max 70 chars):
 The subject is a short header, NOT a sentence from the body. Never reuse the body opener as the subject.
@@ -449,14 +466,110 @@ const CTA_POOL = [
   "Want the specifics?",
   "Worth me sending what I'd tweak?",
   "Want me to show you on a quick call?",
+  "Want a 5-minute breakdown?",
+  "Worth a quick look?",
 ];
 
 const SIGNOFF_POOL = ["Best", "Thanks", "Cheers"];
 
 const GREETING_POOL = ["Hey", "Hi", "Hey there", "Hi there"];
 
+// Per-niche CTAs that lean on the niche's actual buying-trigger language.
+// Used in place of the generic CTA pool when the lead's niche matches.
+const NICHE_CTA_POOL: Array<{ match: RegExp; ctas: string[] }> = [
+  {
+    match: /roof/i,
+    ctas: [
+      "Want a quick storm-readiness audit?",
+      "Worth me sending the 2 or 3 changes that pull more quote requests?",
+      "Want a 2-minute Loom showing where roofing buyers drop off?",
+    ],
+  },
+  {
+    match: /plumb/i,
+    ctas: [
+      "Want the 2 changes that win more emergency calls?",
+      "Worth a quick look at where after-hours leads drop off?",
+      "Want me to send what's costing same-day calls?",
+    ],
+  },
+  {
+    match: /hvac|heating|cooling|furnace|air conditioning/i,
+    ctas: [
+      "Want what I'd change before summer hits?",
+      "Worth a quick look at where seasonal leads drop off?",
+      "Want me to send the 2 things tied to same-day quotes?",
+    ],
+  },
+  {
+    match: /electric/i,
+    ctas: [
+      "Want the changes that move licensed/insured trust higher?",
+      "Worth a 2-minute Loom on where electrical buyers stall?",
+      "Want me to send what's costing same-day jobs?",
+    ],
+  },
+  {
+    match: /tree/i,
+    ctas: [
+      "Want what'd move more storm-call traffic to quote?",
+      "Worth a quick look at the insurance/credential surfacing?",
+      "Want me to send the 2 changes for after-storm urgency?",
+    ],
+  },
+  {
+    match: /landscap|lawn|garden/i,
+    ctas: [
+      "Want what I'd change before the spring rush?",
+      "Worth a quick gallery/portfolio audit?",
+      "Want a Loom on where seasonal buyers stall?",
+    ],
+  },
+];
+
+// Distinct subject templates so headers aren't all "Quick thought on X".
+// Each receives { name, city, niche } and returns a short string.
+const SUBJECT_TEMPLATES: Array<(c: { name: string; city: string; niche: string; reviewCount: number }) => string> = [
+  ({ name }) => `Quick thought on ${name}`,
+  ({ name }) => `One tweak for ${name}`,
+  ({ name }) => `Noticed something on ${name}`,
+  ({ city, niche }) => `${city} ${niche} site idea`,
+  ({ name }) => `Small fix for ${name}`,
+  ({ name }) => `${name} site, one thing`,
+  ({ reviewCount, name }) => (reviewCount >= 25 ? `${reviewCount} reviews and one tweak` : `Quick note on ${name}`),
+  ({ name, niche }) => `${name}, ${niche} site thought`,
+  ({ name }) => `One change on ${name}`,
+];
+
+function pickSubjectTemplate(lead: LeadRecord): string {
+  const idx = (leadSeed(lead) + 3) % SUBJECT_TEMPLATES.length;
+  const tpl = SUBJECT_TEMPLATES[idx];
+  return tpl({
+    name: lead.businessName,
+    city: lead.city || "",
+    niche: lead.niche || "service",
+    reviewCount: clampReviewCount(lead.reviewCount),
+  });
+}
+
 function pickCta(lead: LeadRecord): string {
+  const niche = `${lead.niche || ""} ${lead.category || ""}`.toLowerCase();
+  // Niche-aware CTA fires ~60% of the time when a niche pool exists, falling
+  // back to the generic pool otherwise. The 60% gate is deterministic on lead
+  // id so two leads in the same niche don't always get the same CTA.
+  for (const { match, ctas } of NICHE_CTA_POOL) {
+    if (match.test(niche) && leadSeed(lead) % 5 < 3) {
+      return ctas[leadSeed(lead) % ctas.length];
+    }
+  }
   return CTA_POOL[leadSeed(lead) % CTA_POOL.length];
+}
+
+// Deterministic length target so emails don't all hit the same word count.
+// Pool is 40 / 55 / 70 / 85 — keeps inside the 35-110 validator range.
+function pickLengthTarget(lead: LeadRecord): number {
+  const pool = [40, 55, 70, 85];
+  return pool[(leadSeed(lead) + 4) % pool.length];
 }
 
 function pickSignoff(lead: LeadRecord): string {
@@ -558,10 +671,12 @@ function buildInitialContext(
   lines.push("");
   lines.push("WRITE THIS EMAIL WITH:");
   lines.push(`- Greeting: "${pickGreeting(lead)},"`);
-  lines.push(`- Opener pattern: ${pickOpenerPattern(lead)} (see system prompt patterns A-F). Use exactly this pattern.`);
+  lines.push(`- Opener pattern: ${pickOpenerPattern(lead)} (see system prompt patterns A-F). Use exactly this pattern — but write FRESH prose. Do not echo the example wording from the system prompt.`);
+  lines.push(`- Subject: use this template as the subject (no rewording): "${pickSubjectTemplate(lead)}"`);
+  lines.push(`- Body target length: ${pickLengthTarget(lead)} words (±10).`);
   lines.push(`- CTA: "${pickCta(lead)}"`);
   lines.push(`- Signoff line: "${pickSignoff(lead)},\\n${firstName(senderName)}"`);
-  lines.push("Use these exact strings for greeting, CTA, and signoff. Do not substitute.");
+  lines.push("Use these exact strings for subject, greeting, CTA, and signoff. Do not substitute. Write fresh wording for the body opener and observation — never reuse a phrasing pattern from a prior email.");
 
   return lines.join("\n");
 }
