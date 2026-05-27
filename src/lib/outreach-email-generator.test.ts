@@ -204,3 +204,14 @@ test("single-token business names get caps restored when the LLM lowercases them
   assert.match(email.subject, /Plumberoos/);
   assert(!/plumberoos(?!\w)/.test(email.subject));
 });
+
+test("business names with ampersand restore every word's casing", () => {
+  const lead = {
+    ...makeLead(),
+    businessName: "Drain & Inspection Services",
+  } satisfies LeadRecord;
+
+  const email = buildInitialEmailForTesting(lead, enrichment, "Aidan");
+  assert.match(email.subject, /Drain & Inspection/);
+  assert(!/inspection(?!\w)/.test(email.subject.replace(/Inspection/g, "")));
+});

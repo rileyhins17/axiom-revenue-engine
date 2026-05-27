@@ -141,31 +141,30 @@ function restoreCasing(subject: string, original: string, businessName: string):
     }
   }
 
-  // 2. Restore business-name casing. Search for the longest contiguous
-  //    subsequence of business-name tokens that appears in the subject
-  //    (case-insensitive, ignoring punctuation) and overlay the original
-  //    casing of each matched token.
+  // 2. Restore business-name casing. Each token in the business name that
+  //    has letter content is searched in the subject (case-insensitive,
+  //    punctuation-stripped) and the original casing is overlaid. Done
+  //    token-by-token so names with punctuation gaps ("Drain & Inspection
+  //    Services") still restore every word, and names truncated to a
+  //    prefix ("Raise the Roof Roofing & Repair Ltd." → "raise the roof")
+  //    still get each surviving token capitalized correctly.
   if (businessName) {
     const nameTokens = businessName.trim().split(/\s+/).filter(Boolean);
-    const nameLower = nameTokens.map(letterCore);
     const subjectLower = resultTokens.map(letterCore);
 
-    outer:
-    for (let runLen = nameTokens.length; runLen >= 1; runLen--) {
-      for (let nameStart = 0; nameStart + runLen <= nameTokens.length; nameStart++) {
-        const slice = nameLower.slice(nameStart, nameStart + runLen);
-        if (slice.some((s) => !s)) continue;
-        for (let subjStart = 0; subjStart + runLen <= resultTokens.length; subjStart++) {
-          const subSlice = subjectLower.slice(subjStart, subjStart + runLen);
-          if (subSlice.every((s, idx) => s === slice[idx])) {
-            for (let j = 0; j < runLen; j++) {
-              const cur = resultTokens[subjStart + j];
-              const trailingMatch = cur.match(/[^\p{L}\p{N}]+$/u);
-              const trailing = trailingMatch ? trailingMatch[0] : "";
-              resultTokens[subjStart + j] = nameTokens[nameStart + j] + trailing;
-            }
-            break outer;
-          }
+    for (const nameTok of nameTokens) {
+      const ncore = letterCore(nameTok);
+      if (!ncore) continue;
+      for (let j = 0; j < resultTokens.length; j++) {
+        if (subjectLower[j] === ncore) {
+          const cur = resultTokens[j];
+          const trailingMatch = cur.match(/[^\p{L}\p{N}]+$/u);
+          const trailing = trailingMatch ? trailingMatch[0] : "";
+          resultTokens[j] = nameTok + trailing;
+          // Update lower-cased mirror so we don't restore the same slot
+          // twice if the name repeats a token.
+          subjectLower[j] = "";
+          break;
         }
       }
     }
