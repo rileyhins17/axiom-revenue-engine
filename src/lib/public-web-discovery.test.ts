@@ -105,14 +105,19 @@ test("collectWebsiteDiscoveryPages scans the highest-signal subpages within the 
     if (event.message) events.push(event.message);
   });
 
-  assert.equal(result.pages.length, 3);
-  assert.equal(events.length, 2);
-  assert.equal(context.pages.filter((page) => page.settled > 0).length, 3);
+  // WEBSITE_DISCOVERY_CONTACT_PAGE_LIMIT = 3 selects the 3 highest-signal
+  // subpages, so homepage + 3 subpages = 4 pages. The picks are the top 3 by
+  // role score: contact (18), request-a-quote (18, "quote" => contact role),
+  // team (15) — about (12) and privacy (legal, 3) fall outside the budget.
+  assert.equal(result.pages.length, 4);
+  assert.equal(events.length, 3);
+  assert.equal(context.pages.filter((page) => page.settled > 0).length, 4);
   assert.deepEqual(
     new Set(result.pages.slice(1).map((page) => page.url)),
     new Set([
       "https://example.ca/contact",
       "https://example.ca/request-a-quote",
+      "https://example.ca/team",
     ]),
   );
 });

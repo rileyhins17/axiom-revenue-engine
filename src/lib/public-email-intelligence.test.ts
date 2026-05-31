@@ -61,3 +61,29 @@ test("resolvePublicBusinessEmail canonicalizes encoded mailto addresses", () => 
   assert.equal(result.email, "sarah.lee@example-roofing.ca");
   assert.equal(result.emailType, "owner");
 });
+
+test("resolvePublicBusinessEmail extracts the email from appended JSON-LD structured data", () => {
+  // Mirrors what the crawler now appends: body.innerText followed by a
+  // [STRUCTURED-DATA] block containing schema.org JSON-LD. The owner email
+  // only exists in the JSON-LD, never in visible body text — the prior
+  // innerText-only capture would have missed it entirely.
+  const bodyText = "Owner Sarah Lee handles every roofing project across the city.";
+  const jsonLd = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "RoofingContractor",
+    name: "Example Roofing",
+    email: "sarah.lee@example-roofing.ca",
+    url: "https://example-roofing.ca",
+  });
+  const combined = `${bodyText}\n\n[STRUCTURED-DATA]\n${jsonLd}`;
+
+  const result = resolvePublicBusinessEmail({
+    businessName: "Example Roofing",
+    businessWebsite: "https://example-roofing.ca",
+    ownerName: "Sarah Lee",
+    pages: [page(combined)],
+  });
+
+  assert.equal(result.email, "sarah.lee@example-roofing.ca");
+  assert.equal(result.emailType, "owner");
+});

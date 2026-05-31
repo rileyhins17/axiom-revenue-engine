@@ -35,8 +35,48 @@ async function capturePageSnapshot(page: AutomationPage): Promise<PageSnapshot> 
             })
             .filter((link) => link.href);
 
+        // body.innerText misses emails that live in places the renderer never
+        // paints as visible text: schema.org JSON-LD, structured-data
+        // attributes, and meta tags. Local-business sites very often only
+        // expose their real email there, which is why innerText-only capture
+        // tops out around 20% email yield. Harvest those sources here — same
+        // page load, zero extra browser-rendering cost — and append them so
+        // the existing email extractor/validator picks them up.
+        const structured: string[] = [];
+
+        // 1. schema.org JSON-LD blocks (LocalBusiness/Organization carry `email`).
+        for (const node of Array.from(document.querySelectorAll('script[type="application/ld+json"]'))) {
+            const raw = node.textContent || "";
+            if (raw) structured.push(raw);
+        }
+
+        // 2. Explicit email-bearing markup: itemprop, data-email, mailto targets
+        //    (including non-anchor elements and onclick mailto handlers).
+        for (const el of Array.from(
+            document.querySelectorAll('[itemprop="email"], [data-email], [href^="mailto:" i]'),
+        )) {
+            const value =
+                el.getAttribute("data-email") ||
+                el.getAttribute("content") ||
+                el.getAttribute("href") ||
+                el.textContent ||
+                "";
+            if (value) structured.push(value.replace(/^mailto:/i, ""));
+        }
+
+        // 3. Meta tags occasionally hold the contact email.
+        for (const meta of Array.from(
+            document.querySelectorAll('meta[name*="email" i], meta[property*="email" i]'),
+        )) {
+            const content = meta.getAttribute("content") || "";
+            if (content) structured.push(content);
+        }
+
+        const bodyText = document.body?.innerText || "";
+        const structuredText = structured.join("\n").slice(0, 8000);
+
         return {
-            text: document.body?.innerText || "",
+            text: structuredText ? `${bodyText}\n\n[STRUCTURED-DATA]\n${structuredText}` : bodyText,
             links,
         };
     });
