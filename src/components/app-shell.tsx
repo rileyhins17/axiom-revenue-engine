@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-const PUBLIC_PATH_PREFIXES = ["/sign-in", "/sign-up", "/offline"];
+const PUBLIC_PATH_PREFIXES = ["/sign-in", "/sign-up", "/offline", "/install"];
 
 type ShellSession = {
   user?: {
