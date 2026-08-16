@@ -1,4 +1,4 @@
-export const AXIOM_OUTREACH_MIN_SCORE = 29;
+export const AXIOM_OUTREACH_MIN_SCORE = 30;
 export const OWNER_EMAIL_MIN_CONFIDENCE = 0.5;
 export const STAFF_EMAIL_MIN_CONFIDENCE = 0.65;
 
@@ -191,7 +191,7 @@ export function isLeadOutreachEligible(input: LeadQualificationInput) {
   return (
     typeof input.axiomScore === "number" &&
     Number.isFinite(input.axiomScore) &&
-    input.axiomScore > AXIOM_OUTREACH_MIN_SCORE &&
+    input.axiomScore >= AXIOM_OUTREACH_MIN_SCORE &&
     hasValidPipelineEmail(input)
   );
 }

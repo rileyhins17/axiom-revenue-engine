@@ -5,6 +5,7 @@ export const FUNNEL_POLICY_VERSION = "axiom-revenue-v2";
 export type FunnelEventType =
   | "SCRAPE_JOB_CREATED"
   | "LEAD_DISCOVERED"
+  | "LEAD_QUALIFIED"
   | "OUTREACH_SENT"
   | "OUTREACH_FAILED"
   | "BOUNCE_DETECTED"

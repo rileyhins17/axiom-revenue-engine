@@ -2378,6 +2378,10 @@ export async function executeScrapeJob(input: ExecuteScrapeJobInput): Promise<Ex
         phone: cleanTextOrNull(target.phone) || "",
         phoneConfidence: contactValidation.phoneConfidence,
         phoneFlags: JSON.stringify(contactValidation.phoneFlags),
+        qualificationContext: {
+          hasContactForm,
+          hasSocialMessaging,
+        },
         rating: target.rating,
         reviewCount: target.reviewCount,
         scoreBreakdown: JSON.stringify(scoreResult.breakdown),

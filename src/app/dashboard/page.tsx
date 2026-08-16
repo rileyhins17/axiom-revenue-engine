@@ -31,7 +31,6 @@ import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { ReplyInboxPanel } from "@/components/dashboard/reply-inbox-actions";
 import {
-  AUTONOMOUS_INTAKE_MIN_SCORE,
   AUTOMATION_SETTINGS_DEFAULTS,
   MAILBOX_DAILY_SEND_TARGET,
 } from "@/lib/automation-policy";
@@ -45,7 +44,7 @@ import { listScrapeJobs } from "@/lib/scrape-jobs";
 import { listRecentScrapeTargets, pickNextScrapeTarget, countActiveScrapeTargets } from "@/lib/scrape-targets";
 import { requireSession } from "@/lib/session";
 import { formatAppDateTime } from "@/lib/time";
-import { adequateLeadWhereClause, isSendableMailbox, resolveGlobalDailySendCap, startOfUtcDay } from "@/lib/ui/data-accuracy";
+import { isSendableMailbox, resolveGlobalDailySendCap, startOfUtcDay } from "@/lib/ui/data-accuracy";
 import { SentEmailViewerTrigger } from "@/components/sent-email-viewer";
 
 export const dynamic = "force-dynamic";
@@ -365,7 +364,7 @@ async function getConversionFunnel() {
   const db = getDatabase();
   const [totalRow, qualifiedRow, contactedRow, repliedRow, pipelineRow, wonRow] = await Promise.all([
     db.prepare(`SELECT COUNT(DISTINCT leadId) AS c FROM "FunnelEvent" WHERE eventType = 'LEAD_DISCOVERED'`).first<{ c: number | string }>(),
-    db.prepare(`SELECT COUNT(*) AS c FROM "Lead" WHERE ${adequateLeadWhereClause("?")}`).bind(AUTONOMOUS_INTAKE_MIN_SCORE).first<{ c: number | string }>(),
+    db.prepare(`SELECT COUNT(DISTINCT leadId) AS c FROM "FunnelEvent" WHERE eventType = 'LEAD_QUALIFIED'`).first<{ c: number | string }>(),
     db.prepare(`SELECT COUNT(DISTINCT leadId) AS c FROM "FunnelEvent" WHERE eventType = 'OUTREACH_SENT'`).first<{ c: number | string }>(),
     db.prepare(`SELECT COUNT(DISTINCT leadId) AS c FROM "FunnelEvent" WHERE eventType = 'REPLY_DETECTED'`).first<{ c: number | string }>(),
     db.prepare(`SELECT COUNT(DISTINCT leadId) AS c FROM "FunnelEvent" WHERE eventType = 'OPPORTUNITY_CREATED'`).first<{ c: number | string }>(),
@@ -378,6 +377,29 @@ async function getConversionFunnel() {
     replied: Number(repliedRow?.c ?? 0),
     pipeline: Number(pipelineRow?.c ?? 0),
     won: Number(wonRow?.c ?? 0),
+  };
+}
+
+async function getQualificationRoutes() {
+  const row = await getDatabase()
+    .prepare(
+      `SELECT
+        SUM(CASE WHEN "band" IN ('OUTREACH','PRIORITY') AND "recommendedChannel" = 'EMAIL' THEN 1 ELSE 0 END) AS emailReady,
+        SUM(CASE WHEN "band" IN ('OUTREACH','PRIORITY') AND "recommendedChannel" IN ('PHONE','FORM') THEN 1 ELSE 0 END) AS directReady,
+        SUM(CASE WHEN "band" IN ('OUTREACH','PRIORITY') AND "recommendedChannel" = 'SOCIAL' THEN 1 ELSE 0 END) AS socialReady,
+        SUM(CASE WHEN "band" = 'REVIEW' THEN 1 ELSE 0 END) AS needsReview,
+        SUM(CASE WHEN "hardGateStatus" = 'DISQUALIFIED' THEN 1 ELSE 0 END) AS disqualified
+       FROM "QualificationSnapshot"
+       WHERE "policyVersion" = 'axiom-revenue-v2'`,
+    )
+    .first<Record<string, number | string | null>>();
+
+  return {
+    directReady: Number(row?.directReady || 0),
+    disqualified: Number(row?.disqualified || 0),
+    emailReady: Number(row?.emailReady || 0),
+    needsReview: Number(row?.needsReview || 0),
+    socialReady: Number(row?.socialReady || 0),
   };
 }
 
@@ -511,6 +533,7 @@ export default async function DashboardPage() {
     totalSentAllTime,
     replyInbox,
     funnel,
+    qualificationRoutes,
     auditLog,
     scrapeTargetList,
   ] = await Promise.all([
@@ -553,6 +576,7 @@ export default async function DashboardPage() {
       .catch(() => 0),
     getReplyInbox().catch(() => [] as ReplyInboxItem[]),
     getConversionFunnel().catch(() => ({ total: 0, qualified: 0, contacted: 0, replied: 0, pipeline: 0, won: 0 })),
+    getQualificationRoutes().catch(() => ({ emailReady: 0, directReady: 0, socialReady: 0, needsReview: 0, disqualified: 0 })),
     getAuditLog().catch(() => [] as AuditEntry[]),
     getScrapeTargetList().catch(() => [] as ScrapeTargetRow[]),
   ]);
@@ -939,6 +963,20 @@ export default async function DashboardPage() {
             { label: "In Pipeline", value: funnel.pipeline, tone: "emerald" },
             { label: "Won", value: funnel.won, tone: "emerald" },
           ]} />
+          <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.06] md:grid-cols-5">
+            {[
+              { label: "Email ready", value: qualificationRoutes.emailReady, tone: "text-emerald-300" },
+              { label: "Call / form", value: qualificationRoutes.directReady, tone: "text-cyan-300" },
+              { label: "Social route", value: qualificationRoutes.socialReady, tone: "text-violet-300" },
+              { label: "Needs review", value: qualificationRoutes.needsReview, tone: "text-amber-300" },
+              { label: "Hard gated", value: qualificationRoutes.disqualified, tone: "text-zinc-400" },
+            ].map((route) => (
+              <div key={route.label} className="bg-[#101114] px-3 py-3">
+                <div className={`font-mono text-lg font-semibold ${route.tone}`}>{route.value.toLocaleString()}</div>
+                <div className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-zinc-600">{route.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -2,8 +2,13 @@ import { extractDomain } from "@/lib/dedupe";
 import { validateAgentLeadPayload } from "@/lib/agent-protocol";
 import { countAdequateLeadsToday, getAutonomousDailyLeadCap } from "@/lib/autonomous-intake";
 import { isAdequateAutonomousLead } from "@/lib/automation-policy";
+import { hasValidPipelineEmail } from "@/lib/lead-qualification";
 import { getPrisma, type LeadRecord } from "@/lib/prisma";
 import { recordFunnelEvent } from "@/lib/funnel-events";
+import {
+  buildRevenueQualification,
+  recordQualificationSnapshot,
+} from "@/lib/revenue-qualification";
 import {
   appendScrapeJobEvent,
   getScrapeJob,
@@ -153,9 +158,10 @@ export async function persistScrapeJobLead(input: {
   }
 
   const prisma = getPrisma();
+  const { qualificationContext, ...validatedLeadData } = validation.lead;
   const createdLead = await prisma.lead.create({
     data: {
-      ...validation.lead,
+      ...validatedLeadData,
       country: currentJob.country || null,
       isArchived: validation.lead.isArchived ? true : false,
       region: currentJob.region || null,
@@ -163,6 +169,44 @@ export async function persistScrapeJobLead(input: {
       sourceTargetId: currentJob.targetId,
     },
   });
+
+  const qualification = buildRevenueQualification({
+    emailReady: hasValidPipelineEmail(validation.lead),
+    hardDisqualified: validation.lead.isArchived,
+    hasContactForm: qualificationContext?.hasContactForm === true,
+    hasSocialMessaging:
+      qualificationContext?.hasSocialMessaging === true || Boolean(validation.lead.socialLink),
+    legacyScore: validation.lead.axiomScore,
+    phone: validation.lead.phone,
+    phoneConfidence: validation.lead.phoneConfidence,
+    scoreBreakdown: validation.lead.scoreBreakdown,
+    websiteLabel: validation.lead.websiteGrade,
+    websiteStatus: validation.lead.websiteStatus,
+  });
+
+  await recordQualificationSnapshot({
+    draft: qualification,
+    leadId: createdLead.id,
+    sourceJobId: currentJob.id,
+  }).catch((error) => {
+    console.error(`[qualification] Failed to record snapshot for lead ${createdLead.id}:`, error);
+  });
+
+  if (qualification.band === "OUTREACH" || qualification.band === "PRIORITY") {
+    await recordFunnelEvent({
+      channel: qualification.recommendedChannel,
+      dedupeKey: `lead-qualified:${createdLead.id}:${qualification.policyVersion}`,
+      eventType: "LEAD_QUALIFIED",
+      leadId: createdLead.id,
+      metadata: { band: qualification.band },
+      policyVersion: qualification.policyVersion,
+      score: qualification.totalScore,
+      scrapeJobId: currentJob.id,
+      scrapeTargetId: currentJob.targetId,
+    }).catch((error) => {
+      console.error(`[funnel] Failed to record qualified lead ${createdLead.id}:`, error);
+    });
+  }
 
   await recordFunnelEvent({
     channel: validation.lead.email ? "EMAIL" : validation.lead.phone ? "PHONE" : "RESEARCH",

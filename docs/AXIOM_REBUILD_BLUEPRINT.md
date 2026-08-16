@@ -38,6 +38,8 @@ Automation is intentionally stopped. On 2026-06-03, Aidan enabled the global, em
 
 The biggest data-quality defect is geographic: the old engine searched every target as `<niche> in <city>, Ontario`, even when the target was Vancouver, Seattle, Dallas, or another non-Ontario location. The first implementation slice fixes this end to end.
 
+The first v2 qualification backfill separates account value from contact route. It identifies 1,836 active `OUTREACH`/`PRIORITY` accounts: 861 with an email route and 975 that should be worked through phone, form, or social instead of being hidden by an email-only score cap. Historical snapshots are explicitly marked as migrated evidence; newly discovered accounts use the live v2 policy.
+
 ## North-star and guardrail metrics
 
 The north-star metric is **qualified positive replies per 100 verified first touches**. This is closer to revenue than open rate and is harder to inflate than total replies.
@@ -198,6 +200,7 @@ Dashboards must cohort by first-touch date and break down results by:
 - Fix geography propagation and remove the Ontario hardcode.
 - Preserve scrape target/job provenance on new leads.
 - Introduce the append-only funnel event ledger and backfill reliable historic milestones.
+- Store a versioned four-part qualification snapshot and route strong no-email accounts to alternate channels.
 - Move the dashboard funnel to deduplicated evidence events.
 - Publish this blueprint beside the code.
 

@@ -1,4 +1,5 @@
 import type { LeadRecord, OutreachAutomationSettingRecord } from "@/lib/prisma";
+import { AXIOM_OUTREACH_MIN_SCORE } from "@/lib/lead-qualification";
 
 import { isGenericRoleEmail } from "@/lib/contact-validation";
 import { isLeadOutreachEligible } from "@/lib/lead-qualification";
@@ -21,7 +22,7 @@ export const MAILBOX_MAX_DELAY_SECONDS = 30 * 60;
 
 /** Adequate-lead threshold. Intake, queueing, and send-time checks must stay
  *  aligned so every adequate lead can actually receive an email. */
-export const AUTONOMOUS_INTAKE_MIN_SCORE = 30;
+export const AUTONOMOUS_INTAKE_MIN_SCORE = AXIOM_OUTREACH_MIN_SCORE;
 export const AUTONOMOUS_SEND_MIN_SCORE = AUTONOMOUS_INTAKE_MIN_SCORE;
 /** Max leads to queue per scheduler tick. With cron every 5 min this is
  *  600/hour peak which is more than enough headroom. */

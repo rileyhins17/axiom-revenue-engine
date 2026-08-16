@@ -59,6 +59,12 @@ const leadSchema = z
     phone: z.string().max(64),
     phoneConfidence: z.number().finite(),
     phoneFlags: z.string().max(512).optional().nullable(),
+    qualificationContext: z
+      .object({
+        hasContactForm: z.boolean(),
+        hasSocialMessaging: z.boolean(),
+      })
+      .optional(),
     outreachStatus: z.string().max(64).optional().nullable(),
     rating: z.number().finite(),
     reviewCount: z.number().finite(),

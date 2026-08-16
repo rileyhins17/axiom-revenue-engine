@@ -40,7 +40,7 @@ test("Axiom scoring treats a resolved owner email as valid pipeline reachability
   assert(result.axiomScore > AXIOM_OUTREACH_MIN_SCORE);
 });
 
-test("Axiom scoring does not treat email type alone as a valid email", () => {
+test("Axiom scoring keeps business potential separate from email readiness", () => {
   const result = computeAxiomScore({
     assessment: null,
     category: "Roofing contractor",
@@ -65,5 +65,8 @@ test("Axiom scoring does not treat email type alone as a valid email", () => {
   });
 
   assert.equal(result.hasValidEmail, false);
-  assert(result.axiomScore <= AXIOM_OUTREACH_MIN_SCORE);
+  assert(result.axiomScore >= AXIOM_OUTREACH_MIN_SCORE);
+  assert.equal(result.outreachEligible, false);
+  assert.equal(result.emailGateApplied, true);
+  assert(result.reasonCodes.includes("alternate_channel_needed"));
 });

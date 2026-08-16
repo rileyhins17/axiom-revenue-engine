@@ -363,8 +363,8 @@ function buildReasonSummary(input: {
     reasons.push("A vetted email is available, so the lead is directly reachable.");
     codes.push("valid_email");
   } else {
-    reasons.push("No vetted email is available, so the score is capped below outreach range.");
-    codes.push("email_gate");
+    reasons.push("No vetted email is available, so this account needs a phone, form, social, or research route.");
+    codes.push("alternate_channel_needed");
   }
 
   if (input.serviceFitScore >= 8) {
@@ -429,9 +429,12 @@ export function computeAxiomScore(input: {
     emailFlags: input.contact.emailFlags || [],
   });
 
-  const axiomScore = hasValidEmail ? rawScore : Math.min(rawScore, AXIOM_OUTREACH_MIN_SCORE - 1);
+  // Business potential and channel readiness are different decisions. Keep
+  // the full account score even without email, then use outreachEligible and
+  // the qualification snapshot's recommendedChannel to decide what happens.
+  const axiomScore = rawScore;
   const tier = computeTier(axiomScore);
-  const outreachEligible = hasValidEmail && axiomScore > AXIOM_OUTREACH_MIN_SCORE;
+  const outreachEligible = hasValidEmail && axiomScore >= AXIOM_OUTREACH_MIN_SCORE;
   const emailGateApplied = !hasValidEmail && rawScore >= AXIOM_OUTREACH_MIN_SCORE;
 
   const websiteRiskScore = getWebsiteRiskScore(input.assessment);

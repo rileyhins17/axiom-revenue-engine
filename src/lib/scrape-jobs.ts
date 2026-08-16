@@ -144,6 +144,10 @@ export interface ScrapeLeadWriteInput {
   phone: string;
   phoneConfidence: number;
   phoneFlags: string | null;
+  qualificationContext?: {
+    hasContactForm: boolean;
+    hasSocialMessaging: boolean;
+  };
   outreachStatus?: string | null;
   rating: number;
   region?: string | null;
