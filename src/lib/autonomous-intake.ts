@@ -5,6 +5,7 @@ import {
   AUTONOMOUS_INTAKE_MIN_SCORE,
 } from "@/lib/automation-policy";
 import { getServerEnv } from "@/lib/env";
+import { recordFunnelEvent } from "@/lib/funnel-events";
 import { getAutomationSettings } from "@/lib/outreach-automation";
 import { createScrapeJob, failStuckPendingScrapeJobs } from "@/lib/scrape-jobs";
 import {
@@ -115,11 +116,29 @@ export async function runAutonomousIntake(): Promise<IntakeResult> {
     actorUserId: SYSTEM_USER_ID,
     niche: target.niche,
     city: target.city,
+    region: target.region,
+    country: target.country,
+    targetId: target.id,
     radius: target.radius,
     maxDepth: target.maxDepth,
   });
 
   await markScrapeTargetDispatched(target.id, job.id);
+
+  await recordFunnelEvent({
+    dedupeKey: `scrape-job:${job.id}`,
+    eventType: "SCRAPE_JOB_CREATED",
+    metadata: {
+      city: target.city,
+      country: target.country,
+      niche: target.niche,
+      region: target.region,
+    },
+    scrapeJobId: job.id,
+    scrapeTargetId: target.id,
+  }).catch((error) => {
+    console.error(`[funnel] Failed to record scrape dispatch ${job.id}:`, error);
+  });
 
   await writeAuditEvent({
     action: "intake.autonomous_dispatch",

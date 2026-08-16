@@ -58,9 +58,12 @@ export interface ScrapeJobRecord {
   id: string;
   maxDepth: number;
   niche: string;
+  country: string;
   radius: string;
+  region: string;
   stats: Record<string, unknown> | null;
   status: ScrapeJobStatus;
+  targetId: string | null;
   updatedAt: Date;
 }
 
@@ -73,8 +76,11 @@ export interface ScrapeJobSummary {
   id: string;
   maxDepth: number;
   niche: string;
+  country: string;
   radius: string;
+  region: string;
   status: ScrapeJobStatus;
+  targetId: string | null;
   updatedAt: Date;
 }
 
@@ -111,6 +117,7 @@ export interface ScrapeLeadWriteInput {
   callOpener: string;
   category: string | null;
   city: string;
+  country?: string | null;
   contactName: string | null;
   dedupeKey: string;
   dedupeMatchedBy: string;
@@ -139,10 +146,13 @@ export interface ScrapeLeadWriteInput {
   phoneFlags: string | null;
   outreachStatus?: string | null;
   rating: number;
+  region?: string | null;
   reviewCount: number;
   scoreBreakdown: string;
   socialLink: string;
   source: string | null;
+  sourceJobId?: string | null;
+  sourceTargetId?: string | null;
   tacticalNote: string;
   websiteGrade: string | null;
   websiteDomain: string | null;
@@ -153,9 +163,12 @@ export interface ScrapeLeadWriteInput {
 export interface CreateScrapeJobInput {
   actorUserId: string;
   city: string;
+  country?: string;
   maxDepth: number;
   niche: string;
   radius: string;
+  region?: string;
+  targetId?: string | null;
 }
 
 export interface ClaimScrapeJobInput {
@@ -223,9 +236,12 @@ function jobFromRow(row: Record<string, unknown>): ScrapeJobRecord {
     id: String(row.id || ""),
     maxDepth: Number(row.maxDepth || 0),
     niche: String(row.niche || ""),
+    country: String(row.country || "CA"),
     radius: String(row.radius || ""),
+    region: String(row.region || ""),
     stats: parseJsonRecord(row.statsJson),
     status: String(row.status || "pending") as ScrapeJobStatus,
+    targetId: row.targetId === null || row.targetId === undefined ? null : String(row.targetId),
     updatedAt: parseDate(row.updatedAt) || new Date(),
   };
 }
@@ -267,17 +283,23 @@ export async function createScrapeJob(input: CreateScrapeJobInput): Promise<Scra
       "status",
       "niche",
       "city",
+      "region",
+      "country",
+      "targetId",
       "radius",
       "maxDepth",
       "createdAt",
       "updatedAt"
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       input.actorUserId,
       "pending",
       input.niche,
       input.city,
+      input.region || "",
+      input.country || "CA",
+      input.targetId || null,
       input.radius,
       input.maxDepth,
       now,
@@ -308,8 +330,11 @@ function summaryFromRow(row: Record<string, unknown>): ScrapeJobSummary {
     id: String(row.id || ""),
     maxDepth: Number(row.maxDepth || 0),
     niche: String(row.niche || ""),
+    country: String(row.country || "CA"),
     radius: String(row.radius || ""),
+    region: String(row.region || ""),
     status: String(row.status || "pending") as ScrapeJobStatus,
+    targetId: row.targetId === null || row.targetId === undefined ? null : String(row.targetId),
     updatedAt: parseDate(row.updatedAt) || new Date(),
   };
 }

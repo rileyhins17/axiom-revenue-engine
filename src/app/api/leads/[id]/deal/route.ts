@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { buildDealUpdateActivities, getDefaultNextActionForStage } from "@/lib/crm-activity";
-import { isClientPriority, isDealStage, isEngagementType } from "@/lib/crm";
+import { isClientPriority, isDealStage, isEngagementType, isWonDeal } from "@/lib/crm";
+import { recordFunnelEvent } from "@/lib/funnel-events";
 import { getPrisma } from "@/lib/prisma";
 import { requireApiSession } from "@/lib/session";
 
@@ -139,6 +140,34 @@ export async function PATCH(
     ).catch((error) => {
       console.error(`[crm] Failed to write activity for lead ${leadId}:`, error);
     });
+  }
+
+  if (previousLead.dealStage !== lead.dealStage && lead.dealStage) {
+    const event = isWonDeal(lead.dealStage)
+      ? { dedupeKey: `deal-won:${lead.id}`, eventType: "DEAL_WON" as const }
+      : lead.dealStage === "LOST"
+        ? { dedupeKey: `deal-lost:${lead.id}`, eventType: "DEAL_LOST" as const }
+        : !previousLead.dealStage
+          ? { dedupeKey: `opportunity-created:${lead.id}`, eventType: "OPPORTUNITY_CREATED" as const }
+          : null;
+
+    if (event) {
+      await recordFunnelEvent({
+        channel: lead.outreachChannel,
+        dedupeKey: event.dedupeKey,
+        eventType: event.eventType,
+        leadId: lead.id,
+        metadata: {
+          dealStage: lead.dealStage,
+          engagementType: lead.engagementType,
+          monthlyValue: lead.monthlyValue,
+          previousDealStage: previousLead.dealStage,
+          proposalValue: lead.proposalValue,
+        },
+      }).catch((error) => {
+        console.error(`[funnel] Failed to record CRM event for lead ${lead.id}:`, error);
+      });
+    }
   }
 
   return NextResponse.json(lead);

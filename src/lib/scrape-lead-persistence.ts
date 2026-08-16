@@ -3,6 +3,7 @@ import { validateAgentLeadPayload } from "@/lib/agent-protocol";
 import { countAdequateLeadsToday, getAutonomousDailyLeadCap } from "@/lib/autonomous-intake";
 import { isAdequateAutonomousLead } from "@/lib/automation-policy";
 import { getPrisma, type LeadRecord } from "@/lib/prisma";
+import { recordFunnelEvent } from "@/lib/funnel-events";
 import {
   appendScrapeJobEvent,
   getScrapeJob,
@@ -155,8 +156,31 @@ export async function persistScrapeJobLead(input: {
   const createdLead = await prisma.lead.create({
     data: {
       ...validation.lead,
+      country: currentJob.country || null,
       isArchived: validation.lead.isArchived ? true : false,
+      region: currentJob.region || null,
+      sourceJobId: currentJob.id,
+      sourceTargetId: currentJob.targetId,
     },
+  });
+
+  await recordFunnelEvent({
+    channel: validation.lead.email ? "EMAIL" : validation.lead.phone ? "PHONE" : "RESEARCH",
+    dedupeKey: `lead-discovered:${createdLead.id}`,
+    eventType: "LEAD_DISCOVERED",
+    leadId: createdLead.id,
+    metadata: {
+      city: currentJob.city,
+      country: currentJob.country,
+      emailType: validation.lead.emailType,
+      niche: currentJob.niche,
+      region: currentJob.region,
+    },
+    score: validation.lead.axiomScore,
+    scrapeJobId: currentJob.id,
+    scrapeTargetId: currentJob.targetId,
+  }).catch((error) => {
+    console.error(`[funnel] Failed to record discovered lead ${createdLead.id}:`, error);
   });
 
   await appendScrapeJobEvent(input.jobId, "result", {

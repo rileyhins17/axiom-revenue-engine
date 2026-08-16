@@ -364,12 +364,12 @@ async function getReplyInbox(): Promise<ReplyInboxItem[]> {
 async function getConversionFunnel() {
   const db = getDatabase();
   const [totalRow, qualifiedRow, contactedRow, repliedRow, pipelineRow, wonRow] = await Promise.all([
-    db.prepare(`SELECT COUNT(*) AS c FROM "Lead" WHERE isArchived = 0`).first<{ c: number | string }>(),
+    db.prepare(`SELECT COUNT(DISTINCT leadId) AS c FROM "FunnelEvent" WHERE eventType = 'LEAD_DISCOVERED'`).first<{ c: number | string }>(),
     db.prepare(`SELECT COUNT(*) AS c FROM "Lead" WHERE ${adequateLeadWhereClause("?")}`).bind(AUTONOMOUS_INTAKE_MIN_SCORE).first<{ c: number | string }>(),
-    db.prepare(`SELECT COUNT(*) AS c FROM "Lead" WHERE firstContactedAt IS NOT NULL AND isArchived = 0`).first<{ c: number | string }>(),
-    db.prepare(`SELECT COUNT(*) AS c FROM "Lead" WHERE outreachStatus = 'REPLIED' AND isArchived = 0`).first<{ c: number | string }>(),
-    db.prepare(`SELECT COUNT(*) AS c FROM "Lead" WHERE dealStage IS NOT NULL AND dealStage != 'LOST' AND isArchived = 0`).first<{ c: number | string }>(),
-    db.prepare(`SELECT COUNT(*) AS c FROM "Lead" WHERE dealStage IN ('SIGNED', 'ACTIVE', 'DELIVERED', 'RETAINED') AND isArchived = 0`).first<{ c: number | string }>(),
+    db.prepare(`SELECT COUNT(DISTINCT leadId) AS c FROM "FunnelEvent" WHERE eventType = 'OUTREACH_SENT'`).first<{ c: number | string }>(),
+    db.prepare(`SELECT COUNT(DISTINCT leadId) AS c FROM "FunnelEvent" WHERE eventType = 'REPLY_DETECTED'`).first<{ c: number | string }>(),
+    db.prepare(`SELECT COUNT(DISTINCT leadId) AS c FROM "FunnelEvent" WHERE eventType = 'OPPORTUNITY_CREATED'`).first<{ c: number | string }>(),
+    db.prepare(`SELECT COUNT(DISTINCT leadId) AS c FROM "FunnelEvent" WHERE eventType = 'DEAL_WON'`).first<{ c: number | string }>(),
   ]);
   return {
     total: Number(totalRow?.c ?? 0),
@@ -926,7 +926,7 @@ export default async function DashboardPage() {
         <header className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
           <div>
             <div className="text-sm font-semibold text-white">Conversion Funnel</div>
-            <div className="mt-0.5 text-[11px] text-zinc-500">Lead-to-client pipeline (all time)</div>
+            <div className="mt-0.5 text-[11px] text-zinc-500">Evidence ledger · deduplicated, all time</div>
           </div>
           <Filter className="size-4 text-zinc-600" />
         </header>

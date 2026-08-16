@@ -52,6 +52,7 @@ import {
   MAILBOX_MIN_DELAY_SECONDS,
 } from "@/lib/automation-policy";
 import { isGenericRoleEmail } from "@/lib/contact-validation";
+import { recordFunnelEvent } from "@/lib/funnel-events";
 import { hasValidPipelineEmail, isLeadOutreachEligible, normalizePipelineEmail } from "@/lib/lead-qualification";
 import { resolveLeadEnrichment } from "@/lib/outreach-enrichment";
 import { getPrisma } from "@/lib/prisma";
@@ -2590,6 +2591,24 @@ async function stopSequenceInternal(
         outreachChannel: "EMAIL",
       },
     });
+
+    const normalizedStopReason = stopReason.toUpperCase();
+    if (normalizedStopReason === "REPLIED" || normalizedStopReason === "BOUNCED") {
+      await recordFunnelEvent({
+        channel: "EMAIL",
+        dedupeKey:
+          normalizedStopReason === "REPLIED"
+            ? `reply-detected:${sequence.id}`
+            : `bounce-detected:${sequence.id}`,
+        eventType: normalizedStopReason === "REPLIED" ? "REPLY_DETECTED" : "BOUNCE_DETECTED",
+        leadId: lead.id,
+        metadata: { stopReason: normalizedStopReason },
+        occurredAt: replyDetectedAt,
+        sequenceId: sequence.id,
+      }).catch((error) => {
+        console.error(`[funnel] Failed to record ${normalizedStopReason.toLowerCase()} for ${sequence.id}:`, error);
+      });
+    }
   }
 }
 
@@ -3747,6 +3766,25 @@ async function sendScheduledStep(
       },
     }).catch(() => null);
 
+    if (definitiveRejection) {
+      await recordFunnelEvent({
+        channel: "EMAIL",
+        dedupeKey: `outreach-failed:${deliveryId}`,
+        eventType: "OUTREACH_FAILED",
+        leadId: context.lead.id,
+        metadata: {
+          failureKind: classification.kind,
+          reason: classification.reason,
+          stepNumber: claim.step.stepNumber,
+        },
+        outreachEmailId: deliveryId,
+        sequenceId: claim.sequence.id,
+        sequenceStepId: claim.step.id,
+      }).catch((funnelError) => {
+        console.error(`[funnel] Failed to record outreach failure ${deliveryId}:`, funnelError);
+      });
+    }
+
     if (!definitiveRejection) {
       throw new AutomationSkipError("delivery_state_unknown");
     }
@@ -3789,6 +3827,25 @@ async function sendScheduledStep(
       generationModel: "deepseek-chat",
       claimedByRunId: runId,
     },
+  });
+
+  await recordFunnelEvent({
+    channel: "EMAIL",
+    dedupeKey: `outreach-sent:${deliveryId}`,
+    eventType: "OUTREACH_SENT",
+    leadId: context.lead.id,
+    metadata: {
+      mailboxId: claim.mailbox.id,
+      stepNumber: claim.step.stepNumber,
+      stepType: claim.step.stepType,
+    },
+    occurredAt: sentAt,
+    outreachEmailId: deliveryId,
+    score: context.lead.axiomScore,
+    sequenceId: claim.sequence.id,
+    sequenceStepId: claim.step.id,
+  }).catch((error) => {
+    console.error(`[funnel] Failed to record outreach send ${deliveryId}:`, error);
   });
 
   await _advancePhase(claim.step.id, "COMPLETED").catch(() => null);

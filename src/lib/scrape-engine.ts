@@ -7,6 +7,7 @@ import { chatCompletion } from "@/lib/deepseek";
 import { validateContact } from "@/lib/contact-validation";
 import { extractDomain, generateDedupeKey } from "@/lib/dedupe";
 import { checkDisqualifiers } from "@/lib/disqualifiers";
+import { browserLocaleForCountry, buildMapsSearchQuery } from "@/lib/geo";
 import {
   applyScrapeResourceBlocking,
   launchAutomationBrowser,
@@ -70,12 +71,14 @@ export type CollectedMapsTarget = {
 
 export interface ExecuteScrapeJobInput {
   city: string;
+  country: string;
   existingDedupeKeys: string[];
   jobId: string;
   maxDepth: number;
   niche: string;
   persistLead: (lead: ScrapeLeadWriteInput) => Promise<void>;
   radius: string;
+  region: string;
   sendEvent: (data: ScrapeJobEventPayload) => Promise<void>;
   shouldAbort?: () => boolean;
   skipMapsDetailPages?: boolean;
@@ -1516,6 +1519,8 @@ async function collectTargets(
   context: AutomationBrowserContext,
   niche: string,
   city: string,
+  region: string,
+  country: string,
   maxDepth: number,
   sendEvent: (data: ScrapeJobEventPayload) => Promise<void>,
   shouldAbort?: () => boolean,
@@ -1529,7 +1534,7 @@ async function collectTargets(
       throw new ScrapeCanceledError("Scrape canceled before Maps navigation.");
     }
 
-    const query = `${niche} in ${city}, Ontario`;
+    const query = buildMapsSearchQuery({ niche, city, region, country });
     await page.goto(`https://www.google.com/maps/search/${encodeURIComponent(query)}`, {
       waitUntil: "commit",
       timeout: 30000,
@@ -1988,7 +1993,13 @@ async function enrichWithAi(input: {
 }
 
 export async function executeScrapeJob(input: ExecuteScrapeJobInput): Promise<ExecuteScrapeJobResult> {
-  const source = `${input.niche}|${input.city}|${new Date().toISOString().split("T")[0]}`;
+  const source = [
+    input.niche,
+    input.city,
+    input.region,
+    input.country,
+    new Date().toISOString().split("T")[0],
+  ].filter(Boolean).join("|");
   const existingDedupeKeys = new Set(input.existingDedupeKeys);
   let browser: AutomationBrowser | null = null;
   let context: AutomationBrowserContext | null = null;
@@ -2029,11 +2040,11 @@ export async function executeScrapeJob(input: ExecuteScrapeJobInput): Promise<Ex
 
   try {
     browser = await launchAutomationBrowser();
-    context = await browser.newContext({ locale: "en-CA" });
+    context = await browser.newContext({ locale: browserLocaleForCountry(input.country) });
     await applyScrapeResourceBlocking(context);
 
     await input.sendEvent({
-      message: `[ENGINE] AXIOM ENGINE initialized for ${input.niche} in ${input.city} (R:${input.radius}km, D:${input.maxDepth})`,
+      message: `[ENGINE] AXIOM ENGINE initialized for ${input.niche} in ${input.city}, ${input.region}, ${input.country} (R:${input.radius}km, D:${input.maxDepth})`,
     });
     await input.sendEvent({
       message:
@@ -2044,6 +2055,8 @@ export async function executeScrapeJob(input: ExecuteScrapeJobInput): Promise<Ex
       context,
       input.niche,
       input.city,
+      input.region,
+      input.country,
       input.maxDepth,
       input.sendEvent,
       shouldAbort,

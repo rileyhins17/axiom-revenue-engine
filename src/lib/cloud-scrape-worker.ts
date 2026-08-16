@@ -228,12 +228,14 @@ async function runClaimedJob(job: ScrapeJobRecord, existingDedupeKeys: string[])
     const result = await withCloudScrapeTimeout(
       executeScrapeJob({
         city: job.city,
+        country: job.country,
         existingDedupeKeys,
         jobId: job.id,
         maxDepth: job.maxDepth,
         niche: job.niche,
         persistLead: (lead: ScrapeLeadWriteInput) => persistScrapeJobLead({ jobId: job.id, lead }).then(() => undefined),
         radius: job.radius,
+        region: job.region,
         sendEvent: (payload: ScrapeJobEventPayload) => sendEvent(job, payload),
         shouldAbort: () => cancelRequested,
         skipMapsDetailPages: shouldSkipCloudMapsDetailPages(env),
@@ -277,10 +279,13 @@ async function runClaimedJob(job: ScrapeJobRecord, existingDedupeKeys: string[])
       targetId: job.id,
       targetType: "scrape_job",
       metadata: {
-        city: job.city,
-        cloudRunner: true,
-        niche: job.niche,
-        radius: job.radius,
+      city: job.city,
+      cloudRunner: true,
+      country: job.country,
+      niche: job.niche,
+      radius: job.radius,
+      region: job.region,
+      targetId: job.targetId,
       },
     });
   } catch (error) {

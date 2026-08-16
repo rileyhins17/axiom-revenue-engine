@@ -2,6 +2,8 @@
 
 Private Axiom operations app for lead intake, enrichment, autonomous first-touch outreach, reply tracking, and CRM movement.
 
+The product direction, production baseline, target architecture, conversion strategy, safety gates, and staged root rebuild are documented in [`docs/AXIOM_REBUILD_BLUEPRINT.md`](docs/AXIOM_REBUILD_BLUEPRINT.md).
+
 The live app runs at `https://operations.getaxiom.ca`. The Cloudflare Worker and D1 resources still use the legacy resource name `axiom-ops-omniscient` so the production domain, bindings, and database stay stable. The npm package name is `axiom-pipeline-engine`.
 
 ## Current Production Shape

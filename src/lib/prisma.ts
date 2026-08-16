@@ -46,6 +46,8 @@ export type LeadRecord = {
   businessName: string;
   niche: string;
   city: string;
+  region?: string | null;
+  country?: string | null;
   category: string | null;
   address: string | null;
   phone: string | null;
@@ -91,6 +93,8 @@ export type LeadRecord = {
   enrichmentPersonalizedHook?: string | null;
   enrichmentRecommendedCTA?: string | null;
   source: string | null;
+  sourceJobId?: string | null;
+  sourceTargetId?: string | null;
   isArchived: boolean;
   createdAt: Date;
   lastUpdated: Date | null;
@@ -512,6 +516,8 @@ const leadTable: TableSpec<LeadRecord> = {
     "businessName",
     "niche",
     "city",
+    "region",
+    "country",
     "category",
     "address",
     "phone",
@@ -557,6 +563,8 @@ const leadTable: TableSpec<LeadRecord> = {
     "enrichmentPersonalizedHook",
     "enrichmentRecommendedCTA",
     "source",
+    "sourceJobId",
+    "sourceTargetId",
     "isArchived",
     "createdAt",
     "lastUpdated",
@@ -587,6 +595,8 @@ const leadTable: TableSpec<LeadRecord> = {
     "businessName",
     "niche",
     "city",
+    "region",
+    "country",
     "category",
     "address",
     "phone",
@@ -622,6 +632,8 @@ const leadTable: TableSpec<LeadRecord> = {
     "enrichmentPersonalizedHook",
     "enrichmentRecommendedCTA",
     "source",
+    "sourceJobId",
+    "sourceTargetId",
     "dealStage",
     "engagementType",
     "proposalStatus",
@@ -993,6 +1005,10 @@ async function ensureLeadQualityColumns() {
       const migrations: Array<[string, string]> = [
         ["websiteUrl", "TEXT"],
         ["websiteDomain", "TEXT"],
+        ["region", "TEXT"],
+        ["country", "TEXT"],
+        ["sourceJobId", "TEXT"],
+        ["sourceTargetId", "TEXT"],
         ["emailFlags", "TEXT"],
         ["phoneFlags", "TEXT"],
         ["outreachStatus", `TEXT NOT NULL DEFAULT 'NOT_CONTACTED'`],
