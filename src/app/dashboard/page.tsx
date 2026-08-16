@@ -494,6 +494,40 @@ async function getAuditLog(): Promise<AuditEntry[]> {
 
 type ScrapeTargetRow = { id: string; niche: string; city: string; status: string; lastScrapedAt: string | null; leadCount: number };
 
+type MessageVariantMetric = {
+  campaignKey: string;
+  variantKey: string;
+  sent: number | string;
+  replied: number | string;
+  lastSentAt: string | null;
+};
+
+async function getMessageVariantMetrics(): Promise<MessageVariantMetric[]> {
+  const rows = await getDatabase().prepare(
+    `SELECT
+       step."campaignKey",
+       step."variantKey",
+       COUNT(DISTINCT step."sequenceId") AS "sent",
+       COUNT(DISTINCT CASE WHEN EXISTS (
+         SELECT 1 FROM "FunnelEvent" reply
+         WHERE reply."eventType" = 'REPLY_DETECTED'
+           AND reply."sequenceId" = step."sequenceId"
+           AND datetime(reply."occurredAt") >= datetime(step."sentAt")
+       ) THEN step."sequenceId" END) AS "replied",
+       MAX(step."sentAt") AS "lastSentAt"
+     FROM "OutreachSequenceStep" step
+     WHERE step."stepType" = 'INITIAL'
+       AND step."status" = 'SENT'
+       AND step."campaignKey" IS NOT NULL
+       AND step."variantKey" IS NOT NULL
+       AND step."validationStatus" = 'PASSED'
+     GROUP BY step."campaignKey", step."variantKey"
+     ORDER BY COUNT(DISTINCT step."sequenceId") DESC, step."variantKey" ASC
+     LIMIT 8`,
+  ).all<MessageVariantMetric>().catch(() => ({ results: [] as MessageVariantMetric[] }));
+  return rows.results ?? [];
+}
+
 async function getScrapeTargetList(): Promise<ScrapeTargetRow[]> {
   const db = getDatabase();
   const rows = await db.prepare(
@@ -534,6 +568,7 @@ export default async function DashboardPage() {
     replyInbox,
     funnel,
     qualificationRoutes,
+    messageVariants,
     auditLog,
     scrapeTargetList,
   ] = await Promise.all([
@@ -577,6 +612,7 @@ export default async function DashboardPage() {
     getReplyInbox().catch(() => [] as ReplyInboxItem[]),
     getConversionFunnel().catch(() => ({ total: 0, qualified: 0, contacted: 0, replied: 0, pipeline: 0, won: 0 })),
     getQualificationRoutes().catch(() => ({ emailReady: 0, directReady: 0, socialReady: 0, needsReview: 0, disqualified: 0 })),
+    getMessageVariantMetrics().catch(() => [] as MessageVariantMetric[]),
     getAuditLog().catch(() => [] as AuditEntry[]),
     getScrapeTargetList().catch(() => [] as ScrapeTargetRow[]),
   ]);
@@ -978,6 +1014,68 @@ export default async function DashboardPage() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Evidence-bound messaging experiments */}
+      <div className="v2-card overflow-hidden">
+        <header className="flex flex-col gap-2 border-b border-white/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2.5">
+            <div className="mt-0.5 rounded-lg border border-violet-400/15 bg-violet-400/10 p-1.5">
+              <Radar className="size-4 text-violet-300" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-white">Message Learning Lab</div>
+              <div className="mt-0.5 text-[11px] text-zinc-500">
+                Evidence-first copy · first-touch reply attribution · no guessed historical variants
+              </div>
+            </div>
+          </div>
+          <span className="w-fit rounded-full border border-emerald-400/15 bg-emerald-400/10 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-emerald-300">
+            policy evidence-first-v1
+          </span>
+        </header>
+        {messageVariants.length === 0 ? (
+          <div className="grid gap-3 p-4 md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <div className="text-xs font-medium text-zinc-200">The experiment ledger is ready.</div>
+              <p className="mt-1 max-w-2xl text-[11px] leading-relaxed text-zinc-500">
+                New sends will store the exact evidence, opener, CTA, policy, and variant used. Old emails stay unassigned so this view never invents attribution.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/[0.06] bg-black/20 px-4 py-3 text-right">
+              <div className="font-mono text-xl font-semibold text-zinc-300">0</div>
+              <div className="text-[9px] uppercase tracking-[0.12em] text-zinc-600">policy sends</div>
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.05]">
+            {messageVariants.map((variant) => {
+              const sent = Number(variant.sent || 0);
+              const replied = Number(variant.replied || 0);
+              const rate = sent > 0 ? (replied / sent) * 100 : 0;
+              return (
+                <div key={`${variant.campaignKey}:${variant.variantKey}`} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_90px_90px_100px] md:items-center">
+                  <div className="min-w-0">
+                    <div className="truncate font-mono text-[11px] text-zinc-200">{variant.variantKey.replace(/__/g, " · ")}</div>
+                    <div className="mt-0.5 truncate text-[10px] text-zinc-600">{variant.campaignKey} · last sent {relativeAgo(variant.lastSentAt)}</div>
+                  </div>
+                  <div>
+                    <div className="font-mono text-sm text-zinc-300">{sent.toLocaleString()}</div>
+                    <div className="text-[9px] uppercase tracking-[0.1em] text-zinc-600">sent</div>
+                  </div>
+                  <div>
+                    <div className="font-mono text-sm text-amber-300">{replied.toLocaleString()}</div>
+                    <div className="text-[9px] uppercase tracking-[0.1em] text-zinc-600">replied</div>
+                  </div>
+                  <div>
+                    <div className="font-mono text-sm text-emerald-300">{rate.toFixed(1)}%</div>
+                    <div className="text-[9px] uppercase tracking-[0.1em] text-zinc-600">reply rate</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Audit Log & Scrape Targets */}

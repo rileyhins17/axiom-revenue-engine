@@ -232,6 +232,8 @@ Exit gate: intake, dashboard, queue, and send agree on the same policy version; 
 - Store generated claims and reject unsupported statements before send.
 - Fix pending-mailbox accounting and generate close to send time.
 
+The first Phase 3 slice is now implemented as `evidence-first-v1`: every new generated step receives a deterministic campaign/variant assignment, an evidence envelope, the selected observation, CTA type, confidence, and validation state. Unsupported outcome, competitor, visitor-behaviour, and timeline claims are rejected; generic enrichment alone cannot authorize an email; unsafe legacy cached copy is regenerated; and the duplicate pending-mailbox increment is removed. The dashboard's Message Learning Lab reports first-touch replies only for these explicitly attributed sends and leaves historical mail unassigned rather than guessing.
+
 Exit gate: every sent message has evidence IDs and variant attribution; no unsupported-claim defects in a 100-message audit.
 
 ### Phase 4 — reply intelligence and CRM execution

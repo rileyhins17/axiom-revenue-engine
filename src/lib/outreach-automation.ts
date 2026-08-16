@@ -1,5 +1,7 @@
 import {
   generateSequenceStepEmail,
+  MESSAGE_POLICY_VERSION,
+  type GeneratedEmail,
   type OutreachSequenceStepType,
 } from "@/lib/outreach-email-generator";
 import {
@@ -71,6 +73,22 @@ import type {
 } from "@/lib/prisma";
 
 type PrismaLike = ReturnType<typeof getPrisma>;
+
+function generatedMessageStepData(email: GeneratedEmail) {
+  return {
+    subject: email.subject,
+    bodyHtml: email.bodyHtml,
+    bodyPlain: email.bodyPlain,
+    messagePolicyVersion: email.messagePolicyVersion,
+    campaignKey: email.campaignKey,
+    variantKey: email.variantKey,
+    evidenceJson: email.evidenceJson,
+    observedIssue: email.observed_issue || null,
+    ctaType: email.CTA_type || null,
+    confidenceScore: email.confidence_score ?? null,
+    validationStatus: email.validationStatus,
+  };
+}
 
 export type OutreachSequenceConfig = {
   timezone: string;
@@ -2217,9 +2235,7 @@ export async function queueLeadsForAutomation(input: {
         await prisma.outreachSequenceStep.update({
           where: { id: stepIds[0] },
           data: {
-            subject: pregenEmail.subject,
-            bodyHtml: pregenEmail.bodyHtml,
-            bodyPlain: pregenEmail.bodyPlain,
+            ...generatedMessageStepData(pregenEmail),
             generationModel: "deepseek-chat-pregen",
           },
         });
@@ -2243,10 +2259,6 @@ export async function queueLeadsForAutomation(input: {
         data: { outreachStatus: READY_FOR_FIRST_TOUCH_STATUS },
       });
     }
-    pendingAssignments.set(
-      allocation.mailbox.id,
-      (pendingAssignments.get(allocation.mailbox.id) || 0) + 1,
-    );
   }
 
   return result;
@@ -3610,12 +3622,30 @@ async function sendScheduledStep(
   let email: Awaited<ReturnType<typeof generateSequenceStepEmail>>;
 
   // Use pre-generated email if available (cached at queue time for initial touch)
-  const hasPregeneratedEmail = claim.step.subject && claim.step.bodyHtml && claim.step.bodyPlain;
+  const hasPregeneratedEmail = Boolean(
+    claim.step.subject &&
+    claim.step.bodyHtml &&
+    claim.step.bodyPlain &&
+    claim.step.messagePolicyVersion === MESSAGE_POLICY_VERSION &&
+    claim.step.campaignKey &&
+    claim.step.variantKey &&
+    claim.step.evidenceJson &&
+    claim.step.validationStatus === "PASSED",
+  );
   if (hasPregeneratedEmail) {
     email = {
       subject: claim.step.subject!,
       bodyHtml: claim.step.bodyHtml!,
       bodyPlain: claim.step.bodyPlain!,
+      personalization_reason: "Reused a validated, evidence-bound queue-time generation.",
+      observed_issue: claim.step.observedIssue || undefined,
+      CTA_type: claim.step.ctaType || undefined,
+      confidence_score: claim.step.confidenceScore ?? undefined,
+      messagePolicyVersion: claim.step.messagePolicyVersion!,
+      campaignKey: claim.step.campaignKey!,
+      variantKey: claim.step.variantKey!,
+      evidenceJson: claim.step.evidenceJson!,
+      validationStatus: "PASSED",
     };
   } else {
   try {
@@ -3660,6 +3690,21 @@ async function sendScheduledStep(
     throw new AutomationRetryableSendError("generation_failed_retryable");
   }
   } // close else block for pre-generated email check
+
+  const generationModel = hasPregeneratedEmail
+    ? claim.step.generationModel || "deepseek-chat-pregen"
+    : "deepseek-chat";
+
+  // Persist the copy and its provenance before any network send. A crash can
+  // then resume only a message that passed the current evidence policy; legacy
+  // or untracked cached copy is deliberately regenerated above.
+  await prisma.outreachSequenceStep.update({
+    where: { id: claim.step.id },
+    data: {
+      ...generatedMessageStepData(email),
+      generationModel,
+    },
+  });
 
   // Persist generated content in the task queue so a crashed worker
   // doesn't lose the generation work. The next tick can resume from here.
@@ -3821,10 +3866,8 @@ async function sendScheduledStep(
       sentAt,
       gmailMessageId: sendResult.messageId,
       gmailThreadId: sendResult.threadId || context.previousStep?.gmailThreadId || null,
-      subject: email.subject,
-      bodyHtml: email.bodyHtml,
-      bodyPlain: email.bodyPlain,
-      generationModel: "deepseek-chat",
+      ...generatedMessageStepData(email),
+      generationModel,
       claimedByRunId: runId,
     },
   });
@@ -3838,6 +3881,12 @@ async function sendScheduledStep(
       mailboxId: claim.mailbox.id,
       stepNumber: claim.step.stepNumber,
       stepType: claim.step.stepType,
+      messagePolicyVersion: email.messagePolicyVersion,
+      campaignKey: email.campaignKey,
+      variantKey: email.variantKey,
+      observedIssue: email.observed_issue,
+      ctaType: email.CTA_type,
+      confidenceScore: email.confidence_score,
     },
     occurredAt: sentAt,
     outreachEmailId: deliveryId,

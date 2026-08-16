@@ -275,6 +275,14 @@ export type OutreachSequenceStepRecord = {
   bodyHtml: string | null;
   bodyPlain: string | null;
   generationModel: string | null;
+  messagePolicyVersion: string | null;
+  campaignKey: string | null;
+  variantKey: string | null;
+  evidenceJson: string | null;
+  observedIssue: string | null;
+  ctaType: string | null;
+  confidenceScore: number | null;
+  validationStatus: string | null;
   errorMessage: string | null;
   attemptCount: number;
   createdAt: Date;
@@ -869,6 +877,14 @@ const outreachSequenceStepTable: TableSpec<OutreachSequenceStepRecord> = {
     "bodyHtml",
     "bodyPlain",
     "generationModel",
+    "messagePolicyVersion",
+    "campaignKey",
+    "variantKey",
+    "evidenceJson",
+    "observedIssue",
+    "ctaType",
+    "confidenceScore",
+    "validationStatus",
     "errorMessage",
     "attemptCount",
     "createdAt",
@@ -876,7 +892,7 @@ const outreachSequenceStepTable: TableSpec<OutreachSequenceStepRecord> = {
   ],
   dateFields: new Set(["scheduledFor", "claimedAt", "sentAt", "createdAt", "updatedAt"]),
   idField: "id",
-  integerFields: new Set(["stepNumber", "attemptCount"]),
+  integerFields: new Set(["stepNumber", "attemptCount", "confidenceScore"]),
   stringFields: new Set([
     "id",
     "sequenceId",
@@ -889,6 +905,13 @@ const outreachSequenceStepTable: TableSpec<OutreachSequenceStepRecord> = {
     "bodyHtml",
     "bodyPlain",
     "generationModel",
+    "messagePolicyVersion",
+    "campaignKey",
+    "variantKey",
+    "evidenceJson",
+    "observedIssue",
+    "ctaType",
+    "validationStatus",
     "errorMessage",
   ]),
   tableName: "OutreachSequenceStep",

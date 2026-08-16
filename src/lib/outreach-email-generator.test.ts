@@ -1,7 +1,16 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
 
-import { buildFollowUpContextForTesting, buildInitialEmailForTesting } from "./outreach-email-generator";
+import {
+  buildFollowUpContextForTesting,
+  buildInitialEmailForTesting,
+  buildMessageEvidenceForTesting,
+  buildMessageExperimentForTesting,
+  CAMPAIGN_KEY,
+  hasReliableOutreachEvidenceForTesting,
+  MESSAGE_POLICY_VERSION,
+  validateEvidenceBoundCopy,
+} from "./outreach-email-generator";
 import type { EnrichmentResult } from "./outreach-enrichment";
 import type { LeadRecord } from "./prisma";
 
@@ -214,4 +223,65 @@ test("business names with ampersand restore every word's casing", () => {
   const email = buildInitialEmailForTesting(lead, enrichment, "Aidan");
   assert.match(email.subject, /Drain & Inspection/);
   assert(!/inspection(?!\w)/.test(email.subject.replace(/Inspection/g, "")));
+});
+
+test("evidence policy rejects unsupported revenue, visitor, competitor, and timeline claims", () => {
+  const rejected = [
+    "This is costing you same-day calls.",
+    "Visitors go to the next result.",
+    "We will increase booked jobs.",
+    "Most of your competitors already have this.",
+    "We can fix it within two weeks.",
+  ];
+
+  for (const copy of rejected) {
+    assert.equal(validateEvidenceBoundCopy(copy).valid, false, copy);
+  }
+
+  assert.equal(
+    validateEvidenceBoundCopy("The contact option is hard to find, which can add friction for a visitor on a phone.").valid,
+    true,
+  );
+});
+
+test("message evidence and experiment assignment are deterministic and auditable", () => {
+  const lead = makeLead();
+  const firstAssignment = buildMessageExperimentForTesting(lead);
+  const repeatedAssignment = buildMessageExperimentForTesting(lead);
+  const evidence = buildMessageEvidenceForTesting(lead, enrichment);
+  const email = buildInitialEmailForTesting(lead, enrichment, "Aidan");
+
+  assert.deepEqual(firstAssignment, repeatedAssignment);
+  assert.equal(firstAssignment.campaignKey, CAMPAIGN_KEY);
+  assert.equal(firstAssignment.policyVersion, MESSAGE_POLICY_VERSION);
+  assert.match(firstAssignment.variantKey, /^initial__opener_[a-f]__cta_/);
+  assert(evidence.items.some((item) => item.source === "website_assessment" && item.field === "top_fix_1"));
+  assert.equal(email.messagePolicyVersion, MESSAGE_POLICY_VERSION);
+  assert.equal(email.campaignKey, CAMPAIGN_KEY);
+  assert.equal(email.variantKey, firstAssignment.variantKey);
+  assert.equal(email.validationStatus, "PASSED");
+  assert.doesNotThrow(() => JSON.parse(email.evidenceJson));
+});
+
+test("generic enrichment alone is not enough to authorize outreach copy", () => {
+  const weakLead = {
+    ...makeLead(),
+    painSignals: null,
+    axiomWebsiteAssessment: JSON.stringify({
+      overallGrade: "B",
+      speedRisk: 2,
+      conversionRisk: 2,
+      trustRisk: 2,
+      seoRisk: 2,
+      topFixes: ["Keep the main offer and next step easy to scan"],
+    }),
+  } satisfies LeadRecord;
+  const missingWebsiteLead = {
+    ...weakLead,
+    websiteStatus: "MISSING",
+    websiteUrl: null,
+  } satisfies LeadRecord;
+
+  assert.equal(hasReliableOutreachEvidenceForTesting(buildMessageEvidenceForTesting(weakLead, enrichment)), false);
+  assert.equal(hasReliableOutreachEvidenceForTesting(buildMessageEvidenceForTesting(missingWebsiteLead, enrichment)), true);
 });
