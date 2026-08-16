@@ -5,6 +5,7 @@ import openNextWorkerModule, {
 } from "./.open-next/worker.js";
 
 import { setCloudflareBindings } from "./src/lib/cloudflare";
+import { getCronTimeoutBudgets } from "./src/lib/cron-timeouts";
 import { clearServerEnvCache } from "./src/lib/env";
 
 const worker = openNextWorkerModule;
@@ -40,7 +41,12 @@ async function dispatchInternalTask(env, task, options = {}) {
   });
 
   try {
-    const fetchPromise = fetch(url, {
+    const service = env.WORKER_SELF_REFERENCE;
+    if (!service || typeof service.fetch !== "function") {
+      console.warn(`[cron:${task}] WORKER_SELF_REFERENCE not configured; cannot dispatch internal task`);
+      return;
+    }
+    const fetchPromise = service.fetch(url, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
@@ -64,12 +70,15 @@ async function runCronTasks(env) {
   const now = new Date();
   const minuteOfHour = now.getUTCMinutes();
   const tasks = ["scheduler", "pipeline"];
+  const timeoutBudgets = getCronTimeoutBudgets(env);
 
   const slot = minuteOfHour % 15;
   if (slot === 0) tasks.push("intake");
   else if (slot === 5) tasks.push("scrape");
   // Dispatch in parallel — each is its own fetch invocation with its own CPU.
-  await Promise.allSettled(tasks.map((task) => dispatchInternalTask(env, task)));
+  await Promise.allSettled(
+    tasks.map((task) => dispatchInternalTask(env, task, { timeoutMs: timeoutBudgets[task] })),
+  );
 }
 
 const exportedWorker = {

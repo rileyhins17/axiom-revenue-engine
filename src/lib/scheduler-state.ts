@@ -28,6 +28,7 @@ export type AutomationBlockerReason =
   | "awaiting_follow_up_window"
   | "generation_failed_retryable"
   | "send_failed_retryable"
+  | "delivery_state_unknown"
   | "below_send_min_score"
   | "blocked_segment"
   | "blocked_email_domain"
@@ -56,6 +57,7 @@ export const AUTOMATION_BLOCKER_REASONS = [
   "awaiting_follow_up_window",
   "generation_failed_retryable",
   "send_failed_retryable",
+  "delivery_state_unknown",
   "below_send_min_score",
   "blocked_segment",
   "blocked_email_domain",
@@ -91,6 +93,7 @@ export const BLOCKER_PRECEDENCE: AutomationBlockerReason[] = [
   "awaiting_follow_up_window",
   "generation_failed_retryable",
   "send_failed_retryable",
+  "delivery_state_unknown",
   "below_send_min_score",
   "blocked_segment",
   "blocked_email_domain",
@@ -156,6 +159,7 @@ export const OPERATOR_ACTIONABLE_BLOCKER_REASONS = new Set<AutomationBlockerReas
   "emergency_stop",
   "mailbox_disconnected",
   "mailbox_disabled",
+  "delivery_state_unknown",
 ]);
 
 export function isRecoverableSchedulerBlockerReason(value: string | null | undefined) {
@@ -273,6 +277,8 @@ export function getBlockerMeta(reason: AutomationBlockerReason) {
       return { label: "Email generation needs retry", detail: "The last email draft failed validation and is waiting for retry or manual review." };
     case "send_failed_retryable":
       return { label: "Send failed, retry queued", detail: "A transient send failure occurred and the step was rescheduled." };
+    case "delivery_state_unknown":
+      return { label: "Delivery needs review", detail: "Gmail may have accepted this message, so automation paused instead of risking a duplicate send." };
     case "below_send_min_score":
       return { label: "Below adequate score", detail: "This lead is below the adequate-lead threshold for automated email." };
     case "blocked_segment":

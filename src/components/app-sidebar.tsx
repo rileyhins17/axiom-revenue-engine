@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Activity, Building2, CheckCircle2, Database, Radio } from "lucide-react";
+import { Activity, CheckCircle2, Database, Radio, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -33,10 +33,17 @@ export function AppSidebar() {
   const [stats, setStats] = React.useState<LeadStats | null>(null);
 
   React.useEffect(() => {
+    let requestInFlight = false;
+    let disposed = false;
+
     const fetchStats = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
       try {
         const response = await fetch("/api/leads/stats");
+        if (!response.ok) throw new Error("stats_request_failed");
         const data = await response.json();
+        if (disposed) return;
         setStats({
           total: data.total ?? 0,
           todayLeads: data.todayLeads ?? 0,
@@ -45,7 +52,9 @@ export function AppSidebar() {
           replied: data.replied,
         });
       } catch {
-        setStats({ total: 0, todayLeads: 0 });
+        if (!disposed) setStats((current) => current ?? { total: 0, todayLeads: 0 });
+      } finally {
+        requestInFlight = false;
       }
     };
 
@@ -56,27 +65,31 @@ export function AppSidebar() {
 
     const interval = setInterval(fetchStats, 30_000);
 
-    return () => clearInterval(interval);
+    return () => {
+      disposed = true;
+      clearInterval(interval);
+    };
   }, []);
 
   return (
     <Sidebar className="v2-sidebar">
-      <SidebarHeader className="border-b border-white/[0.08] px-4 py-4">
-        <Link href="/dashboard" className="flex items-center gap-3">
+      <SidebarHeader className="border-b border-white/[0.08] px-4 py-5">
+        <Link href="/dashboard" className="flex items-center justify-between gap-3">
           <BrandMark
-            className="h-10 justify-start border-0 bg-transparent p-0"
-            imageClassName="h-9"
+            className="h-8 w-[130px] justify-start border-0 bg-transparent p-0"
+            imageClassName="h-7"
             priority
             showBorder={false}
           />
+          <span className="rounded-md border border-white/[0.08] bg-white/[0.035] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-zinc-500">Ops</span>
         </Link>
       </SidebarHeader>
 
       <SidebarContent className="px-3 py-4">
         <SidebarGroup>
           <div className="mb-2.5 flex items-center justify-between px-3">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-              Workspace
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-600">
+              Pipeline
             </span>
             <span className="text-[10px] font-mono text-zinc-600">⌘K</span>
           </div>
@@ -97,7 +110,7 @@ export function AppSidebar() {
                         aria-current={isActive ? "page" : undefined}
                         title={`${item.title} — ${item.description} (${item.shortcut})`}
                         className={cn(
-                          "v2-nav-item v2-focus-ring group flex items-center gap-3 px-3 py-2.5 text-sm",
+                          "v2-nav-item v2-focus-ring group flex min-h-14 items-center gap-3 px-3 py-2.5 text-sm",
                           isActive ? "text-emerald-100" : "text-zinc-400 hover:text-white",
                         )}
                       >
@@ -108,7 +121,10 @@ export function AppSidebar() {
                           )}
                           aria-hidden="true"
                         />
-                        <span className="min-w-0 flex-1 truncate font-medium">{item.title}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{item.title}</span>
+                          <span className="mt-0.5 block truncate text-[10.5px] font-normal text-zinc-600 group-hover:text-zinc-500">{item.description}</span>
+                        </span>
                         {badgeValue > 0 ? (
                           <span
                             aria-label={`${badgeValue} ${item.title} items`}
@@ -122,9 +138,6 @@ export function AppSidebar() {
                             {badgeValue > 99 ? "99+" : badgeValue}
                           </span>
                         ) : null}
-                        <span aria-hidden="true" className="font-mono text-[10px] text-zinc-600 group-hover:text-zinc-500">
-                          {item.shortcut}
-                        </span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -136,15 +149,15 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-white/[0.08] p-3">
-        <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.025] to-black/30">
+        <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-black/20">
           <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2.5">
             <div className="flex items-center gap-2">
               <div className="grid size-7 place-items-center rounded-md border border-emerald-400/25 bg-emerald-400/10">
-                <Building2 className="size-3.5 text-emerald-300" />
+                <Workflow className="size-3.5 text-emerald-300" />
               </div>
               <div className="leading-tight">
-                <div className="text-[9.5px] uppercase tracking-[0.18em] text-zinc-500">Workspace</div>
-                <div className="text-xs font-semibold text-zinc-100">Axiom Sales CA</div>
+                <div className="text-[9.5px] uppercase tracking-[0.18em] text-zinc-600">Workspace</div>
+                <div className="text-xs font-semibold text-zinc-100">Revenue operations</div>
               </div>
             </div>
             <span className="font-mono text-[10px] text-zinc-600">prod</span>

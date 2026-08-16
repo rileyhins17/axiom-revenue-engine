@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, LogOutIcon, Settings, UserIcon } from "lucide-react";
+import { CircleUserRound, LogOutIcon, Radio, Settings, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -11,6 +11,7 @@ import { LayoutBreadcrumb } from "@/components/layout-breadcrumb";
 import { SearchTrigger } from "@/components/system/search-trigger";
 import { HotkeyProvider } from "@/components/system/hotkey-provider";
 import { APP_NAV_ITEMS } from "@/lib/navigation";
+import { isPublicPath } from "@/lib/public-paths";
 import { cn } from "@/lib/utils";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar } from "@/components/ui/avatar";
@@ -24,8 +25,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-const PUBLIC_PATH_PREFIXES = ["/sign-in", "/sign-up", "/offline", "/install"];
-
 type ShellSession = {
   user?: {
     name?: string | null;
@@ -34,10 +33,6 @@ type ShellSession = {
     role?: string | null;
   } | null;
 } | null;
-
-function isPublicPath(pathname: string) {
-  return PUBLIC_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -53,11 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (isPublicPath(pathname)) {
-    return (
-      <main className="min-h-screen bg-background">
-        <div className="p-6 sm:p-8">{children}</div>
-      </main>
-    );
+    return <div className="min-h-screen bg-background">{children}</div>;
   }
 
   // Display name is derived from the live session email (local part,
@@ -85,21 +76,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <AppSidebar />
       <main id="main-content" className="flex min-h-screen w-full flex-1 flex-col bg-background">
         <header className="v2-header sticky top-0 z-40">
-          <div className="flex h-[64px] items-center gap-3 px-4 md:px-6">
+          <div className="flex h-[68px] items-center gap-3 px-4 md:px-7">
             <SidebarTrigger className="v2-focus-ring rounded-md text-zinc-400 transition-colors hover:text-white" />
-            <div className="hidden h-5 w-px bg-white/[0.08] md:block" />
+            <div className="hidden h-6 w-px bg-white/[0.08] md:block" />
             <div className="min-w-0 flex-1">
               <LayoutBreadcrumb />
             </div>
             <SearchTrigger />
-            <div className="hidden items-center gap-2 md:flex">
+            <div className="hidden items-center gap-2 lg:flex">
+              <div className="flex h-9 items-center gap-2 rounded-lg border border-white/[0.08] bg-black/20 px-3 text-[11px] font-medium text-zinc-400">
+                <Radio className="size-3.5 text-emerald-300" aria-hidden="true" />
+                Live sync
+              </div>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     aria-label="Open settings"
                     onClick={() => router.push("/settings")}
-                    className="v2-focus-ring relative flex size-9 items-center justify-center rounded-lg border border-white/[0.09] bg-white/[0.025] text-zinc-400 transition-all hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white cursor-pointer"
+                    className="v2-focus-ring relative flex size-9 cursor-pointer items-center justify-center rounded-lg border border-white/[0.09] bg-black/20 text-zinc-400 transition-colors hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white"
                   >
                     <Settings className="size-4" aria-hidden="true" />
                   </button>
@@ -111,9 +106,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="hidden items-center gap-3 pl-2 lg:flex cursor-pointer rounded-lg p-1.5 -m-1.5 transition-colors hover:bg-white/[0.04] outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50"
+                  aria-label="Open account menu"
+                  className="v2-focus-ring flex size-9 cursor-pointer items-center justify-center rounded-lg outline-none transition-colors hover:bg-white/[0.05] lg:h-auto lg:w-auto lg:gap-3 lg:px-2 lg:py-1.5"
                 >
-                  <div className="text-right leading-tight">
+                  <div className="hidden text-right leading-tight lg:block">
                     <div className="text-xs font-semibold text-white">
                       {loading ? "Loading…" : displayName || sessionEmail || "User"}
                     </div>
@@ -121,7 +117,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       {sessionEmail || "—"}
                     </div>
                   </div>
-                  <div className="relative">
+                  <div className="relative hidden sm:block">
                     <Avatar
                       src={session?.user?.image}
                       fallback={initials}
@@ -129,6 +125,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     />
                     <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-[#06101a] bg-emerald-400" />
                   </div>
+                  <CircleUserRound className="size-5 text-zinc-400 sm:hidden" aria-hidden="true" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -164,26 +161,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <HotkeyProvider>
-          <div className="flex-1 px-3 py-4 pb-28 sm:px-4 sm:py-6 md:px-7 md:py-7">{children}</div>
+          <div className="flex-1 px-3 py-4 pb-28 sm:px-5 sm:py-6 md:px-8 md:py-8">{children}</div>
         </HotkeyProvider>
 
         <MobileTabBar pathname={pathname} />
-
-        <footer className="v2-footer sticky bottom-0 z-30 hidden px-4 py-2.5 md:block md:px-7">
-          <div className="flex flex-col gap-2 text-[11px] text-zinc-500 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-2">
-              <span className="v2-dot text-emerald-400" />
-              <span className="font-medium uppercase tracking-[0.14em] text-zinc-400">Status</span>
-              <span className="text-emerald-300">Autonomous · cron every 5m</span>
-            </div>
-            <div className="flex items-center gap-5 font-mono text-[10.5px] tabular-nums text-zinc-500">
-              <span className="hidden md:inline-flex items-center gap-1.5">
-                <CheckCircle2 className="size-3 text-emerald-400" />
-                v3.0 · autonomous
-              </span>
-            </div>
-          </div>
-        </footer>
       </main>
     </SidebarProvider>
   );
@@ -193,7 +174,7 @@ function MobileTabBar({ pathname }: { pathname: string | null }) {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-white/[0.08] bg-[#06101a]/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 backdrop-blur-xl md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-white/[0.08] bg-[#0b0d10]/96 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 backdrop-blur-xl md:hidden"
     >
       <div className="grid grid-cols-5 gap-1">
         {APP_NAV_ITEMS.map((item) => {

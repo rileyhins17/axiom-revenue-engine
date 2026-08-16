@@ -8,7 +8,7 @@
     "build:next": "next build --webpack",
     "build:cloudflare": "opennextjs-cloudflare build",
     "preview": "npm run build:cloudflare && wrangler dev",
-    "deploy": "wrangler deploy --experimental-autoconfig false",
+    "deploy": "wrangler deploy --autoconfig false",
     "worker": "tsx scripts/local-scrape-worker.ts",
     "worker:local": "tsx scripts/local-scrape-worker.ts",
     "test": "tsx --test \"src/**/*.test.ts\"",
@@ -23,12 +23,12 @@
   },
   "dependencies": {
     "@cloudflare/playwright": "^1.1.2",
-    "better-auth": "^1.6.11",
+    "better-auth": "1.6.29",
     "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
-    "next": "16.2.6",
+    "next": "16.3.1",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -36,26 +36,27 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.19.11",
+    "@opennextjs/cloudflare": "1.20.2",
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.3.1",
     "patch-package": "^8.0.1",
-    "playwright": "^1.58.2",
+    "playwright": "1.62.1",
     "tailwindcss": "^4",
-    "tsx": "^4.19.3",
+    "tsx": "4.23.12",
     "tw-animate-css": "^1.4.0",
     "typescript": "^5",
-    "wrangler": "4.94.0"
+    "wrangler": "4.123.0"
   },
   "overrides": {
     "next": {
-      "postcss": "8.5.15"
+      "postcss": "8.5.26"
     },
+    "nanoid": "3.3.18",
     "qs": "6.15.2"
   }
 }

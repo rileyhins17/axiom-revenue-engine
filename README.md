@@ -33,6 +33,12 @@ Autonomous outreach should only send to qualified recipients:
 
 The dashboard and automation queue show projected effective send times based on mailbox cooldown and capacity. They should not show stale scheduled dates as if they were live next-send times.
 
+## Operator interface
+
+The Ops 04 interface is built for dense, repeated operational work: calm graphite surfaces, one mint status accent, shared page headers, compact metrics, keyboard search, responsive mobile navigation, and reduced-motion support. Authentication, Vault, Clients, Automation, and Settings use the same visual hierarchy and error language.
+
+The interface is deliberately restrained. Status colour communicates meaning; decorative animation does not compete with queue health, send safety, replies, or revenue signals.
+
 ## Local Setup
 
 ```bash
@@ -114,7 +120,7 @@ npm test
 npm run typecheck
 npm run lint
 npm run build:cloudflare
-npx wrangler deploy --dry-run
+npx wrangler deploy --dry-run --autoconfig false
 npm audit --omit=dev
 ```
 

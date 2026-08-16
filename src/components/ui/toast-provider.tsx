@@ -49,12 +49,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         <ToastContext.Provider value={{ toast: addToast }}>
             {children}
             {/* Toast container */}
-            <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 pointer-events-none">
+            <div
+                aria-atomic="false"
+                aria-live="polite"
+                className="pointer-events-none fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-4 right-4 z-[200] flex flex-col gap-2 md:bottom-6 md:left-auto md:right-6"
+            >
                 {toasts.map((t) => {
                     const IconComp = t.icon ? ICON_MAP[t.icon] : Check;
                     return (
                         <div
                             key={t.id}
+                            role={t.type === "error" || t.type === "warning" ? "alert" : "status"}
                             className={cn(
                                 "pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl glass-ultra border shadow-2xl",
                                 "animate-slide-up text-sm font-medium",

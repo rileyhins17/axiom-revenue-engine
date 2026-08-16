@@ -15,10 +15,13 @@ type ReactivateResult = {
 export function MailboxReactivateButton({ mailboxId, gmailAddress }: { mailboxId: string; gmailAddress: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [requestPending, setRequestPending] = useState(false);
   const [result, setResult] = useState<ReactivateResult | null>(null);
 
   async function onClick() {
+    if (requestPending) return;
     setResult(null);
+    setRequestPending(true);
     try {
       const res = await fetch(`/api/outreach/automation/mailboxes/${mailboxId}/reactivate`, {
         method: "POST",
@@ -30,18 +33,22 @@ export function MailboxReactivateButton({ mailboxId, gmailAddress }: { mailboxId
       }
     } catch (error) {
       setResult({ ok: false, error: error instanceof Error ? error.message : "Request failed" });
+    } finally {
+      setRequestPending(false);
     }
   }
+
+  const isPending = requestPending || pending;
 
   return (
     <div>
       <button
         type="button"
         onClick={onClick}
-        disabled={pending}
+        disabled={isPending}
         className="inline-flex items-center gap-1.5 rounded-md border border-emerald-400/30 bg-emerald-500/[0.08] px-2.5 py-1 text-[11px] font-medium text-emerald-200 transition hover:bg-emerald-500/[0.16] disabled:opacity-50"
       >
-        {pending ? <RefreshCw className="size-3 animate-spin" /> : <Power className="size-3" />}
+        {isPending ? <RefreshCw className="size-3 animate-spin" /> : <Power className="size-3" />}
         Reactivate inbox
       </button>
       {result ? (

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
+  Bot,
   CheckCircle2,
   Clock3,
   Database,
@@ -19,6 +20,7 @@ import { useRouter } from "next/navigation";
 
 import { MailboxReactivateButton } from "@/components/mailbox-reactivate-button";
 import { SentEmailViewerTrigger } from "@/components/sent-email-viewer";
+import { PageHeader } from "@/components/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AutomationOperatorConsoleData, OperatorMailbox, OperatorNextEmail, OperatorRecentEmail } from "@/lib/automation-operator-view";
 
@@ -53,55 +55,44 @@ export function AutomationConsole({ data }: Props) {
 
   useEffect(() => {
     const refreshInterval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
+      if (document.visibilityState === "visible" && !refreshing) {
         startRefresh(() => router.refresh());
       }
     }, 30_000);
     return () => window.clearInterval(refreshInterval);
-  }, [router, startRefresh]);
+  }, [refreshing, router, startRefresh]);
 
   return (
     <div className="mx-auto flex w-full max-w-[1540px] flex-col gap-5">
-      <section className={`overflow-hidden rounded-lg border ${statusFrame(data.status.tone)}`}>
-        <div className="border-b border-white/[0.06] bg-white/[0.018] px-4 py-4 sm:px-5 lg:px-6 lg:py-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusPill tone={data.status.tone} label={data.status.label} />
-                <span className="v2-pill">
-                  <Clock3 className="size-3.5" />
-                  Updated {formatTime(generatedAt)}
-                </span>
-              </div>
-              <h1 className="mt-4 text-[28px] font-semibold leading-tight tracking-normal text-white sm:text-[34px] lg:text-[40px]">
-                Automation
-              </h1>
-              <p className="mt-2 max-w-4xl text-[17px] leading-7 text-zinc-200 sm:text-[19px]">
-                {data.status.sentence}
-              </p>
-            </div>
-
-            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-row xl:justify-end">
-              <button
-                type="button"
-                onClick={refresh}
-                disabled={refreshing}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-white/[0.1] bg-white/[0.035] px-4 text-sm font-semibold text-zinc-200 transition hover:border-white/[0.18] hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <RefreshCcw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
-                Refresh
-              </button>
-            </div>
+      <PageHeader
+        eyebrow="Autonomous execution"
+        title="Automation"
+        description={data.status.sentence}
+        icon={Bot}
+        status={
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill tone={data.status.tone} label={data.status.label} />
+            <span className="v2-pill"><Clock3 className="size-3.5" />Updated {formatTime(generatedAt)}</span>
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-px bg-white/[0.06] xl:grid-cols-4">
-          <MetricTile label="Sent today" value={String(data.metrics.sentToday)} detail="Across active inboxes" />
-          <MetricTile label="Left today" value={String(data.metrics.leftToday)} detail="Before daily caps" />
-          <MetricTile label="Next send" value={formatDue(data.metrics.nextSendAt, now)} detail={formatDateTime(data.metrics.nextSendAt)} />
-          <MetricTile label="Inboxes ready" value={`${data.metrics.inboxesReady}/${data.metrics.inboxesTotal}`} detail={readyDetail(data.mailboxes)} />
-        </div>
-      </section>
+        }
+        actions={
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={refreshing}
+            className="v2-btn-ghost v2-focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCcw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        }
+        metrics={[
+          { label: "Sent today", value: data.metrics.sentToday, detail: "across inboxes", tone: "positive" },
+          { label: "Capacity left", value: data.metrics.leftToday, detail: "before daily caps" },
+          { label: "Next send", value: formatDue(data.metrics.nextSendAt, now), detail: formatDateTime(data.metrics.nextSendAt), tone: "info" },
+          { label: "Inboxes ready", value: `${data.metrics.inboxesReady}/${data.metrics.inboxesTotal}`, detail: readyDetail(data.mailboxes) },
+        ]}
+      />
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabValue)} className="gap-5">
         <div className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
@@ -476,16 +467,6 @@ function Panel({
   );
 }
 
-function MetricTile({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="min-h-[92px] bg-[#0a111c]/72 p-3 sm:min-h-[104px] sm:p-5">
-      <div className="text-xs font-medium uppercase tracking-normal text-zinc-500">{label}</div>
-      <div className="mt-2 truncate text-[24px] font-semibold leading-none tracking-normal text-white sm:mt-3 sm:text-[28px]">{value}</div>
-      <div className="mt-2 min-h-5 truncate text-xs text-zinc-400 sm:text-sm">{detail}</div>
-    </div>
-  );
-}
-
 function StatusPill({ tone, label }: { tone: string; label: string }) {
   const className =
     tone === "running"
@@ -520,13 +501,6 @@ function EmptyMessage({ title, detail }: { title: string; detail: string }) {
       <div className="mt-1 text-sm text-zinc-500">{detail}</div>
     </div>
   );
-}
-
-function statusFrame(tone: string) {
-  if (tone === "running") return "border-emerald-400/18 bg-emerald-400/[0.035]";
-  if (tone === "action") return "border-amber-400/22 bg-amber-400/[0.035]";
-  if (tone === "stopped") return "border-red-400/22 bg-red-500/[0.035]";
-  return "border-white/[0.08] bg-[#0a111c]/84";
 }
 
 function readyDetail(mailboxes: OperatorMailbox[]) {

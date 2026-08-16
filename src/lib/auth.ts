@@ -132,11 +132,11 @@ export function getAuth() {
       }),
     },
     plugins: [
-      nextCookies(),
       admin({
         defaultRole: "user",
         adminRoles: ["admin"],
       }),
+      nextCookies(),
     ],
   });
 

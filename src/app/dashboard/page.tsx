@@ -662,21 +662,24 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-5">
-      <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
+    <div className="mx-auto flex max-w-[1500px] flex-col gap-6">
+      <header className="page-header-main border-b border-white/[0.08] pb-6">
+        <div className="page-header-icon" aria-hidden="true">
+          <Activity className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
           <span className="v2-eyebrow inline-flex items-center gap-2 text-[10px]">
             <span className="v2-dot text-emerald-400" />
-            Autonomous Pipeline · live
+            Operating now
           </span>
-          <h1 className="mt-2 text-[34px] font-semibold tracking-[-0.025em] text-white">Command center</h1>
+          <h1 className="page-header-title">Pipeline overview</h1>
           <p className="mt-1 text-sm text-zinc-400">
-            Live operating surface for intake, enrichment, sending, replies, and revenue movement.
+            The decisions, bottlenecks, and next actions that need an operator today.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="page-header-actions">
           <RefreshButton />
-          <div className="rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 py-1.5 text-right text-[11px] text-zinc-400">
+          <div className="rounded-lg border border-white/[0.08] bg-black/20 px-3 py-1.5 text-right text-[11px] text-zinc-400">
           <div className="font-medium text-zinc-200">
             {new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: BUSINESS_TZ }).format(new Date())}
           </div>

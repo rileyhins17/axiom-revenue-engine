@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/cloudflare";
-import { requireApiSession } from "@/lib/session";
+import { requireAdminApiSession, requireApiSession } from "@/lib/session";
 
 export async function POST(request: Request) {
   const authResult = await requireApiSession(request);
@@ -32,17 +32,20 @@ export async function POST(request: Request) {
   switch (body.action) {
     case "archive": {
       const placeholders = validIds.map(() => "?").join(",");
-      await db.prepare(
+      const result = await db.prepare(
         `UPDATE "Lead" SET "isArchived" = 1, "lastUpdated" = datetime('now') WHERE "id" IN (${placeholders})`,
       ).bind(...validIds).run();
-      return NextResponse.json({ archived: validIds.length });
+      return NextResponse.json({ archived: result.meta?.changes ?? 0 });
     }
     case "delete": {
+      const adminResult = await requireAdminApiSession(request);
+      if ("response" in adminResult) return adminResult.response;
+
       const placeholders = validIds.map(() => "?").join(",");
-      await db.prepare(
+      const result = await db.prepare(
         `DELETE FROM "Lead" WHERE "id" IN (${placeholders})`,
       ).bind(...validIds).run();
-      return NextResponse.json({ deleted: validIds.length });
+      return NextResponse.json({ deleted: result.meta?.changes ?? 0 });
     }
     default:
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });

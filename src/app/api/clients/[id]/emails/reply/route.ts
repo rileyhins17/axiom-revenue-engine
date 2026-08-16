@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { getErrorMessage } from "@/lib/errors";
+import { getDatabase } from "@/lib/cloudflare";
 import { getValidAccessToken, sendGmailReply } from "@/lib/gmail";
 import { getPrisma } from "@/lib/prisma";
+import { isAllowedReplyTarget } from "@/lib/reply-validation";
 import { requireApiSession } from "@/lib/session";
 
 function parseLeadId(value: string) {
@@ -64,6 +66,30 @@ export async function POST(
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead || lead.isArchived) {
     return NextResponse.json({ error: "Client not found" }, { status: 404 });
+  }
+
+  const threadRows = await getDatabase()
+    .prepare(
+      `SELECT "recipientEmail"
+       FROM "OutreachEmail"
+       WHERE "leadId" = ? AND "gmailThreadId" = ?
+       UNION ALL
+       SELECT lead."email" AS "recipientEmail"
+       FROM "OutreachSequenceStep" step
+       JOIN "OutreachSequence" sequence ON sequence."id" = step."sequenceId"
+       JOIN "Lead" lead ON lead."id" = sequence."leadId"
+       WHERE sequence."leadId" = ? AND step."gmailThreadId" = ?`,
+    )
+    .bind(leadId, threadId, leadId, threadId)
+    .all<{ recipientEmail: string | null }>();
+
+  const recordedRecipients = threadRows.results ?? [];
+  if (recordedRecipients.length === 0) {
+    return NextResponse.json({ error: "Email thread does not belong to this client" }, { status: 409 });
+  }
+
+  if (!isAllowedReplyTarget(to, lead.email, recordedRecipients.map((row) => row.recipientEmail))) {
+    return NextResponse.json({ error: "Reply recipient does not belong to this client thread" }, { status: 400 });
   }
 
   // Get Gmail connection
@@ -130,7 +156,7 @@ export async function POST(
         bodyPlain: plainText,
         gmailMessageId: result.messageId,
         gmailThreadId: result.threadId,
-        status: "SENT",
+        status: "sent",
         sentAt: new Date(),
       },
     });

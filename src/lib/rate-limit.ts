@@ -26,36 +26,20 @@ export async function consumeRateLimit(options: RateLimitOptions) {
   const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
   const key = `${options.scope}:${options.identifier}:${windowStart.toISOString()}`;
 
-  const existing = await prisma.rateLimitWindow.findUnique({
-    where: { key },
-  });
-
-  if (!existing) {
-    await prisma.rateLimitWindow.create({
+  // Create an empty window if this is the first request. Concurrent creators
+  // race on the unique key; the loser continues to the atomic increment.
+  await prisma.rateLimitWindow.create({
       data: {
         key,
         windowStart,
-        count: 1,
+        count: 0,
       },
-    });
+    })
+    .catch(() => null);
 
-    return {
-      allowed: true,
-      count: 1,
-      remaining: Math.max(options.limit - 1, 0),
-      resetAt: new Date(windowStart.getTime() + windowMs),
-    };
-  }
-
-  if (existing.count >= options.limit) {
-    return {
-      allowed: false,
-      count: existing.count,
-      remaining: 0,
-      resetAt: new Date(windowStart.getTime() + windowMs),
-    };
-  }
-
+  // SQLite applies `count = count + 1` atomically. The previous read-then-
+  // write flow allowed simultaneous requests to observe the same count and
+  // all pass the limit check.
   const updated = await prisma.rateLimitWindow.update({
     where: { key },
     data: {
@@ -66,7 +50,7 @@ export async function consumeRateLimit(options: RateLimitOptions) {
   });
 
   return {
-    allowed: true,
+    allowed: updated.count <= options.limit,
     count: updated.count,
     remaining: Math.max(options.limit - updated.count, 0),
     resetAt: new Date(windowStart.getTime() + windowMs),

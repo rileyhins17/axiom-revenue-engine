@@ -1,20 +1,7 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATH_PREFIXES = [
-  "/sign-in",
-  "/sign-up",
-  "/offline",
-  "/api/auth",
-  "/api/agent",
-  "/api/mcp",
-  "/_next",
-  "/favicon.ico",
-];
-
-function isPublicPath(pathname: string) {
-  return PUBLIC_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-}
+import { isPublicPath } from "@/lib/public-paths";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

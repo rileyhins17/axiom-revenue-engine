@@ -1,9 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { CheckCircle2, Mail, XCircle } from "lucide-react";
+import { CheckCircle2, Mail, Settings, XCircle } from "lucide-react";
 
 import { EmergencyControlCard } from "@/components/emergency-control-card";
+import { PageHeader } from "@/components/ui/page-header";
 
 type MailboxStatus = {
   email: string;
@@ -44,24 +45,19 @@ export function SettingsClient({
   mailboxes: MailboxStatus[];
   emergencyControl: EmergencyState;
 }) {
-  void userProfile;
-
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <header className="v2-card p-4 sm:p-5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="min-w-0">
-            <p className="v2-eyebrow">Settings</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-[-0.022em] text-white sm:text-[32px]">Settings</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-              Sender mailboxes and kill switches.
-            </p>
-          </div>
-          <div className="v2-pill max-w-full self-start">
-            Signed in as <span className="font-mono text-zinc-300">{runtimeStatus.currentUserEmail}</span>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="Workspace controls"
+        title="Settings"
+        description="Connect sending identities, review operating limits, and control autonomous work."
+        icon={Settings}
+        status={<span className="v2-pill"><span className="capitalize text-emerald-300">{userProfile.role ?? "user"}</span><span className="font-mono text-zinc-300">{runtimeStatus.currentUserEmail}</span></span>}
+        metrics={[
+          { label: "Daily send limit", value: runtimeStatus.globalDailySendCap, detail: "workspace total", tone: "info" },
+          { label: "Connected inboxes", value: mailboxes.filter((mailbox) => mailbox.connected).length, detail: `of ${mailboxes.length}`, tone: "positive" },
+        ]}
+      />
 
       <Panel>
         <SectionTitle

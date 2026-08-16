@@ -10,6 +10,7 @@ import {
   getStepType,
   haveAllSendableMailboxesClaimedThisTick,
   isExpectedReplySender,
+  isDefinitiveGmailRejection,
   isBounceNotificationMessage,
   orderDueStepsForClaiming,
   recoverStaleSchedulerRuns,
@@ -20,6 +21,12 @@ import {
   selectAutomationReadyLeads,
   withSchedulerTimeout,
 } from "./outreach-automation";
+
+test("Gmail rejection detection distinguishes explicit HTTP failures from ambiguous transport failures", () => {
+  assert.equal(isDefinitiveGmailRejection(new Error("Gmail send failed (429): quota exceeded")), true);
+  assert.equal(isDefinitiveGmailRejection(new Error("The operation was aborted")), false);
+  assert.equal(isDefinitiveGmailRejection(new Error("network connection reset")), false);
+});
 import {
   AUTONOMOUS_DAILY_LEAD_INTAKE_CAP,
   AUTONOMOUS_FOLLOW_UP_DAILY_SEND_CAP,

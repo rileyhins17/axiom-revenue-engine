@@ -31,6 +31,7 @@ test("scheduler only asks for operator attention on true manual blockers", () =>
     "emergency_stop",
     "mailbox_disconnected",
     "mailbox_disabled",
+    "delivery_state_unknown",
   ] as const) {
     assert.equal(isRecoverableSchedulerBlockerReason(reason), false, reason);
     assert.equal(isOperatorActionableBlockerReason(reason), true, reason);

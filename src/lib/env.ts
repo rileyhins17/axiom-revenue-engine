@@ -2,6 +2,41 @@ import { z } from "zod";
 
 import { getCloudflareBindings } from "@/lib/cloudflare";
 
+/**
+ * Parse boolean environment values without JavaScript's truthiness trap
+ * (`Boolean("false") === true`). Missing values remain undefined so the
+ * schema can apply its safe default; invalid values throw and stop startup
+ * rather than silently enabling autonomous work.
+ */
+export function parseEnvironmentBoolean(value: unknown): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "boolean") return value;
+  if (value === 1 || value === "1") return true;
+  if (value === 0 || value === "0") return false;
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "on") return true;
+    if (normalized === "false" || normalized === "off") return false;
+  }
+
+  throw new Error(`Invalid boolean environment value: ${String(value)}`);
+}
+
+function environmentBoolean(defaultValue: boolean) {
+  return z.preprocess((value, context) => {
+    try {
+      return parseEnvironmentBoolean(value);
+    } catch (error) {
+      context.addIssue({
+        code: "custom",
+        message: error instanceof Error ? error.message : "Invalid boolean environment value",
+      });
+      return z.NEVER;
+    }
+  }, z.boolean().default(defaultValue));
+}
+
 const envSchema = z.object({
   APP_BASE_URL: z.string().url().default("http://localhost:3000"),
   AUTH_ALLOWED_EMAILS: z.string().default(""),
@@ -28,9 +63,9 @@ const envSchema = z.object({
   WORKER_HEARTBEAT_STALE_MS: z.coerce.number().int().positive().default(60000),
   // Master kill switches for autonomous operation. Default safe: intake +
   // queue on, sends OFF until lead quality is trusted.
-  AUTONOMOUS_INTAKE_ENABLED: z.coerce.boolean().default(true),
-  AUTONOMOUS_QUEUE_ENABLED: z.coerce.boolean().default(true),
-  AUTONOMOUS_SEND_ENABLED: z.coerce.boolean().default(false),
+  AUTONOMOUS_INTAKE_ENABLED: environmentBoolean(true),
+  AUTONOMOUS_QUEUE_ENABLED: environmentBoolean(true),
+  AUTONOMOUS_SEND_ENABLED: environmentBoolean(false),
   AUTONOMOUS_DAILY_LEAD_INTAKE_CAP: z.coerce.number().int().positive().default(50),
   AUTONOMOUS_MAX_SENDS_PER_DAY: z.coerce.number().int().nonnegative().default(80),
   AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY: z.coerce.number().int().nonnegative().default(20),

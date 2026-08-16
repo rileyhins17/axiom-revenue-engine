@@ -12,10 +12,10 @@ export function LayoutBreadcrumb() {
   if (pathname?.match(/^\/lead\/\d+/)) {
     return (
       <div className="flex items-center gap-2.5 text-sm">
-        <div className="grid size-7 place-items-center rounded-md border border-emerald-400/25 bg-emerald-400/10">
+        <div className="grid size-8 place-items-center rounded-lg border border-white/[0.09] bg-white/[0.035]">
           <MessageSquareText className="size-3.5 text-emerald-300" />
         </div>
-        <span className="font-semibold text-white tracking-tight">Lead Dossier</span>
+        <span className="font-semibold tracking-tight text-white">Lead dossier</span>
         <span className="text-zinc-700">›</span>
         <span className="flex items-center gap-1.5 text-zinc-400">
           <User className="size-3.5" />
@@ -28,13 +28,13 @@ export function LayoutBreadcrumb() {
   if (route) {
     const Icon = route.icon;
     return (
-      <div className="flex min-w-0 items-center gap-2.5 text-sm">
-        <div className="grid size-7 shrink-0 place-items-center rounded-md border border-emerald-400/25 bg-emerald-400/10">
-          <Icon className="size-3.5 text-emerald-300" />
+      <div className="flex min-w-0 items-center gap-3 text-sm">
+        <div className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/[0.09] bg-white/[0.035]">
+          <Icon className="size-3.5 text-zinc-300" />
         </div>
         <div className="flex min-w-0 items-baseline gap-2.5">
-          <span className="truncate font-semibold text-white tracking-tight">{route.label}</span>
-          <span className="hidden truncate text-[12px] text-zinc-500 md:inline">{route.description}</span>
+          <span className="truncate font-semibold tracking-tight text-white">{route.label}</span>
+          <span className="hidden truncate text-[11px] text-zinc-600 md:inline">/ {route.description}</span>
         </div>
       </div>
     );

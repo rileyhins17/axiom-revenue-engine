@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/cloudflare";
-import { requireApiSession } from "@/lib/session";
+import { requireAdminApiSession } from "@/lib/session";
 
 export async function POST(request: Request) {
-  const authResult = await requireApiSession(request);
+  const authResult = await requireAdminApiSession(request);
   if ("response" in authResult) return authResult.response;
 
   const db = getDatabase();

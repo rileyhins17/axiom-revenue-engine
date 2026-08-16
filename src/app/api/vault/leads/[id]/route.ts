@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/cloudflare";
-import { requireApiSession } from "@/lib/session";
+import { requireAdminApiSession, requireApiSession } from "@/lib/session";
 
 const EDITABLE_FIELDS = new Set([
   "businessName",
@@ -55,7 +55,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authResult = await requireApiSession(request);
+  const authResult = await requireAdminApiSession(request);
   if ("response" in authResult) return authResult.response;
 
   const { id: rawId } = await params;

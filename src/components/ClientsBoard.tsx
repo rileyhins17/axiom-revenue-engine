@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   Building2,
@@ -119,6 +120,7 @@ function DealCard({
   onDragStart?: (e: React.DragEvent, leadId: number) => void;
   onDragEnd?: () => void;
 }) {
+  const router = useRouter();
   const stageMeta = getDealStageMeta(lead.dealStage);
   const daysUntilRenewal = getDaysUntilRenewal(lead.renewalDate);
   const renewalWarning = daysUntilRenewal !== null && daysUntilRenewal <= 30;
@@ -127,14 +129,19 @@ function DealCard({
   const healthMeta = health ? DEAL_HEALTH_META[health] : null;
 
   return (
-    <button
-      type="button"
+    <article
       draggable={Boolean(onDragStart)}
       onDragStart={(e) => onDragStart?.(e, lead.id)}
       onDragEnd={() => onDragEnd?.()}
-      onClick={() => onEdit(lead)}
-      className="group w-full text-left rounded-xl border border-white/[0.08] bg-white/[0.025] p-3.5 transition-all hover:border-white/[0.14] hover:bg-white/[0.05] md:cursor-grab md:active:cursor-grabbing"
+      className="group relative w-full rounded-xl border border-white/[0.08] bg-white/[0.025] p-3.5 text-left transition-colors hover:border-white/[0.14] hover:bg-white/[0.05] md:cursor-grab md:active:cursor-grabbing"
     >
+      <button
+        type="button"
+        aria-label={`Edit ${lead.businessName}`}
+        onClick={() => onEdit(lead)}
+        className="v2-focus-ring absolute inset-0 rounded-xl"
+      />
+      <div className="pointer-events-none relative">
       <div className="flex items-start justify-between gap-2 mb-2.5">
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-white truncate leading-tight">
@@ -153,20 +160,21 @@ function DealCard({
               {healthMeta.label}
             </span>
           )}
+          <div className="pointer-events-auto relative z-10">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
+                aria-label={`Actions for ${lead.businessName}`}
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 className="inline-flex size-6 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-white/[0.08] hover:text-zinc-300 cursor-pointer"
               >
                 <MoreHorizontalIcon className="size-3.5" />
-              </span>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); window.location.href = `/clients/${lead.id}`; }}>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/clients/${lead.id}` as Route); }}>
                 <UserIcon className="size-3.5" />
                 View Profile
               </DropdownMenuItem>
@@ -187,6 +195,7 @@ function DealCard({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </div>
 
@@ -251,7 +260,8 @@ function DealCard({
           {stageMeta.shortLabel}
         </div>
       )}
-    </button>
+      </div>
+    </article>
   );
 }
 
@@ -399,7 +409,7 @@ function DealDrawer({
 }: {
   lead: CrmLead;
   onClose: () => void;
-  onSave: (leadId: number, update: Record<string, unknown>) => Promise<void>;
+  onSave: (leadId: number, update: Record<string, unknown>) => Promise<boolean>;
   onRemove: (lead: CrmLead) => void;
   saving: boolean;
 }) {
@@ -844,7 +854,7 @@ function InboxSection({
 }: {
   leads: CrmLead[];
   onEdit: (lead: CrmLead) => void;
-  onQuickUpdate: (leadId: number, update: Record<string, unknown>) => Promise<void>;
+  onQuickUpdate: (leadId: number, update: Record<string, unknown>) => Promise<boolean>;
   onDismiss: (leadId: number) => Promise<void>;
   onReset: () => Promise<void>;
   saving: boolean;
@@ -1156,10 +1166,12 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
       setLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
       setEditing(null);
       toast("Deal updated", { type: "success" });
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save";
       setError(msg);
       toast(msg, { type: "error" });
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1275,7 +1287,8 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
     if (!deleteConfirm) return;
     setDeleting(true);
     try {
-      await handleSave(deleteConfirm.id, { dealStage: null, dealLostReason: null });
+      const removed = await handleSave(deleteConfirm.id, { dealStage: null, dealLostReason: null });
+      if (!removed) return;
       setLeads((prev) => prev.filter((l) => l.id !== deleteConfirm.id));
       toast(`${deleteConfirm.businessName} removed from board`, { type: "info" });
     } catch {

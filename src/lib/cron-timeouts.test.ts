@@ -8,6 +8,7 @@ test("cron scrape timeout derives from Cloudflare scrape runtime with cleanup bu
 
   assert.equal(budgets.scrape, 870_000);
   assert.equal(budgets.intake, 120_000);
+  assert.equal(budgets.pipeline, 900_000);
   assert.equal(budgets.scheduler, 900_000);
 });
 

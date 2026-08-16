@@ -17,6 +17,7 @@ export function getCronTimeoutBudgets(env: CronTimeoutEnv = {}) {
 
   return {
     intake: DEFAULT_INTAKE_TIMEOUT_MS,
+    pipeline: DEFAULT_SCHEDULER_TIMEOUT_MS,
     scrape: scrapeRuntimeMs + CLEANUP_BUFFER_MS,
     scheduler: DEFAULT_SCHEDULER_TIMEOUT_MS,
   };

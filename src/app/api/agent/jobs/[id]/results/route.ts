@@ -4,6 +4,7 @@ import { isValidJobId, normalizeAgentName, validateAgentLeadPayload } from "@/li
 import { appendScrapeJobEvent } from "@/lib/scrape-jobs";
 import { requireAgentAuth } from "@/lib/agent-auth";
 import { extractDomain } from "@/lib/dedupe";
+import { getDatabase } from "@/lib/cloudflare";
 import { hasValidPipelineEmail } from "@/lib/lead-qualification";
 import { enrichLead } from "@/lib/outreach-enrichment";
 import { getPrisma, type LeadRecord } from "@/lib/prisma";
@@ -162,6 +163,50 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   const prisma = getPrisma();
   const now = new Date();
+  const receiptId = `${jobId}:${validation.lead.dedupeKey}`;
+  const db = getDatabase();
+
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS "AgentResultReceipt" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "jobId" TEXT NOT NULL,
+        "dedupeKey" TEXT NOT NULL,
+        "leadId" INTEGER,
+        "createdAt" DATETIME NOT NULL,
+        "updatedAt" DATETIME NOT NULL
+      )`,
+    )
+    .run();
+  await db
+    .prepare(
+      `CREATE UNIQUE INDEX IF NOT EXISTS "AgentResultReceipt_jobId_dedupeKey_key"
+       ON "AgentResultReceipt"("jobId", "dedupeKey")`,
+    )
+    .run();
+
+  const receiptInsert = await db
+    .prepare(
+      `INSERT OR IGNORE INTO "AgentResultReceipt"
+        ("id", "jobId", "dedupeKey", "leadId", "createdAt", "updatedAt")
+       VALUES (?, ?, ?, NULL, ?, ?)`,
+    )
+    .bind(receiptId, jobId, validation.lead.dedupeKey, now.toISOString(), now.toISOString())
+    .run();
+
+  if (Number(receiptInsert.meta?.changes ?? 0) === 0) {
+    const existingReceipt = await db
+      .prepare(`SELECT "leadId" FROM "AgentResultReceipt" WHERE "id" = ? LIMIT 1`)
+      .bind(receiptId)
+      .first<{ leadId: number | null }>();
+
+    if (existingReceipt?.leadId) {
+      return NextResponse.json({ ok: true, leadId: existingReceipt.leadId, deduplicated: true });
+    }
+
+    return NextResponse.json({ error: "This lead result is already being processed" }, { status: 409 });
+  }
+
   const createData = {
     ...validation.lead,
     isArchived: validation.lead.isArchived ? true : false,
@@ -241,9 +286,19 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
   }
 
-  const createdLead = await prisma.lead.create({
-    data: createData,
-  });
+  let createdLead: LeadRecord;
+  try {
+    createdLead = await prisma.lead.create({ data: createData });
+  } catch (error) {
+    await db.prepare(`DELETE FROM "AgentResultReceipt" WHERE "id" = ? AND "leadId" IS NULL`).bind(receiptId).run().catch(() => null);
+    throw error;
+  }
+
+  await db
+    .prepare(`UPDATE "AgentResultReceipt" SET "leadId" = ?, "updatedAt" = ? WHERE "id" = ?`)
+    .bind(createdLead.id, new Date().toISOString(), receiptId)
+    .run()
+    .catch((error) => console.error(`[agent.results] Failed to finalize receipt ${receiptId}:`, error));
 
   await appendScrapeJobEvent(jobId, "result", {
     jobId,

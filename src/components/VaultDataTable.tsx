@@ -131,6 +131,22 @@ function hasText(value: string | null) {
     return Boolean(value && value.trim());
 }
 
+async function assertResponseOk(response: Response, fallback: string) {
+    if (response.ok) return;
+
+    let detail: string | null = null;
+    try {
+        const data = await response.json() as { error?: unknown };
+        if (typeof data.error === "string" && data.error.trim()) {
+            detail = data.error;
+        }
+    } catch {
+        // Some error responses are not JSON; use the status-based fallback below.
+    }
+
+    throw new Error(detail ?? `${fallback} (${response.status})`);
+}
+
 function isArchivedLead(lead: Lead) {
     return lead.isArchived === true || lead.isArchived === 1 || lead.isArchived === "1";
 }
@@ -450,6 +466,9 @@ function TriFilter({ label, value, onChange }: { label: string; value: ContactFi
 export default function VaultDataTable({ totalCount }: { totalCount: number }) {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [loadAttempt, setLoadAttempt] = useState(0);
+    const [archiveError, setArchiveError] = useState<string | null>(null);
     const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("active");
     const [vaultCounts, setVaultCounts] = useState<VaultCounts>({
         total: totalCount,
@@ -460,8 +479,12 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
     useEffect(() => {
         const controller = new AbortController();
         setLoading(true);
+        setLoadError(null);
         fetch(`/api/vault/leads?archive=${archiveFilter}&limit=5000`, { signal: controller.signal })
-            .then((r) => r.json())
+            .then(async (response) => {
+                await assertResponseOk(response, "Unable to load Vault leads");
+                return response.json();
+            })
             .then((data: VaultLeadsResponse) => {
                 setLeads(data.leads ?? []);
                 if (data.counts) {
@@ -469,13 +492,15 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                 }
             })
             .catch((error) => {
-                if ((error as Error).name !== "AbortError") setLeads([]);
+                if ((error as Error).name !== "AbortError") {
+                    setLoadError(error instanceof Error ? error.message : "Unable to load Vault leads. Please try again.");
+                }
             })
             .finally(() => {
                 if (!controller.signal.aborted) setLoading(false);
             });
         return () => controller.abort();
-    }, [archiveFilter]);
+    }, [archiveFilter, loadAttempt]);
     const [search, setSearch] = useState("");
     const [showFilters, setShowFilters] = useState(false);
     const [statusFilter, setStatusFilter] = useState("ALL");
@@ -660,7 +685,11 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
         setSelectedIds((prev) => {
             const pageIds = pagedLeads.map((l) => l.id);
             const allSelected = pageIds.every((id) => prev.has(id));
-            if (allSelected) return new Set();
+            if (allSelected) {
+                const next = new Set(prev);
+                pageIds.forEach((id) => next.delete(id));
+                return next;
+            }
             return new Set([...prev, ...pageIds]);
         });
     }, [pagedLeads]);
@@ -674,20 +703,47 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
         });
     }, []);
 
-    const handleBulkArchive = useCallback(async () => {
-        if (selectedIds.size === 0) return;
-        setBulkActing(true);
+    const archiveLead = useCallback(async (id: number) => {
+        setArchiveError(null);
         try {
             const res = await fetch("/api/vault/bulk", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "archive", ids: [...selectedIds] }),
+                body: JSON.stringify({ action: "archive", ids: [id] }),
             });
-            if (res.ok) {
-                setLeads((prev) => prev.filter((l) => !selectedIds.has(l.id)));
-                setSelectedIds(new Set());
-            }
-        } catch { /* swallow */ } finally {
+            await assertResponseOk(res, "Unable to archive lead");
+            setLeads((prev) => prev.filter((l) => l.id !== id));
+            setSelectedIds((prev) => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
+        } catch (error) {
+            setArchiveError(error instanceof Error ? error.message : "Unable to archive lead. Please try again.");
+        }
+    }, []);
+
+    const handleBulkArchive = useCallback(async () => {
+        const ids = [...selectedIds];
+        if (ids.length === 0) return;
+        setBulkActing(true);
+        setArchiveError(null);
+        try {
+            const res = await fetch("/api/vault/bulk", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "archive", ids }),
+            });
+            await assertResponseOk(res, "Unable to archive selected leads");
+            setLeads((prev) => prev.filter((l) => !ids.includes(l.id)));
+            setSelectedIds((prev) => {
+                const next = new Set(prev);
+                ids.forEach((id) => next.delete(id));
+                return next;
+            });
+        } catch (error) {
+            setArchiveError(error instanceof Error ? error.message : "Unable to archive selected leads. Please try again.");
+        } finally {
             setBulkActing(false);
         }
     }, [selectedIds]);
@@ -776,6 +832,34 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                     else if (deleteConfirm?.type === "bulk") handleBulkDelete();
                 }}
             />
+            {loadError ? (
+                <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-red-500/25 bg-red-500/[0.06] px-4 py-3 text-sm text-red-200">
+                    <XCircle className="h-4 w-4 shrink-0 text-red-300" />
+                    <span className="min-w-0 flex-1">{loadError}</span>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+                        className="h-8 border-red-400/30 text-red-200 hover:bg-red-400/10 hover:text-red-100"
+                    >
+                        Retry
+                    </Button>
+                </div>
+            ) : null}
+            {archiveError ? (
+                <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-red-500/25 bg-red-500/[0.06] px-4 py-3 text-sm text-red-200">
+                    <XCircle className="h-4 w-4 shrink-0 text-red-300" />
+                    <span className="min-w-0 flex-1">{archiveError}</span>
+                    <button
+                        type="button"
+                        onClick={() => setArchiveError(null)}
+                        className="text-xs text-red-300 underline-offset-2 hover:text-red-100 hover:underline"
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            ) : null}
             <div className="grid gap-3 lg:grid-cols-[minmax(280px,1fr)_auto] lg:items-center">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
@@ -1091,6 +1175,12 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                 <div className="flex items-center justify-center py-16 text-sm text-zinc-500">
                     <span className="animate-pulse">Loading leads…</span>
                 </div>
+            ) : loadError && leads.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-sm text-zinc-500">
+                    <XCircle className="h-9 w-9 text-red-300/70" />
+                    <p>Vault leads could not be displayed.</p>
+                    <p className="text-[11px] text-zinc-600">Use Retry above to try loading them again.</p>
+                </div>
             ) : (
             <>
             <div className="space-y-3 md:hidden">
@@ -1111,14 +1201,7 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                             expanded={expandedId === lead.id}
                             onSelect={() => toggleSelectOne(lead.id)}
                             onExpand={() => setExpandedId((current) => (current === lead.id ? null : lead.id))}
-                            onArchive={async () => {
-                                await fetch("/api/vault/bulk", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ action: "archive", ids: [lead.id] }),
-                                });
-                                setLeads((prev) => prev.filter((l) => l.id !== lead.id));
-                            }}
+                            onArchive={() => { void archiveLead(lead.id); }}
                             onDelete={() => setDeleteConfirm({ type: "single", id: lead.id })}
                         />
                     ))
@@ -1291,14 +1374,7 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                                                     )}
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem
-                                                        onClick={async () => {
-                                                            await fetch("/api/vault/bulk", {
-                                                                method: "POST",
-                                                                headers: { "Content-Type": "application/json" },
-                                                                body: JSON.stringify({ action: "archive", ids: [lead.id] }),
-                                                            });
-                                                            setLeads((prev) => prev.filter((l) => l.id !== lead.id));
-                                                        }}
+                                                        onClick={() => { void archiveLead(lead.id); }}
                                                     >
                                                         <Archive className="h-3.5 w-3.5" />
                                                         Archive
