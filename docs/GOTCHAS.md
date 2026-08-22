@@ -133,3 +133,15 @@ Retire entries when the architecture makes them impossible.
   runs typecheck and the Cloudflare build.
 - **Affected area:** environment bindings, client APIs, CI.
 - **Verifying commit:** `7afc212`.
+
+## BUILD-002 — CI runtime lagged behind Wrangler's Node requirement
+
+- **Symptom:** Linux CI stopped at `wrangler types` before migrations or tests.
+- **Root cause:** both GitHub workflows pinned Node 20 while Wrangler 4.123.0
+  declares Node >=22.
+- **Proven fix:** run CI and protected deployment on Node 22 and declare the same
+  minimum in the root package.
+- **Prevention/test:** dependency installation plus generated-binding verification
+  run before the rest of every Linux gate.
+- **Affected area:** CI, Cloudflare tooling, release workflow.
+- **Verifying commit:** pending CI fix checkpoint.

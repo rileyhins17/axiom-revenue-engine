@@ -23,6 +23,9 @@ the owner-facing Leads screen prioritizes quality instead of record age.
   zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
   build, and Wrangler deploy dry run pass
 - Generated Cloudflare bindings replaced the stale hand-written environment file
+- Draft PR: `#8`; its first Linux run proved the workflow's Node 20 pin was
+  incompatible with Wrangler's Node >=22 requirement. The Node 22 fix is pending
+  verification on GitHub.
 
 ## Safety and production
 
