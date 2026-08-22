@@ -35,5 +35,7 @@
   every Cloudflare build.
 - Deployed the first isolated staging console with one fresh auth secret, no
   schedule/provider/mailbox credentials, and zero staging runs or sends.
+- Regenerated deterministic Cloudflare bindings for the isolated staging
+  environment after Linux CI correctly rejected the stale checked-in types.
 
 Production has not been cut over to this release.

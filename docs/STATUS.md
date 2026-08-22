@@ -25,6 +25,8 @@ staging; no rebuild code or migration has been deployed to production.
   `23ee458a997ddfd4df48f3f1f90581a6f4df3da0`
 - Cloudflare bundle-safety checkpoint:
   `ab5621cae3d463f935883705bd324ca92ef7e938`
+- Staging binding-refresh checkpoint:
+  `e68ac403b8fbd49005438c33554253962340b545`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -71,12 +73,11 @@ staging; no rebuild code or migration has been deployed to production.
   `941b37bc-38e8-4c6c-9111-d475e9871727`, with only a fresh
   `BETTER_AUTH_SECRET`. Sign-in returns 200, protected automation health returns
   401 without a session, and staging still has zero runs and zero sends.
-- Linux CI run `32550535144` failed only at generated-binding drift. The tracked
-  `cloudflare-env.d.ts` predates the staging environment; a diagnostic candidate
-  confirms the expected change is staging URL unions, intake cap zero, removal
-  of the legacy self-binding, and a generated `StagingEnv` interface. The secret
-  sanitizer passed on Linux. Source regeneration awaits owner approval under the
-  CI-fix workflow.
+- Linux CI run `32550535144` failed only at generated-binding drift. Commit
+  `e68ac40` regenerated the expected staging URL unions, intake cap zero, removal
+  of the legacy self-binding, and `StagingEnv` interface. The deterministic type
+  check, secret scan, 168 tests, typecheck, lint, sanitized build, and explicit
+  default dry run now pass locally; replacement Linux CI is pending.
 
 ## Safety and production
 
@@ -153,13 +154,11 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 - R2 activation currently requires a Cloudflare dashboard decision. Approve only
   if the account shows it fits inside the existing C$50 ceiling; no R2 resource
   or charge has been created yet.
-- Approve regenerating the tracked Cloudflare binding file and rerunning the full
-  gate to clear Linux CI run `32550535144`.
 
 ## Next three actions
 
-1. Regenerate the tracked Cloudflare binding file, rerun the full release gate,
-   and verify the replacement Linux CI run after owner approval.
+1. Push the staging deployment/binding checkpoints and verify the replacement
+   Linux CI run clears generated-binding drift.
 2. Scaffold the typed engine Queue/Workflow worker without attaching a live
    consumer; keep R2 blocked until the account-cost decision is explicit.
 3. Implement the deterministic website evidence/audit workflow and build the

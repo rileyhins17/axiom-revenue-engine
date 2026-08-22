@@ -155,7 +155,7 @@ Retire entries when the architecture makes them impossible.
 - **Prevention/test:** CI regenerates `cloudflare-env.d.ts`, rejects a diff, then
   runs typecheck and the Cloudflare build.
 - **Affected area:** environment bindings, client APIs, CI.
-- **Verifying commit:** `7afc212`.
+- **Verifying commit:** `7afc212`; staging environment refresh `e68ac40`.
 
 ## BUILD-002 — CI runtime lagged behind Wrangler's Node requirement
 
