@@ -39,6 +39,9 @@ jobs:
       - name: Verify generated bindings and Cloudflare build
         run: npm run cf:typegen:check
 
+      - name: Verify inert engine bindings
+        run: npm run cf:engine:typegen:check
+
       - name: Apply all migrations to a fresh local D1 database
         run: npm run db:migrate:local
 
@@ -53,3 +56,6 @@ jobs:
 
       - name: Validate deploy bundle without deploying
         run: npx wrangler deploy --env="" --dry-run --autoconfig false
+
+      - name: Validate inert engine bundle without deploying
+        run: npm run cf:engine:dry-run
