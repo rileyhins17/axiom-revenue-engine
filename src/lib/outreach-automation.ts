@@ -55,6 +55,7 @@ import {
 } from "@/lib/automation-policy";
 import { isGenericRoleEmail } from "@/lib/contact-validation";
 import { recordFunnelEvent } from "@/lib/funnel-events";
+import { requireOutreachApproval } from "@/lib/outreach-approval";
 import { hasValidPipelineEmail, isLeadOutreachEligible, normalizePipelineEmail } from "@/lib/lead-qualification";
 import { resolveLeadEnrichment } from "@/lib/outreach-enrichment";
 import { getPrisma } from "@/lib/prisma";
@@ -3714,6 +3715,23 @@ async function sendScheduledStep(
     generatedBodyHtml: email.bodyHtml,
     generatedBodyPlain: email.bodyPlain,
   }).catch(() => null);
+
+  const approval = await requireOutreachApproval({
+    bodyHtml: email.bodyHtml,
+    bodyPlain: email.bodyPlain,
+    campaignKey: email.campaignKey || null,
+    leadId: context.lead.id,
+    messagePolicyVersion: email.messagePolicyVersion || null,
+    recipientEmail,
+    sequenceId: claim.sequence.id,
+    sequenceStepId: claim.step.id,
+    subject: email.subject,
+    variantKey: email.variantKey || null,
+  });
+  if (!approval.allowed) {
+    await setSequenceBlocked(prisma, claim, "human_approval_required");
+    throw new AutomationSkipError("human_approval_required");
+  }
 
   await _advancePhase(claim.step.id, "SENDING").catch(() => null);
 

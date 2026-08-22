@@ -1,0 +1,59 @@
+name: Revenue Engine CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "RileyHinsperger/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BETTER_AUTH_SECRET: ci-only-secret-that-is-longer-than-thirty-two-characters
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Verify fail-closed configuration
+        run: npm run check:safety
+
+      - name: Regenerate and verify Cloudflare bindings
+        run: |
+          npm run cf:typegen
+          git diff --exit-code -- cloudflare-env.d.ts
+
+      - name: Apply all migrations to a fresh local D1 database
+        run: npm run db:migrate:local
+
+      - name: Unit and characterization tests
+        run: npm test
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build Cloudflare artifact
+        run: npm run build:cloudflare
+
+      - name: Validate deploy bundle without deploying
+        run: npx wrangler deploy --dry-run --autoconfig false

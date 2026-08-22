@@ -4,6 +4,7 @@ import {
   AUTONOMOUS_DAILY_LEAD_INTAKE_CAP,
   AUTONOMOUS_INTAKE_MIN_SCORE,
 } from "@/lib/automation-policy";
+import { evaluateAutomationSafety } from "@/lib/automation-safety";
 import { getServerEnv } from "@/lib/env";
 import { recordFunnelEvent } from "@/lib/funnel-events";
 import { getAutomationSettings } from "@/lib/outreach-automation";
@@ -75,17 +76,15 @@ async function countActiveOrPendingScrapeJobs(): Promise<number> {
  */
 export async function runAutonomousIntake(): Promise<IntakeResult> {
   const env = getServerEnv();
-  if (!env.AUTONOMOUS_INTAKE_ENABLED) {
-    return { dispatched: false, reason: "intake_disabled_kill_switch" };
+  let settings;
+  try {
+    settings = await getAutomationSettings();
+  } catch {
+    return { dispatched: false, reason: "database_policy_unavailable" };
   }
 
-  const settings = await getAutomationSettings();
-  if (settings.emergencyPaused) {
-    return { dispatched: false, reason: "emergency_stop_active" };
-  }
-  if (settings.intakePaused) {
-    return { dispatched: false, reason: "intake_paused_by_operator" };
-  }
+  const safety = evaluateAutomationSafety({ env, phase: "intake", settings });
+  if (!safety.allowed) return { dispatched: false, reason: safety.reason };
 
   // Auto-fail any pending scrape job older than 30 min so a wedged job
   // (typically Cloudflare Browser Rendering 429) cannot indefinitely block

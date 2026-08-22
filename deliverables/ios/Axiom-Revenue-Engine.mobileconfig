@@ -81,11 +81,11 @@
       <key>IsRemovable</key>
       <true/>
       <key>Label</key>
-      <string>Axiom Ops</string>
+      <string>Axiom Revenue</string>
       <key>PayloadDescription</key>
-      <string>Adds Axiom Pipeline Engine as a full-screen Home Screen app.</string>
+      <string>Adds Axiom Revenue Engine as a full-screen Home Screen app.</string>
       <key>PayloadDisplayName</key>
-      <string>Axiom Ops Web Clip</string>
+      <string>Axiom Revenue Web Clip</string>
       <key>PayloadIdentifier</key>
       <string>ca.getaxiom.operations.webclip</string>
       <key>PayloadType</key>
@@ -97,17 +97,17 @@
       <key>Precomposed</key>
       <false/>
       <key>URL</key>
-      <string>https://operations.getaxiom.ca/dashboard</string>
+      <string>https://revenue.getaxiom.ca/dashboard</string>
     </dict>
   </array>
   <key>PayloadDescription</key>
-  <string>Installs Axiom Pipeline Engine as a private iPhone app-like web clip.</string>
+  <string>Installs Axiom Revenue Engine as a private iPhone app-like web clip.</string>
   <key>PayloadDisplayName</key>
-  <string>Axiom Pipeline Engine</string>
+  <string>Axiom Revenue Engine</string>
   <key>PayloadIdentifier</key>
   <string>ca.getaxiom.operations.profile</string>
   <key>PayloadOrganization</key>
-  <string>Axiom Infrastructure</string>
+  <string>Axiom Web</string>
   <key>PayloadRemovalDisallowed</key>
   <false/>
   <key>PayloadType</key>

@@ -95,7 +95,9 @@ function SentEmailViewerModal({ emailId, onClose }: { emailId: string; onClose: 
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/outreach/emails/${emailId}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(async (r) => (r.ok
+        ? await r.json() as { email: EmailDetail }
+        : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((data) => {
         if (!cancelled) {
           setEmail(data.email);

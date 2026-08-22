@@ -1,4 +1,5 @@
 import { writeAuditEvent } from "@/lib/audit";
+import { evaluateAutomationSafety } from "@/lib/automation-safety";
 import { getCloudflareBindings } from "@/lib/cloudflare";
 import { generateDedupeKey } from "@/lib/dedupe";
 import { getServerEnv } from "@/lib/env";
@@ -41,14 +42,6 @@ type ExistingLeadDedupeCandidate = {
   websiteDomain?: string | null;
   websiteUrl?: string | null;
 };
-
-function isEnabled(value: string | undefined, fallback = true) {
-  if (value === undefined || value === null || value === "") {
-    return fallback;
-  }
-
-  return !/^(0|false|no|off)$/i.test(value.trim());
-}
 
 export function shouldUseExistingLeadForScrapeDedupe(lead: ExistingLeadDedupeCandidate) {
   const hasContactOrWebsite = Boolean(
@@ -166,7 +159,7 @@ async function claimCloudJob(workerName: string) {
 }
 
 export function shouldSkipCloudMapsDetailPages(env: Pick<ReturnType<typeof getServerEnv>, "CLOUD_SCRAPE_DETAIL_PAGES_ENABLED">) {
-  return isEnabled(env.CLOUD_SCRAPE_DETAIL_PAGES_ENABLED, false) === false;
+  return !env.CLOUD_SCRAPE_DETAIL_PAGES_ENABLED;
 }
 
 export function isTransientCloudBrowserError(message: string) {
@@ -203,7 +196,9 @@ async function runClaimedJob(job: ScrapeJobRecord, existingDedupeKeys: string[])
       }
 
       try {
-        if (await getAutomationSettings().then((settings) => settings.emergencyPaused).catch(() => false)) {
+        const settings = await getAutomationSettings();
+        const safety = evaluateAutomationSafety({ env, phase: "intake", settings });
+        if (!safety.allowed) {
           cancelRequested = true;
           return;
         }
@@ -212,6 +207,7 @@ async function runClaimedJob(job: ScrapeJobRecord, existingDedupeKeys: string[])
           cancelRequested = true;
         }
       } catch (error) {
+        cancelRequested = true;
         console.warn(`[cloud-scrape] heartbeat failed for ${job.id}:`, error);
       }
     })();
@@ -406,13 +402,19 @@ export async function runCloudScrapeWorker() {
   }
 
   const env = getServerEnv();
-  if (!isEnabled(env.CLOUD_SCRAPE_ENABLED)) {
+  if (!env.CLOUD_SCRAPE_ENABLED) {
     return { claimed: false, reason: "Cloud scrape disabled" };
   }
 
-  if (await getAutomationSettings().then((settings) => settings.emergencyPaused).catch(() => false)) {
-    return { claimed: false, reason: "Emergency kill switch active" };
+  let settings;
+  try {
+    settings = await getAutomationSettings();
+  } catch {
+    return { claimed: false, reason: "Database safety policy unavailable" };
   }
+
+  const safety = evaluateAutomationSafety({ env, phase: "intake", settings });
+  if (!safety.allowed) return { claimed: false, reason: safety.reason };
 
   const workerName = env.CLOUD_SCRAPE_WORKER_NAME || DEFAULT_CLOUD_WORKER_NAME;
   const job = await claimCloudJob(workerName);

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Activity, CheckCircle2, Database, Radio, Workflow } from "lucide-react";
+import { Activity, Crosshair, ShieldCheck, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -42,7 +42,7 @@ export function AppSidebar() {
       try {
         const response = await fetch("/api/leads/stats");
         if (!response.ok) throw new Error("stats_request_failed");
-        const data = await response.json();
+        const data = await response.json() as Partial<LeadStats>;
         if (disposed) return;
         setStats({
           total: data.total ?? 0,
@@ -81,7 +81,7 @@ export function AppSidebar() {
             priority
             showBorder={false}
           />
-          <span className="rounded-md border border-white/[0.08] bg-white/[0.035] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-zinc-500">Ops</span>
+          <span className="rounded-md border border-white/[0.08] bg-white/[0.035] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-zinc-500">Revenue</span>
         </Link>
       </SidebarHeader>
 
@@ -89,7 +89,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <div className="mb-2.5 flex items-center justify-between px-3">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-600">
-              Pipeline
+              Revenue Engine
             </span>
             <span className="text-[10px] font-mono text-zinc-600">⌘K</span>
           </div>
@@ -157,17 +157,17 @@ export function AppSidebar() {
               </div>
               <div className="leading-tight">
                 <div className="text-[9.5px] uppercase tracking-[0.18em] text-zinc-600">Workspace</div>
-                <div className="text-xs font-semibold text-zinc-100">Revenue operations</div>
+                <div className="text-xs font-semibold text-zinc-100">Owner workspace</div>
               </div>
             </div>
             <span className="font-mono text-[10px] text-zinc-600">prod</span>
           </div>
           <div className="grid grid-cols-2 divide-x divide-white/[0.06]">
             <SidebarStat
-              icon={<Database className="size-3.5" aria-hidden="true" />}
-              label="Records"
-              value={stats ? stats.total.toLocaleString() : "--"}
-              title="Total lead records in Vault"
+              icon={<Crosshair className="size-3.5" aria-hidden="true" />}
+              label="Ready"
+              value={stats ? String(stats.readyForTouch ?? 0) : "--"}
+              title="Leads ready for an owner decision"
             />
             <SidebarStat
               icon={<Activity className="size-3.5" aria-hidden="true" />}
@@ -182,14 +182,11 @@ export function AppSidebar() {
             role="status"
             aria-label="Workspace status"
           >
-            <span className="flex items-center gap-1.5 text-emerald-300" title="System healthy">
-              <CheckCircle2 className="size-3.5" aria-hidden="true" />
-              Healthy
+            <span className="flex items-center gap-1.5 text-zinc-300" title="Open System for verified health">
+              <ShieldCheck className="size-3.5 text-amber-300" aria-hidden="true" />
+              Safety gated
             </span>
-            <span className="flex items-center gap-1.5 text-zinc-400" title="Receiving live updates every 30s">
-              <Radio className="size-3.5 animate-pulse text-emerald-400/70" aria-hidden="true" />
-              Live
-            </span>
+            <Link href="/settings" className="v2-focus-ring rounded text-zinc-400 hover:text-white">View status</Link>
           </div>
         </div>
       </SidebarFooter>

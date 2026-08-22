@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CircleUserRound, LogOutIcon, Radio, Settings, UserIcon } from "lucide-react";
+import { CircleUserRound, LogOutIcon, ShieldCheck, Settings, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -85,8 +85,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <SearchTrigger />
             <div className="hidden items-center gap-2 lg:flex">
               <div className="flex h-9 items-center gap-2 rounded-lg border border-white/[0.08] bg-black/20 px-3 text-[11px] font-medium text-zinc-400">
-                <Radio className="size-3.5 text-emerald-300" aria-hidden="true" />
-                Live sync
+                <ShieldCheck className="size-3.5 text-amber-300" aria-hidden="true" />
+                Safety gated
               </div>
               <Tooltip>
                 <TooltipTrigger asChild>

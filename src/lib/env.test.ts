@@ -11,22 +11,23 @@ const autonomousSwitches = [
 
 const envKeysToRestore = ["BETTER_AUTH_SECRET", ...autonomousSwitches];
 const originalEnv = new Map<string, string | undefined>();
+const mutableProcessEnv = process.env as Record<string, string | undefined>;
 
 test.beforeEach(() => {
   for (const key of envKeysToRestore) {
     originalEnv.set(key, process.env[key]);
   }
 
-  process.env.BETTER_AUTH_SECRET = "test-secret-that-is-at-least-32-characters";
+  mutableProcessEnv.BETTER_AUTH_SECRET = "test-secret-that-is-at-least-32-characters";
 });
 
 test.afterEach(() => {
   for (const key of envKeysToRestore) {
     const value = originalEnv.get(key);
     if (value === undefined) {
-      delete process.env[key];
+      delete mutableProcessEnv[key];
     } else {
-      process.env[key] = value;
+      mutableProcessEnv[key] = value;
     }
   }
 
@@ -60,7 +61,7 @@ test("all autonomous kill switches use the explicit parser", () => {
     ["1", true],
   ] as const) {
     for (const key of autonomousSwitches) {
-      process.env[key] = value;
+      mutableProcessEnv[key] = value;
     }
 
     clearServerEnvCache();
@@ -74,13 +75,13 @@ test("all autonomous kill switches use the explicit parser", () => {
 
 test("invalid autonomous boolean values fail closed instead of enabling automation", () => {
   for (const key of autonomousSwitches) {
-    process.env[key] = "maybe";
+    mutableProcessEnv[key] = "maybe";
     clearServerEnvCache();
 
     assert.throws(() => getServerEnv(), /Invalid boolean environment value/);
 
     // A failed parse must not leave a partially cached environment behind.
-    process.env[key] = "false";
+    mutableProcessEnv[key] = "false";
     clearServerEnvCache();
     assert.equal(getServerEnv()[key], false, key);
   }
@@ -88,13 +89,13 @@ test("invalid autonomous boolean values fail closed instead of enabling automati
 
 test("missing autonomous kill switches retain safe defaults", () => {
   for (const key of autonomousSwitches) {
-    delete process.env[key];
+    delete mutableProcessEnv[key];
   }
 
   clearServerEnvCache();
   const env = getServerEnv();
 
-  assert.equal(env.AUTONOMOUS_INTAKE_ENABLED, true);
-  assert.equal(env.AUTONOMOUS_QUEUE_ENABLED, true);
+  assert.equal(env.AUTONOMOUS_INTAKE_ENABLED, false);
+  assert.equal(env.AUTONOMOUS_QUEUE_ENABLED, false);
   assert.equal(env.AUTONOMOUS_SEND_ENABLED, false);
 });

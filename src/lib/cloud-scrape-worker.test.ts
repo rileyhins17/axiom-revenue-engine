@@ -41,15 +41,15 @@ test("usable existing leads still participate in scrape dedupe", () => {
 
 test("cloud scrape skips Maps detail pages unless explicitly enabled", () => {
   assert.equal(
-    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: "false" }),
+    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: false }),
     true,
   );
   assert.equal(
-    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: "" }),
+    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: false }),
     true,
   );
   assert.equal(
-    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: "true" }),
+    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: true }),
     false,
   );
 });

@@ -49,7 +49,7 @@ type ToolDefinition = {
 };
 
 const PROTOCOL_VERSION = "2025-03-26";
-const SERVER_INFO = { name: "axiom-pipeline-engine", version: "1.0.0" };
+const SERVER_INFO = { name: "axiom-revenue-engine", version: "2.0.0-shadow" };
 
 function unauthorized() {
   return NextResponse.json(

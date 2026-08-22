@@ -1,4 +1,4 @@
-const CACHE_PREFIX = "axiom-pipeline-engine";
+const CACHE_PREFIX = "axiom-revenue-engine";
 const CACHE_VERSION = "v1";
 const STATIC_CACHE = `${CACHE_PREFIX}-${CACHE_VERSION}-static`;
 const OFFLINE_URL = "/offline";

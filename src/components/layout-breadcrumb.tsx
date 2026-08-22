@@ -40,5 +40,5 @@ export function LayoutBreadcrumb() {
     );
   }
 
-  return <span className="text-sm font-semibold tracking-tight text-white">Axiom Pipeline Engine</span>;
+  return <span className="text-sm font-semibold tracking-tight text-white">Axiom Revenue Engine</span>;
 }

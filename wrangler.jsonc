@@ -1,9 +1,9 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "axiom-ops-omniscient",
+  "name": "axiom-revenue-engine-console",
   "account_id": "fe468a56a5b8c7f8fc5d39e265c2f791",
   "main": "worker.mjs",
-  "compatibility_date": "2026-03-15",
+  "compatibility_date": "2026-08-16",
   "compatibility_flags": [
     "nodejs_compat",
     "nodejs_compat_populate_process_env",
@@ -24,7 +24,7 @@
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "axiom-ops-omniscient"
+      "service": "axiom-revenue-engine-console"
     }
   ],
   "triggers": {
@@ -33,11 +33,11 @@
     "crons": ["*/5 * * * *"]
   },
   "vars": {
-    "APP_BASE_URL": "https://operations.getaxiom.ca/",
+    "APP_BASE_URL": "https://revenue.getaxiom.ca/",
     "AUTH_ALLOWED_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
     "AUTH_ADMIN_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
-    "AUTH_ALLOWED_ORIGINS": "https://axiom-ops-omniscient.aidan-magee2.workers.dev,https://operations.getaxiom.ca",
-    "CLOUD_SCRAPE_ENABLED": "true",
+    "AUTH_ALLOWED_ORIGINS": "https://axiom-revenue-engine-console.aidan-magee2.workers.dev,https://revenue.getaxiom.ca,https://operations.getaxiom.ca",
+    "CLOUD_SCRAPE_ENABLED": "false",
     "CLOUD_SCRAPE_TIMEOUT_MS": "840000",
     "CLOUD_SCRAPE_WORKER_NAME": "cloudflare-browser",
     // Detail-page extraction populates websiteDomain + email + the
@@ -45,32 +45,28 @@
     // is now wrapped with a 40s outer timeout (commit 461c6244+) plus a
     // 25-listing cap, so a single slow business site can no longer wedge an
     // entire scrape job past CLOUD_SCRAPE_TIMEOUT_MS.
-    "CLOUD_SCRAPE_DETAIL_PAGES_ENABLED": "true",
+    "CLOUD_SCRAPE_DETAIL_PAGES_ENABLED": "false",
     "RATE_LIMIT_WINDOW_SECONDS": "60",
     "RATE_LIMIT_MAX_AUTH": "50",
     "RATE_LIMIT_MAX_SCRAPE": "20",
     "RATE_LIMIT_MAX_EXPORT": "20",
     "SCRAPE_CONCURRENCY_LIMIT": "1",
     "SCRAPE_TIMEOUT_MS": "1800000",
-    // Master kill switches. Scrape + queue + send are ON for the fully
-    // autonomous production pipeline; per-mailbox and policy caps still gate
-    // actual throughput.
-    "AUTONOMOUS_INTAKE_ENABLED": "true",
-    "AUTONOMOUS_QUEUE_ENABLED": "true",
-    "AUTONOMOUS_SEND_ENABLED": "true",
-    "AUTONOMOUS_DAILY_LEAD_INTAKE_CAP": "100",
-    "AUTONOMOUS_MAX_SENDS_PER_DAY": "100",
-    // Follow-ups intentionally disabled for now; first-touch volume gets all capacity.
-    // Re-enable later by raising this and clearing followUpsPaused in DB settings.
+    // Fail closed. Phase switches are enabled only through an approved rollout;
+    // checked-in production defaults never create or send autonomous work.
+    "AUTONOMOUS_INTAKE_ENABLED": "false",
+    "AUTONOMOUS_QUEUE_ENABLED": "false",
+    "AUTONOMOUS_SEND_ENABLED": "false",
+    "AUTONOMOUS_DAILY_LEAD_INTAKE_CAP": "25",
+    "AUTONOMOUS_MAX_SENDS_PER_DAY": "0",
     "AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY": "0",
-    "AUTONOMOUS_DOMAIN_COOLDOWN_DAYS": "1"
+    "AUTONOMOUS_DOMAIN_COOLDOWN_DAYS": "14"
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "axiom-ops-omniscient",
       "database_id": "e42f3d48-5813-4d18-86c4-4471b55aa65e",
-      "preview_database_id": "e42f3d48-5813-4d18-86c4-4471b55aa65e",
       "migrations_dir": "./migrations"
     }
   ],
