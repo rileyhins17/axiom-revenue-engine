@@ -33,8 +33,23 @@ they cannot masquerade as the business's website. Prepared businesses stay
 
 Preparation creates separate source-run records for each city/niche cohort and
 shows the exact remaining count and balance. It does not audit a website, call a
-provider, create an email candidate, or load staging/production D1. A later
-release-gated persistence step will validate the same versioned plan again.
+provider, create an email candidate, or load staging/production D1.
+
+The prepared plan can now be converted into a separate validation-only
+persistence artifact:
+
+```powershell
+npm run kw:plan-persistence -- --input data/kw-evaluation/plan.json --output data/kw-evaluation/persistence.json
+```
+
+This command also stays entirely inside ignored local storage and refuses to
+overwrite output. It proves the proposed source-run, business, location, and
+source-record fields match the shadow schema, and prepares exact preflight checks
+for collisions or drift. It does **not** connect to any database or provider,
+write D1, audit or qualify a business, create contact data, or authorize a
+mutation. The output says `mutationAuthorized: false`. Any future executor must
+revalidate the original versioned input, reproduce the same plan from trusted
+code, pass every exact preflight, and receive a separate release approval.
 
 ## What Riley will do
 

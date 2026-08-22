@@ -110,7 +110,10 @@ binding, live capture call, or spending path.
 The first 50-business seed can be normalized into ignored local storage with
 `npm run kw:prepare-import -- --input data/kw-evaluation/input.json --output data/kw-evaluation/plan.json`.
 This command makes no provider call, spends nothing, and cannot qualify or contact
-a business. See the evaluation guide before preparing real private data.
+a business. A second local-only command can prepare schema-bound preflights with
+`npm run kw:plan-persistence -- --input data/kw-evaluation/plan.json --output data/kw-evaluation/persistence.json`.
+It does not connect to or write a database and its output explicitly carries no
+mutation authority. See the evaluation guide before preparing real private data.
 
 Legacy resource identifiers are kept only where needed for safe migration. They
 must not be renamed in place or retired until reconciliation, rollback, and the

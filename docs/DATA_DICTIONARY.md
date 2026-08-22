@@ -28,6 +28,7 @@
 | CostLedger | Provider usage/cost attached to a run, lead, campaign, and budget period. |
 | KwLeadEvaluationSet | Private 50-lead owner-labelled KW quality gate used to measure engine agreement before live outreach. |
 | PrivateKwImportPlan | Versioned, ignored local seed of canonical research-only businesses, locations, cohort source runs, and source records; it grants no qualification or outreach authority. |
+| PrivateKwPersistencePlan | Validation-only, schema-bound expected-state and insert-if-absent plan for the private seed; it has no executor or mutation authority and creates no qualification, contact, or outreach records. |
 
 ## Identity and evidence rules
 
@@ -52,5 +53,8 @@
   require captured browser evidence.
 - Real evaluation businesses and Riley's labels live in private D1 or ignored
   local storage. Synthetic fixtures may be committed; prospect records may not.
+- A saved private persistence artifact is not trusted executable input. Any
+  future loader must revalidate the source import, reproduce the canonical plan,
+  require exact preflight matches, and stop on collision or drift.
 - An approval is invalid after content changes, expiry, rejection, or revocation;
   the final provider call recomputes its digest every time.

@@ -37,6 +37,8 @@ staging; no rebuild code or migration has been deployed to production.
   `f0d0378c7dffb34a41637165539424bb98b88ccd`
 - Bounded HTML fact-extraction checkpoint:
   `fe8fb659c01982a2e82d1c7b8bcbc1d6065eea8e`
+- Validation-only private KW persistence checkpoint:
+  `4d7d9a608b42b09db599cc4f813d8f1fbd062d8b`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -144,6 +146,18 @@ staging; no rebuild code or migration has been deployed to production.
   Rendering proves them; truncated extraction is marked incomplete. No live site
   or provider was called. The checkpoint passes 204/204 tests, `npm audit` with
   zero vulnerabilities, and the complete local release gate.
+- A second guarded local command now converts a validated private KW import plan
+  into deterministic schema-0054 preflights and insert-if-absent statements for
+  only source runs, businesses, locations, and source records. Every statement
+  has an exact expected-state fingerprint so an identity collision or data drift
+  is visible before a later release-gated write can be considered idempotent.
+- The persistence artifact is explicitly `mutationAuthorized: false`; there is
+  no database executor, D1/Cloudflare/provider access, qualification row, contact
+  row, outreach row, or spend path. Tests apply its SQL only to a disposable
+  in-memory database. Real evaluation progress remains 0/50.
+- Validation-only persistence checkpoint verification passes 209/209 tests,
+  typecheck, zero-warning lint, safety checks, secret-sanitized console build,
+  explicit console dry run, deterministic engine type check, and engine dry run.
 
 ## Safety and production
 
@@ -212,6 +226,9 @@ Completed gates:
 - Bounded HTML facts: standards-based streaming parse, non-executing scripts,
   strict token/text/JSON-LD limits, safe URL resolution, explicit unknown visual
   state, and adversarial fixture coverage.
+- Validation-only KW persistence: deterministic schema-bound preflights and
+  insert-if-absent plans, collision/drift detection, ignored no-overwrite output,
+  and in-memory migration compatibility/idempotency coverage with no executor.
 
 Still required for Phase 1:
 
@@ -242,12 +259,11 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Push the bounded HTML fact-extraction checkpoint and verify Linux CI.
-2. Add a repeatable, validation-only persistence plan for the private seed; do
-   not write staging/production D1 or acquire paid data until that gate is
-   separately verified.
-3. Define the Browser Rendering evidence contract and fixture merge rules before
+1. Push the validation-only persistence checkpoint and verify all Linux CI gates.
+2. Define the Browser Rendering evidence contract and fixture merge rules before
    attaching a Browser or R2 binding to the engine.
+3. Add offline fixtures proving how browser observations and server-HTML facts
+   become evidence claims without converting unknown visual state into failure.
 
 ## Resume instructions
 

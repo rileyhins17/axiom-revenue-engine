@@ -60,5 +60,10 @@
 - Added bounded WHATWG-compatible streaming HTML fact extraction for metadata,
   visible text, actions, forms, trust markers, JSON-LD types, and internal page
   links. Scripts are never executed and visual placement remains unknown.
+- Added a validation-only private KW persistence planner. It binds the prepared
+  seed to migration 0054 with deterministic expected-state fingerprints and
+  insert-if-absent statements for source, business, location, and source-record
+  rows only. Collision, drift, idempotency, and schema compatibility are tested
+  in memory; no database executor or outreach authority exists.
 
 Production has not been cut over to this release.
