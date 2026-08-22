@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle] = await Promise.all([
+const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../.env.example", import.meta.url), "utf8"),
@@ -18,6 +18,7 @@ const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap,
   readFile(new URL("../src/lib/revenue-engine/content-addressed-artifact-store.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/website-audit-assembly.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-lifecycle.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/website-page-selection.ts", import.meta.url), "utf8"),
 ]);
 
 const failures = [];
@@ -125,6 +126,9 @@ requireMatch("src/lib/revenue-engine/artifact-lifecycle.ts", artifactLifecycle, 
 requireMatch("src/lib/revenue-engine/artifact-lifecycle.ts", artifactLifecycle, /providerDeleteAuthorized:\s*z\.literal\(false\)/, "artifact release records must not authorize deletion");
 requireMatch("src/lib/revenue-engine/artifact-lifecycle.ts", artifactLifecycle, /maxCostUsd:\s*z\.literal\(0\)/, "artifact lifecycle operations must have zero provider budget");
 forbidMatch("src/lib/revenue-engine/artifact-lifecycle.ts", artifactLifecycle, /@cloudflare|env\.[A-Z_]+|R2Bucket|fetch\s*\(|\.put\s*\(|\.delete\s*\(/, "fixture-only artifact lifecycle must not access providers, runtime bindings, writes, or deletion");
+requireMatch("src/lib/revenue-engine/website-page-selection.ts", pageSelection, /plannerKind:\s*z\.literal\("DETERMINISTIC_FIXTURE"\)/, "website page selection must remain deterministic and fixture-only");
+requireMatch("src/lib/revenue-engine/website-page-selection.ts", pageSelection, /maxCostUsd:\s*z\.literal\(0\)/, "website page selection must have zero provider budget");
+forbidMatch("src/lib/revenue-engine/website-page-selection.ts", pageSelection, /@cloudflare|env\.[A-Z_]+|R2Bucket|fetch\s*\(|\.put\s*\(|\.delete\s*\(/, "fixture-only website page selection must not access providers, runtime bindings, writes, or deletion");
 
 if (failures.length > 0) {
   console.error("Safety configuration check failed:");
