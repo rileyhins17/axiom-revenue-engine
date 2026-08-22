@@ -50,6 +50,11 @@ Cloudflare builds automatically remove values loaded from local `.env*` files an
 scan the generated bundle for secret material. Runtime secrets belong in
 Cloudflare's secret store; a local `.env.local` value is never a deploy source.
 
+The separate engine scaffold is intentionally inert. Use `npm run cf:engine:dev`
+for local inspection; its empty secret allow-list prevents unrelated console
+secrets from entering the Worker. `/health` should return `503 LOCKED` until a
+later, explicitly approved phase adds execution authority.
+
 ## Verification
 
 ```powershell
@@ -59,6 +64,8 @@ npm run typecheck
 npm run lint
 npm run build:cloudflare
 npx wrangler deploy --env="" --dry-run --autoconfig false
+npm run cf:engine:typegen:check
+npm run cf:engine:dry-run
 ```
 
 ## Documentation map
@@ -83,6 +90,9 @@ separate typed Worker using Cloudflare Queues and Workflows; D1 stores operation
 records and R2 stores screenshots/evidence. Runtime AI uses a provider interface
 with OpenAI Responses, structured outputs, snapshot-pinned models, strict per-job
 limits, and a cost ledger.
+
+The Worker/Workflow contracts now exist, but there is deliberately no deployed
+engine resource, live queue consumer, schedule, data binding, or spending path.
 
 Legacy resource identifiers are kept only where needed for safe migration. They
 must not be renamed in place or retired until reconciliation, rollback, and the

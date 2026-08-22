@@ -27,6 +27,8 @@ staging; no rebuild code or migration has been deployed to production.
   `ab5621cae3d463f935883705bd324ca92ef7e938`
 - Staging binding-refresh checkpoint:
   `e68ac403b8fbd49005438c33554253962340b545`
+- Inert engine/workflow checkpoint:
+  `5d3ef6a30467db85234b0860b243587dd31084a4`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -75,9 +77,16 @@ staging; no rebuild code or migration has been deployed to production.
   401 without a session, and staging still has zero runs and zero sends.
 - Linux CI run `32550535144` failed only at generated-binding drift. Commit
   `e68ac40` regenerated the expected staging URL unions, intake cap zero, removal
-  of the legacy self-binding, and `StagingEnv` interface. The deterministic type
-  check, secret scan, 168 tests, typecheck, lint, sanitized build, and explicit
-  default dry run now pass locally; replacement Linux CI is pending.
+  of the legacy self-binding, and `StagingEnv` interface. Replacement Linux CI
+  run `32551436311` passed every step on commit `3f28acd`.
+- A separate engine Worker and two-step durable Workflow scaffold now exist with
+  stable adapter and receipt contracts. They have no queue, schedule, route,
+  D1/R2/Browser binding, provider credential, or nonzero budget. Local `/health`
+  returns `503 LOCKED`; a POST action returns 404. Nothing was deployed.
+- Wrangler is pinned to `4.125.0`, and both generated binding files use its
+  current workerd runtime. The complete checkpoint gate passes with 171/171
+  tests, deterministic console/engine bindings, typecheck, zero-warning lint,
+  a sanitized console build, and both no-upload deployment dry runs.
 
 ## Safety and production
 
@@ -128,6 +137,9 @@ Completed gates:
   it explicitly says current evidence is still required.
 - Phase 0 production safety: non-secret inventory, full export/checksum, Time
   Travel bookmark, master database stop, and legacy cron removal are verified.
+- Inert typed engine: versioned Workflow input/receipt contracts, stable source,
+  audit, contact, verification, and mailbox adapter interfaces, two durable
+  fail-closed steps, generated bindings, safety tests, and CI dry-run coverage.
 
 Still required for Phase 1:
 
@@ -136,8 +148,9 @@ Still required for Phase 1:
   deploy is not approved. GitHub required reviewers are unavailable for this
   private repository on the current plan; `main` restriction plus exact SHA,
   backup reference, and approval phrase are the no-cost gates.
-- Remaining staging resources: R2 and the typed engine Workflow. The console,
-  D1, and job/DLQ Queues are complete and isolated.
+- Remaining staging resources: R2 and deployment of the typed engine Workflow.
+  The source scaffold is complete but intentionally has no live resource or
+  consumer. The console, D1, and job/DLQ Queues are complete and isolated.
 - Characterization coverage retained while first v2 modules are introduced.
 
 ## Budget
@@ -157,12 +170,11 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Push the staging deployment/binding checkpoints and verify the replacement
-   Linux CI run clears generated-binding drift.
-2. Scaffold the typed engine Queue/Workflow worker without attaching a live
-   consumer; keep R2 blocked until the account-cost decision is explicit.
-3. Implement the deterministic website evidence/audit workflow and build the
-   50-lead KW evaluation set before qualification can connect to sending.
+1. Push the inert engine checkpoint and verify the expanded Linux CI gate.
+2. Implement deterministic HTTP/DOM website checks and versioned evidence audit
+   results without enabling Browser Rendering or R2.
+3. Build the first labelled 50-lead KW evaluation fixture before qualification
+   can connect to any live acquisition or sending path.
 
 ## Resume instructions
 

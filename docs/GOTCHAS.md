@@ -172,15 +172,34 @@ Retire entries when the architecture makes them impossible.
 ## TYPE-002 — Generated bindings absorbed a local secret name
 
 - **Symptom:** bindings regenerated cleanly on Riley's machine but failed the CI
-  diff because only local `.env.local` contained `OPENAI_API_KEY`.
+  diff because only local `.env.local` contained `OPENAI_API_KEY`; the first
+  engine-local runtime also inherited that unrelated secret name.
 - **Root cause:** Wrangler type generation was allowed to discover private local
   environment files, making generated output machine-dependent.
-- **Proven fix:** generate/check with an explicit tracked empty env file and keep
-  secret *names* in a value-free declaration separate from generated bindings.
-- **Prevention/test:** `npm run cf:typegen:check` uses `wrangler.typegen.env` in
-  both local and Linux environments.
+- **Proven fix:** generate/check with an explicit tracked empty env file, declare
+  an empty `secrets.required` allow-list on the inert engine, and keep secret
+  *names* in a value-free declaration separate from generated bindings.
+- **Prevention/test:** console and engine type generation use
+  `wrangler.typegen.env`; `npm run cf:engine:dev` uses the same file; the safety
+  check requires the empty engine secret allow-list.
 - **Affected area:** generated bindings, secrets, CI reproducibility.
-- **Verifying commit:** `6a03de6`; clean Linux run `32547238706`.
+- **Verifying commit:** `6a03de6`; clean Linux run `32547238706`; separate engine
+  enforcement in `5d3ef6a`.
+
+## BUILD-005 — A new compatibility date exceeded the pinned local runtime
+
+- **Symptom:** the new engine passed a Wrangler dry bundle but `wrangler dev`
+  could not start because compatibility date `2026-08-22` was newer than the
+  bundled workerd runtime's `2026-08-18` maximum.
+- **Root cause:** the project pinned Wrangler 4.123.0 while the new Worker
+  correctly selected the current compatibility date.
+- **Proven fix:** pin Wrangler 4.125.0, regenerate both binding files, and prove
+  the local engine starts and returns the locked health response.
+- **Prevention/test:** keep Wrangler exact, regenerate types with dependency
+  upgrades, run both Cloudflare dry builds in CI, and locally exercise `/health`
+  when advancing a compatibility date.
+- **Affected area:** Cloudflare local runtime, generated types, CI.
+- **Verifying commit:** `5d3ef6a`.
 
 ## BUILD-003 — One branch push launched the same CI twice
 

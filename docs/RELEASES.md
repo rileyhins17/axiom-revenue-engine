@@ -37,5 +37,11 @@
   schedule/provider/mailbox credentials, and zero staging runs or sends.
 - Regenerated deterministic Cloudflare bindings for the isolated staging
   environment after Linux CI correctly rejected the stale checked-in types.
+- Added an inert, separately typed Revenue Engine Worker and durable Workflow
+  scaffold with versioned receipts/adapters, zero execution budget, no live
+  consumer or schedule, generated bindings, local lock proof, and CI dry runs.
+- Pinned Wrangler 4.125.0 so the new Worker can use the current compatibility
+  date, while preventing engine type generation and local development from
+  inheriting unrelated `.env.local` secrets.
 
 Production has not been cut over to this release.
