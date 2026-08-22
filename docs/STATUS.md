@@ -41,6 +41,8 @@ staging; no rebuild code or migration has been deployed to production.
   `4d7d9a608b42b09db599cc4f813d8f1fbd062d8b`
 - Browser evidence-contract checkpoint:
   `99e37fa2c04fd095013f1200acfa99d90922c8c7`
+- Browser evidence documentation/CI checkpoint:
+  `30424528b920ec535641282035428661e057a2d7`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -178,6 +180,9 @@ staging; no rebuild code or migration has been deployed to production.
   occurred. The checkpoint passes 215/215 tests, typecheck, zero-warning lint,
   safety checks, the secret-sanitized console build and dry run, deterministic
   engine bindings, and the inert engine dry run.
+- Linux CI run `32557669210` passed all 13 gates on browser evidence checkpoint
+  `3042452`, including a clean Ubuntu build, all migrations, 215/215 tests, and
+  both no-upload Worker validations.
 
 ## Safety and production
 
@@ -282,11 +287,12 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Push the Browser evidence-contract checkpoint and verify all Linux CI gates.
-2. Add a bounded Browser measurement adapter behind an injected runner, with
+1. Add a bounded Browser measurement adapter behind an injected runner, with
    fixture/fake tests and no live binding, navigation, or artifact write.
-3. Define content-addressed R2 artifact keys and retention/rollback rules before
+2. Define content-addressed R2 artifact keys and retention/rollback rules before
    provisioning or attaching the staging evidence bucket.
+3. Assemble multi-page HTML/browser evidence into one versioned audit input,
+   with explicit page-set coverage and per-business cost limits.
 
 ## Resume instructions
 
