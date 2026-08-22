@@ -63,6 +63,8 @@ staging; no rebuild code or migration has been deployed to production.
   `0165a0a6a304b06f7bbc09766c2572d3459054fc`
 - Deterministic website page-selection documentation/CI checkpoint:
   `f3b3812a93a962658edc259810a202b32f63247f`
+- Fixture website-evidence workflow source checkpoint:
+  `1c9d093351cea3a064ba4b0bc4a4d37d76d880d9`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -307,6 +309,24 @@ staging; no rebuild code or migration has been deployed to production.
 - Linux CI run `32563067858` passed all 13 gates on page-selection checkpoint
   `f3b3812`, including exact dependencies, a clean Ubuntu Cloudflare build, all
   55 migrations, 251/251 tests, and both no-upload Worker validations.
+- One fixture-only business workflow now composes homepage capture, HTML fact
+  extraction, high-signal page selection, selected-subpage capture, fixed Browser
+  measurements, content-addressed artifact receipts, multi-page assembly, and
+  deterministic audit through eight fixed checkpoint receipts.
+- An unavailable homepage is preserved as a completed `UNREACHABLE` observation.
+  A missing selected page or failed mobile measurement makes the run `PARTIAL`
+  and keeps unsupported website checks `UNKNOWN`. Capture identity, artifact
+  integrity, schema, or storage failures stop the run and publish no audit.
+- Workflow/page/artifact IDs are deterministic from the workflow identity.
+  Repeating the same input reuses exact matching artifacts; a retry after a
+  partial fixture write reconciles the immutable orphan rather than overwriting
+  or deleting it. Every receipt keeps provider operations and total cost at zero.
+- Fixture-workflow checkpoint verification passes 258/258 tests, typecheck,
+  zero-warning lint, the repository safety check, secret-sanitized Cloudflare
+  build, explicit default console no-upload dry run, deterministic engine
+  bindings, and the inert engine no-upload dry run. The first local build attempt
+  hit a transient Windows/OneDrive lock in generated `.next` output; moving only
+  that generated directory aside allowed the complete unchanged gate to pass.
 
 ## Safety and production
 
@@ -396,6 +416,10 @@ Completed gates:
 - Deterministic page selection: fresh same-authority homepage inputs, explainable
   role/relevance scoring, global unique assignment, explicit noise exclusions,
   stable receipts, and partial-state handling with no provider authority.
+- Fixture website-evidence workflow: eight ordered business checkpoints,
+  deterministic identities/output digests, explicit unreachable/partial/failed
+  semantics, content-addressed retry recovery, aggregate zero-cost budgets, and
+  end-to-end adversarial coverage with no live provider or Worker wiring.
 
 Still required for Phase 1:
 
@@ -429,10 +453,12 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Compose capture, extraction, page selection, Browser drafts, artifact receipts,
-   and audit assembly into one bounded fixture-only business workflow receipt.
-2. Define additive manifest, promotion, evidence-use, selection, and release
-   persistence records before a live artifact adapter can be connected.
+1. Define additive workflow-receipt, page-selection, artifact-manifest,
+   promotion, evidence-use, and release persistence records with no production
+   migration or execution authority.
+2. Add a deterministic resume planner over persisted checkpoint receipts,
+   including version drift, stale lease, duplicate delivery, partial-write, and
+   deployment-interruption tests.
 3. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
    smoke test; do not add a binding or make a live request until R2, budget,
    rollback, and owner approval gates are recorded.

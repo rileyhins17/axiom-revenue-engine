@@ -110,6 +110,16 @@ use, the reviewing owner/compliance actor, reason, and exact decision. It still
 cannot delete an object—deletion needs a fresh reference check and a separate
 future release gate. All lifecycle work remains fixture-only and zero-cost.
 
+Those boundaries now run together in one fixture-only business workflow. Eight
+fixed receipts cover homepage capture, fact extraction, page selection, subpage
+capture, Browser measurement, artifact storage, audit assembly, and the final
+deterministic audit. An unreachable homepage is a real observed site state;
+missing page/mobile proof stays partial and unknown; identity, integrity, or
+storage failure publishes no audit. Repeating the same workflow safely reuses
+matching content-addressed artifacts. This is still an in-process proof—there is
+no live provider adapter, durable workflow persistence, binding, deployment, or
+execution authority.
+
 ## Verification
 
 ```powershell
