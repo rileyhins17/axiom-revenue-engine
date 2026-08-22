@@ -26,11 +26,15 @@
 | WorkflowRun | Resumable execution receipt with version, step, attempt, result, and failure. |
 | CostLedger | Provider usage/cost attached to a run, lead, campaign, and budget period. |
 | KwLeadEvaluationSet | Private 50-lead owner-labelled KW quality gate used to measure engine agreement before live outreach. |
+| PrivateKwImportPlan | Versioned, ignored local seed of canonical research-only businesses, locations, cohort source runs, and source records; it grants no qualification or outreach authority. |
 
 ## Identity and evidence rules
 
 - Business identity is resolved from source IDs, normalized domain, phone,
   address, and name; no single weak field is universally authoritative.
+- The private KW seed refuses shared domain, phone, or normalized name/location
+  signals instead of silently merging possible duplicates. Source-run and record
+  IDs remain deterministic for the same import version and input.
 - ContactPoint is not Business. A business may have many routes and people.
 - Current state may change, but FunnelEvent, EvidenceClaim, QualificationSnapshot,
   ConsentEvidence, WorkflowRun, and CostLedger are immutable/versioned history.

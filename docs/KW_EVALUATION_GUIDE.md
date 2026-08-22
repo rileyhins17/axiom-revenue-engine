@@ -11,6 +11,31 @@ The current progress is **0 of 50 real leads loaded**. The repository now has th
 validated format and scoring gate; real lead records will stay in the private
 database or ignored local evaluation storage, not in Git documentation.
 
+## Safe private loading
+
+The preparation path is implemented. Codex—not Riley—will normally operate it:
+
+```powershell
+npm run kw:prepare-import -- --input data/kw-evaluation/input.json --output data/kw-evaluation/plan.json
+```
+
+Both files must be direct children of the ignored `data/kw-evaluation/` folder.
+The command refuses to overwrite an existing plan. It accepts at most 50 records
+and only Kitchener, Waterloo, or Cambridge businesses in roofing, HVAC, or
+landscaping. It validates public source/website URLs, Canadian phone/postal
+formats, stable identity signals, duplicate source IDs, and potential duplicate
+businesses.
+
+The seed version accepts only manual research or the read-only legacy export and
+requires provider cost to be zero. Social/listing pages remain source evidence;
+they cannot masquerade as the business's website. Prepared businesses stay
+`RESEARCH_ONLY`, with qualification and outreach explicitly unauthorized.
+
+Preparation creates separate source-run records for each city/niche cohort and
+shows the exact remaining count and balance. It does not audit a website, call a
+provider, create an email candidate, or load staging/production D1. A later
+release-gated persistence step will validate the same versioned plan again.
+
 ## What Riley will do
 
 For each business, the app will show its website capture, the engine's scores,

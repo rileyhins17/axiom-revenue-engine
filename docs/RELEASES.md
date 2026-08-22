@@ -52,5 +52,10 @@
   private/internal target blocking, manual redirect revalidation, timeout and
   1 MiB HTML limits, explicit failure outcomes, and fake-network tests. It is not
   connected to live engine execution.
+- Added a zero-cost private KW seed-preparation path with strict market/niche
+  validation, stable identity/source records, cohort runs, duplicate rejection,
+  ignored no-overwrite storage, and explicit research-only/no-outreach state.
+- Corrected the complete test command so TypeScript safety tests in `scripts/`
+  are always included, and made that test-glob coverage a safety assertion.
 
 Production has not been cut over to this release.

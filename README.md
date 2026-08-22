@@ -102,6 +102,11 @@ The Worker/Workflow and bounded website-capture contracts now exist, but there i
 deliberately no deployed engine resource, live queue consumer, schedule, data
 binding, live capture call, or spending path.
 
+The first 50-business seed can be normalized into ignored local storage with
+`npm run kw:prepare-import -- --input data/kw-evaluation/input.json --output data/kw-evaluation/plan.json`.
+This command makes no provider call, spends nothing, and cannot qualify or contact
+a business. See the evaluation guide before preparing real private data.
+
 Legacy resource identifiers are kept only where needed for safe migration. They
 must not be renamed in place or retired until reconciliation, rollback, and the
 30-day stability gate are complete.

@@ -33,6 +33,8 @@ staging; no rebuild code or migration has been deployed to production.
   `ea7ff1a35302c927c0c26bf6008d05692d77a2be`
 - Bounded public-website capture checkpoint:
   `5c372091ace34f68596ebbadb59fe66727f66e8e`
+- Private KW seed-preparation checkpoint:
+  `f0d0378c7dffb34a41637165539424bb98b88ccd`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -118,6 +120,17 @@ staging; no rebuild code or migration has been deployed to production.
 - Public-capture checkpoint verification passes 193/193 tests, typecheck,
   zero-warning lint, safety checks, secret-sanitized console build, explicit
   console dry run, deterministic engine type check, and engine dry run.
+- A private seed-preparation command now turns up to 50 manually researched or
+  legacy-read-only KW businesses into a versioned ignored plan. It normalizes
+  public URLs, names, Canadian phones/postal codes, locations, city/niche cohort
+  runs, and stable identity/source IDs; likely duplicates fail closed.
+- Seed plans are research-only, zero-cost, and explicitly cannot qualify or
+  contact anyone. The command cannot use Cloudflare/providers and cannot write
+  outside `data/kw-evaluation/` or overwrite an existing plan. Real progress is
+  still 0/50 because no prospect data was committed or acquired.
+- The complete test glob previously omitted TypeScript tests in `scripts/`.
+  That is corrected and enforced by the safety checker. The private-import
+  checkpoint passes 200/200 tests and the complete local release gate.
 
 ## Safety and production
 
@@ -180,6 +193,9 @@ Completed gates:
 - Public website capture boundary: canonical public targets, redirect-by-redirect
   validation, bounded HTML/time, explicit failure states, generated Cloudflare
   types, and fake-network safety tests.
+- Private KW source/identity seed: ignored no-overwrite storage, strict input and
+  plan schemas, stable multi-signal identities, cohort provenance, duplicate and
+  market guards, and zero qualification/outreach authority.
 
 Still required for Phase 1:
 
@@ -210,12 +226,13 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Push the bounded public-website capture checkpoint and verify Linux CI.
-2. Implement the source/identity import path that can privately load the first
-   real 50-lead KW set; do not acquire paid data or enable providers yet.
-3. Convert bounded HTML fixtures into deterministic page facts, with adversarial
+1. Push the private KW seed-preparation checkpoint and verify Linux CI.
+2. Convert bounded HTML fixtures into deterministic page facts, with adversarial
    parser tests, before Browser Rendering, R2, or any live website capture is
    enabled.
+3. Add a repeatable, validation-only persistence plan for the private seed; do
+   not write staging/production D1 or acquire paid data until that gate is
+   separately verified.
 
 ## Resume instructions
 
