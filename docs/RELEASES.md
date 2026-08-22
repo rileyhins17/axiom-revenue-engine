@@ -17,5 +17,13 @@
   and Wrangler dry run.
 - Verified the same complete gate on clean Ubuntu in GitHub Actions after making
   Node/tooling and secret-independent generated bindings reproducible.
+- Exported and checksummed the 223 MB legacy production D1 database before any
+  mutation, recorded a Time Travel bookmark, and confirmed 1,936 historical sends
+  with no send or scrape activity since June 3.
+- Corrected the legacy master database switch to off and removed the dormant
+  five-minute cron that was creating 287 zero-send skipped runs per day. No code,
+  route, or database migration was deployed.
+- Added the GitHub `production` environment restricted to `main`; deployment
+  credentials remain absent, so the protected workflow cannot deploy yet.
 
 Production has not been cut over to this release.

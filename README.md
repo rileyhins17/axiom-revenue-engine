@@ -33,7 +33,7 @@ messages remain manual actions.
 
 ## Safe local setup
 
-Requirements: Node.js 20+, npm, and Wrangler through the project dependency.
+Requirements: Node.js 22+, npm, and Wrangler through the project dependency.
 
 ```powershell
 npm ci
@@ -62,6 +62,8 @@ npx wrangler deploy --dry-run --autoconfig false
 - [`AGENTS.md`](AGENTS.md) — mandatory rules for every agent and contributor.
 - [`docs/OWNER_CONTEXT.md`](docs/OWNER_CONTEXT.md) — private business and owner context.
 - [`docs/STATUS.md`](docs/STATUS.md) — exact resumable checkpoint.
+- [`docs/PRODUCTION_INVENTORY.md`](docs/PRODUCTION_INVENTORY.md) — latest non-secret
+  legacy resource, data, safety, and backup inventory.
 - [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) — product, architecture, phases, and gates.
 - [`docs/GOTCHAS.md`](docs/GOTCHAS.md) — proven recurring traps and prevention.
 - [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — safe operator and release procedures.

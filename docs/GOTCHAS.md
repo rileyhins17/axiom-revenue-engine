@@ -23,10 +23,29 @@ Retire entries when the architecture makes them impossible.
   database pause records were the real production stop.
 - **Root cause:** multiple authorities and unsafe defaults.
 - **Proven fix:** code, examples, and infrastructure default every autonomous
-  switch off; all applicable gates must agree before work.
+  switch off; all applicable gates must agree before work. The production
+  inventory also corrected the legacy master database bit to `enabled=0` after a
+  verified export; the old Worker remains rollback-only and is not the new source
+  of configuration truth.
 - **Prevention/test:** `src/lib/env.test.ts` plus `npm run check:safety`.
 - **Affected area:** all automation.
-- **Verifying commit:** `7afc212`.
+- **Verifying commit:** `7afc212`; live stop re-verified 2026-08-21 and exact
+  documentation checkpoint pending.
+
+## SAFE-002 — A paused cron still wrote a skipped run every five minutes
+
+- **Symptom:** no email or scrape work ran, but D1 recorded 287 `SKIPPED`
+  automation runs in 24 hours and continuously refreshed the scheduler lease.
+- **Root cause:** the legacy cron acquired/persisted scheduler state before
+  returning at the database pause gate.
+- **Proven fix:** remove all cron triggers from the rollback-only legacy Worker
+  during the rebuild; future durable schedules remain absent until their phase is
+  explicitly approved.
+- **Prevention/test:** a disabled phase has no deployed schedule; paused workflow
+  tests assert zero provider calls and zero durable run/lease writes.
+- **Affected area:** production safety, D1 cost/noise, observability.
+- **Verifying commit:** documentation checkpoint pending; production trigger
+  removal observed through the full propagation window on 2026-08-21.
 
 ## DATA-001 — Raw SQL drifted from the live schema
 
@@ -172,3 +191,18 @@ Retire entries when the architecture makes them impossible.
   gate is added.
 - **Affected area:** GitHub Actions cost and feedback time.
 - **Verifying commit:** `6a03de6` produced one PR run and no duplicate push run.
+
+## DEPLOY-001 — Required reviewers are unavailable on this private repo plan
+
+- **Symptom:** GitHub returned 422 when creating an environment reviewer rule,
+  even with an empty reviewer list.
+- **Root cause:** GitHub's current Free/Pro/Team environment reviewer protection
+  is limited to public repositories; this repository is correctly private.
+- **Proven fix:** create the `production` environment with a custom `main` branch
+  policy and keep the exact release SHA, backup reference, typed approval phrase,
+  and absent-by-default deployment credentials as the no-cost release gates.
+- **Prevention/test:** audit the environment and secret names read-only before a
+  release; never weaken repository privacy to gain a reviewer button.
+- **Affected area:** GitHub Actions and production approval.
+- **Verifying commit:** documentation checkpoint pending; environment configured
+  2026-08-21.

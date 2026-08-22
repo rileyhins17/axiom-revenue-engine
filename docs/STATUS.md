@@ -5,10 +5,11 @@ Last updated: 2026-08-21 (America/Toronto)
 ## Plain-English status
 
 The real repository has been recovered into the local workspace, renamed to
-`rileyhins17/axiom-revenue-engine`, and made private. The first rebuild checkpoint
-is locally verified: autonomous work defaults off, final email delivery requires
-an exact human approval, the new evidence/quality kernel runs in shadow mode, and
-the owner-facing Leads screen prioritizes quality instead of record age.
+`rileyhins17/axiom-revenue-engine`, and made private. The foundation gate is green
+locally and on Linux. Production has now been inventoried and backed up: legacy
+email/intake work is stopped, the redundant master database switch is off, and
+the legacy five-minute cron was removed so a paused engine no longer writes an
+empty run every five minutes. No rebuild code or migration has been deployed.
 
 ## Verified checkpoint
 
@@ -24,12 +25,24 @@ the owner-facing Leads screen prioritizes quality instead of record age.
 - Current checkpoint verification rerun 2026-08-21: 160/160 tests, typecheck,
   zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
   build, and Wrangler deploy dry run pass
+- OpenAI project key authentication was verified without a generation request;
+  the key remains ignored and GPT-5.4 nano/mini model families are available.
 - Generated Cloudflare bindings replaced the stale hand-written environment file
 - Draft PR: `#8`.
 - Linux CI run `32547238706` passed on clean Ubuntu: deterministic binding check,
   OpenNext Cloudflare build, all 55 migrations from scratch, 160/160 tests,
   typecheck, lint, and Wrangler deploy dry run.
 - The CI fixes also removed duplicate branch/PR runs; PR work now gets one gate.
+- Private D1 export completed at `2026-08-22T02:59:22Z`: ignored path
+  `backups/production/20260821T2300-0400/axiom-ops-omniscient.sql`, 226,228,443
+  bytes, SHA-256
+  `46d60b80e099759c54522858d0ee9174d649dce5627fc8f9894b141666518dc7`.
+- Post-lockdown D1 Time Travel bookmark:
+  `00002ff8-00000002-000050cf-aa041de046860de5cf0527956a845930`.
+- Detailed non-secret inventory: `docs/PRODUCTION_INVENTORY.md`.
+- GitHub `production` environment exists and only accepts deployments originating
+  from `main`. No repository/environment deployment secrets or variables exist,
+  so the production workflow remains incapable of deploying.
 
 ## Safety and production
 
@@ -37,12 +50,27 @@ the owner-facing Leads screen prioritizes quality instead of record age.
   send cap zero.
 - Even if send configuration is later enabled, the final Gmail call now blocks
   without an unexpired operator approval matching the exact message content.
-- Production D1 pause records were the last known real stop. This was not
-  re-verified on 2026-08-21; production must be inventoried read-only and backed
-  up before any deployment or migration.
-- No live email, inbox sync, prospect contact, database migration, or Cloudflare
-  deployment has been performed during this rebuild checkpoint.
-- Legacy Worker/database identifiers still exist for rollback and data continuity.
+- Production D1 is `axiom-ops-omniscient` (58 tables, about 223 MB). Remote schema
+  is still at migration 0052; migrations 0053-0055 have not been applied.
+- At `2026-08-22T03:03:15Z`, the single global settings row was safely corrected
+  from `enabled=1` to `enabled=0`; global, emergency, intake, and follow-up pauses
+  all remain `1`. This was one reversible row update after the verified export.
+- No outbound email has been recorded since `2026-06-03T09:20:57Z`: 1,936 total,
+  zero in the last seven days. No new scrape job has been created since June 3.
+- A dormant legacy backlog remains: 472 ACTIVE and 14 QUEUED sequences with 1,537
+  scheduled steps. The database stops and removed cron prevent processing.
+- The deployed legacy Worker is version 683
+  (`9670516c-88cb-42b3-8ec2-dc48eea7a115`, deployed 2026-08-16). Its embedded
+  autonomous variables are still historically `true`, but it has no intended
+  scheduled execution and every database control is off. After the full trigger
+  propagation window, a read at `2026-08-22T03:18:07Z` still showed 1,695 skipped
+  runs and no run newer than `2026-08-22T03:00:46Z`.
+- The old cron had produced 287 zero-send SKIPPED runs in the preceding 24 hours.
+  Its trigger was removed without uploading code, changing routes, or migrating
+  data.
+- No live email, inbox sync, prospect contact, production code deployment, or
+  production database migration has been performed during this rebuild.
+- Legacy Worker/database identifiers remain for rollback and data continuity.
 
 ## Current phase
 
@@ -63,12 +91,16 @@ Completed gates:
   qualification, coverage, verification, and costs.
 - Leads UI now defaults to priority and exposes a transparent legacy score split;
   it explicitly says current evidence is still required.
+- Phase 0 production safety: non-secret inventory, full export/checksum, Time
+  Travel bookmark, master database stop, and legacy cron removal are verified.
 
 Still required for Phase 1:
 
-- Protected production deployment environment/secrets and manual workflow still
-  require a non-deploying configuration audit; production deploy is not approved.
-- Current production inventory/backup and explicit proof automation is stopped.
+- The protected production environment and manual workflow are configured, but
+  Cloudflare deployment credentials remain intentionally absent and production
+  deploy is not approved. GitHub required reviewers are unavailable for this
+  private repository on the current plan; `main` restriction plus exact SHA,
+  backup reference, and approval phrase are the no-cost gates.
 - Staging Worker/D1/R2/Queue/Workflow resources provisioned.
 - Characterization coverage retained while first v2 modules are introduced.
 
@@ -86,12 +118,11 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Export and inventory legacy production read-only, proving every automation
-   stop and recording a backup/checksum before any remote change.
-2. Provision isolated staging
-   resources without changing production traffic.
-3. Implement the website evidence/audit workflow and build the 50-lead KW
-   evaluation set before connecting any new qualification to sending.
+1. Provision isolated staging Worker/D1/R2/Queue resources and ensure no staging
+   binding points at legacy production.
+2. Harden release input validation before any deployment credentials are added.
+3. Implement the deterministic website evidence/audit workflow and build the
+   50-lead KW evaluation set before qualification can connect to sending.
 
 ## Resume instructions
 
