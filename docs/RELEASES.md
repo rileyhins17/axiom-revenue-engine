@@ -15,5 +15,7 @@
   score components and an explicit stale-evidence warning.
 - Locally verified 160 tests, typecheck, lint, all 55 migrations, Cloudflare build,
   and Wrangler dry run.
+- Verified the same complete gate on clean Ubuntu in GitHub Actions after making
+  Node/tooling and secret-independent generated bindings reproducible.
 
 Production has not been cut over to this release.

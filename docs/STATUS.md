@@ -15,6 +15,8 @@ the owner-facing Leads screen prioritizes quality instead of record age.
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
 - Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
+- CI hardening commits: `14d85a0468bef56e2bf7a97f7e53ed521955f1da`
+  and `6a03de6fe251155d7e5e8fa14b3c7f8e494c5a3b`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -23,10 +25,11 @@ the owner-facing Leads screen prioritizes quality instead of record age.
   zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
   build, and Wrangler deploy dry run pass
 - Generated Cloudflare bindings replaced the stale hand-written environment file
-- Draft PR: `#8`; its first Linux run proved the workflow's Node 20 pin was
-  incompatible with Wrangler's Node >=22 requirement. The next run proved local
-  `.env.local` had also contaminated generated bindings with a secret name. Node
-  22 plus deterministic, secret-independent type generation are pending CI proof.
+- Draft PR: `#8`.
+- Linux CI run `32547238706` passed on clean Ubuntu: deterministic binding check,
+  OpenNext Cloudflare build, all 55 migrations from scratch, 160/160 tests,
+  typecheck, lint, and Wrangler deploy dry run.
+- The CI fixes also removed duplicate branch/PR runs; PR work now gets one gate.
 
 ## Safety and production
 
@@ -63,7 +66,8 @@ Completed gates:
 
 Still required for Phase 1:
 
-- CI and protected manual production deployment verified in GitHub.
+- Protected production deployment environment/secrets and manual workflow still
+  require a non-deploying configuration audit; production deploy is not approved.
 - Current production inventory/backup and explicit proof automation is stopped.
 - Staging Worker/D1/R2/Queue/Workflow resources provisioned.
 - Characterization coverage retained while first v2 modules are introduced.
@@ -82,8 +86,9 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Push this checkpoint, open its draft PR, and verify the Linux GitHub CI result.
-2. Export and inventory legacy production read-only, then provision isolated staging
+1. Export and inventory legacy production read-only, proving every automation
+   stop and recording a backup/checksum before any remote change.
+2. Provision isolated staging
    resources without changing production traffic.
 3. Implement the website evidence/audit workflow and build the 50-lead KW
    evaluation set before connecting any new qualification to sending.

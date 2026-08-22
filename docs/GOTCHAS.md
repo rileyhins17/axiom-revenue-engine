@@ -107,7 +107,8 @@ Retire entries when the architecture makes them impossible.
 - **Proven fix:** Linux GitHub Actions runs build and Wrangler dry run.
 - **Prevention/test:** required CI gate before production approval.
 - **Affected area:** build/deployment.
-- **Verifying commit:** workflow added in `7afc212`; Linux CI result pending.
+- **Verifying commit:** workflow added in `7afc212`; clean Linux run
+  `32547238706` passed at `6a03de6`.
 
 ## UI-001 — “Healthy” UI was not backed by business or runtime proof
 
@@ -144,7 +145,7 @@ Retire entries when the architecture makes them impossible.
 - **Prevention/test:** dependency installation plus generated-binding verification
   run before the rest of every Linux gate.
 - **Affected area:** CI, Cloudflare tooling, release workflow.
-- **Verifying commit:** pending CI fix checkpoint.
+- **Verifying commit:** `14d85a0`; confirmed by clean Linux run `32547238706`.
 
 ## TYPE-002 — Generated bindings absorbed a local secret name
 
@@ -157,7 +158,7 @@ Retire entries when the architecture makes them impossible.
 - **Prevention/test:** `npm run cf:typegen:check` uses `wrangler.typegen.env` in
   both local and Linux environments.
 - **Affected area:** generated bindings, secrets, CI reproducibility.
-- **Verifying commit:** pending deterministic-typegen checkpoint.
+- **Verifying commit:** `6a03de6`; clean Linux run `32547238706`.
 
 ## BUILD-003 — One branch push launched the same CI twice
 
@@ -170,4 +171,4 @@ Retire entries when the architecture makes them impossible.
 - **Prevention/test:** inspect workflow triggers and steps whenever a new release
   gate is added.
 - **Affected area:** GitHub Actions cost and feedback time.
-- **Verifying commit:** pending CI-efficiency checkpoint.
+- **Verifying commit:** `6a03de6` produced one PR run and no duplicate push run.
