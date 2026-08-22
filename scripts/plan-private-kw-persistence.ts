@@ -1,17 +1,18 @@
 import { pathToFileURL } from "node:url";
 
 import {
-  preparePrivateKwImport,
-  type PrivateKwImportInput,
+  PrivateKwImportPlanSchema,
 } from "../src/lib/revenue-engine/private-kw-import";
+import {
+  buildPrivateKwPersistencePlan,
+} from "../src/lib/revenue-engine/private-kw-persistence-plan";
 import {
   readPrivateKwJson,
   resolvePrivateKwDataPath,
   writePrivateKwJson,
 } from "./private-kw-files";
 
-const MAX_PRIVATE_INPUT_BYTES = 2_000_000;
-export { resolvePrivateKwDataPath } from "./private-kw-files";
+const MAX_PRIVATE_PLAN_BYTES = 5_000_000;
 
 function parseArgs(args: string[]) {
   const values = new Map<string, string>();
@@ -19,7 +20,7 @@ function parseArgs(args: string[]) {
     const name = args[index];
     const value = args[index + 1];
     if (!name?.startsWith("--") || !value || value.startsWith("--")) {
-      throw new Error("Usage: npm run kw:prepare-import -- --input data/kw-evaluation/input.json --output data/kw-evaluation/plan.json");
+      throw new Error("Usage: npm run kw:plan-persistence -- --input data/kw-evaluation/plan.json --output data/kw-evaluation/persistence.json");
     }
     if (values.has(name)) throw new Error(`Duplicate argument ${name}.`);
     values.set(name, value);
@@ -33,23 +34,25 @@ function parseArgs(args: string[]) {
   };
 }
 
-export async function preparePrivateKwImportFile(args: string[]) {
+export async function planPrivateKwPersistenceFile(args: string[]) {
   const files = parseArgs(args);
   if (files.input === files.output) throw new Error("Input and output files must be different.");
-  const input = await readPrivateKwJson(files.input, MAX_PRIVATE_INPUT_BYTES);
-  const plan = preparePrivateKwImport(input.value as PrivateKwImportInput);
+  const input = await readPrivateKwJson(files.input, MAX_PRIVATE_PLAN_BYTES);
+  const source = PrivateKwImportPlanSchema.parse(input.value);
+  const plan = buildPrivateKwPersistencePlan(source);
   const output = await writePrivateKwJson(files.output, plan);
-  return { output, summary: plan.summary };
+  return { output, summary: plan.summary, mutationAuthorized: plan.mutationAuthorized };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  preparePrivateKwImportFile(process.argv.slice(2))
+  planPrivateKwPersistenceFile(process.argv.slice(2))
     .then((result) => {
-      console.log(`Prepared private KW import: ${result.summary.loaded} loaded, ${result.summary.remaining} remaining.`);
+      console.log(`Prepared validation-only persistence plan with ${result.summary.totalStatements} statements.`);
+      console.log(`Mutation authorized: ${String(result.mutationAuthorized)}.`);
       console.log(`Ignored output: ${result.output}`);
     })
     .catch((error) => {
-      console.error(error instanceof Error ? error.message : "Private KW import failed.");
+      console.error(error instanceof Error ? error.message : "Private KW persistence planning failed.");
       process.exitCode = 1;
     });
 }

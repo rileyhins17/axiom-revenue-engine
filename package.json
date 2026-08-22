@@ -31,7 +31,8 @@
     "cf:engine:typegen:check": "wrangler types --config wrangler.engine.jsonc --env-file wrangler.typegen.env --env-interface RevenueEngineEnv ./src/engine/worker-env.d.ts --check",
     "cf:engine:dev": "wrangler dev --config wrangler.engine.jsonc --local --env-file wrangler.typegen.env",
     "cf:engine:dry-run": "wrangler deploy --config wrangler.engine.jsonc --dry-run --autoconfig false",
-    "kw:prepare-import": "tsx scripts/prepare-private-kw-import.ts"
+    "kw:prepare-import": "tsx scripts/prepare-private-kw-import.ts",
+    "kw:plan-persistence": "tsx scripts/plan-private-kw-persistence.ts"
   },
   "dependencies": {
     "@cloudflare/playwright": "^1.1.2",
