@@ -30,5 +30,8 @@
   configuration that cannot bind legacy production.
 - Hardened production workflow inputs with exact-SHA/checksum validation and a
   requirement that the deployed commit is contained in `main`.
+- Blocked a pre-deploy local-secret leak from OpenNext's generated environment
+  module and added automatic sanitization plus whole-bundle secret scanning to
+  every Cloudflare build.
 
 Production has not been cut over to this release.

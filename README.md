@@ -46,6 +46,10 @@ optional until AI-backed development is being tested. Local and automated tests
 must use fixtures/fakes and must never call prospects, submit forms, sync a live
 inbox, or run the production scheduler.
 
+Cloudflare builds automatically remove values loaded from local `.env*` files and
+scan the generated bundle for secret material. Runtime secrets belong in
+Cloudflare's secret store; a local `.env.local` value is never a deploy source.
+
 ## Verification
 
 ```powershell

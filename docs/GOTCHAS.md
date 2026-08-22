@@ -193,6 +193,23 @@ Retire entries when the architecture makes them impossible.
 - **Affected area:** GitHub Actions cost and feedback time.
 - **Verifying commit:** `6a03de6` produced one PR run and no duplicate push run.
 
+## BUILD-004 — OpenNext compiled local secrets into its runtime environment file
+
+- **Symptom:** the first staging pre-deploy inspection found the local OpenAI key
+  value inside `.open-next/cloudflare/next-env.mjs` even though `.env.local` was
+  ignored by Git.
+- **Root cause:** OpenNext intentionally compiles values from Next.js `.env*`
+  files into a runtime fallback module. Git ignore rules do not affect build
+  output.
+- **Proven fix:** every Cloudflare build replaces the compiled fallback with empty
+  environments, then scans the entire generated bundle for sensitive source
+  values and recognizable secret material before Wrangler can upload it.
+- **Prevention/test:** `scripts/sanitize-cloudflare-bundle.test.mjs`; the safety
+  configuration requires the sanitizer in `build:cloudflare`; provider secrets
+  are set in Cloudflare's secret store instead of supplied by local build files.
+- **Affected area:** all Cloudflare builds, previews, dry runs, and deployments.
+- **Verifying commit:** pending bundle-safety checkpoint.
+
 ## DEPLOY-001 — Required reviewers are unavailable on this private repo plan
 
 - **Symptom:** GitHub returned 422 when creating an environment reviewer rule,

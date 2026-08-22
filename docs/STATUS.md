@@ -56,9 +56,14 @@ empty run every five minutes. No rebuild code or migration has been deployed.
   D1 checksum reference, exact checkout, and ancestry on `main`; targeted tests
   reject abbreviated, branch-shaped, and command-shaped inputs.
 - Staging/release checkpoint verification rerun 2026-08-21: safety scan,
-  164/164 tests, typecheck, lint, Cloudflare production build, explicit default
-  deploy dry run, and explicit staging deploy dry run pass. The staging dry run
-  exposes only the isolated D1, Browser Rendering, assets, and fail-closed vars.
+  168/168 tests, typecheck, lint, secret-sanitizing Cloudflare production build,
+  explicit default deploy dry run, and explicit staging deploy dry run pass. The
+  staging dry run exposes only the isolated D1, Browser Rendering, assets, and
+  fail-closed vars.
+- The first staging upload was stopped before network deployment because OpenNext
+  had copied the ignored local OpenAI key into its generated environment module.
+  Every Cloudflare build now empties that local fallback and scans all generated
+  files; the real key was removed and the corrected default/staging dry runs pass.
 
 ## Safety and production
 

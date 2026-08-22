@@ -9,7 +9,7 @@
     "dev": "next dev --webpack",
     "build": "npm run build:cloudflare",
     "build:next": "next build --webpack",
-    "build:cloudflare": "opennextjs-cloudflare build",
+    "build:cloudflare": "opennextjs-cloudflare build && node scripts/sanitize-cloudflare-bundle.mjs",
     "preview": "npm run build:cloudflare && wrangler dev",
     "deploy": "node scripts/production-deploy-guard.mjs",
     "deploy:production": "wrangler deploy --env=\"\" --autoconfig false",

@@ -24,7 +24,8 @@
 1. Confirm the diff contains no secret or untracked owner data.
 2. Confirm every autonomous default is off and `npm run check:safety` passes.
 3. Back up D1 before any remote migration; record export location and checksum.
-4. Run test, typecheck, lint, Cloudflare build, and Wrangler dry run on Linux CI.
+4. Run test, typecheck, lint, the secret-sanitizing Cloudflare build, and Wrangler
+   dry run on Linux CI. A bundle secret-scan failure is a hard stop.
 5. Deploy staging; use test providers/mail sinks only.
 6. Exercise owner flows, workflow retry/idempotency, cost stop, and rollback.
 7. Record exact versions/config/resources and obtain production approval.
