@@ -45,6 +45,8 @@ staging; no rebuild code or migration has been deployed to production.
   `30424528b920ec535641282035428661e057a2d7`
 - Fixture Browser-measurement source checkpoint:
   `44a65c966841d3a92bf99c14559d2ad85dda87dd`
+- Fixture Browser-measurement documentation/CI checkpoint:
+  `a4d73fa89b1072fdd7803cd6c2276fe8fe830676`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -203,6 +205,9 @@ staging; no rebuild code or migration has been deployed to production.
   default console no-upload dry run, deterministic engine bindings, and the inert
   engine no-upload dry run. The console dry run still reports only the known
   generated duplicate-key warnings documented for the legacy UI bundle.
+- Linux CI run `32558784285` passed all 13 gates on fixture measurement checkpoint
+  `a4d73fa`, including exact dependency installation, a clean Ubuntu Cloudflare
+  build, all migrations, 220/220 tests, and both no-upload Worker validations.
 
 ## Safety and production
 
