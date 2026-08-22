@@ -172,11 +172,12 @@ staging; no rebuild code or migration has been deployed to production.
   become a website defect. The deterministic website audit advanced to v2 so
   content/page-set completeness and visual coverage decide whether absence is a
   supported failure or an owner-review gap.
-- Browser evidence remains fixture-only and disconnected from the Worker. No
-  Browser or R2 binding, session, request, artifact write, provider cost, live
-  website capture, database write, qualification, or outreach occurred. The
-  checkpoint passes 215/215 tests, typecheck, lint, and safety checks before the
-  final packaging gate.
+- Browser evidence remains fixture-only and disconnected from the new engine
+  Worker. No new engine Browser or R2 binding, session, request, artifact write,
+  provider cost, live website capture, database write, qualification, or outreach
+  occurred. The checkpoint passes 215/215 tests, typecheck, zero-warning lint,
+  safety checks, the secret-sanitized console build and dry run, deterministic
+  engine bindings, and the inert engine dry run.
 
 ## Safety and production
 
