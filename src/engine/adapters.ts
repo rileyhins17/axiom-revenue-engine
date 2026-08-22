@@ -1,4 +1,4 @@
-import type { EvidenceClaim } from "@/lib/revenue-engine/evidence";
+import type { DeterministicWebsiteAuditResult } from "@/lib/revenue-engine/website-audit";
 
 export type AdapterCostReceipt = {
   provider: string;
@@ -43,21 +43,17 @@ export interface SourceAdapter {
   }>>;
 }
 
-export type WebsiteAuditResult = {
-  businessId: string;
-  auditVersion: string;
-  classification: "REBUILD" | "NO_SITE_NEW_BUILD" | "MINOR_IMPROVEMENT" | "NO_OPPORTUNITY";
-  claims: EvidenceClaim[];
-  desktopArtifactRef: string | null;
-  mobileArtifactRef: string | null;
-};
-
 export interface AuditAdapter {
   audit(input: AdapterContext & {
     businessId: string;
+    businessName: string;
+    niche: string;
+    expectedServices: string[];
+    expectedLocations: string[];
+    sourceEvidenceUrl: string;
     websiteUrl: string | null;
     auditVersion: string;
-  }): Promise<AdapterResult<WebsiteAuditResult>>;
+  }): Promise<AdapterResult<DeterministicWebsiteAuditResult>>;
 }
 
 export type ContactCandidate = {
