@@ -27,6 +27,7 @@ function auditFixture(id: number) {
     desktopArtifactRef: null,
     mobileArtifactRef: null,
     domArtifactRef: null,
+    pageSetComplete: false,
     pages: [],
     resourceProbes: [],
     mobile: {

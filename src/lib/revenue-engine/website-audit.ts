@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { EvidenceClaimSchema, type EvidenceClaim } from "@/lib/revenue-engine/evidence";
 
-export const DETERMINISTIC_WEBSITE_AUDIT_VERSION = "website-audit-deterministic-v1";
+export const DETERMINISTIC_WEBSITE_AUDIT_VERSION = "website-audit-deterministic-v2";
 
 export const WebsiteSiteStateSchema = z.enum(["NO_SITE", "UNREACHABLE", "CAPTURED"]);
 export const WebsiteClassificationSchema = z.enum([
@@ -25,26 +25,26 @@ export const WebsiteTrustSignalSchema = z.enum([
   "CASE_STUDY",
 ]);
 
-const WebsiteActionSchema = z
+export const WebsiteActionSchema = z
   .object({
     kind: WebsiteActionKindSchema,
     label: z.string().trim().min(1).max(120),
     href: z.string().trim().max(2048).nullable(),
-    visible: z.boolean(),
-    aboveFold: z.boolean(),
+    visible: z.boolean().nullable(),
+    aboveFold: z.boolean().nullable(),
   })
   .strict();
 
-const WebsiteFormSchema = z
+export const WebsiteFormSchema = z
   .object({
-    visible: z.boolean(),
+    visible: z.boolean().nullable(),
     hasSubmitControl: z.boolean(),
     disabled: z.boolean(),
     actionUrl: z.string().url().nullable(),
   })
   .strict();
 
-const WebsitePageSnapshotSchema = z
+export const WebsitePageSnapshotSchema = z
   .object({
     kind: WebsitePageKindSchema,
     url: z.string().url(),
@@ -55,10 +55,57 @@ const WebsitePageSnapshotSchema = z
     forms: z.array(WebsiteFormSchema).max(30),
     trustSignals: z.array(WebsiteTrustSignalSchema).max(50),
     structuredDataTypes: z.array(z.string().trim().min(1).max(120)).max(50),
+    contentComplete: z.boolean(),
+    evidenceCoverage: z
+      .object({
+        desktopRenderCaptured: z.boolean(),
+        actionVisibilityComplete: z.boolean(),
+        formVisibilityComplete: z.boolean(),
+      })
+      .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((page, context) => {
+    if (
+      !page.evidenceCoverage.desktopRenderCaptured
+      && (page.evidenceCoverage.actionVisibilityComplete || page.evidenceCoverage.formVisibilityComplete)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Complete visual coverage requires a captured desktop render.",
+        path: ["evidenceCoverage"],
+      });
+    }
+    if (
+      page.evidenceCoverage.actionVisibilityComplete
+      && page.actions.some((action) => action.visible === null || action.aboveFold === null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Complete action coverage cannot contain unknown visibility or placement.",
+        path: ["actions"],
+      });
+    }
+    if (
+      page.evidenceCoverage.formVisibilityComplete
+      && page.forms.some((form) => form.visible === null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Complete form coverage cannot contain unknown visibility.",
+        path: ["forms"],
+      });
+    }
+    if (page.actions.some((action) => action.aboveFold === true && action.visible !== true)) {
+      context.addIssue({
+        code: "custom",
+        message: "An action cannot be above the fold unless it is visibly rendered.",
+        path: ["actions"],
+      });
+    }
+  });
 
-const ResourceProbeSchema = z
+export const ResourceProbeSchema = z
   .object({
     url: z.string().url(),
     type: z.enum(["PAGE", "ASSET"]),
@@ -67,7 +114,7 @@ const ResourceProbeSchema = z
   })
   .strict();
 
-const MobileSnapshotSchema = z
+export const MobileSnapshotSchema = z
   .object({
     captured: z.boolean(),
     horizontalOverflow: z.boolean().nullable(),
@@ -94,6 +141,7 @@ export const DeterministicWebsiteAuditInputSchema = z
     desktopArtifactRef: z.string().trim().min(1).nullable(),
     mobileArtifactRef: z.string().trim().min(1).nullable(),
     domArtifactRef: z.string().trim().min(1).nullable(),
+    pageSetComplete: z.boolean(),
     pages: z.array(WebsitePageSnapshotSchema).max(10),
     resourceProbes: z.array(ResourceProbeSchema).max(250),
     mobile: MobileSnapshotSchema,
@@ -105,6 +153,13 @@ export const DeterministicWebsiteAuditInputSchema = z
         code: "custom",
         message: "A captured site requires a final URL and at least one page snapshot.",
         path: ["siteState"],
+      });
+    }
+    if (input.siteState === "CAPTURED" && (input.statusCode < 200 || input.statusCode >= 400)) {
+      context.addIssue({
+        code: "custom",
+        message: "A captured site requires a successful HTTP status.",
+        path: ["statusCode"],
       });
     }
     if (input.siteState === "NO_SITE" && (input.requestedUrl || input.finalUrl || input.pages.length > 0)) {
@@ -129,6 +184,46 @@ export const DeterministicWebsiteAuditInputSchema = z
         code: "custom",
         message: "An unreachable site requires the URL that was probed.",
         path: ["requestedUrl"],
+      });
+    }
+    if (
+      input.siteState === "UNREACHABLE"
+      && (
+        input.finalUrl
+        || input.pages.length > 0
+        || input.desktopArtifactRef
+        || input.mobileArtifactRef
+        || input.domArtifactRef
+        || input.resourceProbes.length > 0
+        || input.mobile.captured
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "An unreachable site cannot retain successful capture evidence.",
+        path: ["siteState"],
+      });
+    }
+    if (input.mobile.captured && !input.mobileArtifactRef) {
+      context.addIssue({
+        code: "custom",
+        message: "Measured mobile evidence requires its artifact reference.",
+        path: ["mobileArtifactRef"],
+      });
+    }
+    if (
+      !input.mobile.captured
+      && (
+        input.mobile.horizontalOverflow !== null
+        || input.mobile.navigationUsable !== null
+        || input.mobile.textReadable !== null
+        || input.mobile.minimumTapTargetPx !== null
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "An uncaptured mobile view cannot contain measured results.",
+        path: ["mobile"],
       });
     }
   });
@@ -282,7 +377,7 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
     const home = input.pages.find((page) => page.kind === "HOME") || input.pages[0];
     const allText = input.pages.map((page) => page.visibleText).join(" ");
     const sourceUrl = home.url;
-    const visibleActions = home.actions.filter((action) => action.visible);
+    const visibleActions = home.actions.filter((action) => action.visible === true);
     const primaryAction = visibleActions.some((action) => action.aboveFold);
     const tapToCall = visibleActions.some((action) => action.kind === "PHONE" && action.href?.startsWith("tel:"));
     const usableForm = input.pages.some((page) =>
@@ -343,7 +438,9 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
     });
     addCheck({
       checkId: "offer_clarity",
-      outcome: includesAnyTerm(home.visibleText, input.expectedServices) ? "PASS" : "FAIL",
+      outcome: includesAnyTerm(home.visibleText, input.expectedServices)
+        ? "PASS"
+        : home.contentComplete ? "FAIL" : "UNKNOWN",
       severity: "IMPORTANT",
       category: "offer_clarity",
       scoreImpact: 15,
@@ -355,7 +452,9 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
     });
     addCheck({
       checkId: "local_relevance",
-      outcome: includesAnyTerm(allText, input.expectedLocations) ? "PASS" : "FAIL",
+      outcome: includesAnyTerm(allText, input.expectedLocations)
+        ? "PASS"
+        : input.pageSetComplete && input.pages.every((page) => page.contentComplete) ? "FAIL" : "UNKNOWN",
       severity: "IMPORTANT",
       category: "local_relevance",
       scoreImpact: 8,
@@ -367,7 +466,9 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
     });
     addCheck({
       checkId: "primary_conversion_action",
-      outcome: primaryAction ? "PASS" : "FAIL",
+      outcome: primaryAction
+        ? "PASS"
+        : home.evidenceCoverage.actionVisibilityComplete ? "FAIL" : "UNKNOWN",
       severity: "CRITICAL",
       category: "conversion_action",
       scoreImpact: 25,
@@ -380,7 +481,9 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
     });
     addCheck({
       checkId: "tap_to_call",
-      outcome: tapToCall ? "PASS" : "FAIL",
+      outcome: tapToCall
+        ? "PASS"
+        : home.evidenceCoverage.actionVisibilityComplete ? "FAIL" : "UNKNOWN",
       severity: "IMPORTANT",
       category: "conversion_action",
       scoreImpact: 10,
@@ -392,7 +495,9 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
     });
     addCheck({
       checkId: "form_availability",
-      outcome: usableForm ? "PASS" : "FAIL",
+      outcome: usableForm
+        ? "PASS"
+        : input.pages.every((page) => page.evidenceCoverage.formVisibilityComplete) ? "FAIL" : "UNKNOWN",
       severity: "IMPORTANT",
       category: "form",
       scoreImpact: 10,
@@ -404,7 +509,7 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
     });
     addCheck({
       checkId: "service_pages",
-      outcome: servicePageCount > 0 ? "PASS" : "FAIL",
+      outcome: servicePageCount > 0 ? "PASS" : input.pageSetComplete ? "FAIL" : "UNKNOWN",
       severity: "IMPORTANT",
       category: "offer_clarity",
       scoreImpact: 8,
@@ -416,7 +521,9 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
     });
     addCheck({
       checkId: "trust_signals",
-      outcome: trustSignalCount > 0 ? "PASS" : "FAIL",
+      outcome: trustSignalCount > 0
+        ? "PASS"
+        : input.pageSetComplete && input.pages.every((page) => page.contentComplete) ? "FAIL" : "UNKNOWN",
       severity: "IMPORTANT",
       category: "trust",
       scoreImpact: 12,
@@ -428,7 +535,7 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
     });
     addCheck({
       checkId: "page_title",
-      outcome: home.title ? "PASS" : "FAIL",
+      outcome: home.title ? "PASS" : home.contentComplete ? "FAIL" : "UNKNOWN",
       severity: "MINOR",
       category: "seo",
       scoreImpact: 3,
@@ -440,7 +547,7 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
     });
     addCheck({
       checkId: "meta_description",
-      outcome: home.metaDescription ? "PASS" : "FAIL",
+      outcome: home.metaDescription ? "PASS" : home.contentComplete ? "FAIL" : "UNKNOWN",
       severity: "MINOR",
       category: "seo",
       scoreImpact: 2,
@@ -452,7 +559,7 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
     });
     addCheck({
       checkId: "structured_data",
-      outcome: home.structuredDataTypes.length > 0 ? "PASS" : "FAIL",
+      outcome: home.structuredDataTypes.length > 0 ? "PASS" : home.contentComplete ? "FAIL" : "UNKNOWN",
       severity: "MINOR",
       category: "seo",
       scoreImpact: 3,

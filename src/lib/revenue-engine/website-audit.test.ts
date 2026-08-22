@@ -24,6 +24,7 @@ function modernSite(): DeterministicWebsiteAuditInput {
     desktopArtifactRef: "artifact:desktop:kw-roofing",
     mobileArtifactRef: "artifact:mobile:kw-roofing",
     domArtifactRef: "artifact:dom:kw-roofing",
+    pageSetComplete: true,
     pages: [
       {
         kind: "HOME",
@@ -38,6 +39,12 @@ function modernSite(): DeterministicWebsiteAuditInput {
         forms: [],
         trustSignals: ["REVIEW", "PROJECT_GALLERY", "WARRANTY"],
         structuredDataTypes: ["RoofingContractor"],
+        contentComplete: true,
+        evidenceCoverage: {
+          desktopRenderCaptured: true,
+          actionVisibilityComplete: true,
+          formVisibilityComplete: true,
+        },
       },
       {
         kind: "SERVICE",
@@ -49,6 +56,12 @@ function modernSite(): DeterministicWebsiteAuditInput {
         forms: [],
         trustSignals: ["PROJECT_GALLERY"],
         structuredDataTypes: [],
+        contentComplete: true,
+        evidenceCoverage: {
+          desktopRenderCaptured: true,
+          actionVisibilityComplete: true,
+          formVisibilityComplete: true,
+        },
       },
       {
         kind: "CONTACT",
@@ -60,6 +73,12 @@ function modernSite(): DeterministicWebsiteAuditInput {
         forms: [{ visible: true, hasSubmitControl: true, disabled: false, actionUrl: "https://kwroofing.example/contact" }],
         trustSignals: [],
         structuredDataTypes: [],
+        contentComplete: true,
+        evidenceCoverage: {
+          desktopRenderCaptured: true,
+          actionVisibilityComplete: true,
+          formVisibilityComplete: true,
+        },
       },
     ],
     resourceProbes: [
@@ -99,6 +118,12 @@ test("a weak generic site produces several traceable rebuild claims", () => {
     forms: [],
     trustSignals: [],
     structuredDataTypes: [],
+    contentComplete: true,
+    evidenceCoverage: {
+      desktopRenderCaptured: true,
+      actionVisibilityComplete: true,
+      formVisibilityComplete: true,
+    },
   }];
   input.resourceProbes = [
     { url: "http://kwroofing.example/missing.css", type: "ASSET", internal: true, statusCode: 404 },
@@ -130,8 +155,18 @@ test("unreachable and missing websites remain distinct opportunities", () => {
   unreachable.siteState = "UNREACHABLE";
   unreachable.finalUrl = null;
   unreachable.statusCode = 503;
+  unreachable.desktopArtifactRef = null;
+  unreachable.mobileArtifactRef = null;
+  unreachable.domArtifactRef = null;
   unreachable.pages = [];
   unreachable.resourceProbes = [];
+  unreachable.mobile = {
+    captured: false,
+    horizontalOverflow: null,
+    navigationUsable: null,
+    textReadable: null,
+    minimumTapTargetPx: null,
+  };
   const brokenResult = auditWebsiteDeterministically(unreachable);
   assert.equal(brokenResult.classification, "REBUILD");
   assert.equal(brokenResult.claims[0]?.method, "http_probe");
@@ -190,4 +225,17 @@ test("captured input fails closed without a final URL and page evidence", () => 
 
   const contaminatedNoSite = { ...modernSite(), siteState: "NO_SITE", requestedUrl: null, finalUrl: null, pages: [] };
   assert.equal(DeterministicWebsiteAuditInputSchema.safeParse(contaminatedNoSite).success, false);
+
+  const contaminatedUnreachable = { ...modernSite(), siteState: "UNREACHABLE", finalUrl: null, statusCode: 503, pages: [] };
+  assert.equal(DeterministicWebsiteAuditInputSchema.safeParse(contaminatedUnreachable).success, false);
+
+  const uncapturedMobileWithMeasurements = modernSite();
+  uncapturedMobileWithMeasurements.mobile = {
+    captured: false,
+    horizontalOverflow: true,
+    navigationUsable: null,
+    textReadable: null,
+    minimumTapTargetPx: null,
+  };
+  assert.equal(DeterministicWebsiteAuditInputSchema.safeParse(uncapturedMobileWithMeasurements).success, false);
 });
