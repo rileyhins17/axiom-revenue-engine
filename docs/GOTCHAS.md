@@ -29,8 +29,8 @@ Retire entries when the architecture makes them impossible.
   of configuration truth.
 - **Prevention/test:** `src/lib/env.test.ts` plus `npm run check:safety`.
 - **Affected area:** all automation.
-- **Verifying commit:** `7afc212`; live stop re-verified 2026-08-21 and exact
-  documentation checkpoint pending.
+- **Verifying commit:** `7afc212`; live stop and production inventory recorded in
+  `4408a89`.
 
 ## SAFE-002 — A paused cron still wrote a skipped run every five minutes
 
@@ -44,8 +44,8 @@ Retire entries when the architecture makes them impossible.
 - **Prevention/test:** a disabled phase has no deployed schedule; paused workflow
   tests assert zero provider calls and zero durable run/lease writes.
 - **Affected area:** production safety, D1 cost/noise, observability.
-- **Verifying commit:** documentation checkpoint pending; production trigger
-  removal observed through the full propagation window on 2026-08-21.
+- **Verifying commit:** `4408a89`; production trigger removal observed through
+  the full propagation window on 2026-08-21.
 
 ## DATA-001 — Raw SQL drifted from the live schema
 
@@ -204,5 +204,4 @@ Retire entries when the architecture makes them impossible.
 - **Prevention/test:** audit the environment and secret names read-only before a
   release; never weaken repository privacy to gain a reviewer button.
 - **Affected area:** GitHub Actions and production approval.
-- **Verifying commit:** documentation checkpoint pending; environment configured
-  2026-08-21.
+- **Verifying commit:** `4408a89`; environment configured 2026-08-21.
