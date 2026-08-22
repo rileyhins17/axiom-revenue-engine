@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   BROWSER_PAGE_EVIDENCE_VERSION,
   BROWSER_PAGE_MEASUREMENT_VERSION,
+  BROWSER_NETWORK_POLICY_VERSION,
   BrowserPageEvidenceSchema,
   mergeHtmlPageWithBrowserEvidence,
   type BrowserPageEvidence,
@@ -81,6 +82,18 @@ function capturedEvidence(
     provider: "CLOUDFLARE_BROWSER_RENDERING",
     providerRequestId: null,
     browserMsUsed: 250,
+    networkPolicy: {
+      policyVersion: BROWSER_NETWORK_POLICY_VERSION,
+      requestInterceptionEnabled: true,
+      allRequestUrlsValidated: true,
+      privateNetworkRequestsAllowed: 0,
+      credentialsUsed: false,
+      formSubmissions: 0,
+      downloadsAccepted: 0,
+      requestsObserved: 12,
+      requestsBlocked: 0,
+      documentUrls: [PAGE_URL],
+    },
     warnings: [],
     outcome: "CAPTURED",
     finalUrl: PAGE_URL,
@@ -244,6 +257,18 @@ test("failed browser capture is retained as a warning and cannot become a negati
     provider: "CLOUDFLARE_BROWSER_RENDERING",
     providerRequestId: null,
     browserMsUsed: 120_000,
+    networkPolicy: {
+      policyVersion: BROWSER_NETWORK_POLICY_VERSION,
+      requestInterceptionEnabled: true,
+      allRequestUrlsValidated: true,
+      privateNetworkRequestsAllowed: 0,
+      credentialsUsed: false,
+      formSubmissions: 0,
+      downloadsAccepted: 0,
+      requestsObserved: 1,
+      requestsBlocked: 0,
+      documentUrls: [PAGE_URL],
+    },
     warnings: ["provider_timeout"],
     outcome: "FAILED",
     finalUrl: null,
@@ -280,6 +305,17 @@ test("contract rejects inconsistent viewports and embedded screenshot data", () 
   assert.equal(BrowserPageEvidenceSchema.safeParse({
     ...valid,
     screenshotArtifactRef: "data:image/png;base64,not-an-artifact-reference",
+  }).success, false);
+  assert.equal(BrowserPageEvidenceSchema.safeParse({
+    ...valid,
+    requestedUrl: "http://127.0.0.1/",
+  }).success, false);
+  assert.equal(BrowserPageEvidenceSchema.safeParse({
+    ...valid,
+    networkPolicy: {
+      ...(valid.networkPolicy as Record<string, unknown>),
+      documentUrls: [PAGE_URL, "http://169.254.169.254/latest/meta-data/"],
+    },
   }).success, false);
 });
 

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { HtmlPageFactsSchema, type HtmlPageFacts } from "@/lib/revenue-engine/html-page-facts";
+import { normalizePublicWebsiteUrl } from "@/lib/revenue-engine/public-website-url";
 import {
   MobileSnapshotSchema,
   WebsiteActionKindSchema,
@@ -11,13 +12,14 @@ import {
 export const BROWSER_PAGE_EVIDENCE_VERSION = "browser-page-evidence-v1";
 export const BROWSER_PAGE_MEASUREMENT_VERSION = "browser-page-measurement-v1";
 export const BROWSER_HTML_MERGE_VERSION = "browser-html-merge-v1";
+export const BROWSER_NETWORK_POLICY_VERSION = "browser-network-policy-v1";
 
 export const BrowserViewportProfileSchema = z.enum([
   "DESKTOP_1440X900",
   "MOBILE_390X844",
 ]);
 
-const BrowserViewportSchema = z
+export const BrowserViewportSchema = z
   .object({
     width: z.number().int().min(320).max(2_560),
     height: z.number().int().min(480).max(2_000),
@@ -27,7 +29,31 @@ const BrowserViewportSchema = z
   })
   .strict();
 
-const BoundingBoxSchema = z
+export const BrowserNetworkReceiptSchema = z
+  .object({
+    policyVersion: z.literal(BROWSER_NETWORK_POLICY_VERSION),
+    requestInterceptionEnabled: z.literal(true),
+    allRequestUrlsValidated: z.literal(true),
+    privateNetworkRequestsAllowed: z.literal(0),
+    credentialsUsed: z.literal(false),
+    formSubmissions: z.literal(0),
+    downloadsAccepted: z.literal(0),
+    requestsObserved: z.number().int().nonnegative().max(1_000),
+    requestsBlocked: z.number().int().nonnegative().max(1_000),
+    documentUrls: z.array(z.string().url()).min(1).max(6),
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    if (receipt.requestsBlocked > receipt.requestsObserved) {
+      context.addIssue({
+        code: "custom",
+        message: "Blocked browser requests cannot exceed observed requests.",
+        path: ["requestsBlocked"],
+      });
+    }
+  });
+
+export const BrowserBoundingBoxSchema = z
   .object({
     x: z.number().finite().min(-10_000).max(100_000),
     y: z.number().finite().min(-10_000).max(1_000_000),
@@ -36,7 +62,7 @@ const BoundingBoxSchema = z
   })
   .strict();
 
-const BrowserActionMeasurementSchema = z
+export const BrowserActionMeasurementSchema = z
   .object({
     actionId: z.string().trim().min(1).max(160),
     kind: WebsiteActionKindSchema,
@@ -44,7 +70,7 @@ const BrowserActionMeasurementSchema = z
     href: z.string().trim().max(2_048).nullable(),
     visible: z.boolean(),
     enabled: z.boolean(),
-    boundingBox: BoundingBoxSchema.nullable(),
+    boundingBox: BrowserBoundingBoxSchema.nullable(),
   })
   .strict()
   .superRefine((action, context) => {
@@ -57,7 +83,7 @@ const BrowserActionMeasurementSchema = z
     }
   });
 
-const BrowserFormMeasurementSchema = z
+export const BrowserFormMeasurementSchema = z
   .object({
     formId: z.string().trim().min(1).max(160),
     actionUrl: z.string().url().nullable(),
@@ -65,7 +91,7 @@ const BrowserFormMeasurementSchema = z
     visible: z.boolean(),
     hasSubmitControl: z.boolean(),
     disabled: z.boolean(),
-    boundingBox: BoundingBoxSchema.nullable(),
+    boundingBox: BrowserBoundingBoxSchema.nullable(),
   })
   .strict()
   .superRefine((form, context) => {
@@ -78,7 +104,7 @@ const BrowserFormMeasurementSchema = z
     }
   });
 
-const BrowserDocumentMeasurementSchema = z
+export const BrowserDocumentMeasurementSchema = z
   .object({
     clientWidth: z.number().int().positive().max(100_000),
     documentScrollWidth: z.number().int().positive().max(100_000),
@@ -86,7 +112,7 @@ const BrowserDocumentMeasurementSchema = z
   })
   .strict();
 
-const BrowserNavigationMeasurementSchema = z
+export const BrowserNavigationMeasurementSchema = z
   .object({
     status: z.enum(["USABLE", "UNUSABLE", "UNKNOWN"]),
     probePerformed: z.boolean(),
@@ -94,7 +120,7 @@ const BrowserNavigationMeasurementSchema = z
   })
   .strict();
 
-const BrowserTextMeasurementSchema = z
+export const BrowserTextMeasurementSchema = z
   .object({
     readable: z.boolean().nullable(),
     minimumFontSizePx: z.number().finite().positive().max(200).nullable(),
@@ -115,6 +141,7 @@ const BrowserEvidenceBaseSchema = z.object({
   provider: z.literal("CLOUDFLARE_BROWSER_RENDERING"),
   providerRequestId: z.string().trim().min(1).max(200).nullable(),
   browserMsUsed: z.number().int().nonnegative().max(120_000),
+  networkPolicy: BrowserNetworkReceiptSchema,
   warnings: z.array(z.string().trim().min(1).max(120)).max(20),
 });
 
@@ -181,6 +208,31 @@ export const BrowserPageEvidenceSchema = z
           code: "custom",
           message: `${evidence.profile} requires its fixed comparison viewport.`,
           path: ["viewport", field],
+        });
+      }
+    }
+    const urls: Array<{ path: Array<string | number>; value: string }> = [
+      { path: ["requestedUrl"], value: evidence.requestedUrl },
+      ...evidence.networkPolicy.documentUrls.map((value, index) => ({
+        path: ["networkPolicy", "documentUrls", index],
+        value,
+      })),
+    ];
+    if (evidence.finalUrl) urls.push({ path: ["finalUrl"], value: evidence.finalUrl });
+    for (const url of urls) {
+      try {
+        if (normalizePublicWebsiteUrl(url.value) !== url.value) {
+          context.addIssue({
+            code: "custom",
+            message: "Browser evidence URLs must be canonical public URLs.",
+            path: url.path,
+          });
+        }
+      } catch (error) {
+        context.addIssue({
+          code: "custom",
+          message: error instanceof Error ? error.message : "Browser evidence URL is not public.",
+          path: url.path,
         });
       }
     }
@@ -253,7 +305,7 @@ function formKey(form: { actionUrl: string | null; method?: string }, baseUrl: s
   return `${form.method || ""}|${normalizedHref(form.actionUrl, baseUrl)}`;
 }
 
-function isAboveFold(box: z.infer<typeof BoundingBoxSchema>, viewportHeight: number) {
+function isAboveFold(box: z.infer<typeof BrowserBoundingBoxSchema>, viewportHeight: number) {
   return box.y < viewportHeight && box.y + box.height > 0;
 }
 
