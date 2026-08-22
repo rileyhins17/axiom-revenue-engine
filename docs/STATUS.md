@@ -35,6 +35,8 @@ staging; no rebuild code or migration has been deployed to production.
   `5c372091ace34f68596ebbadb59fe66727f66e8e`
 - Private KW seed-preparation checkpoint:
   `f0d0378c7dffb34a41637165539424bb98b88ccd`
+- Bounded HTML fact-extraction checkpoint:
+  `fe8fb659c01982a2e82d1c7b8bcbc1d6065eea8e`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -131,6 +133,17 @@ staging; no rebuild code or migration has been deployed to production.
 - The complete test glob previously omitted TypeScript tests in `scripts/`.
   That is corrected and enforced by the safety checker. The private-import
   checkpoint passes 200/200 tests and the complete local release gate.
+- Linux CI run `32554761048` passed all 13 gates on private-import documentation
+  commit `7cf0ec4`, including the newly enforced TypeScript script tests.
+- A versioned streaming HTML extractor now turns captured fixture HTML into
+  bounded metadata, visible text, actions, forms, trust markers, structured-data
+  types, and internal page links. It never executes scripts and blocks unsafe
+  navigation/form destinations.
+- Token, visible-text, JSON-LD, and output limits prevent unbounded parsing.
+  Above-the-fold and computed visibility remain explicitly unknown until Browser
+  Rendering proves them; truncated extraction is marked incomplete. No live site
+  or provider was called. The checkpoint passes 204/204 tests, `npm audit` with
+  zero vulnerabilities, and the complete local release gate.
 
 ## Safety and production
 
@@ -196,6 +209,9 @@ Completed gates:
 - Private KW source/identity seed: ignored no-overwrite storage, strict input and
   plan schemas, stable multi-signal identities, cohort provenance, duplicate and
   market guards, and zero qualification/outreach authority.
+- Bounded HTML facts: standards-based streaming parse, non-executing scripts,
+  strict token/text/JSON-LD limits, safe URL resolution, explicit unknown visual
+  state, and adversarial fixture coverage.
 
 Still required for Phase 1:
 
@@ -226,13 +242,12 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Push the private KW seed-preparation checkpoint and verify Linux CI.
-2. Convert bounded HTML fixtures into deterministic page facts, with adversarial
-   parser tests, before Browser Rendering, R2, or any live website capture is
-   enabled.
-3. Add a repeatable, validation-only persistence plan for the private seed; do
+1. Push the bounded HTML fact-extraction checkpoint and verify Linux CI.
+2. Add a repeatable, validation-only persistence plan for the private seed; do
    not write staging/production D1 or acquire paid data until that gate is
    separately verified.
+3. Define the Browser Rendering evidence contract and fixture merge rules before
+   attaching a Browser or R2 binding to the engine.
 
 ## Resume instructions
 

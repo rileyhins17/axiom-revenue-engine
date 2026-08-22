@@ -57,5 +57,8 @@
   ignored no-overwrite storage, and explicit research-only/no-outreach state.
 - Corrected the complete test command so TypeScript safety tests in `scripts/`
   are always included, and made that test-glob coverage a safety assertion.
+- Added bounded WHATWG-compatible streaming HTML fact extraction for metadata,
+  visible text, actions, forms, trust markers, JSON-LD types, and internal page
+  links. Scripts are never executed and visual placement remains unknown.
 
 Production has not been cut over to this release.

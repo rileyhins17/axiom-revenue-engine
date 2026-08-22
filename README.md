@@ -60,6 +60,11 @@ normalizes only public HTTP(S) domains, revalidates each manual redirect, and ca
 time and HTML size. All capture tests use an injected fake transport; running the
 test suite does not fetch a real business website.
 
+Captured HTML fixtures can now be converted into bounded page facts with a
+standards-based streaming parser. Scripts are never executed, incomplete parsing
+stays explicit, and visual/mobile facts remain unknown until Browser Rendering
+proves them. This parser is also not connected to a live capture path.
+
 ## Verification
 
 ```powershell
