@@ -69,6 +69,12 @@ generated output and scanned 1,988 files.
 - R2 is not enabled on the Cloudflare account. Wrangler returned code 10042 and
   directed the owner to enable R2 in the dashboard. Do not accept a new paid
   commitment without confirming it fits the C$50 monthly ceiling.
+- The pre-provisioning storage contract is complete at source checkpoint
+  `2621f3c1a790516507a78d89ea3ae06e7e738722`. If approved, the bucket must be
+  private and use Standard storage, SHA-256 content keys, create-if-absent writes,
+  a 30-day `shadow/30d/v1/` lifecycle, and a 180-day
+  `qualification/180d/v1/` lifecycle. Outreach-active and legal-hold prefixes
+  must not receive an automatic expiry. No bucket or lifecycle rule exists yet.
 - Workflows are created when the typed engine Worker is deployed; there are no
   Workflows in the account today.
 

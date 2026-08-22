@@ -10,6 +10,8 @@
 | HtmlPageFacts | Versioned server-HTML observations for metadata, visible text, actions, forms, trust markers, structured-data types, and internal links; visual placement and computed visibility remain unknown. |
 | BrowserPageEvidence | One versioned fixed-viewport render outcome with screenshot/measurement artifact references, hashes, deterministic layout/action/form/navigation/text observations, explicit coverage, provider receipt, and failure state. |
 | BrowserMeasurementDraft | A bounded, zero-cost, unpersisted fixture-runner result containing screenshot/measurement bytes, canonical hashes, validated public-navigation receipt, and no artifact-write authority. |
+| ArtifactWritePlan | A transient, bounded content-addressed batch whose object keys, retention class, media metadata, bytes, SHA-256 digests, create-if-absent policy, and zero provider authority validate together. |
+| ArtifactWriteReceipt | The immutable outcome of a fixture storage attempt, including created/reused items, exact object identity, operation counts, cost, failure point, and no-delete rollback decision. |
 | EvidenceClaim | One supportable observation with URL/artifact, method, confidence, and audit version. |
 | ContactPoint | Email, phone, form, social route, or operator identity candidate. |
 | ConsentEvidence | Recorded lawful basis and public-source context for a contact action. |
@@ -61,6 +63,16 @@
   byte lengths, canonical measurement bytes, and SHA-256 digests, then requires
   exact `artifact:sha256:<digest>` references. Version 1 accepts fixtures only;
   live Browser and R2 adapters require separate release gates.
+- Artifact object keys are derived from retention class, artifact kind, digest
+  prefix, full digest, and media extension. Create-if-absent retries may reuse an
+  object only after key, size, SHA-256, storage class, media metadata, and custom
+  metadata all match. A partial batch is not rolled back by deletion because an
+  immutable object may already be shared; unreferenced shadow objects expire by
+  lifecycle instead.
+- Shadow artifacts expire after 30 days and uncontacted qualification artifacts
+  after 180 days. `OUTREACH_ACTIVE` and `LEGAL_HOLD` have no automatic deletion;
+  release requires an approved compliance/owner decision. CRTC guidance does not
+  prescribe one universal CASL record-retention period.
 - Real evaluation businesses and Riley's labels live in private D1 or ignored
   local storage. Synthetic fixtures may be committed; prospect records may not.
 - A saved private persistence artifact is not trusted executable input. Any

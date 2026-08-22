@@ -80,6 +80,13 @@ remain unpersisted, zero-cost drafts until separate content-addressed artifact
 references match their revalidated bytes and hashes. This version cannot connect
 to Browser Rendering or R2.
 
+The next storage boundary is also fixture-only. Screenshot and measurement keys
+are derived from their SHA-256 content, writes are create-if-absent, retries reuse
+matching objects, and conflicting objects stop the job. Shadow evidence has a
+planned 30-day lifecycle and uncontacted qualification evidence 180 days;
+outreach/compliance evidence is never assigned a guessed automatic expiry. R2 is
+still disabled and no bucket, binding, object, operation, or charge exists.
+
 ## Verification
 
 ```powershell

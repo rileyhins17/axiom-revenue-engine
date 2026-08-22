@@ -75,5 +75,9 @@
   fail-closed network receipts, unpersisted screenshot/measurement drafts, and
   byte/hash integrity checks. Content-addressed references must match before a
   draft becomes evidence; live Browser Rendering and R2 remain inaccessible.
+- Added the fixture-only content-addressed artifact contract. Deterministic
+  retention/kind/hash keys, create-if-absent requests, exact checksum and metadata
+  reconciliation, idempotent reuse receipts, partial-failure receipts, and
+  lifecycle-safe rollback rules are tested without an R2 binding or operation.
 
 Production has not been cut over to this release.

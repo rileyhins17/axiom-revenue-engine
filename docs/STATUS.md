@@ -47,6 +47,8 @@ staging; no rebuild code or migration has been deployed to production.
   `44a65c966841d3a92bf99c14559d2ad85dda87dd`
 - Fixture Browser-measurement documentation/CI checkpoint:
   `a4d73fa89b1072fdd7803cd6c2276fe8fe830676`
+- Content-addressed artifact-contract source checkpoint:
+  `2621f3c1a790516507a78d89ea3ae06e7e738722`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -208,6 +210,23 @@ staging; no rebuild code or migration has been deployed to production.
 - Linux CI run `32558784285` passed all 13 gates on fixture measurement checkpoint
   `a4d73fa`, including exact dependency installation, a clean Ubuntu Cloudflare
   build, all migrations, 220/220 tests, and both no-upload Worker validations.
+- A fixture-only artifact-store contract now derives private Standard-storage
+  object keys from retention class, artifact kind, digest prefix, full SHA-256,
+  and media type. Plans remain shadow-only, provider-write unauthorized, capped,
+  and zero-cost; no R2 type, binding, bucket, API, or provider method is reachable.
+- Create-if-absent retries reuse an existing object only after its key, length,
+  digest, storage class, HTTP metadata, and custom metadata all match. Conflict or
+  partial failure creates a bounded failure receipt and cannot produce Browser
+  evidence references. Content-addressed partial objects are kept for safe retry
+  rather than deleted and are later handled by prefix lifecycle.
+- Planned automatic retention is 30 days for shadow evidence and 180 days for
+  uncontacted qualification evidence. Outreach-active and legal-hold evidence
+  have no guessed expiry and require owner/compliance release; current CRTC
+  guidance says CASL does not prescribe one universal record-retention period.
+- Artifact-contract checkpoint verification passes 228/228 tests, typecheck,
+  zero-warning lint, safety checks, the secret-sanitized console build, explicit
+  default console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. No Cloudflare resource was created or changed.
 
 ## Safety and production
 
@@ -285,6 +304,9 @@ Completed gates:
 - Fixture Browser measurement boundary: injected fixture runner, public-only
   redirect/network receipts, strict execution/payload limits, in-memory artifact
   drafts, and content-hash finalization with safety-check enforcement.
+- Content-addressed artifact boundary: deterministic private keys and lifecycle
+  prefixes, create-if-absent idempotency, exact stored-object reconciliation,
+  no-delete retry receipts, and zero provider authority with fixture-only tests.
 
 Still required for Phase 1:
 
@@ -302,6 +324,9 @@ Still required for Phase 1:
 
 Approved runtime ceiling: C$50/month excluding ChatGPT/Codex. New paid providers
 or overage billing are not yet authorized. Cost ledger implementation is pending.
+The planned R2 contract uses Standard storage, whose current included allowance
+is 10 GB-month plus one million writes and ten million reads monthly, but R2 is
+not activated and the project has incurred zero artifact-storage cost.
 
 ## Blockers / owner actions
 
@@ -315,11 +340,11 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Define content-addressed R2 artifact keys and retention/rollback rules before
-   provisioning or attaching the staging evidence bucket.
-2. Assemble multi-page HTML/browser evidence into one versioned audit input,
+1. Assemble multi-page HTML/browser evidence into one versioned audit input,
    with explicit page-set coverage and per-business cost limits.
-3. Design the separately release-gated Cloudflare Browser runner and staging
+2. Define evidence promotion and owner-release records so 30-day shadow artifacts
+   cannot expire after they become qualification or outreach proof.
+3. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
    smoke test; do not add a binding or make a live request until R2, budget,
    rollback, and owner approval gates are recorded.
 
