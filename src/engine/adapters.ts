@@ -1,4 +1,5 @@
 import type { DeterministicWebsiteAuditResult } from "@/lib/revenue-engine/website-audit";
+import type { WebsiteCaptureResult } from "@/lib/revenue-engine/website-capture";
 
 export type AdapterCostReceipt = {
   provider: string;
@@ -54,6 +55,13 @@ export interface AuditAdapter {
     websiteUrl: string | null;
     auditVersion: string;
   }): Promise<AdapterResult<DeterministicWebsiteAuditResult>>;
+}
+
+export interface WebsiteCaptureAdapter {
+  capture(input: AdapterContext & {
+    businessId: string;
+    websiteUrl: string;
+  }): Promise<AdapterResult<WebsiteCaptureResult>>;
 }
 
 export type ContactCandidate = {
