@@ -65,6 +65,8 @@ staging; no rebuild code or migration has been deployed to production.
   `f3b3812a93a962658edc259810a202b32f63247f`
 - Fixture website-evidence workflow source checkpoint:
   `1c9d093351cea3a064ba4b0bc4a4d37d76d880d9`
+- Fixture website-evidence workflow documentation/CI checkpoint:
+  `831bf77d2661287676a7e18ddd203719bc6efbb9`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -327,6 +329,9 @@ staging; no rebuild code or migration has been deployed to production.
   bindings, and the inert engine no-upload dry run. The first local build attempt
   hit a transient Windows/OneDrive lock in generated `.next` output; moving only
   that generated directory aside allowed the complete unchanged gate to pass.
+- Linux CI run `32564289630` passed all 13 gates on fixture-workflow checkpoint
+  `831bf77`, including exact dependencies, a clean Ubuntu Cloudflare build, all
+  55 migrations, 258/258 tests, and both no-upload Worker validations.
 
 ## Safety and production
 
