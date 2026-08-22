@@ -88,5 +88,9 @@
   only toward longer protection, uses determine the minimum retention class,
   exact source/destination reconciliation makes retries safe, and content-bound
   owner/compliance release records still cannot authorize or perform deletion.
+- Added deterministic fixture-only website page selection. Fresh same-site
+  homepage links are scored globally for unique service/about/contact coverage,
+  business-specific service relevance wins over generic pages, noisy/unsafe
+  candidates are explicitly excluded, and incomplete discovery remains partial.
 
 Production has not been cut over to this release.

@@ -59,6 +59,8 @@ staging; no rebuild code or migration has been deployed to production.
   `7bdabe0316108bb4b24d450ee29e93cac70ed593`
 - Artifact lifecycle documentation/CI checkpoint:
   `3892c9b3dc8d5f43871ceb73f05f9ce156d287b0`
+- Deterministic website page-selection source checkpoint:
+  `0165a0a6a304b06f7bbc09766c2572d3459054fc`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -283,6 +285,23 @@ staging; no rebuild code or migration has been deployed to production.
 - Linux CI run `32562059951` passed all 13 gates on artifact-lifecycle checkpoint
   `3892c9b`, including exact dependencies, a clean Ubuntu Cloudflare build, all
   55 migrations, 244/244 tests, and both no-upload Worker validations.
+- A deterministic page selector now turns fresh homepage link facts into one
+  unique home/service/about/contact capture plan. It scores all subpage roles
+  together, favours the business's expected services and niche, and records each
+  candidate's scores, eligibility, selection, and reasons in stable order.
+- Query URLs, homepage duplicates, non-HTML files, policy/blog/news/resource,
+  careers, account/commerce, FAQ, financing/rebate/promotion, off-site, reserved,
+  noncanonical, stale, and future-dated inputs cannot become selected pages.
+  Incomplete homepage extraction or a missing role remains `PARTIAL`; the planner
+  never improvises another crawl target.
+- Version 1 is deterministic fixture-only work with zero provider operations and
+  zero cost. It is not wired to capture, Browser Rendering, R2, D1, the engine
+  Worker, a live website, or a prospect.
+- Page-selection checkpoint verification passes 251/251 tests, typecheck,
+  zero-warning lint, the repository safety check, secret-sanitized Cloudflare
+  build, explicit default console no-upload dry run, deterministic engine
+  bindings, and the inert engine no-upload dry run. The console build reports
+  only the known generated duplicate-key warnings documented for the legacy UI.
 
 ## Safety and production
 
@@ -369,6 +388,9 @@ Completed gates:
 - Artifact lifecycle boundary: receipt-derived manifests, evidence-use-driven
   monotonic retention, idempotent copy/reuse/failure receipts, exact plan
   reconciliation, and owner/compliance release records with no delete authority.
+- Deterministic page selection: fresh same-authority homepage inputs, explainable
+  role/relevance scoring, global unique assignment, explicit noise exclusions,
+  stable receipts, and partial-state handling with no provider authority.
 
 Still required for Phase 1:
 
@@ -402,13 +424,13 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Define a deterministic page-selection plan that chooses the best service,
-   about, and contact URLs from bounded same-site links before capture.
-2. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
+1. Compose capture, extraction, page selection, Browser drafts, artifact receipts,
+   and audit assembly into one bounded fixture-only business workflow receipt.
+2. Define additive manifest, promotion, evidence-use, selection, and release
+   persistence records before a live artifact adapter can be connected.
+3. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
    smoke test; do not add a binding or make a live request until R2, budget,
    rollback, and owner approval gates are recorded.
-3. Define additive manifest, promotion, evidence-use, and release persistence
-   records before any live artifact adapter can be connected.
 
 ## Resume instructions
 

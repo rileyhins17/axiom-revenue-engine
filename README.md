@@ -94,6 +94,14 @@ measurements. Missing or partial coverage stays visible and keeps absence checks
 unknown; it cannot be converted into a reason to contact a business. The
 assembler is fixture-only, capped at zero dollars, and has no provider access.
 
+Before those pages are captured, a deterministic selector now ranks the
+homepage's same-site links for one service, about, and contact page. It favours
+specific services relevant to the business, explains every role score, and
+filters noisy destinations such as blogs, careers, policy pages, FAQs, financing,
+files, query URLs, and homepage duplicates. Missing or incomplete discovery stays
+partial instead of sending the crawler back to random pages. Selection is also
+fixture-only, provider-free, and zero-cost.
+
 Evidence lifecycle planning is now explicit as well. The same verified content
 hash can move only toward stronger protection: shadow, qualification, outreach,
 then legal hold. Every copy is create-if-absent and reconciled; retries cannot

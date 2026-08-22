@@ -16,6 +16,7 @@
 | ArtifactEvidenceUse | Versioned qualification, outreach, consent, touch, or legal-hold record that determines the minimum protection an artifact requires. |
 | ArtifactPromotionPlan/Receipt | Idempotent copy plan and result that preserve content identity while moving evidence only to a stronger retention prefix. |
 | ArtifactReleaseRecord | Content-bound owner/compliance retention decision covering every listed evidence use; it records review but cannot itself delete an object. |
+| WebsitePageSelectionPlan | Deterministic zero-cost ranking of one same-site service, about, and contact URL from fresh homepage link evidence, with visible candidate scores, exclusions, completeness, and budget receipt. |
 | WebsiteAuditAssembly | One versioned business-level receipt linking selected page captures, HTML facts, Browser evidence, artifact receipts, freshness, completeness, and per-business budgets to the exact deterministic audit input. |
 | EvidenceClaim | One supportable observation with URL/artifact, method, confidence, and audit version. |
 | ContactPoint | Email, phone, form, social route, or operator identity candidate. |
@@ -89,6 +90,14 @@
   manifest, uses, actor, reason, rationale, and time by a deterministic digest.
   Even an approved release has `providerDeleteAuthorized: false`; a future delete
   requires a fresh live-reference check and a separate explicitly approved gate.
+- Page selection uses only fresh, complete homepage facts and cannot call a plan
+  ready without a unique service, about, and contact page. It ranks all three
+  roles together so one ambiguous URL cannot fill more than one requirement.
+- A candidate must be canonical, public, same-authority, query-free, HTML-like,
+  and above a visible role threshold. Service relevance uses the configured niche
+  and expected services; policy, blog/news, careers, account/commerce, FAQ,
+  financing/rebate/promotion, file, and homepage-duplicate destinations are not
+  eligible. Every exclusion remains visible in the plan.
 - A full website audit requires captured `HOME`, `SERVICE`, `ABOUT`, and `CONTACT`
   pages with complete HTML and desktop action/form coverage, plus complete mobile
   measurements for the homepage. A missing, failed, stale, cross-site, or partial
