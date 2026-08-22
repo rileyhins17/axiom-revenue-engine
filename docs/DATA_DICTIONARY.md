@@ -12,6 +12,10 @@
 | BrowserMeasurementDraft | A bounded, zero-cost, unpersisted fixture-runner result containing screenshot/measurement bytes, canonical hashes, validated public-navigation receipt, and no artifact-write authority. |
 | ArtifactWritePlan | A transient, bounded content-addressed batch whose object keys, retention class, media metadata, bytes, SHA-256 digests, create-if-absent policy, and zero provider authority validate together. |
 | ArtifactWriteReceipt | The immutable outcome of a fixture storage attempt, including created/reused items, exact object identity, operation counts, cost, failure point, and no-delete rollback decision. |
+| ArtifactManifest | Verified identity and current retention location for a bounded group of immutable artifacts, derived only from a completed write or promotion receipt. |
+| ArtifactEvidenceUse | Versioned qualification, outreach, consent, touch, or legal-hold record that determines the minimum protection an artifact requires. |
+| ArtifactPromotionPlan/Receipt | Idempotent copy plan and result that preserve content identity while moving evidence only to a stronger retention prefix. |
+| ArtifactReleaseRecord | Content-bound owner/compliance retention decision covering every listed evidence use; it records review but cannot itself delete an object. |
 | WebsiteAuditAssembly | One versioned business-level receipt linking selected page captures, HTML facts, Browser evidence, artifact receipts, freshness, completeness, and per-business budgets to the exact deterministic audit input. |
 | EvidenceClaim | One supportable observation with URL/artifact, method, confidence, and audit version. |
 | ContactPoint | Email, phone, form, social route, or operator identity candidate. |
@@ -74,6 +78,17 @@
   after 180 days. `OUTREACH_ACTIVE` and `LEGAL_HOLD` have no automatic deletion;
   release requires an approved compliance/owner decision. CRTC guidance does not
   prescribe one universal CASL record-retention period.
+- Retention promotion is monotonic. Evidence uses compute the minimum destination:
+  qualification uses require `QUALIFICATION_180D`; approval, consent, and touch
+  uses require `OUTREACH_ACTIVE`; legal use requires `LEGAL_HOLD`. Already stronger
+  protection is reused and never demoted.
+- Promotion keeps the same `artifact:sha256:<digest>` identity while changing the
+  prefix and retention metadata. Source and destination objects must reconcile;
+  partial copies remain immutable for retry and are never rollback-deleted.
+- A release decision reviews every listed use exactly once and is bound to the
+  manifest, uses, actor, reason, rationale, and time by a deterministic digest.
+  Even an approved release has `providerDeleteAuthorized: false`; a future delete
+  requires a fresh live-reference check and a separate explicitly approved gate.
 - A full website audit requires captured `HOME`, `SERVICE`, `ABOUT`, and `CONTACT`
   pages with complete HTML and desktop action/form coverage, plus complete mobile
   measurements for the homepage. A missing, failed, stale, cross-site, or partial

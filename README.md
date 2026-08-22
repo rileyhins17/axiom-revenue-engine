@@ -94,6 +94,14 @@ measurements. Missing or partial coverage stays visible and keeps absence checks
 unknown; it cannot be converted into a reason to contact a business. The
 assembler is fixture-only, capped at zero dollars, and has no provider access.
 
+Evidence lifecycle planning is now explicit as well. The same verified content
+hash can move only toward stronger protection: shadow, qualification, outreach,
+then legal hold. Every copy is create-if-absent and reconciled; retries cannot
+overwrite a conflicting object. A retention-release record must bind every known
+use, the reviewing owner/compliance actor, reason, and exact decision. It still
+cannot delete an object—deletion needs a fresh reference check and a separate
+future release gate. All lifecycle work remains fixture-only and zero-cost.
+
 ## Verification
 
 ```powershell

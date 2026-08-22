@@ -55,6 +55,8 @@ staging; no rebuild code or migration has been deployed to production.
   `347390aebb15d5e97caa2d5caa0e6ceda1ad5f12`
 - Multi-page website-audit assembly documentation/CI checkpoint:
   `7a6ac24a905030095de766364bee01d140f3675a`
+- Artifact lifecycle source checkpoint:
+  `7bdabe0316108bb4b24d450ee29e93cac70ed593`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -257,6 +259,25 @@ staging; no rebuild code or migration has been deployed to production.
 - Linux CI run `32560819780` passed all 13 gates on multi-page assembly
   checkpoint `7a6ac24`, including exact dependencies, a clean Ubuntu Cloudflare
   build, all 55 migrations, 235/235 tests, and both no-upload Worker validations.
+- Artifact manifests can now be derived only from completed write/promotion
+  receipts. Qualification, outreach/consent/touch, and legal-hold uses compute the
+  minimum retention needed; promotion can move only upward and preserves the
+  exact content hash while changing its retention prefix and metadata.
+- The fixture promotion executor verifies the source manifest, performs
+  create-if-absent copies, reconciles existing targets, and emits bounded success
+  or partial-failure receipts without rollback deletion. A later promotion can
+  safely move qualification evidence to outreach protection and then legal hold.
+- Content-bound owner/compliance release records require every known use, exact
+  confirmation, a class-specific reason, rationale, actor, and decision digest.
+  They never authorize or perform provider deletion; a future deletion path must
+  recheck live references and pass another explicit release gate. No R2 binding,
+  object, provider operation, database write, prospect, or production resource
+  was touched.
+- Artifact-lifecycle checkpoint verification passes 244/244 tests, typecheck,
+  zero-warning lint, the repository safety check, secret-sanitized Cloudflare
+  build, explicit default console no-upload dry run, deterministic engine
+  bindings, and the inert engine no-upload dry run. The console build reports
+  only the known generated duplicate-key warnings documented for the legacy UI.
 
 ## Safety and production
 
@@ -340,6 +361,9 @@ Completed gates:
 - Multi-page audit assembly: required page-set coverage, same-business/site and
   artifact-receipt reconciliation, evidence freshness/skew, whole-business
   budgets, deterministic ordering, and audit v3 incomplete-coverage semantics.
+- Artifact lifecycle boundary: receipt-derived manifests, evidence-use-driven
+  monotonic retention, idempotent copy/reuse/failure receipts, exact plan
+  reconciliation, and owner/compliance release records with no delete authority.
 
 Still required for Phase 1:
 
@@ -373,13 +397,13 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Define evidence promotion and owner-release records so 30-day shadow artifacts
-   cannot expire after they become qualification or outreach proof.
-2. Define a deterministic page-selection plan that chooses the best service,
+1. Define a deterministic page-selection plan that chooses the best service,
    about, and contact URLs from bounded same-site links before capture.
-3. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
+2. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
    smoke test; do not add a binding or make a live request until R2, budget,
    rollback, and owner approval gates are recorded.
+3. Define additive manifest, promotion, evidence-use, and release persistence
+   records before any live artifact adapter can be connected.
 
 ## Resume instructions
 

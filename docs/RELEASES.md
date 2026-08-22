@@ -84,5 +84,9 @@
   coverage, a measured mobile homepage, matching artifact receipts, and bounded
   business-level time/byte usage. Missing coverage remains unknown instead of
   becoming a false rebuild claim.
+- Added fixture-only artifact lifecycle planning and receipts. Evidence can move
+  only toward longer protection, uses determine the minimum retention class,
+  exact source/destination reconciliation makes retries safe, and content-bound
+  owner/compliance release records still cannot authorize or perform deletion.
 
 Production has not been cut over to this release.
