@@ -24,8 +24,9 @@ the owner-facing Leads screen prioritizes quality instead of record age.
   build, and Wrangler deploy dry run pass
 - Generated Cloudflare bindings replaced the stale hand-written environment file
 - Draft PR: `#8`; its first Linux run proved the workflow's Node 20 pin was
-  incompatible with Wrangler's Node >=22 requirement. The Node 22 fix is pending
-  verification on GitHub.
+  incompatible with Wrangler's Node >=22 requirement. The next run proved local
+  `.env.local` had also contaminated generated bindings with a secret name. Node
+  22 plus deterministic, secret-independent type generation are pending CI proof.
 
 ## Safety and production
 

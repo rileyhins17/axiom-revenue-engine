@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - "RileyHinsperger/**"
 
 permissions:
   contents: read
@@ -35,10 +34,10 @@ jobs:
       - name: Verify fail-closed configuration
         run: npm run check:safety
 
-      - name: Regenerate and verify Cloudflare bindings
-        run: |
-          npm run cf:typegen
-          git diff --exit-code -- cloudflare-env.d.ts
+      # Wrangler evaluates the custom OpenNext build before checking bindings,
+      # so this step also proves the production Cloudflare build.
+      - name: Verify generated bindings and Cloudflare build
+        run: npm run cf:typegen:check
 
       - name: Apply all migrations to a fresh local D1 database
         run: npm run db:migrate:local
@@ -51,9 +50,6 @@ jobs:
 
       - name: Lint
         run: npm run lint
-
-      - name: Build Cloudflare artifact
-        run: npm run build:cloudflare
 
       - name: Validate deploy bundle without deploying
         run: npx wrangler deploy --dry-run --autoconfig false

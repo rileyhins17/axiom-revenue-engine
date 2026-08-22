@@ -145,3 +145,29 @@ Retire entries when the architecture makes them impossible.
   run before the rest of every Linux gate.
 - **Affected area:** CI, Cloudflare tooling, release workflow.
 - **Verifying commit:** pending CI fix checkpoint.
+
+## TYPE-002 — Generated bindings absorbed a local secret name
+
+- **Symptom:** bindings regenerated cleanly on Riley's machine but failed the CI
+  diff because only local `.env.local` contained `OPENAI_API_KEY`.
+- **Root cause:** Wrangler type generation was allowed to discover private local
+  environment files, making generated output machine-dependent.
+- **Proven fix:** generate/check with an explicit tracked empty env file and keep
+  secret *names* in a value-free declaration separate from generated bindings.
+- **Prevention/test:** `npm run cf:typegen:check` uses `wrangler.typegen.env` in
+  both local and Linux environments.
+- **Affected area:** generated bindings, secrets, CI reproducibility.
+- **Verifying commit:** pending deterministic-typegen checkpoint.
+
+## BUILD-003 — One branch push launched the same CI twice
+
+- **Symptom:** pushing a PR branch launched both `push` and `pull_request` runs,
+  doubling builds, minutes, and noise.
+- **Root cause:** CI listened to every rebuild-branch push as well as every PR.
+- **Proven fix:** run branch validation through `pull_request` and reserve `push`
+  validation for `main`; avoid a third explicit build because the Wrangler type
+  check already executes OpenNext.
+- **Prevention/test:** inspect workflow triggers and steps whenever a new release
+  gate is added.
+- **Affected area:** GitHub Actions cost and feedback time.
+- **Verifying commit:** pending CI-efficiency checkpoint.
