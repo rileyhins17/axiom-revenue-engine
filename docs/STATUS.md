@@ -31,6 +31,8 @@ staging; no rebuild code or migration has been deployed to production.
   `5d3ef6a30467db85234b0860b243587dd31084a4`
 - Deterministic website-quality checkpoint:
   `ea7ff1a35302c927c0c26bf6008d05692d77a2be`
+- Bounded public-website capture checkpoint:
+  `5c372091ace34f68596ebbadb59fe66727f66e8e`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -101,6 +103,21 @@ staging; no rebuild code or migration has been deployed to production.
 - Audit/evaluation checkpoint verification passes 182/182 tests, typecheck,
   zero-warning lint, safety checks, secret-sanitized console build, explicit
   console dry run, deterministic engine type check, and engine dry run.
+- Linux CI run `32553187482` passed all 13 gates on audit documentation commit
+  `df394b1`.
+- The public-website capture boundary now accepts only canonical public HTTP(S)
+  domain targets on standard ports, manually revalidates every redirect, limits
+  a capture to five redirects, ten seconds, and 1 MiB of HTML, and records
+  rejected/failed states without turning them into evidence. IP targets,
+  credentials, local/reserved names, non-HTML, loops, oversized responses, and
+  timeouts fail closed.
+- Cloudflare `global_fetch_strictly_public` is mandatory for the engine and is
+  enforced by the repository safety check. The adapter transport is injected in
+  tests and is not called by the inert Worker; no real business website was
+  fetched.
+- Public-capture checkpoint verification passes 193/193 tests, typecheck,
+  zero-warning lint, safety checks, secret-sanitized console build, explicit
+  console dry run, deterministic engine type check, and engine dry run.
 
 ## Safety and production
 
@@ -160,6 +177,9 @@ Completed gates:
   for modern, weak, unreachable, missing, mobile-failing, and minor sites.
 - KW evaluation gate: private-data contract, duplicate protection, balance
   requirements, owner reasons, 85% agreement calculation, and owner guide.
+- Public website capture boundary: canonical public targets, redirect-by-redirect
+  validation, bounded HTML/time, explicit failure states, generated Cloudflare
+  types, and fake-network safety tests.
 
 Still required for Phase 1:
 
@@ -190,11 +210,12 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Push the deterministic audit/evaluation checkpoint and verify Linux CI.
-2. Build a bounded website snapshot adapter with public-URL/SSRF protection,
-   redirect and response-size limits, and fixture tests before any live fetch.
-3. Implement the source/identity import path that can privately load the first
+1. Push the bounded public-website capture checkpoint and verify Linux CI.
+2. Implement the source/identity import path that can privately load the first
    real 50-lead KW set; do not acquire paid data or enable providers yet.
+3. Convert bounded HTML fixtures into deterministic page facts, with adversarial
+   parser tests, before Browser Rendering, R2, or any live website capture is
+   enabled.
 
 ## Resume instructions
 

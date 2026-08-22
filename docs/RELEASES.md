@@ -48,5 +48,9 @@
   modern/weak/broken/missing/mobile fixture coverage.
 - Added the private KW 50-lead evaluation contract and owner guide with unique
   identity, city/niche balance, required owner reasons, and 85% agreement gates.
+- Added a bounded public-website capture boundary with canonical URL policy,
+  private/internal target blocking, manual redirect revalidation, timeout and
+  1 MiB HTML limits, explicit failure outcomes, and fake-network tests. It is not
+  connected to live engine execution.
 
 Production has not been cut over to this release.

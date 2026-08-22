@@ -55,6 +55,11 @@ for local inspection; its empty secret allow-list prevents unrelated console
 secrets from entering the Worker. `/health` should return `503 LOCKED` until a
 later, explicitly approved phase adds execution authority.
 
+The first website-capture boundary is implemented but not wired to the Worker. It
+normalizes only public HTTP(S) domains, revalidates each manual redirect, and caps
+time and HTML size. All capture tests use an injected fake transport; running the
+test suite does not fetch a real business website.
+
 ## Verification
 
 ```powershell
@@ -93,8 +98,9 @@ records and R2 stores screenshots/evidence. Runtime AI uses a provider interface
 with OpenAI Responses, structured outputs, snapshot-pinned models, strict per-job
 limits, and a cost ledger.
 
-The Worker/Workflow contracts now exist, but there is deliberately no deployed
-engine resource, live queue consumer, schedule, data binding, or spending path.
+The Worker/Workflow and bounded website-capture contracts now exist, but there is
+deliberately no deployed engine resource, live queue consumer, schedule, data
+binding, live capture call, or spending path.
 
 Legacy resource identifiers are kept only where needed for safe migration. They
 must not be renamed in place or retired until reconciliation, rollback, and the

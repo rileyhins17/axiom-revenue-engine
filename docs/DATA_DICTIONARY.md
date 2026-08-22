@@ -6,7 +6,7 @@
 | Location | A physical/service location and typed country/region/city geography. |
 | SourceRecord | Raw provider observation with provenance and source-owned ID. |
 | CoverageRun | One source/niche/geographic-cell attempt, yield, duplicates, cost, and cooldown. |
-| WebsiteSnapshot | Timestamped desktop/mobile website capture and deterministic checks. |
+| WebsiteSnapshot | Timestamped, bounded website capture with requested/final URL, redirect chain, HTTP outcome, content metadata, artifact references, and deterministic checks. |
 | EvidenceClaim | One supportable observation with URL/artifact, method, confidence, and audit version. |
 | ContactPoint | Email, phone, form, social route, or operator identity candidate. |
 | ConsentEvidence | Recorded lawful basis and public-source context for a contact action. |
@@ -39,6 +39,9 @@
 - Deterministic website checks record `PASS`, `FAIL`, or `UNKNOWN`; only a
   supportable `FAIL` creates a negative EvidenceClaim, while unknown capture
   coverage lowers evidence confidence instead of becoming a guessed weakness.
+- Rejected, failed, oversized, non-HTML, and timed-out website captures cannot be
+  converted into DOM or visual evidence. Each redirect is a separately validated
+  public target and the capture result retains its policy/version.
 - Real evaluation businesses and Riley's labels live in private D1 or ignored
   local storage. Synthetic fixtures may be committed; prospect records may not.
 - An approval is invalid after content changes, expiry, rejection, or revocation;
