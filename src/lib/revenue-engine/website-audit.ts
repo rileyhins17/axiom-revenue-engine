@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { EvidenceClaimSchema, type EvidenceClaim } from "@/lib/revenue-engine/evidence";
 
-export const DETERMINISTIC_WEBSITE_AUDIT_VERSION = "website-audit-deterministic-v2";
+export const DETERMINISTIC_WEBSITE_AUDIT_VERSION = "website-audit-deterministic-v3";
 
 export const WebsiteSiteStateSchema = z.enum(["NO_SITE", "UNREACHABLE", "CAPTURED"]);
 export const WebsiteClassificationSchema = z.enum([
@@ -497,7 +497,7 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
       checkId: "form_availability",
       outcome: usableForm
         ? "PASS"
-        : input.pages.every((page) => page.evidenceCoverage.formVisibilityComplete) ? "FAIL" : "UNKNOWN",
+        : input.pageSetComplete && input.pages.every((page) => page.evidenceCoverage.formVisibilityComplete) ? "FAIL" : "UNKNOWN",
       severity: "IMPORTANT",
       category: "form",
       scoreImpact: 10,

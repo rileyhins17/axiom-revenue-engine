@@ -219,6 +219,16 @@ test("one meaningful weakness stays a minor improvement", () => {
   assert.equal(result.rebuildNeedScore, 12);
 });
 
+test("an incomplete page set cannot turn an unseen contact form into a defect", () => {
+  const input = modernSite();
+  input.pageSetComplete = false;
+  input.pages = input.pages.filter((page) => page.kind !== "CONTACT");
+  const result = auditWebsiteDeterministically(input);
+  assert.equal(result.checks.find((check) => check.checkId === "form_availability")?.outcome, "UNKNOWN");
+  assert.ok(result.manualReviewReasons.includes("unverified:form_availability"));
+  assert.ok(result.claims.every((claim) => claim.category !== "form"));
+});
+
 test("captured input fails closed without a final URL and page evidence", () => {
   const input = { ...modernSite(), finalUrl: null, pages: [] };
   assert.equal(DeterministicWebsiteAuditInputSchema.safeParse(input).success, false);

@@ -13,6 +13,7 @@ import {
 import { BROWSER_NETWORK_POLICY_VERSION } from "@/lib/revenue-engine/browser-page-evidence";
 import {
   ARTIFACT_RETENTION_POLICIES,
+  ArtifactWriteReceiptSchema,
   artifactObjectKey,
   browserArtifactRefsFromReceipt,
   createBrowserArtifactWritePlan,
@@ -210,6 +211,34 @@ test("fixture persistence can finalize evidence without any provider operation",
   assert.throws(
     () => browserArtifactRefsFromReceipt(plan, contaminated),
     /does not match its content-addressed plan/,
+  );
+});
+
+test("artifact receipts reject forged references and storage keys", async () => {
+  const plan = createBrowserArtifactWritePlan(await capturedDraft());
+  const receipt = await executeFixtureArtifactWritePlan(plan, {
+    store: fixtureStore().store,
+    now: () => new Date(CAPTURED_AT),
+  });
+  assert.equal(receipt.outcome, "COMPLETED");
+
+  assert.throws(
+    () => ArtifactWriteReceiptSchema.parse({
+      ...receipt,
+      items: receipt.items.map((item, index) => index === 0
+        ? { ...item, artifactRef: `artifact:sha256:${"f".repeat(64)}` }
+        : item),
+    }),
+    /reference must match its digest/,
+  );
+  assert.throws(
+    () => ArtifactWriteReceiptSchema.parse({
+      ...receipt,
+      items: receipt.items.map((item, index) => index === 0
+        ? { ...item, objectKey: artifactObjectKey("LEGAL_HOLD", item.kind, item.sha256) }
+        : item),
+    }),
+    /key must match its retention class, kind, and digest/,
   );
 });
 

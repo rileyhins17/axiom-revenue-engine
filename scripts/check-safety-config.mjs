@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore] = await Promise.all([
+const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../.env.example", import.meta.url), "utf8"),
@@ -16,6 +16,7 @@ const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap,
   readFile(new URL("../src/lib/revenue-engine/private-kw-persistence-plan.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/browser-measurement-adapter.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/content-addressed-artifact-store.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/website-audit-assembly.ts", import.meta.url), "utf8"),
 ]);
 
 const failures = [];
@@ -115,6 +116,9 @@ requireMatch("src/lib/revenue-engine/content-addressed-artifact-store.ts", artif
 requireMatch("src/lib/revenue-engine/content-addressed-artifact-store.ts", artifactStore, /providerWriteAuthorized:\s*z\.literal\(false\)/, "artifact storage plans must not authorize provider writes");
 requireMatch("src/lib/revenue-engine/content-addressed-artifact-store.ts", artifactStore, /maxCostUsd:\s*z\.literal\(0\)/, "artifact storage plans must have zero provider budget");
 forbidMatch("src/lib/revenue-engine/content-addressed-artifact-store.ts", artifactStore, /@cloudflare|env\.[A-Z_]*(R2|ARTIFACT)|R2Bucket|\.put\s*\(|fetch\s*\(/, "fixture-only artifact storage must not access R2 or another provider");
+requireMatch("src/lib/revenue-engine/website-audit-assembly.ts", auditAssembly, /assemblerKind:\s*z\.literal\("FIXTURE"\)/, "website audit assembly must remain fixture-only");
+requireMatch("src/lib/revenue-engine/website-audit-assembly.ts", auditAssembly, /maxCostUsd:\s*z\.literal\(0\)/, "website audit assembly must have zero provider budget");
+forbidMatch("src/lib/revenue-engine/website-audit-assembly.ts", auditAssembly, /@cloudflare|env\.[A-Z_]+|R2Bucket|fetch\s*\(|\.put\s*\(/, "fixture-only website audit assembly must not access providers or runtime bindings");
 
 if (failures.length > 0) {
   console.error("Safety configuration check failed:");

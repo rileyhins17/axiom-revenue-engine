@@ -226,7 +226,12 @@ const ArtifactWriteItemReceiptSchema = z
     etag: z.string().trim().min(1).max(200),
     uploadedAt: z.string().datetime({ offset: true }),
   })
-  .strict();
+  .strict()
+  .superRefine((item, context) => {
+    if (item.artifactRef !== `artifact:sha256:${item.sha256}`) {
+      context.addIssue({ code: "custom", message: "Artifact receipt reference must match its digest.", path: ["artifactRef"] });
+    }
+  });
 
 const ArtifactWriteReceiptBaseSchema = z.object({
   contractVersion: z.literal(ARTIFACT_STORE_CONTRACT_VERSION),
@@ -282,6 +287,11 @@ export const ArtifactWriteReceiptSchema = z.discriminatedUnion("outcome", [
     || receipt.fixturePutAttempts !== receipt.failure.itemIndex + 1
   )) {
     context.addIssue({ code: "custom", message: "Failed artifact receipt must identify the next sequential item.", path: ["failure", "itemIndex"] });
+  }
+  for (const [index, item] of receipt.items.entries()) {
+    if (item.objectKey !== artifactObjectKey(receipt.retentionClass, item.kind, item.sha256)) {
+      context.addIssue({ code: "custom", message: "Artifact receipt key must match its retention class, kind, and digest.", path: ["items", index, "objectKey"] });
+    }
   }
 });
 
