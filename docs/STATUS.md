@@ -51,6 +51,8 @@ staging; no rebuild code or migration has been deployed to production.
   `2621f3c1a790516507a78d89ea3ae06e7e738722`
 - Content-addressed artifact documentation/CI checkpoint:
   `e77f613d78306c3bc5dd076ed6e46a00527884f2`
+- Multi-page website-audit assembly source checkpoint:
+  `347390aebb15d5e97caa2d5caa0e6ceda1ad5f12`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -232,6 +234,24 @@ staging; no rebuild code or migration has been deployed to production.
 - Linux CI run `32559645916` passed all 13 gates on artifact-contract checkpoint
   `e77f613`, including exact dependencies, a clean Ubuntu Cloudflare build, all
   migrations, 228/228 tests, and both no-upload Worker validations.
+- A fixture-only assembler now links captured pages, HTML facts, Browser
+  measurements, and completed content-addressed artifact receipts into one
+  deterministic website-audit input. It rejects stale, cross-site, duplicate,
+  over-budget, future-dated, mismatched, and noncanonical evidence before audit.
+- A full page set requires current home, service, about, and contact coverage,
+  complete desktop action/form facts on every selected page, and a fully measured
+  mobile homepage. Missing, failed, or incomplete coverage is reported as partial
+  and the deterministic audit v3 keeps unseen form absence `UNKNOWN`.
+- Business-level limits are fixed at five pages, six Browser captures, 120
+  Browser seconds, 30 MiB of artifacts, 5 MiB of HTML, 24-hour freshness, and
+  two-hour maximum capture skew. The assembler remains fixture-only with zero
+  provider operations and zero cost; no website, R2 object, database, prospect,
+  or production resource was touched.
+- Multi-page assembly checkpoint verification passes 235/235 tests, typecheck,
+  zero-warning lint, the repository safety check, secret-sanitized Cloudflare
+  build, explicit default console no-upload dry run, deterministic engine
+  bindings, and the inert engine no-upload dry run. The console build reports
+  only the known generated duplicate-key warnings documented for the legacy UI.
 
 ## Safety and production
 
@@ -312,6 +332,9 @@ Completed gates:
 - Content-addressed artifact boundary: deterministic private keys and lifecycle
   prefixes, create-if-absent idempotency, exact stored-object reconciliation,
   no-delete retry receipts, and zero provider authority with fixture-only tests.
+- Multi-page audit assembly: required page-set coverage, same-business/site and
+  artifact-receipt reconciliation, evidence freshness/skew, whole-business
+  budgets, deterministic ordering, and audit v3 incomplete-coverage semantics.
 
 Still required for Phase 1:
 
@@ -345,10 +368,10 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Assemble multi-page HTML/browser evidence into one versioned audit input,
-   with explicit page-set coverage and per-business cost limits.
-2. Define evidence promotion and owner-release records so 30-day shadow artifacts
+1. Define evidence promotion and owner-release records so 30-day shadow artifacts
    cannot expire after they become qualification or outreach proof.
+2. Define a deterministic page-selection plan that chooses the best service,
+   about, and contact URLs from bounded same-site links before capture.
 3. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
    smoke test; do not add a binding or make a live request until R2, budget,
    rollback, and owner approval gates are recorded.

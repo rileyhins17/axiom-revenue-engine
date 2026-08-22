@@ -87,6 +87,13 @@ planned 30-day lifecycle and uncontacted qualification evidence 180 days;
 outreach/compliance evidence is never assigned a guessed automatic expiry. R2 is
 still disabled and no bucket, binding, object, operation, or charge exists.
 
+The audit assembler now combines those bounded inputs across a home, service,
+about, and contact page. It will not call a page set complete unless all four are
+captured with complete HTML/desktop coverage and the homepage has complete mobile
+measurements. Missing or partial coverage stays visible and keeps absence checks
+unknown; it cannot be converted into a reason to contact a business. The
+assembler is fixture-only, capped at zero dollars, and has no provider access.
+
 ## Verification
 
 ```powershell

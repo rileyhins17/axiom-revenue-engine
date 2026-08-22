@@ -79,5 +79,10 @@
   retention/kind/hash keys, create-if-absent requests, exact checksum and metadata
   reconciliation, idempotent reuse receipts, partial-failure receipts, and
   lifecycle-safe rollback rules are tested without an R2 binding or operation.
+- Added fixture-only multi-page website-audit assembly. A full audit now requires
+  current, same-site home/service/about/contact evidence, complete desktop
+  coverage, a measured mobile homepage, matching artifact receipts, and bounded
+  business-level time/byte usage. Missing coverage remains unknown instead of
+  becoming a false rebuild claim.
 
 Production has not been cut over to this release.

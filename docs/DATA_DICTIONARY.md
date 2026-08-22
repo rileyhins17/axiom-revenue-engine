@@ -12,6 +12,7 @@
 | BrowserMeasurementDraft | A bounded, zero-cost, unpersisted fixture-runner result containing screenshot/measurement bytes, canonical hashes, validated public-navigation receipt, and no artifact-write authority. |
 | ArtifactWritePlan | A transient, bounded content-addressed batch whose object keys, retention class, media metadata, bytes, SHA-256 digests, create-if-absent policy, and zero provider authority validate together. |
 | ArtifactWriteReceipt | The immutable outcome of a fixture storage attempt, including created/reused items, exact object identity, operation counts, cost, failure point, and no-delete rollback decision. |
+| WebsiteAuditAssembly | One versioned business-level receipt linking selected page captures, HTML facts, Browser evidence, artifact receipts, freshness, completeness, and per-business budgets to the exact deterministic audit input. |
 | EvidenceClaim | One supportable observation with URL/artifact, method, confidence, and audit version. |
 | ContactPoint | Email, phone, form, social route, or operator identity candidate. |
 | ConsentEvidence | Recorded lawful basis and public-source context for a contact action. |
@@ -73,6 +74,14 @@
   after 180 days. `OUTREACH_ACTIVE` and `LEGAL_HOLD` have no automatic deletion;
   release requires an approved compliance/owner decision. CRTC guidance does not
   prescribe one universal CASL record-retention period.
+- A full website audit requires captured `HOME`, `SERVICE`, `ABOUT`, and `CONTACT`
+  pages with complete HTML and desktop action/form coverage, plus complete mobile
+  measurements for the homepage. A missing, failed, stale, cross-site, or partial
+  page makes the assembly partial and cannot turn an unseen feature into a defect.
+- Assembly budgets apply to the whole business, not each page independently:
+  five selected pages, six Browser captures, 120 Browser seconds, 30 MiB of
+  artifacts, 5 MiB of HTML, evidence no older than 24 hours, and at most two
+  hours of cross-capture skew. Version 1 is fixture-only and costs zero.
 - Real evaluation businesses and Riley's labels live in private D1 or ignored
   local storage. Synthetic fixtures may be committed; prospect records may not.
 - A saved private persistence artifact is not trusted executable input. Any
