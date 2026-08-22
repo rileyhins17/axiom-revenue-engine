@@ -61,6 +61,8 @@ staging; no rebuild code or migration has been deployed to production.
   `3892c9b3dc8d5f43871ceb73f05f9ce156d287b0`
 - Deterministic website page-selection source checkpoint:
   `0165a0a6a304b06f7bbc09766c2572d3459054fc`
+- Deterministic website page-selection documentation/CI checkpoint:
+  `f3b3812a93a962658edc259810a202b32f63247f`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -302,6 +304,9 @@ staging; no rebuild code or migration has been deployed to production.
   build, explicit default console no-upload dry run, deterministic engine
   bindings, and the inert engine no-upload dry run. The console build reports
   only the known generated duplicate-key warnings documented for the legacy UI.
+- Linux CI run `32563067858` passed all 13 gates on page-selection checkpoint
+  `f3b3812`, including exact dependencies, a clean Ubuntu Cloudflare build, all
+  55 migrations, 251/251 tests, and both no-upload Worker validations.
 
 ## Safety and production
 
