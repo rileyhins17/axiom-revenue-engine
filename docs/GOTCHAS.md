@@ -57,9 +57,11 @@ Retire entries when the architecture makes them impossible.
 - **Proven fix:** typed repositories, repeatable migration verification, a schema
   inventory, and pre-cutover count reconciliation.
 - **Prevention/test:** migration checks in CI and a staging/production inventory
-  step in the release runbook.
+  step in the release runbook; query `sqlite_master`/`PRAGMA table_info` before
+  writing operational SQL instead of guessing names from surrounding code.
 - **Affected area:** D1, dashboard, scheduler.
-- **Verifying commit:** pending v2 repository layer.
+- **Verifying commit:** staging inventory confirmed the singular live names on
+  2026-08-22; typed v2 repository layer remains pending.
 
 ## AI-001 — Provider/model documentation drift
 

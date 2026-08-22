@@ -9,7 +9,8 @@ The real repository has been recovered into the local workspace, renamed to
 locally and on Linux. Production has now been inventoried and backed up: legacy
 email/intake work is stopped, the redundant master database switch is off, and
 the legacy five-minute cron was removed so a paused engine no longer writes an
-empty run every five minutes. No rebuild code or migration has been deployed.
+empty run every five minutes. The rebuild console is live only in isolated
+staging; no rebuild code or migration has been deployed to production.
 
 ## Verified checkpoint
 
@@ -66,6 +67,16 @@ empty run every five minutes. No rebuild code or migration has been deployed.
   had copied the ignored local OpenAI key into its generated environment module.
   Every Cloudflare build now empties that local fallback and scans all generated
   files; the real key was removed and the corrected default/staging dry runs pass.
+- The staging console is live from source commit `7725098`, current version
+  `941b37bc-38e8-4c6c-9111-d475e9871727`, with only a fresh
+  `BETTER_AUTH_SECRET`. Sign-in returns 200, protected automation health returns
+  401 without a session, and staging still has zero runs and zero sends.
+- Linux CI run `32550535144` failed only at generated-binding drift. The tracked
+  `cloudflare-env.d.ts` predates the staging environment; a diagnostic candidate
+  confirms the expected change is staging URL unions, intake cap zero, removal
+  of the legacy self-binding, and a generated `StagingEnv` interface. The secret
+  sanitizer passed on Linux. Source regeneration awaits owner approval under the
+  CI-fix workflow.
 
 ## Safety and production
 
@@ -124,10 +135,8 @@ Still required for Phase 1:
   deploy is not approved. GitHub required reviewers are unavailable for this
   private repository on the current plan; `main` restriction plus exact SHA,
   backup reference, and approval phrase are the no-cost gates.
-- Remaining staging resources: console Worker, R2, and typed engine Workflow.
-  D1 plus job/DLQ Queues are complete and isolated.
-- Staging console Worker deployed from a recorded commit with a fresh staging-only
-  auth secret and no production bindings.
+- Remaining staging resources: R2 and the typed engine Workflow. The console,
+  D1, and job/DLQ Queues are complete and isolated.
 - Characterization coverage retained while first v2 modules are introduced.
 
 ## Budget
@@ -144,13 +153,15 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 - R2 activation currently requires a Cloudflare dashboard decision. Approve only
   if the account shows it fits inside the existing C$50 ceiling; no R2 resource
   or charge has been created yet.
+- Approve regenerating the tracked Cloudflare binding file and rerunning the full
+  gate to clear Linux CI run `32550535144`.
 
 ## Next three actions
 
-1. Commit the isolated staging configuration and deploy only the staging console
-   with a fresh auth secret; verify its bindings and zero schedules.
-2. Resolve the R2 activation decision, then scaffold the typed engine
-   Queue/Workflow worker without attaching a live consumer.
+1. Regenerate the tracked Cloudflare binding file, rerun the full release gate,
+   and verify the replacement Linux CI run after owner approval.
+2. Scaffold the typed engine Queue/Workflow worker without attaching a live
+   consumer; keep R2 blocked until the account-cost decision is explicit.
 3. Implement the deterministic website evidence/audit workflow and build the
    50-lead KW evaluation set before qualification can connect to sending.
 

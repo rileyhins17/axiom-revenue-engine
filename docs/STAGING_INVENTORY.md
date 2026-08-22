@@ -1,6 +1,6 @@
 # Staging inventory
 
-Last verified: 2026-08-21 (America/Toronto)
+Last verified: 2026-08-22 (America/Toronto)
 
 Staging is isolated from every legacy production resource. It has no schedule,
 no producer, no consumer, no mailbox credentials, and no production traffic.
@@ -13,6 +13,8 @@ no producer, no consumer, no mailbox credentials, and no production traffic.
   (`3f87b4d293ee414590279a89fba41348`).
 - Dead-letter queue `axiom-revenue-engine-jobs-staging-dlq`
   (`a33464b4834e4b3b95659af0ceec2d9d`).
+- Console Worker `axiom-revenue-engine-console-staging` at
+  `https://axiom-revenue-engine-console-staging.aidan-magee2.workers.dev`.
 
 Both queues have zero producers and zero consumers. They cannot receive or
 process work until the separate typed engine Worker is implemented and approved.
@@ -29,6 +31,9 @@ process work until the separate typed engine Worker is implemented and approved.
   receipts. Cloudflare's resource summary reports 39 user-facing tables.
 - Database safety state: `enabled=0`, global pause `1`, emergency pause `1`,
   intake pause `1`, and follow-up pause `1`.
+- Post-deploy verification: zero `OutreachRun` rows and zero sent
+  `OutreachEmail` rows. The exact table names are singular `OutreachRun` and
+  `OutreachAutomationSetting`; legacy plural guesses are invalid.
 - Time Travel bookmark:
   `00000001-00000073-000050cf-ff3577eebe7c6028b7682a53a95b770d`.
 
@@ -44,8 +49,20 @@ D1 only. The exact configuration checkpoint is
 - Daily intake and send caps set to zero.
 - No Gmail, agent, MCP, or OpenAI runtime secret.
 
-The console Worker and its staging auth secret are not deployed yet. Deploy only
-after the exact source commit is recorded and the staging dry run is green.
+The console was deployed from source commit
+`7725098232829b7aca64a81d730db3b1729a5c7a` after the bundle-safety gate at
+`ab5621cae3d463f935883705bd324ca92ef7e938` removed the local OpenAI key from
+generated output and scanned 1,988 files.
+
+- Initial code version: `ee966729-32e9-40f4-aa09-899ad9a27cd0`.
+- Current version after adding the auth secret:
+  `941b37bc-38e8-4c6c-9111-d475e9871727`.
+- Current deployment: `c4bdd4af-85ec-4075-9a5a-7ded9f42add4` at 100%.
+- Secret inventory contains only `BETTER_AUTH_SECRET`; its value was generated
+  cryptographically, stored remotely, and never printed.
+- `/sign-in` returns 200; unauthenticated automation health returns 401.
+- No cron schedule, producer, consumer, OpenAI key, Gmail credential, or send
+  route is enabled.
 
 ## Pending resources
 
@@ -57,6 +74,8 @@ after the exact source commit is recorded and the staging dry run is green.
 
 ## Rollback
 
-Before traffic or test data exists, rollback is to remove the exact staging
-Worker/Queues/D1 after confirming their identifiers above and preserving the
-exports/checksums. Never delete a similarly named production or legacy resource.
+Before traffic or test data exists, console rollback is to move the staging
+deployment to a previously recorded version or remove only the exact staging
+Worker. Full teardown additionally removes the exact Queues/D1 after confirming
+their identifiers above and preserving exports/checksums. Never delete a similarly
+named production or legacy resource.

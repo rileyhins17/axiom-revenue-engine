@@ -33,5 +33,7 @@
 - Blocked a pre-deploy local-secret leak from OpenNext's generated environment
   module and added automatic sanitization plus whole-bundle secret scanning to
   every Cloudflare build.
+- Deployed the first isolated staging console with one fresh auth secret, no
+  schedule/provider/mailbox credentials, and zero staging runs or sends.
 
 Production has not been cut over to this release.
