@@ -49,6 +49,8 @@ staging; no rebuild code or migration has been deployed to production.
   `a4d73fa89b1072fdd7803cd6c2276fe8fe830676`
 - Content-addressed artifact-contract source checkpoint:
   `2621f3c1a790516507a78d89ea3ae06e7e738722`
+- Content-addressed artifact documentation/CI checkpoint:
+  `e77f613d78306c3bc5dd076ed6e46a00527884f2`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -227,6 +229,9 @@ staging; no rebuild code or migration has been deployed to production.
   zero-warning lint, safety checks, the secret-sanitized console build, explicit
   default console no-upload dry run, deterministic engine bindings, and the inert
   engine no-upload dry run. No Cloudflare resource was created or changed.
+- Linux CI run `32559645916` passed all 13 gates on artifact-contract checkpoint
+  `e77f613`, including exact dependencies, a clean Ubuntu Cloudflare build, all
+  migrations, 228/228 tests, and both no-upload Worker validations.
 
 ## Safety and production
 
