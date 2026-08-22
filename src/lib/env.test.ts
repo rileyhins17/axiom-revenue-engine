@@ -9,7 +9,11 @@ const autonomousSwitches = [
   "AUTONOMOUS_SEND_ENABLED",
 ] as const;
 
-const envKeysToRestore = ["BETTER_AUTH_SECRET", ...autonomousSwitches];
+const envKeysToRestore = [
+  "BETTER_AUTH_SECRET",
+  "AUTONOMOUS_DAILY_LEAD_INTAKE_CAP",
+  ...autonomousSwitches,
+];
 const originalEnv = new Map<string, string | undefined>();
 const mutableProcessEnv = process.env as Record<string, string | undefined>;
 
@@ -98,4 +102,13 @@ test("missing autonomous kill switches retain safe defaults", () => {
   assert.equal(env.AUTONOMOUS_INTAKE_ENABLED, false);
   assert.equal(env.AUTONOMOUS_QUEUE_ENABLED, false);
   assert.equal(env.AUTONOMOUS_SEND_ENABLED, false);
+  assert.equal(env.AUTONOMOUS_DAILY_LEAD_INTAKE_CAP, 0);
+});
+
+test("an explicit zero daily lead intake cap is valid", () => {
+  mutableProcessEnv.AUTONOMOUS_DAILY_LEAD_INTAKE_CAP = "0";
+
+  clearServerEnvCache();
+
+  assert.equal(getServerEnv().AUTONOMOUS_DAILY_LEAD_INTAKE_CAP, 0);
 });

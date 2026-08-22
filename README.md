@@ -54,7 +54,7 @@ npm test
 npm run typecheck
 npm run lint
 npm run build:cloudflare
-npx wrangler deploy --dry-run --autoconfig false
+npx wrangler deploy --env="" --dry-run --autoconfig false
 ```
 
 ## Documentation map
@@ -64,6 +64,8 @@ npx wrangler deploy --dry-run --autoconfig false
 - [`docs/STATUS.md`](docs/STATUS.md) — exact resumable checkpoint.
 - [`docs/PRODUCTION_INVENTORY.md`](docs/PRODUCTION_INVENTORY.md) — latest non-secret
   legacy resource, data, safety, and backup inventory.
+- [`docs/STAGING_INVENTORY.md`](docs/STAGING_INVENTORY.md) — isolated Cloudflare
+  resource IDs, migration state, pending services, and rollback notes.
 - [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) — product, architecture, phases, and gates.
 - [`docs/GOTCHAS.md`](docs/GOTCHAS.md) — proven recurring traps and prevention.
 - [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — safe operator and release procedures.

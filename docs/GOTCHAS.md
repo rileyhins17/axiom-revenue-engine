@@ -39,13 +39,14 @@ Retire entries when the architecture makes them impossible.
 - **Root cause:** the legacy cron acquired/persisted scheduler state before
   returning at the database pause gate.
 - **Proven fix:** remove all cron triggers from the rollback-only legacy Worker
-  during the rebuild; future durable schedules remain absent until their phase is
-  explicitly approved.
+  during the rebuild; checked-in default and staging crons are empty, and future
+  durable schedules remain absent until their phase is explicitly approved.
 - **Prevention/test:** a disabled phase has no deployed schedule; paused workflow
   tests assert zero provider calls and zero durable run/lease writes.
 - **Affected area:** production safety, D1 cost/noise, observability.
 - **Verifying commit:** `4408a89`; production trigger removal observed through
-  the full propagation window on 2026-08-21.
+  the full propagation window on 2026-08-21; no-cron staging config checkpoint
+  pending.
 
 ## DATA-001 — Raw SQL drifted from the live schema
 
@@ -205,3 +206,17 @@ Retire entries when the architecture makes them impossible.
   release; never weaken repository privacy to gain a reviewer button.
 - **Affected area:** GitHub Actions and production approval.
 - **Verifying commit:** `4408a89`; environment configured 2026-08-21.
+
+## DEPLOY-002 — Manual release inputs were treated as trusted shell text
+
+- **Symptom:** a branch name or abbreviated commit could be supplied as the
+  release target, and workflow inputs were interpolated directly into shell code.
+- **Root cause:** the workflow asked for approval evidence but did not validate
+  its structure, exact checkout, or relationship to `main`.
+- **Proven fix:** validate a 40-character SHA and structured D1 checksum reference,
+  pass inputs through environment variables, verify exact checkout, and require
+  the release commit to be an ancestor of `origin/main`.
+- **Prevention/test:** `scripts/validate-release-inputs.test.mjs`; production
+  environment remains limited to `main` and credentials remain absent by default.
+- **Affected area:** production release integrity and workflow injection safety.
+- **Verifying commit:** pending staging/release checkpoint.

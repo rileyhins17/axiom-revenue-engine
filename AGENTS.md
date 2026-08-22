@@ -84,7 +84,7 @@ npm test
 npm run typecheck
 npm run lint
 npm run build:cloudflare
-npx wrangler deploy --dry-run --autoconfig false
+npx wrangler deploy --env="" --dry-run --autoconfig false
 ```
 
 Automated tests must use fakes or mail sinks and must never contact prospects.

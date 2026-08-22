@@ -21,16 +21,11 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  "services": [
-    {
-      "binding": "WORKER_SELF_REFERENCE",
-      "service": "axiom-revenue-engine-console"
-    }
-  ],
+  "services": [],
   "triggers": {
-    // 5-min cron is well within the 36-min mailbox cooldown so send
-    // throughput is identical to */1; saves ~80% of worker invocations.
-    "crons": ["*/5 * * * *"]
+    // Durable schedules remain absent until the matching Workflow phase is
+    // explicitly approved. A disabled cron should create zero D1 writes.
+    "crons": []
   },
   "vars": {
     "APP_BASE_URL": "https://revenue.getaxiom.ca/",
@@ -57,7 +52,7 @@
     "AUTONOMOUS_INTAKE_ENABLED": "false",
     "AUTONOMOUS_QUEUE_ENABLED": "false",
     "AUTONOMOUS_SEND_ENABLED": "false",
-    "AUTONOMOUS_DAILY_LEAD_INTAKE_CAP": "25",
+    "AUTONOMOUS_DAILY_LEAD_INTAKE_CAP": "0",
     "AUTONOMOUS_MAX_SENDS_PER_DAY": "0",
     "AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY": "0",
     "AUTONOMOUS_DOMAIN_COOLDOWN_DAYS": "14"
@@ -72,5 +67,47 @@
   ],
   "browser": {
     "binding": "BROWSER"
+  },
+  "env": {
+    "staging": {
+      "services": [],
+      "triggers": {
+        "crons": []
+      },
+      "vars": {
+        "APP_BASE_URL": "https://axiom-revenue-engine-console-staging.aidan-magee2.workers.dev/",
+        "AUTH_ALLOWED_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
+        "AUTH_ADMIN_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
+        "AUTH_ALLOWED_ORIGINS": "https://axiom-revenue-engine-console-staging.aidan-magee2.workers.dev",
+        "CLOUD_SCRAPE_ENABLED": "false",
+        "CLOUD_SCRAPE_TIMEOUT_MS": "840000",
+        "CLOUD_SCRAPE_WORKER_NAME": "cloudflare-browser",
+        "CLOUD_SCRAPE_DETAIL_PAGES_ENABLED": "false",
+        "RATE_LIMIT_WINDOW_SECONDS": "60",
+        "RATE_LIMIT_MAX_AUTH": "50",
+        "RATE_LIMIT_MAX_SCRAPE": "20",
+        "RATE_LIMIT_MAX_EXPORT": "20",
+        "SCRAPE_CONCURRENCY_LIMIT": "1",
+        "SCRAPE_TIMEOUT_MS": "1800000",
+        "AUTONOMOUS_INTAKE_ENABLED": "false",
+        "AUTONOMOUS_QUEUE_ENABLED": "false",
+        "AUTONOMOUS_SEND_ENABLED": "false",
+        "AUTONOMOUS_DAILY_LEAD_INTAKE_CAP": "0",
+        "AUTONOMOUS_MAX_SENDS_PER_DAY": "0",
+        "AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY": "0",
+        "AUTONOMOUS_DOMAIN_COOLDOWN_DAYS": "14"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "axiom-revenue-engine-staging",
+          "database_id": "322fcf89-312c-44f0-b238-c4a348f6d6ad",
+          "migrations_dir": "./migrations"
+        }
+      ],
+      "browser": {
+        "binding": "BROWSER"
+      }
+    }
   }
 }

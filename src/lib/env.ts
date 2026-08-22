@@ -70,7 +70,7 @@ const envSchema = z.object({
   AUTONOMOUS_INTAKE_ENABLED: environmentBoolean(false),
   AUTONOMOUS_QUEUE_ENABLED: environmentBoolean(false),
   AUTONOMOUS_SEND_ENABLED: environmentBoolean(false),
-  AUTONOMOUS_DAILY_LEAD_INTAKE_CAP: z.coerce.number().int().positive().default(50),
+  AUTONOMOUS_DAILY_LEAD_INTAKE_CAP: z.coerce.number().int().nonnegative().default(0),
   AUTONOMOUS_MAX_SENDS_PER_DAY: z.coerce.number().int().nonnegative().default(0),
   AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY: z.coerce.number().int().nonnegative().default(0),
   // Cooldown so we don't email two contacts at the same business / domain

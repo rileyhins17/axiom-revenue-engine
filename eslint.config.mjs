@@ -13,6 +13,7 @@ const eslintConfig = defineConfig([
     ".wrangler/**",
     ".playwright-mcp/**",
     ".claude/**",
+    "backups/**",
     "axiom-revenue-engine/**",
     "out/**",
     "build/**",

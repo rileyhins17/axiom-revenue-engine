@@ -45,6 +45,18 @@ empty run every five minutes. No rebuild code or migration has been deployed.
 - GitHub `production` environment exists and only accepts deployments originating
   from `main`. No repository/environment deployment secrets or variables exist,
   so the production workflow remains incapable of deploying.
+- Isolated staging D1 plus job and dead-letter Queues are provisioned. All 55
+  migrations are applied to staging, every database stop is engaged, and both
+  Queues have zero producers/consumers. See `docs/STAGING_INVENTORY.md`.
+- The staging configuration has no cron, no legacy self-fetch binding, zero
+  autonomous caps, and cannot use Gmail or OpenAI because those secrets are absent.
+- Production release inputs now require an exact 40-character commit, structured
+  D1 checksum reference, exact checkout, and ancestry on `main`; targeted tests
+  reject abbreviated, branch-shaped, and command-shaped inputs.
+- Staging/release checkpoint verification rerun 2026-08-21: safety scan,
+  164/164 tests, typecheck, lint, Cloudflare production build, explicit default
+  deploy dry run, and explicit staging deploy dry run pass. The staging dry run
+  exposes only the isolated D1, Browser Rendering, assets, and fail-closed vars.
 
 ## Safety and production
 
@@ -103,7 +115,10 @@ Still required for Phase 1:
   deploy is not approved. GitHub required reviewers are unavailable for this
   private repository on the current plan; `main` restriction plus exact SHA,
   backup reference, and approval phrase are the no-cost gates.
-- Staging Worker/D1/R2/Queue/Workflow resources provisioned.
+- Remaining staging resources: console Worker, R2, and typed engine Workflow.
+  D1 plus job/DLQ Queues are complete and isolated.
+- Staging console Worker deployed from a recorded commit with a fresh staging-only
+  auth secret and no production bindings.
 - Characterization coverage retained while first v2 modules are introduced.
 
 ## Budget
@@ -117,12 +132,16 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
   Workspace; verify send/receive, MFA, SPF, DKIM, DMARC, and recovery ownership.
 - Confirm who owns replies for each mailbox before the pilot.
 - Later: label the first 50 KW leads strong/weak/wrong with a short reason.
+- R2 activation currently requires a Cloudflare dashboard decision. Approve only
+  if the account shows it fits inside the existing C$50 ceiling; no R2 resource
+  or charge has been created yet.
 
 ## Next three actions
 
-1. Provision isolated staging Worker/D1/R2/Queue resources and ensure no staging
-   binding points at legacy production.
-2. Harden release input validation before any deployment credentials are added.
+1. Commit the isolated staging configuration and deploy only the staging console
+   with a fresh auth secret; verify its bindings and zero schedules.
+2. Resolve the R2 activation decision, then scaffold the typed engine
+   Queue/Workflow worker without attaching a live consumer.
 3. Implement the deterministic website evidence/audit workflow and build the
    50-lead KW evaluation set before qualification can connect to sending.
 

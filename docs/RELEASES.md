@@ -25,5 +25,10 @@
   route, or database migration was deployed.
 - Added the GitHub `production` environment restricted to `main`; deployment
   credentials remain absent, so the protected workflow cannot deploy yet.
+- Provisioned isolated staging D1 and job/DLQ resources, applied and verified all
+  55 migrations with every stop engaged, and added a no-cron staging console
+  configuration that cannot bind legacy production.
+- Hardened production workflow inputs with exact-SHA/checksum validation and a
+  requirement that the deployed commit is contained in `main`.
 
 Production has not been cut over to this release.
