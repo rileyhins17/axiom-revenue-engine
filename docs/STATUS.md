@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-21 (America/Toronto)
+Last updated: 2026-08-22 (America/Toronto)
 
 ## Plain-English status
 
@@ -22,6 +22,8 @@ empty run every five minutes. No rebuild code or migration has been deployed.
   `4408a894319f786fbe416b3e50c68aa8478e5111`
 - Isolated-staging configuration checkpoint:
   `23ee458a997ddfd4df48f3f1f90581a6f4df3da0`
+- Cloudflare bundle-safety checkpoint:
+  `ab5621cae3d463f935883705bd324ca92ef7e938`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow

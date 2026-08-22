@@ -208,7 +208,7 @@ Retire entries when the architecture makes them impossible.
   configuration requires the sanitizer in `build:cloudflare`; provider secrets
   are set in Cloudflare's secret store instead of supplied by local build files.
 - **Affected area:** all Cloudflare builds, previews, dry runs, and deployments.
-- **Verifying commit:** pending bundle-safety checkpoint.
+- **Verifying commit:** `ab5621c`.
 
 ## DEPLOY-001 — Required reviewers are unavailable on this private repo plan
 
