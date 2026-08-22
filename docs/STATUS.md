@@ -20,6 +20,8 @@ empty run every five minutes. No rebuild code or migration has been deployed.
   and `6a03de6fe251155d7e5e8fa14b3c7f8e494c5a3b`
 - Production-safety checkpoint:
   `4408a894319f786fbe416b3e50c68aa8478e5111`
+- Isolated-staging configuration checkpoint:
+  `23ee458a997ddfd4df48f3f1f90581a6f4df3da0`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow

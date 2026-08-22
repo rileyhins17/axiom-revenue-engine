@@ -35,7 +35,8 @@ process work until the separate typed engine Worker is implemented and approved.
 ## Console configuration
 
 `wrangler.jsonc` contains an explicit `staging` environment bound to the staging
-D1 only. It has:
+D1 only. The exact configuration checkpoint is
+`23ee458a997ddfd4df48f3f1f90581a6f4df3da0`. It has:
 
 - No cron triggers.
 - No legacy self-service binding.

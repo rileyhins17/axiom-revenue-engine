@@ -46,7 +46,7 @@ Retire entries when the architecture makes them impossible.
 - **Affected area:** production safety, D1 cost/noise, observability.
 - **Verifying commit:** `4408a89`; production trigger removal observed through
   the full propagation window on 2026-08-21; no-cron staging config checkpoint
-  pending.
+  `23ee458`.
 
 ## DATA-001 — Raw SQL drifted from the live schema
 
@@ -219,4 +219,4 @@ Retire entries when the architecture makes them impossible.
 - **Prevention/test:** `scripts/validate-release-inputs.test.mjs`; production
   environment remains limited to `main` and credentials remain absent by default.
 - **Affected area:** production release integrity and workflow injection safety.
-- **Verifying commit:** pending staging/release checkpoint.
+- **Verifying commit:** `23ee458`.
