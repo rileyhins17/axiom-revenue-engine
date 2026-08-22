@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-16 (America/Toronto)
+Last updated: 2026-08-21 (America/Toronto)
 
 ## Plain-English status
 
@@ -14,12 +14,14 @@ the owner-facing Leads screen prioritizes quality instead of record age.
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
+- Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
   Revenue Engine records, and content-bound outreach approval
-- Current checkpoint verification: 160/160 tests, typecheck, zero-warning lint,
-  safety scan, Cloudflare production build, and Wrangler deploy dry run pass
+- Current checkpoint verification rerun 2026-08-21: 160/160 tests, typecheck,
+  zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
+  build, and Wrangler deploy dry run pass
 - Generated Cloudflare bindings replaced the stale hand-written environment file
 
 ## Safety and production
@@ -28,8 +30,9 @@ the owner-facing Leads screen prioritizes quality instead of record age.
   send cap zero.
 - Even if send configuration is later enabled, the final Gmail call now blocks
   without an unexpired operator approval matching the exact message content.
-- Production D1 pause records were the last known real stop. Production state must
-  be re-inventoried and backed up before any deployment or migration.
+- Production D1 pause records were the last known real stop. This was not
+  re-verified on 2026-08-21; production must be inventoried read-only and backed
+  up before any deployment or migration.
 - No live email, inbox sync, prospect contact, database migration, or Cloudflare
   deployment has been performed during this rebuild checkpoint.
 - Legacy Worker/database identifiers still exist for rollback and data continuity.

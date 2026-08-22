@@ -26,7 +26,7 @@ Retire entries when the architecture makes them impossible.
   switch off; all applicable gates must agree before work.
 - **Prevention/test:** `src/lib/env.test.ts` plus `npm run check:safety`.
 - **Affected area:** all automation.
-- **Verifying commit:** current rebuild checkpoint; commit pending.
+- **Verifying commit:** `7afc212`.
 
 ## DATA-001 — Raw SQL drifted from the live schema
 
@@ -51,7 +51,7 @@ Retire entries when the architecture makes them impossible.
 - **Prevention/test:** provider contract tests assert endpoint, model, structured
   output, usage, and fail-closed parsing.
 - **Affected area:** extraction, audit, ranking, drafting.
-- **Verifying commit:** current rebuild checkpoint; commit pending.
+- **Verifying commit:** `7afc212`.
 
 ## RUN-001 — Cron self-dispatch hid CPU-bound orchestration
 
@@ -85,7 +85,7 @@ Retire entries when the architecture makes them impossible.
 - **Proven fix:** repository-first resume contract and current README/STATUS.
 - **Prevention/test:** naming scan in `npm run check:safety`.
 - **Affected area:** agent continuity.
-- **Verifying commit:** current rebuild checkpoint; commit pending.
+- **Verifying commit:** `7afc212`.
 
 ## QUAL-001 — Email availability was confused with lead quality
 
@@ -107,7 +107,7 @@ Retire entries when the architecture makes them impossible.
 - **Proven fix:** Linux GitHub Actions runs build and Wrangler dry run.
 - **Prevention/test:** required CI gate before production approval.
 - **Affected area:** build/deployment.
-- **Verifying commit:** current rebuild checkpoint; commit pending.
+- **Verifying commit:** workflow added in `7afc212`; Linux CI result pending.
 
 ## UI-001 — “Healthy” UI was not backed by business or runtime proof
 
@@ -132,4 +132,4 @@ Retire entries when the architecture makes them impossible.
 - **Prevention/test:** CI regenerates `cloudflare-env.d.ts`, rejects a diff, then
   runs typecheck and the Cloudflare build.
 - **Affected area:** environment bindings, client APIs, CI.
-- **Verifying commit:** current rebuild checkpoint; commit pending.
+- **Verifying commit:** `7afc212`.
