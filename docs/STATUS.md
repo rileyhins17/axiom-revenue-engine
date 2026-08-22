@@ -29,6 +29,8 @@ staging; no rebuild code or migration has been deployed to production.
   `e68ac403b8fbd49005438c33554253962340b545`
 - Inert engine/workflow checkpoint:
   `5d3ef6a30467db85234b0860b243587dd31084a4`
+- Deterministic website-quality checkpoint:
+  `ea7ff1a35302c927c0c26bf6008d05692d77a2be`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -87,6 +89,18 @@ staging; no rebuild code or migration has been deployed to production.
   current workerd runtime. The complete checkpoint gate passes with 171/171
   tests, deterministic console/engine bindings, typecheck, zero-warning lint,
   a sanitized console build, and both no-upload deployment dry runs.
+- Expanded Linux CI run `32552447874` passed all 13 console/engine steps on
+  commit `7c11ec0`, including the isolated engine type and dry-run gates.
+- The deterministic website-audit kernel now classifies modern, weak, broken,
+  missing, and mobile-failing sites without AI. Negative findings retain URL,
+  timestamp, method, confidence, artifact reference, and audit version. No live
+  URL was fetched and Browser Rendering/R2 remain unattached.
+- The private KW evaluation contract now enforces 50 unique owner-reviewed leads,
+  at least 10 per city and niche, and at least 85% engine/owner agreement. Real
+  progress remains 0/50; only synthetic test businesses are committed.
+- Audit/evaluation checkpoint verification passes 182/182 tests, typecheck,
+  zero-warning lint, safety checks, secret-sanitized console build, explicit
+  console dry run, deterministic engine type check, and engine dry run.
 
 ## Safety and production
 
@@ -118,7 +132,8 @@ staging; no rebuild code or migration has been deployed to production.
 
 ## Current phase
 
-Phase 1 — durable project foundation (in progress).
+Phase 1 — durable project foundation (in progress), with the first Phase 2 domain
+slice implemented in shadow-only code.
 
 Completed gates:
 
@@ -140,6 +155,11 @@ Completed gates:
 - Inert typed engine: versioned Workflow input/receipt contracts, stable source,
   audit, contact, verification, and mailbox adapter interfaces, two durable
   fail-closed steps, generated bindings, safety tests, and CI dry-run coverage.
+- Deterministic website audit: bounded typed inputs, 18 visible checks, four
+  opportunity classes, evidence traceability, unknown-state handling, and tests
+  for modern, weak, unreachable, missing, mobile-failing, and minor sites.
+- KW evaluation gate: private-data contract, duplicate protection, balance
+  requirements, owner reasons, 85% agreement calculation, and owner guide.
 
 Still required for Phase 1:
 
@@ -170,11 +190,11 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Push the inert engine checkpoint and verify the expanded Linux CI gate.
-2. Implement deterministic HTTP/DOM website checks and versioned evidence audit
-   results without enabling Browser Rendering or R2.
-3. Build the first labelled 50-lead KW evaluation fixture before qualification
-   can connect to any live acquisition or sending path.
+1. Push the deterministic audit/evaluation checkpoint and verify Linux CI.
+2. Build a bounded website snapshot adapter with public-URL/SSRF protection,
+   redirect and response-size limits, and fixture tests before any live fetch.
+3. Implement the source/identity import path that can privately load the first
+   real 50-lead KW set; do not acquire paid data or enable providers yet.
 
 ## Resume instructions
 

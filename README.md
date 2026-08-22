@@ -78,6 +78,8 @@ npm run cf:engine:dry-run
 - [`docs/STAGING_INVENTORY.md`](docs/STAGING_INVENTORY.md) — isolated Cloudflare
   resource IDs, migration state, pending services, and rollback notes.
 - [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) — product, architecture, phases, and gates.
+- [`docs/KW_EVALUATION_GUIDE.md`](docs/KW_EVALUATION_GUIDE.md) — Riley's one-time
+  50-lead quality-label gate and current progress.
 - [`docs/GOTCHAS.md`](docs/GOTCHAS.md) — proven recurring traps and prevention.
 - [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — safe operator and release procedures.
 - [`docs/DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md) — canonical domain language.

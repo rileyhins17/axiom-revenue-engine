@@ -43,5 +43,10 @@
 - Pinned Wrangler 4.125.0 so the new Worker can use the current compatibility
   date, while preventing engine type generation and local development from
   inheriting unrelated `.env.local` secrets.
+- Added a deterministic website-quality kernel with 18 transparent checks,
+  four opportunity classifications, evidence-grounded negative findings, and
+  modern/weak/broken/missing/mobile fixture coverage.
+- Added the private KW 50-lead evaluation contract and owner guide with unique
+  identity, city/niche balance, required owner reasons, and 85% agreement gates.
 
 Production has not been cut over to this release.

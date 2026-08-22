@@ -25,6 +25,7 @@
 | Suppression | Durable do-not-contact state and reason across all relevant identities. |
 | WorkflowRun | Resumable execution receipt with version, step, attempt, result, and failure. |
 | CostLedger | Provider usage/cost attached to a run, lead, campaign, and budget period. |
+| KwLeadEvaluationSet | Private 50-lead owner-labelled KW quality gate used to measure engine agreement before live outreach. |
 
 ## Identity and evidence rules
 
@@ -35,5 +36,10 @@
   ConsentEvidence, WorkflowRun, and CostLedger are immutable/versioned history.
 - Unknown or migrated evidence remains explicitly unknown; never fabricate it to
   satisfy a non-null UI.
+- Deterministic website checks record `PASS`, `FAIL`, or `UNKNOWN`; only a
+  supportable `FAIL` creates a negative EvidenceClaim, while unknown capture
+  coverage lowers evidence confidence instead of becoming a guessed weakness.
+- Real evaluation businesses and Riley's labels live in private D1 or ignored
+  local storage. Synthetic fixtures may be committed; prospect records may not.
 - An approval is invalid after content changes, expiry, rejection, or revocation;
   the final provider call recomputes its digest every time.
