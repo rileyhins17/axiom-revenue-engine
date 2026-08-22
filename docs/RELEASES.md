@@ -65,5 +65,10 @@
   insert-if-absent statements for source, business, location, and source-record
   rows only. Collision, drift, idempotency, and schema compatibility are tested
   in memory; no database executor or outreach authority exists.
+- Added the versioned Browser page-evidence and conservative HTML merge
+  contracts. Fixed desktop/mobile profiles, artifact hashes, measurement
+  coverage, and identity/URL checks make screenshots auditable; failed or
+  incomplete rendering remains unknown. Deterministic website audit v2 no longer
+  converts missing page-set or visual coverage into unsupported negative claims.
 
 Production has not been cut over to this release.

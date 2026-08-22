@@ -39,6 +39,8 @@ staging; no rebuild code or migration has been deployed to production.
   `fe8fb659c01982a2e82d1c7b8bcbc1d6065eea8e`
 - Validation-only private KW persistence checkpoint:
   `4d7d9a608b42b09db599cc4f813d8f1fbd062d8b`
+- Browser evidence-contract checkpoint:
+  `99e37fa2c04fd095013f1200acfa99d90922c8c7`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -158,6 +160,23 @@ staging; no rebuild code or migration has been deployed to production.
 - Validation-only persistence checkpoint verification passes 209/209 tests,
   typecheck, zero-warning lint, safety checks, secret-sanitized console build,
   explicit console dry run, deterministic engine type check, and engine dry run.
+- Linux CI run `32556171801` passed all 13 gates on persistence documentation
+  commit `420e1ba`.
+- A versioned Browser Rendering evidence contract now fixes comparable desktop
+  and mobile viewports, binds screenshots and measurements to artifact references
+  and SHA-256 digests, records coverage separately for layout/actions/forms/
+  navigation/text, and rejects cross-business, cross-page, cross-URL, duplicate-
+  viewport, malformed-artifact, and stale unreachable-site contamination.
+- Server HTML and browser measurements now merge conservatively. Missing,
+  failed, or partial browser work remains `UNKNOWN`; a screenshot alone cannot
+  become a website defect. The deterministic website audit advanced to v2 so
+  content/page-set completeness and visual coverage decide whether absence is a
+  supported failure or an owner-review gap.
+- Browser evidence remains fixture-only and disconnected from the Worker. No
+  Browser or R2 binding, session, request, artifact write, provider cost, live
+  website capture, database write, qualification, or outreach occurred. The
+  checkpoint passes 215/215 tests, typecheck, lint, and safety checks before the
+  final packaging gate.
 
 ## Safety and production
 
@@ -229,6 +248,9 @@ Completed gates:
 - Validation-only KW persistence: deterministic schema-bound preflights and
   insert-if-absent plans, collision/drift detection, ignored no-overwrite output,
   and in-memory migration compatibility/idempotency coverage with no executor.
+- Browser evidence boundary: fixed viewports, bounded measurement schemas,
+  artifact digests, explicit coverage, conservative HTML merge rules, and audit
+  v2 unknown-state semantics with no live Browser/R2 wiring.
 
 Still required for Phase 1:
 
@@ -259,11 +281,11 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Push the validation-only persistence checkpoint and verify all Linux CI gates.
-2. Define the Browser Rendering evidence contract and fixture merge rules before
-   attaching a Browser or R2 binding to the engine.
-3. Add offline fixtures proving how browser observations and server-HTML facts
-   become evidence claims without converting unknown visual state into failure.
+1. Push the Browser evidence-contract checkpoint and verify all Linux CI gates.
+2. Add a bounded Browser measurement adapter behind an injected runner, with
+   fixture/fake tests and no live binding, navigation, or artifact write.
+3. Define content-addressed R2 artifact keys and retention/rollback rules before
+   provisioning or attaching the staging evidence bucket.
 
 ## Resume instructions
 

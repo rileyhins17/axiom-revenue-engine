@@ -8,6 +8,7 @@
 | CoverageRun | One source/niche/geographic-cell attempt, yield, duplicates, cost, and cooldown. |
 | WebsiteSnapshot | Timestamped, bounded website capture with requested/final URL, redirect chain, HTTP outcome, content metadata, artifact references, and deterministic checks. |
 | HtmlPageFacts | Versioned server-HTML observations for metadata, visible text, actions, forms, trust markers, structured-data types, and internal links; visual placement and computed visibility remain unknown. |
+| BrowserPageEvidence | One versioned fixed-viewport render outcome with screenshot/measurement artifact references, hashes, deterministic layout/action/form/navigation/text observations, explicit coverage, provider receipt, and failure state. |
 | EvidenceClaim | One supportable observation with URL/artifact, method, confidence, and audit version. |
 | ContactPoint | Email, phone, form, social route, or operator identity candidate. |
 | ConsentEvidence | Recorded lawful basis and public-source context for a contact action. |
@@ -51,6 +52,10 @@
 - Incomplete HTML extraction cannot claim full page coverage. Server HTML never
   proves above-the-fold placement, computed CSS, or mobile usability; those
   require captured browser evidence.
+- A screenshot is an artifact, not a finding. Browser facts become usable only
+  when their fixed viewport, business/page/URL identity, measurement version,
+  coverage flags, artifact reference, and digest validate. Partial or failed
+  measurement stays unknown.
 - Real evaluation businesses and Riley's labels live in private D1 or ignored
   local storage. Synthetic fixtures may be committed; prospect records may not.
 - A saved private persistence artifact is not trusted executable input. Any

@@ -65,6 +65,13 @@ standards-based streaming parser. Scripts are never executed, incomplete parsing
 stays explicit, and visual/mobile facts remain unknown until Browser Rendering
 proves them. This parser is also not connected to a live capture path.
 
+The browser-evidence contract now defines that proof without enabling the
+provider. Desktop and mobile captures use fixed comparison viewports, referenced
+artifacts and hashes, deterministic measurement coverage, and conservative merge
+rules. Missing or partial measurements stay unknown; a screenshot alone cannot
+lower a lead's website score. Browser Rendering and R2 are still not attached to
+the engine.
+
 ## Verification
 
 ```powershell
