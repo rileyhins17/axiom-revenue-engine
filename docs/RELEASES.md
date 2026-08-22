@@ -70,5 +70,10 @@
   coverage, and identity/URL checks make screenshots auditable; failed or
   incomplete rendering remains unknown. Deterministic website audit v2 no longer
   converts missing page-set or visual coverage into unsupported negative claims.
+- Added a fixture-only Browser measurement adapter with fixed zero-cost shadow
+  requests, bounded time/request/payload policies, public redirect validation,
+  fail-closed network receipts, unpersisted screenshot/measurement drafts, and
+  byte/hash integrity checks. Content-addressed references must match before a
+  draft becomes evidence; live Browser Rendering and R2 remain inaccessible.
 
 Production has not been cut over to this release.

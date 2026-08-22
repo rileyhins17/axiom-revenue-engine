@@ -43,6 +43,8 @@ staging; no rebuild code or migration has been deployed to production.
   `99e37fa2c04fd095013f1200acfa99d90922c8c7`
 - Browser evidence documentation/CI checkpoint:
   `30424528b920ec535641282035428661e057a2d7`
+- Fixture Browser-measurement source checkpoint:
+  `44a65c966841d3a92bf99c14559d2ad85dda87dd`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 55 apply, including the fail-closed lockdown, shadow
@@ -183,6 +185,24 @@ staging; no rebuild code or migration has been deployed to production.
 - Linux CI run `32557669210` passed all 13 gates on browser evidence checkpoint
   `3042452`, including a clean Ubuntu build, all migrations, 215/215 tests, and
   both no-upload Worker validations.
+- A fixture-only Browser measurement adapter now converts an injected runner
+  result into a bounded, zero-cost, unpersisted draft. Requests use fixed
+  desktop/mobile profiles and caps for navigation time, browser time, observed
+  requests, screenshot bytes, measurement JSON, and redirects.
+- Every document/redirect URL must remain canonical and public. The runner
+  receipt proves request interception and URL validation while forbidding
+  credentials, private-network access, form submission, downloads, service
+  workers, and cache reuse. Direct evidence validation repeats the public-URL
+  guard so callers cannot bypass the adapter.
+- Finalization recomputes artifact byte lengths and SHA-256 digests and accepts
+  only exact content-addressed references. Version 1 accepts `FIXTURE` runners
+  only, has no Browser/R2 imports or bindings, grants no artifact-write authority,
+  and spends nothing. No website, provider, database, or prospect was touched.
+- Fixture measurement checkpoint verification passes 220/220 tests, typecheck,
+  zero-warning lint, safety checks, the secret-sanitized console build, explicit
+  default console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. The console dry run still reports only the known
+  generated duplicate-key warnings documented for the legacy UI bundle.
 
 ## Safety and production
 
@@ -257,6 +277,9 @@ Completed gates:
 - Browser evidence boundary: fixed viewports, bounded measurement schemas,
   artifact digests, explicit coverage, conservative HTML merge rules, and audit
   v2 unknown-state semantics with no live Browser/R2 wiring.
+- Fixture Browser measurement boundary: injected fixture runner, public-only
+  redirect/network receipts, strict execution/payload limits, in-memory artifact
+  drafts, and content-hash finalization with safety-check enforcement.
 
 Still required for Phase 1:
 
@@ -287,12 +310,13 @@ or overage billing are not yet authorized. Cost ledger implementation is pending
 
 ## Next three actions
 
-1. Add a bounded Browser measurement adapter behind an injected runner, with
-   fixture/fake tests and no live binding, navigation, or artifact write.
-2. Define content-addressed R2 artifact keys and retention/rollback rules before
+1. Define content-addressed R2 artifact keys and retention/rollback rules before
    provisioning or attaching the staging evidence bucket.
-3. Assemble multi-page HTML/browser evidence into one versioned audit input,
+2. Assemble multi-page HTML/browser evidence into one versioned audit input,
    with explicit page-set coverage and per-business cost limits.
+3. Design the separately release-gated Cloudflare Browser runner and staging
+   smoke test; do not add a binding or make a live request until R2, budget,
+   rollback, and owner approval gates are recorded.
 
 ## Resume instructions
 

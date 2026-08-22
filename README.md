@@ -72,6 +72,14 @@ rules. Missing or partial measurements stay unknown; a screenshot alone cannot
 lower a lead's website score. Browser Rendering and R2 are still not attached to
 the engine.
 
+A fixture-only Browser measurement adapter now proves the boundary around a
+future Cloudflare runner. It accepts only canonical public navigation, fixed
+viewports, strict time/request/byte limits, and a receipt proving that no private
+network request, credential, form submission, or download was allowed. Captures
+remain unpersisted, zero-cost drafts until separate content-addressed artifact
+references match their revalidated bytes and hashes. This version cannot connect
+to Browser Rendering or R2.
+
 ## Verification
 
 ```powershell
