@@ -16,7 +16,7 @@
     "check:safety": "node scripts/check-safety-config.mjs",
     "worker": "tsx scripts/local-scrape-worker.ts",
     "worker:local": "tsx scripts/local-scrape-worker.ts",
-    "test": "tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.mjs\"",
+    "test": "tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\" \"scripts/**/*.test.mjs\"",
     "clean:next-types": "node -e \"const fs=require('fs'); for (const p of ['.next/types','.next/dev/types']) fs.rmSync(p,{recursive:true,force:true});\"",
     "typecheck": "npm run clean:next-types && tsc --noEmit --project tsconfig.typecheck.json",
     "lint": "eslint",
@@ -30,7 +30,8 @@
     "cf:engine:typegen": "wrangler types --config wrangler.engine.jsonc --env-file wrangler.typegen.env --env-interface RevenueEngineEnv ./src/engine/worker-env.d.ts",
     "cf:engine:typegen:check": "wrangler types --config wrangler.engine.jsonc --env-file wrangler.typegen.env --env-interface RevenueEngineEnv ./src/engine/worker-env.d.ts --check",
     "cf:engine:dev": "wrangler dev --config wrangler.engine.jsonc --local --env-file wrangler.typegen.env",
-    "cf:engine:dry-run": "wrangler deploy --config wrangler.engine.jsonc --dry-run --autoconfig false"
+    "cf:engine:dry-run": "wrangler deploy --config wrangler.engine.jsonc --dry-run --autoconfig false",
+    "kw:prepare-import": "tsx scripts/prepare-private-kw-import.ts"
   },
   "dependencies": {
     "@cloudflare/playwright": "^1.1.2",
