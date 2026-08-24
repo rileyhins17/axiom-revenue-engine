@@ -440,6 +440,10 @@ staging; no rebuild code or migration has been deployed to production.
   engine no-upload dry run. All 58 migrations replayed from zero in isolated
   local D1 at
   `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-f35f266d5fbc45dbae9063e709324ea8`.
+- Linux CI run `32692455530` passed every gate on documentation checkpoint
+  `a82246a`: fail-closed safety, deterministic bindings, a clean Ubuntu
+  Cloudflare build, all 58 migrations from zero, 310/310 tests, typecheck, lint,
+  and both no-upload Worker validations.
 
 ## Safety and production
 
