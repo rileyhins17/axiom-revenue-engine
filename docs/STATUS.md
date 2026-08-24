@@ -69,6 +69,8 @@ staging; no rebuild code or migration has been deployed to production.
   `831bf77d2661287676a7e18ddd203719bc6efbb9`
 - Durable evidence-receipt persistence source checkpoint:
   `4372305279d627991e8d47ff5b717c4a81ecddc2`
+- Durable evidence-receipt documentation/CI checkpoint:
+  `48c21491268461071540e5bfc0f3275c18a889fa`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 56 apply, including the fail-closed lockdown, shadow
@@ -354,6 +356,9 @@ staging; no rebuild code or migration has been deployed to production.
   both no-upload Worker validations, and all 56 migrations from zero in an
   isolated local D1 directory. Migration 0056 remains unapplied to staging and
   production.
+- Linux CI run `32682397316` passed all 13 gates on durable-receipt checkpoint
+  `48c2149`, including exact dependencies, a clean Ubuntu Cloudflare build, all
+  56 migrations from zero, 262/262 tests, and both no-upload Worker validations.
 
 ## Safety and production
 
