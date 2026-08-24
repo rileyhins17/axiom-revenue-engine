@@ -85,7 +85,7 @@ function seedSourceRows(database: Database.Database) {
 function claimActiveSnapshot(database: Database.Database) {
   const acquiredAt = new Date(Date.now() - 1_000).toISOString();
   const expiresAt = new Date(Date.now() + 240_000).toISOString();
-  database.prepare(`INSERT INTO "RevenueArtifactReferenceSnapshotAttempt" ("id", "attemptVersion", "workflowRunId", "businessId", "lineageRootManifestId", "attemptNumber", "fencingToken", "ownerId", "queryContractVersion", "queryContractDigest", "requestDigest", "requestedAt", "acquiredAt", "expiresAt", "mode", "executorKind", "attemptDigest", "attemptJson", "providerOperationsAuthorized", "releaseAuthorized", "deletionAuthorized", "costAuthorizedUsd") VALUES (?, 'artifact-reference-snapshot-attempt-v1', ?, ?, ?, 1, 1, 'writer-guard-test', 'artifact-reference-atomic-query-v1', ?, ?, ?, ?, ?, 'SHADOW', 'D1_ATOMIC_BATCH', ?, '{}', 0, 0, 0, 0)`)
+  database.prepare(`INSERT INTO "RevenueArtifactReferenceSnapshotAttempt" ("id", "attemptVersion", "workflowRunId", "businessId", "lineageRootManifestId", "attemptNumber", "fencingToken", "ownerId", "queryContractVersion", "queryContractDigest", "requestDigest", "requestedAt", "acquiredAt", "expiresAt", "mode", "executorKind", "attemptDigest", "attemptJson", "providerOperationsAuthorized", "releaseAuthorized", "deletionAuthorized", "costAuthorizedUsd") VALUES (?, 'artifact-reference-snapshot-attempt-v1', ?, ?, ?, 1, 1, 'writer-guard-test', 'artifact-reference-atomic-query-v2', ?, ?, ?, ?, ?, 'SHADOW', 'D1_ATOMIC_BATCH', ?, '{}', 0, 0, 0, 0)`)
     .run(SNAPSHOT_ATTEMPT_ID, WORKFLOW_ID, BUSINESS_ID, MANIFEST_ID, SHA, OTHER_SHA, acquiredAt, acquiredAt, expiresAt, SHA);
   return { acquiredAt, expiresAt };
 }
@@ -99,9 +99,9 @@ function sealSnapshot(database: Database.Database, acquiredAt: string, expiresAt
     "sourceSetProofsDigest", "sourceSetProofsJson", "sourceFactsDigest", "receiptDigest", "receiptJson", "completenessAssurance", "availabilityAssurance",
     "snapshotComplete", "committedAndReloaded", "retentionConclusionAuthorized", "projectionPersistenceAuthorized", "providerOperationsAuthorized",
     "releaseAuthorized", "deletionAuthorized", "costAuthorizedUsd", "recordedAt"
-  ) VALUES (?, 'artifact-reference-completeness-receipt-v1', ?, ?, ?, ?, 1, 1, 'artifact-reference-atomic-query-v1', ?, ?, ?, 1, 6, 1, 1, 1, 1, 1, 2, 1, 1, ?, '[]', ?, ?, '{}', 'D1_ATOMIC_RECHECK_AND_RELOAD', 'R2_HEAD_PER_MANIFEST', 1, 1, 0, 0, 0, 0, 0, 0, ?)`)
+  ) VALUES (?, 'artifact-reference-completeness-receipt-v1', ?, ?, ?, ?, 1, 1, 'artifact-reference-atomic-query-v2', ?, ?, ?, 1, 6, 1, 1, 1, 1, 1, 2, 1, 1, ?, '[]', ?, ?, '{}', 'D1_ATOMIC_RECHECK_AND_RELOAD', 'R2_HEAD_PER_MANIFEST', 1, 1, 0, 0, 0, 0, 0, 0, ?)`)
     .run(COMPLETENESS_ID, SNAPSHOT_ATTEMPT_ID, WORKFLOW_ID, BUSINESS_ID, MANIFEST_ID, SHA, acquiredAt, expiresAt, SHA, OTHER_SHA, SHA, recordedAt);
-  database.prepare(`INSERT INTO "RevenueArtifactReferenceSourceSetProof" ("id", "completenessReceiptId", "setOrdinal", "setName", "predicateVersion", "rowCount", "setDigest", "proofDigest", "proofJson") VALUES ('proof:workflow-runs', ?, 1, 'WORKFLOW_RUNS', 'artifact-reference-atomic-query-v1', 1, ?, ?, '{}')`)
+  database.prepare(`INSERT INTO "RevenueArtifactReferenceSourceSetProof" ("id", "completenessReceiptId", "setOrdinal", "setName", "predicateVersion", "rowCount", "setDigest", "proofDigest", "proofJson") VALUES ('proof:workflow-runs', ?, 1, 'WORKFLOW_RUNS', 'artifact-reference-atomic-query-v2', 1, ?, ?, '{}')`)
     .run(COMPLETENESS_ID, SHA, OTHER_SHA);
 }
 
@@ -109,7 +109,7 @@ test("guard contract covers every atomic source set and every expected database 
   const contract = artifactReferenceSourceWriterGuardContract();
   assert.equal(contract.sourceTables.length, 15);
   assert.equal(contract.allSourceWritersGuarded, true);
-  assert.equal(contract.trustedExecutorImplemented, false);
+  assert.equal(contract.trustedExecutorImplemented, true);
   assert.equal(contract.completenessReceiptCreationAuthorized, false);
   assert.equal(contract.providerOperationsAuthorized, 0);
 

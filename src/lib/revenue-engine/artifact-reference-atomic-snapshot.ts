@@ -6,10 +6,10 @@ import {
   artifactReferenceDigest,
 } from "@/lib/revenue-engine/artifact-reference-projection";
 
-export const ARTIFACT_REFERENCE_ATOMIC_QUERY_CONTRACT_VERSION = "artifact-reference-atomic-query-v1";
+export const ARTIFACT_REFERENCE_ATOMIC_QUERY_CONTRACT_VERSION = "artifact-reference-atomic-query-v2";
 export const ARTIFACT_REFERENCE_SNAPSHOT_ATTEMPT_VERSION = "artifact-reference-snapshot-attempt-v1";
 export const ARTIFACT_REFERENCE_COMPLETENESS_RECEIPT_VERSION = "artifact-reference-completeness-receipt-v1";
-export const ARTIFACT_REFERENCE_ATOMIC_PLAN_VERSION = "artifact-reference-atomic-plan-v2";
+export const ARTIFACT_REFERENCE_ATOMIC_PLAN_VERSION = "artifact-reference-atomic-plan-v3";
 export const ARTIFACT_REFERENCE_ATOMIC_TARGET_SCHEMA_VERSION = "0060_artifact_reference_source_writer_guards";
 
 const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
@@ -123,6 +123,8 @@ export const ArtifactReferenceAtomicPlanSchema = z.object({
     api: z.literal("D1Database.batch"),
     prepareAndReadInOneBatch: z.literal(true),
     commitRechecksAllSourceSets: z.literal(true),
+    sourceFreezeSpansValidationAndCommit: z.literal(true),
+    applicationCodeNeverHoldsAnInteractiveTransaction: z.literal(true),
     rollbackWholeBatchOnFailure: z.literal(true),
     sessionsAreNotAtomicSnapshots: z.literal(true),
   }).strict(),
@@ -424,21 +426,24 @@ ORDER BY "id"`,
       batchGroup: "PREPARE_SNAPSHOT",
       sql: `INSERT OR IGNORE INTO "RevenueArtifactReferenceSnapshotAttempt" (${columns.map((column) => `"${column}"`).join(", ")})
 SELECT ${columns.map(() => "?").join(", ")}
-WHERE ? = COALESCE((SELECT MAX("attemptNumber") + 1 FROM "RevenueArtifactReferenceSnapshotAttempt" WHERE "lineageRootManifestId" = ?), 1)
+  WHERE julianday(?) <= julianday('now')
+  AND julianday(?) > julianday('now')
+  AND ? = COALESCE((SELECT MAX("attemptNumber") + 1 FROM "RevenueArtifactReferenceSnapshotAttempt" WHERE "lineageRootManifestId" = ?), 1)
   AND ? > COALESCE((SELECT MAX("fencingToken") FROM "RevenueArtifactReferenceSnapshotAttempt" WHERE "lineageRootManifestId" = ?), 0)
   AND NOT EXISTS (
     SELECT 1 FROM "RevenueArtifactReferenceSnapshotAttempt" a
     LEFT JOIN "RevenueArtifactReferenceCompletenessReceipt" r ON r."snapshotAttemptId" = a."id"
-    WHERE a."lineageRootManifestId" = ? AND r."id" IS NULL AND julianday(a."expiresAt") > julianday(?)
+    WHERE a."lineageRootManifestId" = ? AND r."id" IS NULL AND julianday(a."expiresAt") > julianday('now')
   )`,
       bindings: [
         ...Object.values(attemptRow),
+        attempt.acquiredAt,
+        attempt.expiresAt,
         attempt.attemptNumber,
         attempt.lineageRootManifestId,
         attempt.fencingToken,
         attempt.lineageRootManifestId,
         attempt.lineageRootManifestId,
-        attempt.acquiredAt,
       ],
       resultSet: null,
       collisionComplete: false,
@@ -451,11 +456,21 @@ WHERE ? = COALESCE((SELECT MAX("attemptNumber") + 1 FROM "RevenueArtifactReferen
       sql: `SELECT a.*, r."id" AS "completenessReceiptId"
 FROM "RevenueArtifactReferenceSnapshotAttempt" a
 LEFT JOIN "RevenueArtifactReferenceCompletenessReceipt" r ON r."snapshotAttemptId" = a."id"
-WHERE a."id" = ?
-   OR (a."lineageRootManifestId" = ? AND a."attemptNumber" = ?)
-   OR (a."lineageRootManifestId" = ? AND a."fencingToken" = ?)
+WHERE (
+  a."id" = ?
+  OR (a."lineageRootManifestId" = ? AND a."attemptNumber" = ?)
+  OR (a."lineageRootManifestId" = ? AND a."fencingToken" = ?)
+)
+  AND a."attemptDigest" = ?
+  AND julianday(a."acquiredAt") <= julianday('now')
+  AND julianday(a."expiresAt") > julianday('now')
+  AND NOT EXISTS (
+    SELECT 1 FROM "RevenueArtifactReferenceSnapshotAttempt" higher
+    WHERE higher."lineageRootManifestId" = a."lineageRootManifestId"
+      AND higher."fencingToken" > a."fencingToken"
+  )
 ORDER BY a."id"`,
-      bindings: [attempt.id, attempt.lineageRootManifestId, attempt.attemptNumber, attempt.lineageRootManifestId, attempt.fencingToken],
+      bindings: [attempt.id, attempt.lineageRootManifestId, attempt.attemptNumber, attempt.lineageRootManifestId, attempt.fencingToken, attempt.attemptDigest],
       resultSet: null,
       collisionComplete: true,
       mustRunInSingleBatch: true,
@@ -502,18 +517,20 @@ ORDER BY a."id"`,
       api: "D1Database.batch",
       prepareAndReadInOneBatch: true,
       commitRechecksAllSourceSets: true,
+      sourceFreezeSpansValidationAndCommit: true,
+      applicationCodeNeverHoldsAnInteractiveTransaction: true,
       rollbackWholeBatchOnFailure: true,
       sessionsAreNotAtomicSnapshots: true,
     },
     commitRequirements: [
       "re-read the exact live winning attempt and reject exact-expiry or any higher fence",
-      "re-run every source query in one D1 batch and require identical set proofs",
+      "re-run every source query in one D1 batch and require identical set proofs while database writer guards hold the source freeze",
       "validate full workflow history and one exact sealed terminal result",
       "decode canonical rows and reproduce lineage, uses, endings, and availability",
       "preflight every base and target primary plus alternate identity without row truncation",
       "insert missing parents before children with insert-if-absent semantics",
       "reload every target row and require one exact match",
-      "insert completeness only after every prior recheck succeeds in the same transaction",
+      "insert the completeness parent before proof children inside one rollback-safe batch and expose neither unless the whole batch commits",
       "reload the committed receipt before returning any trusted completeness result",
     ],
     sourceWriterFenceGuardRequired: true,
@@ -554,7 +571,13 @@ export const ArtifactReferenceSourceSetProofSchema = z.object({
   rowIdentities: z.array(z.string().trim().min(1)).max(5_000),
   setDigest: Sha256Schema,
   proofDigest: Sha256Schema,
-}).strict();
+}).strict().superRefine((proof, context) => {
+  const { proofDigest: _proofDigest, ...proofCore } = proof;
+  void _proofDigest;
+  if (proof.proofDigest !== artifactReferenceDigest(proofCore)) {
+    context.addIssue({ code: "custom", message: "Source-set proof digest must bind the exact proof fields.", path: ["proofDigest"] });
+  }
+});
 
 export const ArtifactReferenceUntrustedSourceProofSchema = z.object({
   proofVersion: z.literal("artifact-reference-untrusted-source-proof-v1"),
@@ -706,6 +729,7 @@ export const ArtifactReferenceCompletenessReceiptSchema = CompletenessReceiptCor
     Date.parse(receipt.freshUntil) < Date.parse(receipt.snapshotCapturedAt)
     || Date.parse(receipt.freshUntil) - Date.parse(receipt.snapshotCapturedAt) > ARTIFACT_REFERENCE_MAX_FRESHNESS_MS
     || Date.parse(receipt.recordedAt) < Date.parse(receipt.snapshotCapturedAt)
+    || Date.parse(receipt.recordedAt) >= Date.parse(receipt.freshUntil)
   ) {
     context.addIssue({ code: "custom", message: "Completeness receipt timestamps exceed the bounded snapshot window.", path: ["freshUntil"] });
   }

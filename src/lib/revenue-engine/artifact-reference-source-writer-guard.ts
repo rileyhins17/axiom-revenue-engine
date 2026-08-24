@@ -5,7 +5,7 @@ import {
   ArtifactReferenceSourceSetNameSchema,
 } from "@/lib/revenue-engine/artifact-reference-atomic-snapshot";
 
-export const ARTIFACT_REFERENCE_SOURCE_WRITER_GUARD_VERSION = "artifact-reference-source-writer-guard-v1";
+export const ARTIFACT_REFERENCE_SOURCE_WRITER_GUARD_VERSION = "artifact-reference-source-writer-guard-v2";
 export const ARTIFACT_REFERENCE_GUARDED_SCHEMA_VERSION = "0060_artifact_reference_source_writer_guards";
 export const ARTIFACT_REFERENCE_SOURCE_FREEZE_ERROR = "ARTIFACT_REFERENCE_SOURCE_FROZEN";
 export const ARTIFACT_REFERENCE_IMMUTABLE_ERROR = "ARTIFACT_REFERENCE_APPEND_ONLY";
@@ -96,7 +96,7 @@ export const ArtifactReferenceSourceWriterGuardContractSchema = z.object({
   databaseTriggersAreRequired: z.literal(true),
   applicationChecksAreSufficient: z.literal(false),
   allSourceWritersGuarded: z.literal(true),
-  trustedExecutorImplemented: z.literal(false),
+  trustedExecutorImplemented: z.literal(true),
   completenessReceiptCreationAuthorized: z.literal(false),
   projectionPersistenceAuthorized: z.literal(false),
   retentionConclusionAuthorized: z.literal(false),
@@ -138,7 +138,7 @@ export function artifactReferenceSourceWriterGuardContract(): ArtifactReferenceS
     databaseTriggersAreRequired: true,
     applicationChecksAreSufficient: false,
     allSourceWritersGuarded: true,
-    trustedExecutorImplemented: false,
+    trustedExecutorImplemented: true,
     completenessReceiptCreationAuthorized: false,
     projectionPersistenceAuthorized: false,
     retentionConclusionAuthorized: false,

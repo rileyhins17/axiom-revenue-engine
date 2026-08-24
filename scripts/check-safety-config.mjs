@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceSourceWriterGuard, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration] = await Promise.all([
+const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceSourceWriterGuard, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
+  readFile(new URL("../src/engine/worker.ts", import.meta.url), "utf8"),
   readFile(new URL("../.env.example", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/env.ts", import.meta.url), "utf8"),
   readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -29,6 +30,7 @@ const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap,
   readFile(new URL("../src/lib/revenue-engine/artifact-manifest-availability.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-d1-source-rows.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/artifact-reference-d1-executor.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0056_durable_evidence_receipts.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0057_fenced_evidence_resume_records.sql", import.meta.url), "utf8"),
@@ -212,8 +214,15 @@ requireMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", a
 requireMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", artifactReferenceSourceDecoder, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "raw-row decoding must not authorize provider operations");
 requireMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", artifactReferenceSourceDecoder, /projectionPersistenceAuthorized:\s*z\.literal\(false\)/, "raw-row decoding must not authorize projection persistence");
 forbidMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", artifactReferenceSourceDecoder, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.head\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "raw-row decoding must not access providers, runtime bindings, databases, network, writes, or deletion");
+requireMatch("src/lib/revenue-engine/artifact-reference-d1-executor.ts", artifactReferenceD1Executor, /transactionallyTrusted:\s*z\.literal\(true\)/, "only the private D1 commit-and-reload executor may return transactional trust");
+requireMatch("src/lib/revenue-engine/artifact-reference-d1-executor.ts", artifactReferenceD1Executor, /committedReceiptReloaded:\s*z\.literal\(true\)/, "trusted D1 execution must require a committed receipt reload");
+requireMatch("src/lib/revenue-engine/artifact-reference-d1-executor.ts", artifactReferenceD1Executor, /Pick<D1Database,\s*"prepare"\s*\|\s*"batch">/, "the Cloudflare adapter must use the generated narrow D1 binding type");
+requireMatch("src/lib/revenue-engine/artifact-reference-d1-executor.ts", artifactReferenceD1Executor, /projectionPersistenceAuthorized:\s*z\.literal\(false\)/, "trusted completeness must not authorize projection persistence");
+requireMatch("src/lib/revenue-engine/artifact-reference-d1-executor.ts", artifactReferenceD1Executor, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "trusted completeness must not authorize provider operations");
+forbidMatch("src/lib/revenue-engine/artifact-reference-d1-executor.ts", artifactReferenceD1Executor, /env\.[A-Z_]+|R2Bucket|fetch\s*\(|\.head\s*\(|\.put\s*\(|\.delete\s*\(/, "the local-only D1 executor must not access runtime bindings, providers, network, release, or deletion paths");
+forbidMatch("src/engine/worker.ts", engineWorker, /artifact-reference-d1-executor/, "the inert engine must not wire the local-only D1 executor to runtime");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /allSourceWritersGuarded:\s*z\.literal\(true\)/, "the writer-guard contract must cover every atomic source table");
-requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /trustedExecutorImplemented:\s*z\.literal\(false\)/, "writer guards alone must not claim that the trusted executor exists");
+requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /trustedExecutorImplemented:\s*z\.literal\(true\)/, "the guard contract must accurately report the private disposable-D1 executor");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /completenessReceiptCreationAuthorized:\s*z\.literal\(false\)/, "writer guards must not authorize completeness receipt creation");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "writer guards must not authorize provider operations");
 forbidMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.head\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "writer-guard contracts must not access providers, runtime bindings, databases, network, writes, or deletion");

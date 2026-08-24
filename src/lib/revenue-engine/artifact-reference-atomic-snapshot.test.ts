@@ -89,7 +89,8 @@ test("builds a deterministic, complete, fail-closed D1 transaction contract", ()
   assert.equal(first.costAuthorizedUsd, 0);
   assert.ok(first.statements.every((statement) => !/\blimit\s+1\b/i.test(statement.sql)));
   assert.match(first.statements.find((statement) => statement.statementId === "claim-attempt-fence")!.sql, /MAX\("fencingToken"\)/);
-  assert.match(first.statements.find((statement) => statement.statementId === "claim-attempt-fence")!.sql, /julianday\(a\."expiresAt"\) > julianday\(\?\)/);
+  assert.match(first.statements.find((statement) => statement.statementId === "claim-attempt-fence")!.sql, /julianday\(a\."expiresAt"\) > julianday\('now'\)/);
+  assert.match(first.statements.find((statement) => statement.statementId === "verify-winning-attempt-fence")!.sql, /higher\."fencingToken" > a\."fencingToken"/);
   assert.match(first.statements.find((statement) => statement.resultSet === "EVIDENCE_USES")!.sql, /WITH RECURSIVE/);
   assert.match(first.statements.find((statement) => statement.resultSet === "PROMOTIONS")!.sql, /"sourceManifestId"/);
   assert.match(first.statements.find((statement) => statement.resultSet === "MANIFEST_USES")!.sql, /"viaPromotionId"/);
@@ -181,7 +182,7 @@ test("structural receipt parsing never upgrades untrusted JSON into trusted comp
     releaseAuthorized: false,
     deletionAuthorized: false,
     costAuthorizedUsd: 0,
-    recordedAt: "2026-08-24T12:04:02.000Z",
+    recordedAt: "2026-08-24T12:03:00.000Z",
   } as const;
   const receipt = ArtifactReferenceCompletenessReceiptSchema.parse({ ...core, receiptDigest: artifactReferenceDigest(core) });
   const assessment = inspectArtifactReferenceCompletenessReceipt(receipt);
@@ -265,9 +266,15 @@ function runPrepareSnapshotBatch(database: Database.Database, plan: ReturnType<t
     }))();
 }
 
-test("the generated SQL is executable and exact expiry permits only a higher fenced takeover", () => {
+test("the generated SQL uses database time to block active work and permit a stale higher-fence takeover", () => {
   const database = freshDatabase();
-  const first = buildArtifactReferenceAtomicPlan(request());
+  const now = Date.now();
+  const first = buildArtifactReferenceAtomicPlan({
+    ...request(),
+    requestedAt: new Date(now - 3_000).toISOString(),
+    acquiredAt: new Date(now - 2_000).toISOString(),
+    expiresAt: new Date(now + 240_000).toISOString(),
+  });
   const firstResults = runPrepareSnapshotBatch(database, first);
   assert.equal((firstResults[2] as Database.RunResult).changes, 1);
   assert.equal((database.prepare(`SELECT COUNT(*) AS count FROM "RevenueArtifactReferenceSnapshotAttempt"`).get() as { count: number }).count, 1);
@@ -277,26 +284,36 @@ test("the generated SQL is executable and exact expiry permits only a higher fen
     attemptId: "55555555-5555-4555-8555-555555555555",
     attemptNumber: 2,
     fencingToken: 2,
-    requestedAt: "2026-08-24T12:01:00.000Z",
-    acquiredAt: "2026-08-24T12:01:01.000Z",
-    expiresAt: "2026-08-24T12:05:01.000Z",
+    requestedAt: new Date(now - 1_000).toISOString(),
+    acquiredAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + 240_000).toISOString(),
   });
   const activeResults = runPrepareSnapshotBatch(database, activeContender);
   assert.equal((activeResults[2] as Database.RunResult).changes, 0);
 
-  const exactExpiryTakeover = buildArtifactReferenceAtomicPlan({
+  database.close();
+
+  const staleDatabase = freshDatabase();
+  const stale = buildArtifactReferenceAtomicPlan({
+    ...request(),
+    requestedAt: new Date(now - 242_000).toISOString(),
+    acquiredAt: new Date(now - 241_000).toISOString(),
+    expiresAt: new Date(now - 1_000).toISOString(),
+  });
+  insertAttempt(staleDatabase, stale);
+  const staleTakeover = buildArtifactReferenceAtomicPlan({
     ...request(),
     attemptId: "66666666-6666-4666-8666-666666666666",
     attemptNumber: 2,
     fencingToken: 2,
-    requestedAt: EXPIRES_AT,
-    acquiredAt: EXPIRES_AT,
-    expiresAt: "2026-08-24T12:08:01.000Z",
+    requestedAt: new Date(now - 3_000).toISOString(),
+    acquiredAt: new Date(now - 2_000).toISOString(),
+    expiresAt: new Date(now + 240_000).toISOString(),
   });
-  const takeoverResults = runPrepareSnapshotBatch(database, exactExpiryTakeover);
+  const takeoverResults = runPrepareSnapshotBatch(staleDatabase, staleTakeover);
   assert.equal((takeoverResults[2] as Database.RunResult).changes, 1);
-  assert.equal((database.prepare(`SELECT COUNT(*) AS count FROM "RevenueArtifactReferenceSnapshotAttempt"`).get() as { count: number }).count, 2);
-  database.close();
+  assert.equal((staleDatabase.prepare(`SELECT COUNT(*) AS count FROM "RevenueArtifactReferenceSnapshotAttempt"`).get() as { count: number }).count, 2);
+  staleDatabase.close();
 });
 
 test("migration 0059 enforces fenced identities, bounded receipts, and zero authority", () => {

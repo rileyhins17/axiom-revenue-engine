@@ -14,6 +14,11 @@ import {
   ARTIFACT_REFERENCE_SOURCE_SET_ORDER,
   buildArtifactReferenceAtomicPlan,
 } from "@/lib/revenue-engine/artifact-reference-atomic-snapshot";
+import {
+  executeArtifactReferenceD1Snapshot,
+  type ArtifactReferenceD1BatchBoundary,
+  type ArtifactReferenceD1BatchStatement,
+} from "@/lib/revenue-engine/artifact-reference-d1-executor";
 import { decodeArtifactReferenceD1SourceSnapshot } from "@/lib/revenue-engine/artifact-reference-d1-source-decoder";
 import {
   artifactReferenceCanonicalJson,
@@ -65,10 +70,10 @@ const ATTEMPT_ID = "22222222-2222-4222-8222-222222222222";
 const LEASE_ID = "33333333-3333-4333-8333-333333333333";
 const SNAPSHOT_ATTEMPT_ID = "44444444-4444-4444-8444-444444444444";
 const HOME_URL = "https://atomic-decoder-roofing.ca/";
-const REQUESTED_AT = "2026-08-24T12:00:00.000Z";
-const CAPTURED_AT = "2026-08-24T12:00:00.000Z";
-const SNAPSHOT_AT = "2026-08-24T12:03:00.000Z";
-const VALID_THROUGH = "2026-08-24T12:05:00.000Z";
+const REQUESTED_AT = "2026-08-23T12:00:00.000Z";
+const CAPTURED_AT = "2026-08-23T12:00:00.000Z";
+const SNAPSHOT_AT = "2026-08-23T12:03:00.000Z";
+const VALID_THROUGH = "2026-08-23T12:05:00.000Z";
 
 const homeHtml = `<!doctype html><html><head><title>Atomic Decoder Roofing</title>
   <meta name="description" content="Kitchener roof repair and replacement."></head><body>
@@ -234,8 +239,8 @@ function sealedAttempt(terminalReceiptId: string): FixtureWorkflowAttemptSnapsho
     attemptNumber: 1,
     fencingToken: 1,
     status: "SEALED",
-    startedAt: "2026-08-24T11:59:30.000Z",
-    endedAt: "2026-08-24T12:01:00.000Z",
+    startedAt: "2026-08-23T11:59:30.000Z",
+    endedAt: "2026-08-23T12:01:00.000Z",
     terminalReceiptId,
   };
 }
@@ -253,8 +258,8 @@ function lease(attempt: FixtureWorkflowAttemptSnapshot): FixtureWorkflowLeaseCla
     deliveryId: attempt.deliveryId,
     ownerId: "fixture-owner-atomic-decoder",
     fencingToken: attempt.fencingToken,
-    acquiredAt: "2026-08-24T11:59:31.000Z",
-    expiresAt: "2026-08-24T12:02:00.000Z",
+    acquiredAt: "2026-08-23T11:59:31.000Z",
+    expiresAt: "2026-08-23T12:02:00.000Z",
     mode: "SHADOW",
     leaseKind: "FIXTURE",
   };
@@ -269,6 +274,7 @@ function freshDatabase() {
     "0057_fenced_evidence_resume_records.sql",
     "0058_artifact_reference_projections.sql",
     "0059_atomic_artifact_reference_snapshots.sql",
+    "0060_artifact_reference_source_writer_guards.sql",
   ]) database.exec(readFileSync(new URL(`../../../migrations/${migration}`, import.meta.url), "utf8"));
   database.prepare(`INSERT INTO "RevenueBusiness"
     ("id", "canonicalName", "normalizedDomain", "independenceStatus", "status")
@@ -311,18 +317,38 @@ async function buildFixture() {
     definition: currentFixtureWebsiteEvidenceDefinition(),
     attempt,
     receipt,
-    recordedAt: "2026-08-24T12:01:30.000Z",
+    recordedAt: "2026-08-23T12:01:30.000Z",
   });
   return { request, receipt, attempt, claim, revision };
 }
 
-async function persistedObservation() {
+type SnapshotTiming = {
+  requestedAt: string;
+  acquiredAt: string;
+  snapshotAt: string;
+  expiresAt: string;
+  availabilityCheckedAt: string;
+  availabilityValidThrough: string;
+};
+
+function defaultSnapshotTiming(): SnapshotTiming {
+  return {
+    requestedAt: "2026-08-23T12:02:00.000Z",
+    acquiredAt: "2026-08-23T12:02:01.000Z",
+    snapshotAt: SNAPSHOT_AT,
+    expiresAt: VALID_THROUGH,
+    availabilityCheckedAt: "2026-08-23T12:02:30.000Z",
+    availabilityValidThrough: VALID_THROUGH,
+  };
+}
+
+async function persistedDatabaseFixture(timing: SnapshotTiming = defaultSnapshotTiming()) {
   const fixture = await buildFixture();
   const database = freshDatabase();
   const durable = buildDurableEvidencePersistencePlan({
     persistencePlanVersion: DURABLE_EVIDENCE_PERSISTENCE_PLAN_VERSION,
     targetSchemaVersion: DURABLE_EVIDENCE_TARGET_SCHEMA_VERSION,
-    plannedAt: SNAPSHOT_AT,
+    plannedAt: timing.snapshotAt,
     mode: "SHADOW",
     plannerKind: "FIXTURE",
     maxCostUsd: 0,
@@ -338,7 +364,7 @@ async function persistedObservation() {
     targetSchemaVersion: FENCED_EVIDENCE_RESUME_TARGET_SCHEMA_VERSION,
     resumeRequest: {
       resumePlanVersion: FIXTURE_WEBSITE_EVIDENCE_RESUME_PLAN_VERSION,
-      plannedAt: SNAPSHOT_AT,
+      plannedAt: timing.snapshotAt,
       mode: "SHADOW",
       plannerKind: "FIXTURE",
       maxCostUsd: 0,
@@ -359,8 +385,8 @@ async function persistedObservation() {
     const receipt = createArtifactManifestAvailabilityReceipt({
       receiptId: `70000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
       manifest,
-      checkedAt: "2026-08-24T12:02:30.000Z",
-      validThrough: VALID_THROUGH,
+      checkedAt: timing.availabilityCheckedAt,
+      validThrough: timing.availabilityValidThrough,
       expiresAt: "2026-09-20T00:00:00.000Z",
       checkerKind: "R2_HEAD",
       objects: availabilityObjects(manifest),
@@ -385,19 +411,24 @@ async function persistedObservation() {
     attemptNumber: 1,
     fencingToken: 1,
     ownerId: "fixture-owner-snapshot",
-    requestedAt: "2026-08-24T12:02:00.000Z",
-    acquiredAt: "2026-08-24T12:02:01.000Z",
-    expiresAt: VALID_THROUGH,
+    requestedAt: timing.requestedAt,
+    acquiredAt: timing.acquiredAt,
+    expiresAt: timing.expiresAt,
     mode: "SHADOW",
     maxCostUsd: 0,
   });
+  return { fixture, database, plan, timing };
+}
+
+async function persistedObservation() {
+  const { fixture, database, plan, timing } = await persistedDatabaseFixture();
   const sourceSets = plan.statements.filter((statement) => statement.kind === "SOURCE_READ").map((statement) => ({
     setName: statement.resultSet!,
     rows: database.prepare(statement.sql).all(...statement.bindings) as Array<Record<string, string | number | null>>,
   }));
   const observation = {
     planDigest: plan.planDigest,
-    snapshotCapturedAt: SNAPSHOT_AT,
+    snapshotCapturedAt: timing.snapshotAt,
     statementCount: plan.statements.filter((statement) => statement.batchGroup === "PREPARE_SNAPSHOT").length,
     batchSucceeded: true as const,
     transactionApi: "D1Database.batch" as const,
@@ -480,8 +511,8 @@ test("requested roots, exact row columns, and embedded manifest items cannot be 
     attemptNumber: 1,
     fencingToken: 1,
     ownerId: "fixture-owner-snapshot",
-    requestedAt: "2026-08-24T12:02:00.000Z",
-    acquiredAt: "2026-08-24T12:02:01.000Z",
+    requestedAt: "2026-08-23T12:02:00.000Z",
+    acquiredAt: "2026-08-23T12:02:01.000Z",
     expiresAt: VALID_THROUGH,
     mode: "SHADOW",
     maxCostUsd: 0,
@@ -510,4 +541,228 @@ test("requested roots, exact row columns, and embedded manifest items cannot be 
   assert.ok(items && items.rows.length > 1);
   items.rows.shift();
   assert.throws(() => decodeArtifactReferenceD1SourceSnapshot(plan, missingItem), /item rows do not exactly match/);
+});
+
+function currentSnapshotTiming(): SnapshotTiming {
+  const now = Date.now();
+  return {
+    requestedAt: new Date(now - 3_000).toISOString(),
+    acquiredAt: new Date(now - 2_000).toISOString(),
+    snapshotAt: new Date(now - 1_000).toISOString(),
+    expiresAt: new Date(now + 240_000).toISOString(),
+    availabilityCheckedAt: new Date(now - 10_000).toISOString(),
+    availabilityValidThrough: new Date(now + 240_000).toISOString(),
+  };
+}
+
+function sqliteD1Boundary(database: Database.Database): ArtifactReferenceD1BatchBoundary {
+  return {
+    async batch(statements) {
+      return database.transaction((batch: readonly ArtifactReferenceD1BatchStatement[]) => batch.map((statement) => {
+        const prepared = database.prepare(statement.sql);
+        if (prepared.reader) {
+          return {
+            success: true as const,
+            results: prepared.all(...statement.bindings) as Array<Record<string, string | number | null>>,
+            changes: 0,
+          };
+        }
+        const mutation = prepared.run(...statement.bindings);
+        return { success: true as const, results: [], changes: mutation.changes };
+      }))(statements);
+    },
+  };
+}
+
+function tableCount(database: Database.Database, table: string) {
+  return (database.prepare(`SELECT COUNT(*) AS "count" FROM "${table}"`).get() as { count: number }).count;
+}
+
+test("private D1 executor commits, post-verifies, reloads, and exactly replays one trusted receipt", async () => {
+  const { database, plan } = await persistedDatabaseFixture(currentSnapshotTiming());
+  const boundary = sqliteD1Boundary(database);
+  const committed = await executeArtifactReferenceD1Snapshot(boundary, plan);
+  assert.equal(committed.executionPath, "FRESH_COMMIT");
+  assert.equal(committed.transactionallyTrusted, true);
+  assert.equal(committed.snapshotComplete, true);
+  assert.equal(committed.committedReceiptReloaded, true);
+  assert.equal(committed.receiptCreationPerformed, true);
+  assert.equal(committed.sourceRowsMaterialized, true);
+  assert.ok(committed.decodedSnapshot);
+  assert.equal(committed.decodedSnapshot.transactionallyTrusted, false);
+  assert.equal(committed.receipt.sourceSetProofs.length, 15);
+  assert.equal(committed.receipt.sourceFactsDigest, committed.decodedSnapshot.selectedLineage.sourceFactsDigest);
+  assert.equal(committed.retentionConclusionAuthorized, false);
+  assert.equal(committed.projectionPersistenceAuthorized, false);
+  assert.equal(committed.releaseAuthorized, false);
+  assert.equal(committed.deletionAuthorized, false);
+  assert.equal(committed.providerOperationsAuthorized, 0);
+  assert.equal(committed.costAuthorizedUsd, 0);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceCompletenessReceipt"), 1);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceSourceSetProof"), 15);
+
+  const replayed = await executeArtifactReferenceD1Snapshot(boundary, plan);
+  assert.equal(replayed.executionPath, "EXACT_SEALED_REPLAY");
+  assert.equal(replayed.receiptCreationPerformed, false);
+  assert.equal(replayed.sourceRowsMaterialized, false);
+  assert.equal(replayed.decodedSnapshot, null);
+  assert.deepEqual(replayed.receipt, committed.receipt);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceCompletenessReceipt"), 1);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceSourceSetProof"), 15);
+  database.close();
+});
+
+test("private D1 executor detects source-result drift before any completeness commit", async () => {
+  const { database, plan } = await persistedDatabaseFixture(currentSnapshotTiming());
+  const base = sqliteD1Boundary(database);
+  let sourceBatch = 0;
+  const drifted: ArtifactReferenceD1BatchBoundary = {
+    async batch(statements) {
+      const results = await base.batch(statements);
+      if (statements.some((statement) => statement.statementId === "source-workflow-runs")) {
+        sourceBatch += 1;
+        if (sourceBatch === 2) {
+          const index = statements.findIndex((statement) => statement.statementId === "source-workflow-runs");
+          const cloned = structuredClone(results);
+          const result = cloned[index] as { success: true; results: Array<Record<string, string | number | null>>; changes: number };
+          result.results[0] = { ...result.results[0], requestDigest: "f".repeat(64) };
+          return cloned;
+        }
+      }
+      return results;
+    },
+  };
+  await assert.rejects(() => executeArtifactReferenceD1Snapshot(drifted, plan), /does not match|drift|digest/i);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceCompletenessReceipt"), 0);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceSourceSetProof"), 0);
+  database.close();
+});
+
+test("private D1 executor rejects a redigested control-statement forgery before touching D1", async () => {
+  const { database, plan } = await persistedDatabaseFixture(currentSnapshotTiming());
+  const statements = plan.statements.map((statement) => statement.statementId === "verify-winning-attempt-fence"
+    ? { ...statement, sql: statement.sql.replace(/AND NOT EXISTS \([\s\S]*?\n  \)\nORDER BY/, "ORDER BY") }
+    : statement);
+  const { planDigest: _planDigest, ...core } = plan;
+  void _planDigest;
+  const forgedCore = { ...core, statements };
+  const forged = { ...forgedCore, planDigest: artifactReferenceDigest(forgedCore) };
+  let batchCalls = 0;
+  const boundary: ArtifactReferenceD1BatchBoundary = {
+    async batch(batch) {
+      batchCalls += 1;
+      return sqliteD1Boundary(database).batch(batch);
+    },
+  };
+  await assert.rejects(() => executeArtifactReferenceD1Snapshot(boundary, forged), /exact immutable atomic plan/i);
+  assert.equal(batchCalls, 0);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceSnapshotAttempt"), 0);
+  database.close();
+});
+
+test("private D1 executor refuses trust when any required database writer guard is absent", async () => {
+  const { database, plan } = await persistedDatabaseFixture(currentSnapshotTiming());
+  database.exec(`DROP TRIGGER "RevenueArtifactManifest_reference_source_freeze_insert"`);
+  await assert.rejects(
+    () => executeArtifactReferenceD1Snapshot(sqliteD1Boundary(database), plan),
+    /requires all 51 source-freeze and append-only triggers|writer guard/i,
+  );
+  assert.equal(tableCount(database, "RevenueArtifactReferenceSnapshotAttempt"), 0);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceCompletenessReceipt"), 0);
+  database.close();
+});
+
+test("private D1 executor collision-preflights every receipt and proof target before commit", async () => {
+  const { database, plan } = await persistedDatabaseFixture(currentSnapshotTiming());
+  const base = sqliteD1Boundary(database);
+  let inspectedTargetSql = false;
+  const collisionBoundary: ArtifactReferenceD1BatchBoundary = {
+    async batch(statements) {
+      const results = await base.batch(statements);
+      const receiptIndex = statements.findIndex((statement) => statement.statementId === "preflight-completeness-targets");
+      const proofIndex = statements.findIndex((statement) => statement.statementId === "preflight-proof-targets");
+      if (receiptIndex >= 0 && proofIndex >= 0) {
+        assert.match(statements[receiptIndex]!.sql, /"snapshotAttemptId" = \?/);
+        assert.match(statements[receiptIndex]!.sql, /"receiptDigest" = \?/);
+        assert.match(statements[receiptIndex]!.sql, /"lineageRootManifestId" = \?/);
+        assert.match(statements[proofIndex]!.sql, /"completenessReceiptId" = \?/);
+        assert.match(statements[proofIndex]!.sql, /"id" IN \(/);
+        inspectedTargetSql = true;
+        const collided: unknown[] = structuredClone([...results]);
+        collided[proofIndex] = {
+          success: true,
+          results: [{ id: "divergent-proof-target" }],
+          changes: 0,
+        };
+        return collided;
+      }
+      return results;
+    },
+  };
+  await assert.rejects(() => executeArtifactReferenceD1Snapshot(collisionBoundary, plan), /target preflight found a divergent/i);
+  assert.equal(inspectedTargetSql, true);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceCompletenessReceipt"), 0);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceSourceSetProof"), 0);
+  database.close();
+});
+
+test("private D1 executor rolls back the parent when any proof insert fails", async () => {
+  const { database, plan } = await persistedDatabaseFixture(currentSnapshotTiming());
+  const base = sqliteD1Boundary(database);
+  const brokenCommit: ArtifactReferenceD1BatchBoundary = {
+    async batch(statements) {
+      if (statements.some((statement) => statement.statementId === "insert-source-proof-08")) {
+        const corrupted = statements.map((statement) => statement.statementId === "insert-source-proof-08"
+          ? { ...statement, sql: `INSERT INTO "RevenueArtifactReferenceSourceSetProofMissing" ("id") VALUES (?)`, bindings: ["forced-rollback"] }
+          : statement);
+        return base.batch(corrupted);
+      }
+      return base.batch(statements);
+    },
+  };
+  await assert.rejects(() => executeArtifactReferenceD1Snapshot(brokenCommit, plan), /completeness commit D1 batch failed/i);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceCompletenessReceipt"), 0);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceSourceSetProof"), 0);
+  assert.equal(tableCount(database, "RevenueArtifactReferenceSnapshotAttempt"), 1);
+  database.close();
+});
+
+test("private D1 executor rejects expired plans and divergent attempt identity collisions", async () => {
+  const expiredNow = Date.now();
+  const expiredTiming: SnapshotTiming = {
+    requestedAt: new Date(expiredNow - 120_000).toISOString(),
+    acquiredAt: new Date(expiredNow - 119_000).toISOString(),
+    snapshotAt: new Date(expiredNow - 2_000).toISOString(),
+    expiresAt: new Date(expiredNow - 1_000).toISOString(),
+    availabilityCheckedAt: new Date(expiredNow - 10_000).toISOString(),
+    availabilityValidThrough: new Date(expiredNow + 240_000).toISOString(),
+  };
+  const expired = await persistedDatabaseFixture(expiredTiming);
+  await assert.rejects(() => executeArtifactReferenceD1Snapshot(sqliteD1Boundary(expired.database), expired.plan), /half-open fence|active winning fence/i);
+  assert.equal(tableCount(expired.database, "RevenueArtifactReferenceSnapshotAttempt"), 0);
+  expired.database.close();
+
+  const collision = await persistedDatabaseFixture(currentSnapshotTiming());
+  const collisionTiming = currentSnapshotTiming();
+  const divergent = buildArtifactReferenceAtomicPlan({
+    attemptId: "99999999-9999-4999-8999-999999999999",
+    workflowRunId: collision.plan.attempt.workflowRunId,
+    businessId: collision.plan.attempt.businessId,
+    lineageRootManifestId: collision.plan.attempt.lineageRootManifestId,
+    attemptNumber: 1,
+    fencingToken: 1,
+    ownerId: "divergent-owner",
+    requestedAt: collisionTiming.requestedAt,
+    acquiredAt: collisionTiming.acquiredAt,
+    expiresAt: collisionTiming.expiresAt,
+    mode: "SHADOW",
+    maxCostUsd: 0,
+  });
+  const insert = divergent.statements.find((statement) => statement.statementId === "claim-attempt-fence");
+  assert.ok(insert);
+  const inserted = collision.database.prepare(insert.sql).run(...insert.bindings);
+  assert.equal(inserted.changes, 1);
+  await assert.rejects(() => executeArtifactReferenceD1Snapshot(sqliteD1Boundary(collision.database), collision.plan), /collision|does not exactly match/i);
+  assert.equal(tableCount(collision.database, "RevenueArtifactReferenceCompletenessReceipt"), 0);
+  collision.database.close();
 });
