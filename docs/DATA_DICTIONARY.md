@@ -58,8 +58,9 @@
 | ArtifactReferenceSnapshotAttempt | One append-only, five-minute-or-shorter attempt/lease claim for a lineage snapshot, with a contiguous attempt number, strictly increasing fencing token, versioned query contract, and zero operational authority. |
 | ArtifactManifestAvailabilityReceipt | Immutable content-bound fixture or R2 HEAD observation for one exact manifest; only a future fresh, unambiguous R2 winner per manifest may satisfy transactional completeness. |
 | ArtifactReferenceSourceSetProof | Canonical count, stable row identities, predicate version, set digest, and proof digest for one of the 15 exact workflow/lineage/use/availability source sets. |
-| ArtifactReferenceCompletenessReceipt | Future transaction-created and reloaded seal binding the winning attempt/fence, all exact source-set proofs, and normalized source facts; its structural schema alone is never trusted and it grants no retention or deletion authority. |
-| ArtifactReferenceAtomicPlan | Validation-only D1 prepare/snapshot and commit/postverify contract. It exposes exact queries and gates but has no database executor, receipt issuer, provider binding, mutation, or runtime authority. |
+| ArtifactReferenceCompletenessReceipt | Private-executor-created and reloaded seal binding the winning attempt/fence, all exact source-set proofs, and normalized source facts; its structural schema alone is never trusted and it grants no retention or deletion authority. |
+| ArtifactReferenceAtomicPlan | Validation-only D1 claim/read/recheck/commit contract. The private executor reconstructs it exactly before use, so redigesting altered control SQL cannot authorize execution. |
+| ArtifactReferenceTrustedD1Execution | Result available only after the private executor verifies all 51 writer guards, rechecks all 15 source sets, atomically commits the receipt/proofs, and independently reloads them. It grants no projection, retention, provider, release, deletion, outreach, or cost authority. |
 | CostLedger | Provider usage/cost attached to a run, lead, campaign, and budget period. |
 | KwLeadEvaluationSet | Private 50-lead owner-labelled KW quality gate used to measure engine agreement before live outreach. |
 | PrivateKwImportPlan | Versioned, ignored local seed of canonical research-only businesses, locations, cohort source runs, and source records; it grants no qualification or outreach authority. |
@@ -131,10 +132,11 @@
   raw rows, stable IDs, count, predicate version, and digest. Caller observations
   can produce only an explicitly untrusted proof; structural JSON and digests do
   not prove a D1 transaction.
-- A future completeness receipt requires a single winning half-open fence, the
+- A trusted completeness receipt requires a single winning half-open fence, the
   same source-set digests before commit, one fresh unambiguous R2 HEAD receipt per
-  manifest, atomic insert/postverify, and an exact committed-row reload. Migration
-  0059 stores that future shape but no executor currently exists or is authorized.
+  manifest, database-enforced writer freeze, exact recheck, atomic parent/child
+  insert and postverify, and an independent committed-row reload. The private
+  local-only executor now proves this in disposable D1; it has no runtime binding.
 - One website-evidence workflow can contain several independent artifact roots.
   Raw decoding validates the complete workflow forest and every boundary row,
   then selects one explicit root component for projection. Other roots remain
@@ -148,15 +150,16 @@
   JSON with current domain schemas, recomputes every digest, checks denormalized
   columns and alternate identities, reconstructs contiguous fenced attempts and
   one sealed terminal result, and validates manifest/promotion/use/replacement
-  closure. It has no executor and cannot upgrade a caller observation to trust.
+  closure. It cannot upgrade a caller observation to trust; only the private
+  database executor can do so after commit and reload.
 - Migration 0060 makes all 15 atomic source tables append-only and freezes any
   scoped insert while an unsealed workflow snapshot satisfies
   `acquiredAt <= database-now < expiresAt`. The database scope includes alternate
   workflow identity, every workflow manifest, touching promotions, their links,
   recursive replacement uses/endings, and availability. Snapshot attempts,
-  completeness receipts, and source-set proofs are immutable too. This satisfies
-  the writer-guard schema precondition but does not implement or authorize the
-  trusted D1 executor.
+  completeness receipts, and source-set proofs are immutable too. The private
+  executor verifies all 51 trigger definitions before claiming an attempt, but
+  migration 0060 is still local-only and has no runtime binding.
 - A release decision reviews every listed use exactly once and is bound to the
   manifest, uses, actor, reason, rationale, and time by a deterministic digest.
   Even an approved release has `providerDeleteAuthorized: false`; a future delete

@@ -146,8 +146,8 @@ checkpoint identity/payload is separate from prepared/committed state receipts;
 and artifact plans are separate from retry receipts. The validation-only planner
 rejects blocked resume histories and checks every primary or alternate identity
 candidate before proposing ordered insert-if-absent SQL. It deliberately has no
-database executor or transaction: all mutation, resume, execution, provider, and
-cost authority remains false. All 59 migrations pass from zero in isolated local
+resume executor: all resume, workflow execution, provider, and cost authority
+remains false. All 60 migrations pass from zero in isolated local
 D1, but migration 0057 has not been applied to staging or production.
 
 Evidence-use endings and current-reference reasoning are now explicit without
@@ -158,14 +158,14 @@ exact use, effective time, owner/compliance basis, and actor. A lineage-wide
   storage availability.
 For each active use it chooses the weakest valid copy that still satisfies the
 required retention. Equal candidates or a missing valid copy remain
-  `INDETERMINATE`. Because no atomic D1 loader exists yet, fixture snapshots are
-  explicitly incomplete and even all-ended asserted uses cannot suggest that
+  `INDETERMINATE`. Fixture snapshots are explicitly incomplete and even all-ended
+  asserted uses cannot suggest that
   retention review or deletion is safe.
 Migration 0058 and its collision-complete persistence plan grant no mutation,
 release, deletion, provider, or cost authority and have not been applied to
 staging or production.
 
-The next database boundary is now specified without pretending it is live.
+The next database boundary is implemented without pretending it is live.
 Migration 0059 adds append-only snapshot attempts/fences, durable manifest
 availability observations, exact source-set proofs, and the future completeness
 receipt shape. The validation-only planner derives 15 complete workflow,
@@ -175,7 +175,7 @@ recheck, insert, post-verification, and committed-row reload before trust.
 
 Pure TypeScript cannot mint that trusted receipt. Caller-supplied rows create
 only an explicitly untrusted proof, and even a structurally valid completeness
-JSON is reported as incomplete until a future private D1 executor performs and
+JSON is reported as incomplete unless the private D1 executor performs and
 reloads the exact transaction. Migration 0059 has been tested only in disposable
 local databases and is not on staging or production.
 
@@ -189,8 +189,8 @@ being silently filtered.
 Availability v2 also binds one exact expected-and-observed HEAD record per
 manifest object. A digest of expected keys is insufficient: a usable winner must
 be the only latest `R2_HEAD` receipt, match every object's length, SHA-256 metadata,
-and ETag, and remain fresh at the snapshot boundary. The current implementation
-is validation-only and uses no D1 or R2 binding. Successful decoding still reports
+and ETag, and remain fresh at the snapshot boundary. The raw decoder is
+validation-only and uses no D1 or R2 binding. Successful decoding still reports
 `transactionallyTrusted=false`, `snapshotComplete=false`, and zero authority for
 projection persistence, retention, release, deletion, provider operations, or
 cost.
@@ -200,9 +200,18 @@ tables are append-only, and scoped inserts abort while an unsealed snapshot is i
 its half-open active window. The guard follows the whole workflow forest,
 promotion/manifest links, recursive replacement uses, and availability—not only
 the selected root. Provider availability must be persisted before the claim.
-The atomic plan can therefore require `allSourceWritersGuarded=true`, but the
-trusted executor and receipt issuer still do not exist; all runtime and business
-authority remains false. Migration 0060 is also local-only.
+The private executor now verifies those 51 trigger contracts from the database,
+uses database-time claim/read and exact source recheck batches, collision-preflights
+the receipt and all proofs, commits the parent plus 15 children atomically, and
+independently reloads them before returning transactional trust. It rejects a
+redigested control-plan forgery, source drift, missing guards, stale fences,
+collisions, partial writes, and divergent replay.
+
+This executor is local/disposable only. It is not imported by the inert Worker,
+and the engine still has no D1/R2/Browser binding, route, schedule, queue consumer,
+deployment approval, provider authority, projection persistence, retention
+conclusion, release, deletion, outreach, or cost authority. Migrations 0059–0060
+remain unapplied to staging and production.
 
 ## Verification
 

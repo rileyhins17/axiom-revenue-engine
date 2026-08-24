@@ -91,9 +91,11 @@ staging; no rebuild code or migration has been deployed to production.
   `588926aed3294d5cf6621834ff06d25212b90977`
 - Artifact-reference source-writer guard source/documentation checkpoint:
   `7d209816ee9bacb11537d37920ef75efede143c5`
+- Private artifact-reference D1 executor source checkpoint:
+  `a9da5ad20e843f528fff7b528dcb8f9d5095fc9b`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Local migrations: all 59 apply, including the fail-closed lockdown, shadow
+- Local migrations: all 60 apply, including the fail-closed lockdown, shadow
   Revenue Engine records, content-bound outreach approval, and durable evidence
   plus fenced resume, current-reference history, and atomic snapshot receipt
   contracts
@@ -618,8 +620,8 @@ Completed gates:
   append-only snapshot attempt/completeness/proof controls. The freeze covers
   the complete workflow query domain and uses database time with a half-open
   lease. Availability must precede the claim. The atomic plan now requires the
-  guarded schema, but the trusted executor, completeness issuer, persistence,
-  retention, release, deletion, provider, cost, and outreach paths remain off.
+  guarded schema. Projection persistence, retention, release, deletion, provider,
+  cost, outreach, and every live runtime path remain off.
 - Source-writer guard checkpoint verification passes 329/329 tests, fail-closed
   safety, typecheck, zero-warning lint, the secret-sanitized Cloudflare build,
   the console no-upload dry run, deterministic engine bindings, and the inert
@@ -633,6 +635,28 @@ Completed gates:
   dependency installation, fail-closed safety, both Cloudflare builds, all 60
   migrations from zero, 329/329 tests, typecheck, zero-warning lint, and both
   no-upload Worker validations.
+- Private D1 completeness executor: query contract v2 and plan v3 now rebuild the
+  complete control plan before use, verify all 51 database writer guards, use
+  database-time claim/read and exact 15-set recheck batches, collision-preflight
+  every receipt/proof target, atomically insert one parent plus 15 children,
+  post-verify them, and independently reload the exact committed rows. Only this
+  path returns `transactionallyTrusted=true`; raw decoding and structural receipt
+  parsing remain untrusted. Exact replay returns the historical receipt without
+  inventing materialized source rows.
+- Disposable-D1 adversarial coverage proves fresh commit, exact replay, redigested
+  control-SQL rejection before D1, missing-trigger rejection, source-result drift,
+  target collisions, child-failure parent rollback, expired database-time fences,
+  and divergent attempt identities. All projection persistence, retention,
+  release, deletion, provider, cost, and outreach authority remains false/zero.
+- Private executor checkpoint verification passes 336/336 tests, fail-closed
+  safety, typecheck, zero-warning lint, the secret-sanitized Cloudflare build,
+  the console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. All 60 migrations replayed from zero in isolated
+  local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-36f002cfd22d41ab9d265e9ab43439c3`,
+  with 60 migration receipts, 51 triggers, and 15 scoped insert freezes. No
+  staging/production migration, deployment, D1/R2/Browser/provider call, secret
+  access, or prospect action occurred. Linux CI is pending for this checkpoint.
 
 Still required for Phase 1:
 
@@ -666,17 +690,15 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Implement the private trusted D1 executor contract against an injected batch
-   boundary and disposable databases only: claim/read, exact source recheck,
-   collision-complete target preflights, ordered commit, rollback,
-   post-verification, and committed-receipt reload. Do not add a live binding or
-   apply migrations 0059-0060 until the staging backup/rollback gate passes.
-2. Add a fixture-only projection-v2 adapter from one selected decoded lineage;
-   keep completeness, projection persistence, and retention conclusions false
-   until the trusted committed-receipt reload exists.
-3. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
-   smoke test; do not add a binding or make a live request until R2, budget,
-   rollback, and owner approval gates are recorded.
+1. Add a fixture-only projection-v2 adapter that accepts only a fresh-commit
+   executor result with materialized decoded rows, replays the selected lineage,
+   and still grants no persistence or retention-conclusion authority.
+2. Add adversarial projection-v2 tests for stale receipts, exact sealed replay
+   without materialized rows, source-facts mismatch, no-current-reference cases,
+   ambiguous assignments, and zero-authority output.
+3. Design the separately release-gated R2 HEAD staging adapter and smoke test; do
+   not add a binding, apply migrations 0059-0060, or make a live request until
+   backup, rollback, budget, R2 activation, and owner approval are recorded.
 
 ## Resume instructions
 

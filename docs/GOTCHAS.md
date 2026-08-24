@@ -129,18 +129,23 @@ Retire entries when the architecture makes them impossible.
   sequential consistency, but that alone does not keep one interactive snapshot
   open while application code computes and later persists a projection.
 - **Proven fix:** derive 15 versioned source predicates from the workflow/lineage
-  root, claim a bounded strictly higher fence, bind every raw row identity/count/
-  digest, and require atomic recheck, insert, post-verification, and committed-row
-  reload. Pure validation code emits only `transactionallyTrusted=false` and
-  cannot mint a completeness receipt.
-- **Prevention/test:** the safety checker locks receipt creation and execution
-  off. Atomic-reference tests cover immutable query drift, generated SQL,
-  missing/duplicate sets, wrong or expired fences, active-lease contention,
-  exact-expiry takeover, forged receipt digests, migration constraints, and the
-  rule that structural receipt parsing never establishes trust.
+  root, claim a bounded database-time higher fence, freeze every scoped writer in
+  D1, bind every raw row identity/count/digest, re-read and compare every source
+  set while that freeze is active, atomically commit the completeness parent plus
+  15 proof children, and independently reload them. Because D1 batches are not
+  interactive, validation and commit are separate batches joined by database
+  writer guards. A target-schema string is not proof that those guards exist, so
+  the executor verifies all 51 trigger definitions before claiming trust. Pure
+  validation still emits only `transactionallyTrusted=false`.
+- **Prevention/test:** the safety checker keeps the executor disconnected from the
+  inert Worker and all business authority false. Disposable-D1 tests cover exact
+  plan reconstruction, generated SQL, all writer guards, fresh commit/replay,
+  missing/duplicate sets, source drift, target collisions, child rollback, wrong
+  or expired fences, active contention, forged receipt/proof digests, migration
+  constraints, and the rule that structural parsing never establishes trust.
 - **Affected area:** D1 reference snapshots, artifact availability, retention
   projection, retries, and any future release/deletion decision.
-- **Verifying commit:** `98cd88a`.
+- **Verifying commit:** `a9da5ad` (extends `98cd88a`).
 
 ## DATA-005 — A workflow-wide artifact set was mistaken for one lineage
 
