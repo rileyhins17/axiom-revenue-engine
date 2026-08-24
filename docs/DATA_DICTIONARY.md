@@ -15,6 +15,7 @@
 | ArtifactManifest | Verified identity and current retention location for a bounded group of immutable artifacts, derived only from a completed write or promotion receipt. |
 | ArtifactEvidenceUse | Versioned qualification, outreach, consent, touch, or legal-hold record that determines the minimum protection an artifact requires. |
 | ArtifactPromotionPlan/Receipt | Idempotent copy plan and result that preserve content identity while moving evidence only to a stronger retention prefix. |
+| ArtifactManifestEvidenceUse | Immutable link from a promoted manifest to the exact versioned business record that currently requires its retention. |
 | ArtifactReleaseRecord | Content-bound owner/compliance retention decision covering every listed evidence use; it records review but cannot itself delete an object. |
 | WebsitePageSelectionPlan | Deterministic zero-cost ranking of one same-site service, about, and contact URL from fresh homepage link evidence, with visible candidate scores, exclusions, completeness, and budget receipt. |
 | WebsiteAuditAssembly | One versioned business-level receipt linking selected page captures, HTML facts, Browser evidence, artifact receipts, freshness, completeness, and per-business budgets to the exact deterministic audit input. |
@@ -34,7 +35,10 @@
 | Client | Won customer and delivery/recurring value state. |
 | FunnelEvent | Append-only, idempotent business event used for outcome measurement. |
 | Suppression | Durable do-not-contact state and reason across all relevant identities. |
-| WorkflowRun | Resumable execution receipt with version, step, attempt, result, and failure. |
+| WorkflowRun | Stable identity and canonical request for one versioned workflow; immutable attempt receipts carry changing execution outcomes. |
+| WorkflowReceipt | One immutable attempt outcome with status, site path, total cost, exact aggregate JSON/digest, completion time, and recording time. |
+| WorkflowStepReceipt | One ordered checkpoint outcome attached to an exact WorkflowReceipt revision, with attempts, timing, digest, item count, warnings, and failure. |
+| DurableEvidencePersistencePlan | Bounded fixture-only expected-state/preflight/insert-if-absent plan for migration 0056; it grants neither database mutation nor workflow resume authority. |
 | CostLedger | Provider usage/cost attached to a run, lead, campaign, and budget period. |
 | KwLeadEvaluationSet | Private 50-lead owner-labelled KW quality gate used to measure engine agreement before live outreach. |
 | PrivateKwImportPlan | Versioned, ignored local seed of canonical research-only businesses, locations, cohort source runs, and source records; it grants no qualification or outreach authority. |
@@ -86,6 +90,12 @@
 - Promotion keeps the same `artifact:sha256:<digest>` identity while changing the
   prefix and retention metadata. Source and destination objects must reconcile;
   partial copies remain immutable for retry and are never rollback-deleted.
+- A workflow receipt lists the manifest derived from every successful artifact
+  write. A promotion source must already be in that receipt or an earlier ordered
+  promotion, and a release record cannot introduce evidence outside that chain.
+- Persisted evidence-use links mean "known active use" in version 1. No use-ending
+  record or current-reference projection exists yet, so these records cannot
+  authorize expiry, release, object deletion, or a claimed zero reference count.
 - A release decision reviews every listed use exactly once and is bound to the
   manifest, uses, actor, reason, rationale, and time by a deterministic digest.
   Even an approved release has `providerDeleteAuthorized: false`; a future delete
@@ -111,5 +121,10 @@
 - A saved private persistence artifact is not trusted executable input. Any
   future loader must revalidate the source import, reproduce the canonical plan,
   require exact preflight matches, and stop on collision or drift.
+- Durable evidence persistence is also validation-only. Migration 0056 can hold
+  immutable receipt revisions, but the current module has no D1 executor and
+  emits `mutationAuthorized: false` and `resumeAuthorized: false`. A step output
+  digest is not a replay payload; resume needs separately versioned payload or
+  locator, compatibility, lease, and duplicate-delivery contracts.
 - An approval is invalid after content changes, expiry, rejection, or revocation;
   the final provider call recomputes its digest every time.

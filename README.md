@@ -117,8 +117,18 @@ deterministic audit. An unreachable homepage is a real observed site state;
 missing page/mobile proof stays partial and unknown; identity, integrity, or
 storage failure publishes no audit. Repeating the same workflow safely reuses
 matching content-addressed artifacts. This is still an in-process proof—there is
-no live provider adapter, durable workflow persistence, binding, deployment, or
-execution authority.
+no live provider adapter, binding, deployment, or execution authority.
+
+The first durable-record boundary is now defined without enabling it. Additive
+migration 0056 separates the stable workflow request from immutable attempt and
+step receipts, and adds queryable page-selection, audit-assembly, manifest,
+promotion, evidence-use, and release records. A validation-only planner binds
+each row to canonical JSON and digests, requires an exact preflight before every
+insert-if-absent statement, and rejects drift, identity collisions, or manifests
+outside the workflow's receipt/promotion chain. It explicitly grants neither
+database mutation nor resume authority. The migration passes from zero in an
+isolated local D1 store, but it has not been applied to staging or production;
+step payload locators and safe resume planning are the next separate gate.
 
 ## Verification
 

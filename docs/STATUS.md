@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-22 (America/Toronto)
+Last updated: 2026-08-23 (America/Toronto)
 
 ## Plain-English status
 
@@ -67,10 +67,13 @@ staging; no rebuild code or migration has been deployed to production.
   `1c9d093351cea3a064ba4b0bc4a4d37d76d880d9`
 - Fixture website-evidence workflow documentation/CI checkpoint:
   `831bf77d2661287676a7e18ddd203719bc6efbb9`
+- Durable evidence-receipt persistence source checkpoint:
+  `4372305279d627991e8d47ff5b717c4a81ecddc2`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Local migrations: all 55 apply, including the fail-closed lockdown, shadow
-  Revenue Engine records, and content-bound outreach approval
+- Local migrations: all 56 apply, including the fail-closed lockdown, shadow
+  Revenue Engine records, content-bound outreach approval, and durable evidence
+  receipts
 - Current checkpoint verification rerun 2026-08-21: 160/160 tests, typecheck,
   zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
   build, and Wrangler deploy dry run pass
@@ -332,6 +335,25 @@ staging; no rebuild code or migration has been deployed to production.
 - Linux CI run `32564289630` passed all 13 gates on fixture-workflow checkpoint
   `831bf77`, including exact dependencies, a clean Ubuntu Cloudflare build, all
   55 migrations, 258/258 tests, and both no-upload Worker validations.
+- Additive migration 0056 now defines immutable website-evidence workflow runs,
+  per-attempt/per-step receipts, page selection/candidates, audit assemblies,
+  artifact manifests/items, evidence uses, ordered promotion links, and
+  content-bound release records. It creates no trigger, schedule, provider
+  binding, outreach path, or execution authority.
+- The fixture workflow aggregate now carries the exact manifest for every
+  successful artifact receipt. Persistence rejects a promotion or release that
+  attempts to introduce a manifest outside the workflow's receipt and ordered
+  promotion chain.
+- A deterministic persistence plan emits canonical row JSON/digests, one exact
+  preflight for every insert-if-absent statement, and visible conflict results
+  for stored drift or alternate identity collisions. It has no database client
+  or executor and explicitly sets both `mutationAuthorized` and
+  `resumeAuthorized` to false.
+- Durable-receipt checkpoint verification passes 262/262 tests, typecheck,
+  zero-warning lint, repository safety, a secret-sanitized Cloudflare build,
+  both no-upload Worker validations, and all 56 migrations from zero in an
+  isolated local D1 directory. Migration 0056 remains unapplied to staging and
+  production.
 
 ## Safety and production
 
@@ -425,6 +447,10 @@ Completed gates:
   deterministic identities/output digests, explicit unreachable/partial/failed
   semantics, content-addressed retry recovery, aggregate zero-cost budgets, and
   end-to-end adversarial coverage with no live provider or Worker wiring.
+- Durable evidence-receipt persistence: additive migration 0056, immutable
+  attempt revisions, steps bound to the exact revision, queryable page/artifact
+  provenance, exact preflight/idempotency planning, drift/collision detection,
+  and zero mutation/resume/provider authority.
 
 Still required for Phase 1:
 
@@ -458,12 +484,14 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Define additive workflow-receipt, page-selection, artifact-manifest,
-   promotion, evidence-use, and release persistence records with no production
-   migration or execution authority.
-2. Add a deterministic resume planner over persisted checkpoint receipts,
-   including version drift, stale lease, duplicate delivery, partial-write, and
-   deployment-interruption tests.
+1. Add versioned checkpoint payload/locator contracts and a deterministic resume
+   planner over persisted receipt revisions, including version drift, stale
+   lease, duplicate delivery, partial-write, and deployment-interruption tests.
+   Keep fixture resume and runtime execution authority false until those tests
+   prove the exact safe continuation point.
+2. Add evidence-use ending and current-reference projection records so retention
+   review can distinguish active from ended uses without inferring deletion
+   authority.
 3. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
    smoke test; do not add a binding or make a live request until R2, budget,
    rollback, and owner approval gates are recorded.
