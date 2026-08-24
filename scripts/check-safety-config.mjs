@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, durableEvidenceMigration] = await Promise.all([
+const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, durableEvidenceMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../.env.example", import.meta.url), "utf8"),
@@ -21,6 +21,7 @@ const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap,
   readFile(new URL("../src/lib/revenue-engine/website-page-selection.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/fixture-website-evidence-workflow.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/durable-evidence-persistence-plan.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0056_durable_evidence_receipts.sql", import.meta.url), "utf8"),
 ]);
 
@@ -134,11 +135,19 @@ requireMatch("src/lib/revenue-engine/website-page-selection.ts", pageSelection, 
 forbidMatch("src/lib/revenue-engine/website-page-selection.ts", pageSelection, /@cloudflare|env\.[A-Z_]+|R2Bucket|fetch\s*\(|\.put\s*\(|\.delete\s*\(/, "fixture-only website page selection must not access providers, runtime bindings, writes, or deletion");
 requireMatch("src/lib/revenue-engine/fixture-website-evidence-workflow.ts", fixtureEvidenceWorkflow, /orchestratorKind:\s*z\.literal\("FIXTURE"\)/, "website evidence composition must remain fixture-only");
 requireMatch("src/lib/revenue-engine/fixture-website-evidence-workflow.ts", fixtureEvidenceWorkflow, /maxCostUsd:\s*z\.literal\(0\)/, "website evidence composition must have zero provider budget");
+requireMatch("src/lib/revenue-engine/fixture-website-evidence-workflow.ts", fixtureEvidenceWorkflow, /interface FixtureWebsiteEvidenceCheckpointSink[\s\S]*?kind:\s*"FIXTURE"/, "checkpoint observation sinks must remain fixture-only");
 forbidMatch("src/lib/revenue-engine/fixture-website-evidence-workflow.ts", fixtureEvidenceWorkflow, /@cloudflare|env\.[A-Z_]+|R2Bucket|fetch\s*\(|\.delete\s*\(/, "fixture-only website evidence composition must not access providers, runtime bindings, network fetch, or deletion");
 requireMatch("src/lib/revenue-engine/durable-evidence-persistence-plan.ts", durableEvidencePersistence, /mutationAuthorized:\s*z\.literal\(false\)/, "durable evidence plans must not authorize database mutation");
 requireMatch("src/lib/revenue-engine/durable-evidence-persistence-plan.ts", durableEvidencePersistence, /resumeAuthorized:\s*z\.literal\(false\)/, "audit receipts must not claim durable resume authority");
 requireMatch("src/lib/revenue-engine/durable-evidence-persistence-plan.ts", durableEvidencePersistence, /maxCostUsd:\s*z\.literal\(0\)/, "durable evidence planning must have zero provider budget");
 forbidMatch("src/lib/revenue-engine/durable-evidence-persistence-plan.ts", durableEvidencePersistence, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "fixture-only durable evidence planning must not access providers, runtime bindings, databases, network fetch, or deletion");
+requireMatch("src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", fixtureEvidenceResumePlan, /plannerKind:\s*z\.literal\("FIXTURE"\)/, "resume planning must remain fixture-only");
+requireMatch("src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", fixtureEvidenceResumePlan, /maxCostUsd:\s*z\.literal\(0\)/, "resume planning must have zero provider budget");
+requireMatch("src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", fixtureEvidenceResumePlan, /mutationAuthorized:\s*z\.literal\(false\)/, "resume planning must not authorize mutation");
+requireMatch("src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", fixtureEvidenceResumePlan, /executionAuthorized:\s*z\.literal\(false\)/, "resume planning must not authorize execution");
+requireMatch("src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", fixtureEvidenceResumePlan, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "resume planning must not authorize provider operations");
+requireMatch("src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", fixtureEvidenceResumePlan, /rollbackDeletionAuthorized:\s*z\.literal\(false\)/, "artifact reconciliation must never authorize rollback deletion");
+forbidMatch("src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", fixtureEvidenceResumePlan, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "fixture-only resume planning must not access providers, runtime bindings, databases, network fetch, writes, or deletion");
 for (const table of ["RevenueWorkflowRun", "RevenueWorkflowReceipt", "RevenueWorkflowStepReceipt", "RevenueWebsitePageSelection", "RevenueArtifactManifest", "RevenueArtifactManifestEvidenceUse", "RevenueArtifactReleaseRecord"]) {
   requireMatch("migrations/0056_durable_evidence_receipts.sql", durableEvidenceMigration, new RegExp(`CREATE TABLE \\\"${table}\\\"`), `${table} must remain an additive durable evidence table`);
 }

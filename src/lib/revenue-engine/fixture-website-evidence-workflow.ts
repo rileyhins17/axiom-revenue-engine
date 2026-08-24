@@ -20,6 +20,7 @@ import {
   browserArtifactRefsFromReceipt,
   createBrowserArtifactWritePlan,
   executeFixtureArtifactWritePlan,
+  type ArtifactWritePlan,
   type ArtifactWriteReceipt,
   type FixtureArtifactStore,
 } from "@/lib/revenue-engine/content-addressed-artifact-store";
@@ -68,8 +69,8 @@ export const FIXTURE_WEBSITE_EVIDENCE_WORKFLOW_STEPS = [
   "RUN_AUDIT",
 ] as const;
 
-const WorkflowStepSchema = z.enum(FIXTURE_WEBSITE_EVIDENCE_WORKFLOW_STEPS);
-type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
+export const FixtureWebsiteEvidenceWorkflowStepSchema = z.enum(FIXTURE_WEBSITE_EVIDENCE_WORKFLOW_STEPS);
+export type FixtureWebsiteEvidenceWorkflowStep = z.infer<typeof FixtureWebsiteEvidenceWorkflowStepSchema>;
 
 export const FixtureWebsiteEvidenceWorkflowRequestSchema = z.object({
   workflowVersion: z.literal(FIXTURE_WEBSITE_EVIDENCE_WORKFLOW_VERSION),
@@ -114,10 +115,41 @@ export type FixtureWebsiteEvidenceDependencies = {
   capture: FixtureWebsiteDocumentCapture;
   browserRunner: BrowserMeasurementRunner;
   artifactStore: FixtureArtifactStore;
+  checkpointSink?: FixtureWebsiteEvidenceCheckpointSink;
 };
 
+export type FixtureWebsiteEvidenceSubpageCheckpoint = {
+  pageKind: z.infer<typeof WebsitePageKindSchema>;
+  capture: WebsiteCaptureResult;
+  html: HtmlPageFacts | null;
+};
+
+export type FixtureWebsiteEvidenceCheckpointObservation =
+  | { step: "CAPTURE_HOME"; sitePath: "CAPTURED" | "UNREACHABLE"; completedAt: string; output: WebsiteCaptureResult }
+  | { step: "EXTRACT_HOME"; sitePath: "CAPTURED"; completedAt: string; output: HtmlPageFacts }
+  | { step: "SELECT_PAGES"; sitePath: "CAPTURED"; completedAt: string; output: WebsitePageSelectionPlan }
+  | { step: "CAPTURE_SUBPAGES"; sitePath: "CAPTURED"; completedAt: string; output: FixtureWebsiteEvidenceSubpageCheckpoint[] }
+  | { step: "MEASURE_BROWSER"; sitePath: "CAPTURED"; completedAt: string; output: BrowserPageEvidence[] }
+  | { step: "STORE_ARTIFACTS"; sitePath: "CAPTURED"; completedAt: string; output: ArtifactWriteReceipt[] }
+  | { step: "ASSEMBLE_AUDIT"; sitePath: "CAPTURED"; completedAt: string; output: WebsiteAuditAssembly }
+  | { step: "RUN_AUDIT"; sitePath: "CAPTURED" | "UNREACHABLE"; completedAt: string; output: DeterministicWebsiteAuditResult };
+
+export type FixtureWebsiteEvidenceArtifactObservation = {
+  pageKind: z.infer<typeof WebsitePageKindSchema>;
+  profile: "DESKTOP_1440X900" | "MOBILE_390X844";
+  recordedAt: string;
+  plan: ArtifactWritePlan;
+  receipt: ArtifactWriteReceipt;
+};
+
+export interface FixtureWebsiteEvidenceCheckpointSink {
+  kind: "FIXTURE";
+  commit(observation: FixtureWebsiteEvidenceCheckpointObservation): Promise<void>;
+  recordArtifactAttempt(observation: FixtureWebsiteEvidenceArtifactObservation): Promise<void>;
+}
+
 const WorkflowStepReceiptSchema = z.object({
-  step: WorkflowStepSchema,
+  step: FixtureWebsiteEvidenceWorkflowStepSchema,
   status: z.enum(["SUCCEEDED", "PARTIAL", "SKIPPED", "FAILED"]),
   attempts: z.number().int().nonnegative().max(1),
   startedAt: z.string().datetime({ offset: true }).nullable(),
@@ -182,7 +214,7 @@ export const FixtureWebsiteEvidenceWorkflowReceiptSchema = z.object({
   audit: DeterministicWebsiteAuditResultSchema.nullable(),
   budget: WorkflowBudgetSchema,
   failure: z.object({
-    step: WorkflowStepSchema,
+    step: FixtureWebsiteEvidenceWorkflowStepSchema,
     code: z.string().trim().min(1).max(100),
     message: z.string().trim().min(1).max(300),
   }).strict().nullable(),
@@ -254,7 +286,7 @@ function deterministicUuid(seed: string) {
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
 }
 
-function initialSteps(): Record<WorkflowStep, z.infer<typeof WorkflowStepReceiptSchema>> {
+function initialSteps(): Record<FixtureWebsiteEvidenceWorkflowStep, z.infer<typeof WorkflowStepReceiptSchema>> {
   return FIXTURE_WEBSITE_EVIDENCE_WORKFLOW_STEPS.reduce((receipts, step) => {
     receipts[step] = WorkflowStepReceiptSchema.parse({
       step,
@@ -268,7 +300,7 @@ function initialSteps(): Record<WorkflowStep, z.infer<typeof WorkflowStepReceipt
       failure: null,
     });
     return receipts;
-  }, {} as Record<WorkflowStep, z.infer<typeof WorkflowStepReceiptSchema>>);
+  }, {} as Record<FixtureWebsiteEvidenceWorkflowStep, z.infer<typeof WorkflowStepReceiptSchema>>);
 }
 
 function captureSummary(capture: WebsiteCaptureResult) {
@@ -285,7 +317,7 @@ function captureSummary(capture: WebsiteCaptureResult) {
   };
 }
 
-function successStep(step: WorkflowStep, at: string, output: unknown, itemCount: number, warnings: string[] = [], partial = false) {
+function successStep(step: FixtureWebsiteEvidenceWorkflowStep, at: string, output: unknown, itemCount: number, warnings: string[] = [], partial = false) {
   return WorkflowStepReceiptSchema.parse({
     step,
     status: partial ? "PARTIAL" : "SUCCEEDED",
@@ -299,7 +331,7 @@ function successStep(step: WorkflowStep, at: string, output: unknown, itemCount:
   });
 }
 
-function failedStep(step: WorkflowStep, at: string, code: string, message: string) {
+function failedStep(step: FixtureWebsiteEvidenceWorkflowStep, at: string, code: string, message: string) {
   return WorkflowStepReceiptSchema.parse({
     step,
     status: "FAILED",
@@ -374,12 +406,17 @@ export async function runFixtureWebsiteEvidenceWorkflow(
   dependencies: FixtureWebsiteEvidenceDependencies,
 ): Promise<FixtureWebsiteEvidenceWorkflowReceipt> {
   const request = FixtureWebsiteEvidenceWorkflowRequestSchema.parse(value);
-  if (dependencies.capture.kind !== "FIXTURE" || dependencies.browserRunner.kind !== "FIXTURE" || dependencies.artifactStore.kind !== "FIXTURE") {
+  if (
+    dependencies.capture.kind !== "FIXTURE"
+    || dependencies.browserRunner.kind !== "FIXTURE"
+    || dependencies.artifactStore.kind !== "FIXTURE"
+    || (dependencies.checkpointSink && dependencies.checkpointSink.kind !== "FIXTURE")
+  ) {
     throw new Error("Website evidence workflow version 1 accepts fixture dependencies only.");
   }
   const steps = initialSteps();
   const at = request.requestedAt;
-  let currentStep: WorkflowStep = "CAPTURE_HOME";
+  let currentStep: FixtureWebsiteEvidenceWorkflowStep = "CAPTURE_HOME";
   let documentCaptureAttempts = 0;
   let browserCaptureAttempts = 0;
   let artifactWriteAttempts = 0;
@@ -399,7 +436,7 @@ export async function runFixtureWebsiteEvidenceWorkflow(
   const workflowReceipt = (
     status: "COMPLETED" | "PARTIAL" | "FAILED",
     sitePath: "CAPTURED" | "UNREACHABLE" | null,
-    failure: { step: WorkflowStep; code: string; message: string } | null,
+    failure: { step: FixtureWebsiteEvidenceWorkflowStep; code: string; message: string } | null,
   ) => FixtureWebsiteEvidenceWorkflowReceiptSchema.parse({
     workflowVersion: request.workflowVersion,
     workflowId: request.workflowId,
@@ -441,16 +478,35 @@ export async function runFixtureWebsiteEvidenceWorkflow(
 
     if (homeCapture.outcome !== "CAPTURED") {
       if (homeCapture.outcome === "REJECTED") throw new Error("A canonical fixture homepage cannot return a rejected capture.");
+      await dependencies.checkpointSink?.commit({
+        step: "CAPTURE_HOME",
+        sitePath: "UNREACHABLE",
+        completedAt: at,
+        output: homeCapture,
+      });
       currentStep = "RUN_AUDIT";
       audit = unreachableAudit(request, homeCapture);
       steps.RUN_AUDIT = successStep("RUN_AUDIT", at, audit, 1);
+      await dependencies.checkpointSink?.commit({
+        step: "RUN_AUDIT",
+        sitePath: "UNREACHABLE",
+        completedAt: at,
+        output: audit,
+      });
       return workflowReceipt("COMPLETED", "UNREACHABLE", null);
     }
+    await dependencies.checkpointSink?.commit({
+      step: "CAPTURE_HOME",
+      sitePath: "CAPTURED",
+      completedAt: at,
+      output: homeCapture,
+    });
 
     currentStep = "EXTRACT_HOME";
     const homeHtml = await extractHtmlPageFacts(homeCapture, "HOME");
     pages[0].html = homeHtml;
     steps.EXTRACT_HOME = successStep("EXTRACT_HOME", at, homeHtml, 1, homeHtml.warnings, !homeHtml.complete);
+    await dependencies.checkpointSink?.commit({ step: "EXTRACT_HOME", sitePath: "CAPTURED", completedAt: at, output: homeHtml });
 
     currentStep = "SELECT_PAGES";
     pageSelection = planWebsitePages({
@@ -468,6 +524,7 @@ export async function runFixtureWebsiteEvidenceWorkflow(
       homepageFacts: homeHtml,
     });
     steps.SELECT_PAGES = successStep("SELECT_PAGES", at, pageSelection, pageSelection.selectedPages.length, pageSelection.warnings, pageSelection.status === "PARTIAL");
+    await dependencies.checkpointSink?.commit({ step: "SELECT_PAGES", sitePath: "CAPTURED", completedAt: at, output: pageSelection });
 
     currentStep = "CAPTURE_SUBPAGES";
     for (const selectedPage of pageSelection.selectedPages.filter((page) => page.pageKind !== "HOME")) {
@@ -486,6 +543,12 @@ export async function runFixtureWebsiteEvidenceWorkflow(
       unavailablePages.map((page) => `page_unavailable:${page.pageKind}`),
       unavailablePages.length > 0 || pageSelection.status === "PARTIAL",
     );
+    await dependencies.checkpointSink?.commit({
+      step: "CAPTURE_SUBPAGES",
+      sitePath: "CAPTURED",
+      completedAt: at,
+      output: pages.slice(1).map((page) => ({ pageKind: page.pageKind, capture: page.capture, html: page.html })),
+    });
 
     currentStep = "MEASURE_BROWSER";
     const successfulPages = pages.filter((page) => page.capture.outcome === "CAPTURED" && page.html);
@@ -529,6 +592,13 @@ export async function runFixtureWebsiteEvidenceWorkflow(
           store: dependencies.artifactStore,
           now: () => new Date(at),
         }));
+        await dependencies.checkpointSink?.recordArtifactAttempt({
+          pageKind: page.pageKind,
+          profile,
+          recordedAt: at,
+          plan: writePlan,
+          receipt: writeReceipt,
+        });
         artifactWriteAttempts += writeReceipt.fixturePutAttempts;
         artifactHeadReads += writeReceipt.fixtureHeadReads;
         artifactBytes += writeReceipt.items.reduce((sum, item) => sum + item.byteLength, 0);
@@ -550,6 +620,12 @@ export async function runFixtureWebsiteEvidenceWorkflow(
       browserFailures.map((evidence) => `browser_unavailable:${evidence.pageKind}:${evidence.profile}`),
       browserFailures.length > 0,
     );
+    await dependencies.checkpointSink?.commit({
+      step: "MEASURE_BROWSER",
+      sitePath: "CAPTURED",
+      completedAt: at,
+      output: browserEvidence,
+    });
     const artifactReceipts = pages.flatMap((page) => page.artifactReceipts);
     steps.STORE_ARTIFACTS = successStep(
       "STORE_ARTIFACTS",
@@ -559,6 +635,12 @@ export async function runFixtureWebsiteEvidenceWorkflow(
       [],
       browserFailures.length > 0,
     );
+    await dependencies.checkpointSink?.commit({
+      step: "STORE_ARTIFACTS",
+      sitePath: "CAPTURED",
+      completedAt: at,
+      output: artifactReceipts,
+    });
 
     currentStep = "ASSEMBLE_AUDIT";
     auditAssembly = assembleWebsiteAuditInput({
@@ -586,10 +668,12 @@ export async function runFixtureWebsiteEvidenceWorkflow(
       resourceProbes: request.resourceProbes,
     } satisfies WebsiteAuditAssemblyRequest);
     steps.ASSEMBLE_AUDIT = successStep("ASSEMBLE_AUDIT", at, auditAssembly, auditAssembly.pages.length, auditAssembly.warnings, auditAssembly.status === "PARTIAL");
+    await dependencies.checkpointSink?.commit({ step: "ASSEMBLE_AUDIT", sitePath: "CAPTURED", completedAt: at, output: auditAssembly });
 
     currentStep = "RUN_AUDIT";
     audit = auditWebsiteDeterministically(auditAssembly.auditInput);
     steps.RUN_AUDIT = successStep("RUN_AUDIT", at, audit, 1, audit.manualReviewReasons, auditAssembly.status === "PARTIAL");
+    await dependencies.checkpointSink?.commit({ step: "RUN_AUDIT", sitePath: "CAPTURED", completedAt: at, output: audit });
     const partial = pageSelection.status === "PARTIAL" || auditAssembly.status === "PARTIAL";
     return workflowReceipt(partial ? "PARTIAL" : "COMPLETED", "CAPTURED", null);
   } catch (error) {
