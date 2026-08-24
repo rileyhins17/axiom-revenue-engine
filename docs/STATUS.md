@@ -75,8 +75,8 @@ staging; no rebuild code or migration has been deployed to production.
   `c3591e9443826271bea9db9cddcc61f6d304ebfa`
 - Fenced evidence-resume documentation checkpoint:
   `7a3e40a47129403a8feae3983d604ecde743caba`
-- Fenced resume-persistence checkpoint: current worktree; exact commit and Linux
-  CI run will be recorded after the checkpoint is pushed
+- Fenced resume-persistence source/documentation checkpoint:
+  `6d5db2b1536a93571c241f5e2c3fda9be01e075e`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 57 apply, including the fail-closed lockdown, shadow

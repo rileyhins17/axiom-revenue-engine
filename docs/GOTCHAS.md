@@ -77,8 +77,7 @@ Retire entries when the architecture makes them impossible.
   alternate-key collision, and explicit multiple-match rejection; new durable
   planners must not use `LIMIT 1` for collision preflight.
 - **Affected area:** D1 idempotency, retries, imports, and workflow recovery.
-- **Verifying commit:** current fenced-resume persistence checkpoint; exact commit
-  pending.
+- **Verifying commit:** `6d5db2b`.
 
 ## RUN-002 — Mutable snapshots were mistaken for append-only records
 
@@ -95,8 +94,7 @@ Retire entries when the architecture makes them impossible.
   tests cover running-without-closure, terminal sealing order, state/retry
   identity, and exact replay.
 - **Affected area:** durable workflow recovery, fencing, and artifact replay.
-- **Verifying commit:** current fenced-resume persistence checkpoint; exact commit
-  pending.
+- **Verifying commit:** `6d5db2b`.
 
 ## AI-001 — Provider/model documentation drift
 
