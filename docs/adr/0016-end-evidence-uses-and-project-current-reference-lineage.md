@@ -27,8 +27,11 @@ fixture-only lineage projector, and a validation-only persistence planner.
 
 `RevenueArtifactEvidenceUseEnd` is one immutable end fact for one exact use
 version. It binds the original use digest, effective and recording times,
-versioned reason and basis, actor and role, and canonical digest/JSON. A use
-cannot end twice or reopen. Revival requires a new evidence-use identity.
+versioned reason and basis, actor and role, and canonical digest/JSON. A
+replacement also binds the replacement use ID, record version, and digest. The
+persistence bundle must carry both exact use records so business, time, identity,
+and version can be rechecked. A use cannot end twice or reopen. Revival requires
+a new evidence-use identity.
 
 - Normal retention completion requires an owner/compliance review basis.
 - Replacement requires the exact replacement use and cannot cross businesses or
@@ -41,17 +44,34 @@ An existing `ArtifactReleaseRecord` cannot end a use. That record is a historica
 review of one protected manifest and a caller-supplied use set; it does not prove
 that the underlying business-record purpose ended everywhere.
 
-### Complete reference snapshots
+### Fixture-asserted reference snapshots
 
 `RevenueArtifactReferenceProjection` is an immutable, time-bounded snapshot for
 one promotion lineage. Its source digest binds the workflow/business identity,
-every manifest, promotion plan/receipt, manifest-use link, exact use, use ending,
-availability fact, source count, and completeness receipt.
+explicit evidence-use set, every supplied manifest, promotion plan/receipt,
+manifest-use link, use ending, availability fact, and source count.
+
+This checkpoint has no transactional D1 loader. Its fixture helper therefore
+records `FIXTURE_ASSERTED`, keeps `snapshotComplete=false`, and cannot mint a
+completeness receipt. Even when every asserted use has ended, the projection is
+`INDETERMINATE` and cannot suggest retention review. Only a later atomic loader
+may introduce transactionally complete snapshots and the
+`NO_CURRENT_REFERENCES` conclusion.
 
 Only completed promotion receipts create lineage edges. A no-copy receipt is a
-use-link event, not a cycle. Failed promotions, disconnected manifests,
-cross-workflow/business data, retention decreases, divergent manifests, missing
-promotion/use pairs, stale snapshots, and incomplete availability fail closed.
+use-link event, not a cycle. The root must have `ARTIFACT_WRITE` provenance and
+every promoted manifest must have its exact completed promotion and ancestor
+chain. Every completed promotion use needs its exact result-manifest link and
+every link/use must agree with the explicit use set. Failed promotions,
+disconnected manifests, cross-workflow/business data, retention decreases,
+divergent manifests, missing promotion/use pairs, stale snapshots, and incomplete
+availability fail closed.
+
+Fixture freshness is capped at five minutes. Availability receipts bind all of
+their fields by digest and must remain valid through the projection window. All
+manifest, promotion, use, link, ending, and availability timestamps must be no
+later than the asserted snapshot. Currentness verification deterministically
+reproduces the full projection; a merely redigested assignment is a conflict.
 
 For each active use, the projector selects the weakest verified-present,
 unexpired linked manifest whose retention satisfies the policy:
@@ -69,17 +89,17 @@ manifests are never rewritten or demoted.
 
 Projection uses and assignments are normalized in
 `RevenueArtifactReferenceProjectionUse` and
-`RevenueArtifactReferenceProjectionAssignment`. The exact complete source and
+`RevenueArtifactReferenceProjectionAssignment`. The exact asserted source and
 projection also remain canonical JSON with SHA-256 digests.
 
 ### No destructive authority
 
-Even `NO_CURRENT_REFERENCES` means only that a complete fixture snapshot found no
-active assignments at that time. Every ending, projection, and persistence plan
-fixes release, deletion, provider-delete, provider-operation, and cost authority
-to zero/false. A later retention review must recompute and compare the complete
-source digest inside a fresh atomic database read. Provider deletion remains a
-separate explicit release gate.
+Fixture projections cannot produce `NO_CURRENT_REFERENCES`. Every ending,
+projection, currentness result, and persistence plan fixes retention conclusion,
+release, deletion, provider-delete, provider-operation, and cost authority to
+zero/false. A later retention review must recompute and compare a transactionally
+complete source digest inside one fresh atomic database read. Provider deletion
+remains a separate explicit release gate.
 
 The persistence planner uses collision-complete preflights with no `LIMIT 1`.
 It checks primary and alternate identities, rejects multiple matches, emits only
@@ -96,7 +116,7 @@ stores in this checkpoint. It is not applied to staging or production.
 | Count every unended manifest link | Easy reference count | Keeps every older promoted copy active forever |
 | Assign only the strongest/latest manifest | Simple selection | Prevents safe fallback and retains expensive legal copies unnecessarily |
 | Mutable current-reference counter | Cheap read | Drifts under retries, late facts, and deployment interruption |
-| Immutable complete-source projection with candidate assignments | Auditable, replayable, ambiguity-safe | More explicit records and loader work; selected |
+| Fixture-asserted projection now; transactionally complete loader later | Auditable, replayable, and honest about current proof | More explicit records and loader work; selected |
 
 ## Consequences
 
@@ -104,8 +124,8 @@ stores in this checkpoint. It is not applied to staging or production.
   mutating historical evidence.
 - The engine can explain which exact manifest currently protects each use and
   why an older or stronger copy is unassigned.
-- Ambiguous, missing, stale, or incomplete evidence increases protection by
-  blocking a zero-reference conclusion.
+- Ambiguous, missing, stale, fixture-asserted, or incomplete evidence increases
+  protection by blocking a zero-reference conclusion.
 - The projection is not a live materialized counter. A future loader must
   reproduce a complete transaction snapshot and compare its digest before using
   the result in any retention review.
@@ -120,4 +140,3 @@ stores in this checkpoint. It is not applied to staging or production.
    always recomputes a fresh current-reference snapshot.
 3. Keep Browser, R2, Workflow, and provider adapters behind their own staging,
    budget, rollback, and approval gates.
-

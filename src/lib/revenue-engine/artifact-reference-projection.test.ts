@@ -13,8 +13,12 @@ import {
 import {
   ARTIFACT_EVIDENCE_USE_END_VERSION,
   ARTIFACT_REFERENCE_PROJECTION_VERSION,
+  ArtifactEvidenceUseEndRecordSchema,
+  ArtifactManifestAvailabilitySchema,
+  ArtifactReferenceProjectionSchema,
   artifactReferenceDigest,
   createArtifactEvidenceUseEndRecord,
+  createFixtureArtifactManifestAvailability,
   createArtifactReferenceProjection,
   createFixtureArtifactReferenceSnapshotReceipt,
   verifyArtifactReferenceProjectionCurrent,
@@ -34,7 +38,7 @@ const OUTREACH_USE_ID = "77777777-7777-4777-8777-777777777777";
 const LEGAL_USE_ID = "88888888-8888-4888-8888-888888888888";
 const PROJECTED_AT = "2026-08-24T12:00:00.000Z";
 const SNAPSHOT_AT = "2026-08-24T11:59:00.000Z";
-const FRESH_UNTIL = "2026-08-24T12:05:00.000Z";
+const FRESH_UNTIL = "2026-08-24T12:04:00.000Z";
 const SHA256 = "a".repeat(64);
 
 function evidenceUse(useId: string, useType: ArtifactEvidenceUse["useType"], recordedAt = "2026-08-24T10:00:00.000Z"): ArtifactEvidenceUse {
@@ -135,19 +139,21 @@ function promote(source: ArtifactManifest, promotionId: string, evidenceUses: Ar
   return { plan, receipt, manifest: resultManifest };
 }
 
-function availability(manifest: ArtifactManifest, overrides: Partial<ArtifactReferenceSourceFacts["availability"][number]> = {}) {
+function availability(
+  manifest: ArtifactManifest,
+  overrides: Partial<Omit<ArtifactReferenceSourceFacts["availability"][number], "receiptDigest">> = {},
+) {
   const expiring = ["SHADOW_30D", "QUALIFICATION_180D"].includes(manifest.retentionClass);
-  return {
+  return createFixtureArtifactManifestAvailability({
     manifestId: manifest.manifestId,
     availabilityVersion: "artifact-manifest-availability-v1" as const,
     state: "VERIFIED_PRESENT" as const,
     checkedAt: SNAPSHOT_AT,
     validThrough: FRESH_UNTIL,
     expiresAt: expiring ? "2027-02-20T09:00:00.000Z" : null,
-    receiptDigest: artifactReferenceDigest({ manifestId: manifest.manifestId, state: "VERIFIED_PRESENT" }),
     checkerKind: "FIXTURE" as const,
     ...overrides,
-  };
+  });
 }
 
 function link(manifest: ArtifactManifest, evidenceUse: ArtifactEvidenceUse, promotionId: string, linkedAt: string) {
@@ -192,6 +198,7 @@ function lineageFacts() {
     workflowRun: { workflowRunId: WORKFLOW_ID, businessId: BUSINESS_ID, workflowKind: "WEBSITE_EVIDENCE", workflowVersion: "fixture-v1", requestDigest: "f".repeat(64) },
     manifests: [root, qualification.manifest, outreach.manifest, legal.manifest],
     promotions: [qualification, outreach, legal].map(({ plan, receipt }) => ({ plan, receipt })),
+    evidenceUses: [qualificationUse, outreachUse, legalUse],
     manifestEvidenceUses: [
       link(qualification.manifest, qualificationUse, QUALIFICATION_ID, qualification.receipt.completedAt),
       link(outreach.manifest, qualificationUse, OUTREACH_ID, outreach.receipt.completedAt),
@@ -239,7 +246,7 @@ test("lineage projection chooses the weakest valid copy for each active use", ()
   assert.equal(result.deletionAuthorized, false);
 });
 
-test("all ended uses produce a review suggestion but never deletion authority", () => {
+test("all ended fixture uses remain indeterminate without transactional completeness", () => {
   const { facts } = lineageFacts();
   facts.evidenceUseEnds = [
     ending(qualificationUse, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
@@ -247,10 +254,12 @@ test("all ended uses produce a review suggestion but never deletion authority", 
     ending(legalUse, "cccccccc-cccc-4ccc-8ccc-cccccccccccc", "LEGAL_HOLD_CLEARED"),
   ];
   const result = projection(facts);
-  assert.equal(result.state, "NO_CURRENT_REFERENCES");
+  assert.equal(result.state, "INDETERMINATE");
   assert.equal(result.activeUseCount, 0);
   assert.equal(result.requiredRetentionClass, null);
-  assert.equal(result.retentionReviewSuggested, true);
+  assert.equal(result.snapshotComplete, false);
+  assert.equal(result.completenessAssurance, "FIXTURE_ASSERTED");
+  assert.equal(result.retentionReviewSuggested, false);
   assert.equal(result.requiresFreshReferenceCheck, true);
   assert.equal(result.providerDeleteAuthorized, false);
 });
@@ -262,7 +271,7 @@ test("expired weaker evidence falls back to a valid stronger copy", () => {
     ending(legalUse, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "LEGAL_HOLD_CLEARED"),
   ];
   facts.availability = facts.availability.map((record) => record.manifestId === QUALIFICATION_ID
-    ? { ...record, expiresAt: PROJECTED_AT }
+    ? availability(facts.manifests.find((manifest) => manifest.manifestId === QUALIFICATION_ID)!, { expiresAt: PROJECTED_AT })
     : record);
   const result = projection(facts);
   const qualification = result.uses.find((item) => item.evidenceUseId === QUALIFICATION_USE_ID)!;
@@ -277,6 +286,7 @@ test("equal-rank candidates remain ambiguous and block a current-reference concl
     workflowRun: { workflowRunId: WORKFLOW_ID, businessId: BUSINESS_ID, workflowKind: "WEBSITE_EVIDENCE", workflowVersion: "fixture-v1", requestDigest: "f".repeat(64) },
     manifests: [root, first.manifest, second.manifest],
     promotions: [first, second].map(({ plan, receipt }) => ({ plan, receipt })),
+    evidenceUses: [qualificationUse],
     manifestEvidenceUses: [
       link(first.manifest, qualificationUse, first.plan.promotionId, first.receipt.completedAt),
       link(second.manifest, qualificationUse, second.plan.promotionId, second.receipt.completedAt),
@@ -293,20 +303,26 @@ test("equal-rank candidates remain ambiguous and block a current-reference concl
 });
 
 test("a no-copy promotion is a use-link event rather than a lineage cycle", () => {
-  const root = rootManifest("QUALIFICATION_180D");
-  const noCopy = promote(root, QUALIFICATION_ID, [qualificationUse], "2026-08-24T10:10:00.000Z");
+  const root = rootManifest();
+  const copied = promote(root, QUALIFICATION_ID, [qualificationUse], "2026-08-24T10:10:00.000Z");
+  const secondUse = evidenceUse("14141414-1414-4414-8414-141414141414", "QUALIFICATION_SNAPSHOT", "2026-08-24T10:15:00.000Z");
+  const noCopy = promote(copied.manifest, "15151515-1515-4515-8515-151515151515", [qualificationUse, secondUse], "2026-08-24T10:20:00.000Z");
   assert.equal(noCopy.plan.action, "NO_COPY_REQUIRED");
   const facts: ArtifactReferenceSourceFacts = {
     workflowRun: { workflowRunId: WORKFLOW_ID, businessId: BUSINESS_ID, workflowKind: "WEBSITE_EVIDENCE", workflowVersion: "fixture-v1", requestDigest: "f".repeat(64) },
-    manifests: [root],
-    promotions: [{ plan: noCopy.plan, receipt: noCopy.receipt }],
-    manifestEvidenceUses: [link(root, qualificationUse, QUALIFICATION_ID, noCopy.receipt.completedAt)],
+    manifests: [root, copied.manifest],
+    promotions: [{ plan: copied.plan, receipt: copied.receipt }, { plan: noCopy.plan, receipt: noCopy.receipt }],
+    evidenceUses: [qualificationUse, secondUse],
+    manifestEvidenceUses: [
+      link(copied.manifest, qualificationUse, copied.plan.promotionId, copied.receipt.completedAt),
+      link(copied.manifest, secondUse, noCopy.plan.promotionId, noCopy.receipt.completedAt),
+    ],
     evidenceUseEnds: [],
-    availability: [availability(root)],
+    availability: [availability(root), availability(copied.manifest)],
   };
   const result = projection(facts);
   assert.equal(result.state, "ACTIVE_REFERENCES");
-  assert.deepEqual(result.uses[0]?.assignments.map((item) => item.manifestId), [ROOT_ID]);
+  assert.ok(result.uses.every((use) => use.assignments[0]?.manifestId === QUALIFICATION_ID));
 });
 
 test("invalid endings and broken promotion-use lineage fail closed", () => {
@@ -329,6 +345,101 @@ test("invalid endings and broken promotion-use lineage fail closed", () => {
   const { facts } = lineageFacts();
   facts.manifestEvidenceUses[0] = { ...facts.manifestEvidenceUses[0]!, viaPromotionId: OUTREACH_ID };
   assert.throws(() => projection(facts), /does not match its promotion result/i);
+
+  const { facts: endedTooEarly } = lineageFacts();
+  const validEnd = ending(qualificationUse, "dddddddd-dddd-4ddd-8ddd-dddddddddddd");
+  const forgedCore = {
+    endVersion: validEnd.endVersion,
+    endId: validEnd.endId,
+    evidenceUseId: validEnd.evidenceUseId,
+    businessId: validEnd.businessId,
+    useType: validEnd.useType,
+    useDigest: validEnd.useDigest,
+    endedAt: "2026-08-24T09:00:00.000Z",
+    recordedAt: validEnd.recordedAt,
+    reasonCode: validEnd.reasonCode,
+    basis: validEnd.basis,
+    replacementEvidenceUseId: validEnd.replacementEvidenceUseId,
+    replacementEvidenceUseVersion: validEnd.replacementEvidenceUseVersion,
+    replacementEvidenceUseDigest: validEnd.replacementEvidenceUseDigest,
+    actor: validEnd.actor,
+    mode: validEnd.mode,
+    recorderKind: validEnd.recorderKind,
+  };
+  endedTooEarly.evidenceUseEnds = [ArtifactEvidenceUseEndRecordSchema.parse({
+    ...validEnd,
+    ...forgedCore,
+    endDigest: artifactReferenceDigest(forgedCore),
+  })];
+  assert.throws(() => projection(endedTooEarly), /cannot predate its exact original use/i);
+});
+
+test("an omitted promotion link and a promoted-root truncation both fail closed", () => {
+  const { facts } = lineageFacts();
+  facts.manifestEvidenceUses = facts.manifestEvidenceUses.filter((item) => !(
+    item.manifestId === QUALIFICATION_ID && item.evidenceUse.useId === QUALIFICATION_USE_ID
+  ));
+  assert.throws(() => projection(facts), /every completed promotion use requires/i);
+
+  const { facts: complete } = lineageFacts();
+  const truncated: ArtifactReferenceSourceFacts = {
+    ...complete,
+    manifests: complete.manifests.filter((manifest) => manifest.manifestId !== ROOT_ID),
+    promotions: complete.promotions.filter((bundle) => bundle.plan.promotionId !== QUALIFICATION_ID),
+    manifestEvidenceUses: complete.manifestEvidenceUses.filter((link) => link.manifestId !== QUALIFICATION_ID),
+    availability: complete.availability.filter((item) => item.manifestId !== ROOT_ID),
+  };
+  const snapshot = createFixtureArtifactReferenceSnapshotReceipt({ snapshotCapturedAt: SNAPSHOT_AT, freshUntil: FRESH_UNTIL, sourceFacts: truncated });
+  assert.throws(() => createArtifactReferenceProjection({
+    projectionVersion: ARTIFACT_REFERENCE_PROJECTION_VERSION,
+    projectionId: "12121212-1212-4212-8212-121212121212",
+    businessId: BUSINESS_ID,
+    lineageRootManifestId: QUALIFICATION_ID,
+    projectedAt: PROJECTED_AT,
+    mode: "SHADOW",
+    projectorKind: "FIXTURE",
+    maxCostUsd: 0,
+    sourceFacts: truncated,
+    snapshot,
+  }), /original SHADOW_30D ARTIFACT_WRITE manifest/i);
+});
+
+test("impossible protected or mismatched write roots are rejected", () => {
+  for (const root of [
+    rootManifest("OUTREACH_ACTIVE"),
+    ArtifactManifestSchema.parse({
+      ...rootManifest(),
+      provenance: { receiptType: "ARTIFACT_WRITE", receiptId: "16161616-1616-4616-8616-161616161616" },
+    }),
+  ]) {
+    const facts: ArtifactReferenceSourceFacts = {
+      workflowRun: { workflowRunId: WORKFLOW_ID, businessId: BUSINESS_ID, workflowKind: "WEBSITE_EVIDENCE", workflowVersion: "fixture-v1", requestDigest: "f".repeat(64) },
+      manifests: [root],
+      promotions: [],
+      evidenceUses: [],
+      manifestEvidenceUses: [],
+      evidenceUseEnds: [],
+      availability: [availability(root)],
+    };
+    assert.throws(() => projection(facts), /original SHADOW_30D ARTIFACT_WRITE manifest identity/i);
+  }
+});
+
+test("fixture assertions cannot turn an omitted history into a no-reference conclusion", () => {
+  const root = rootManifest();
+  const partial: ArtifactReferenceSourceFacts = {
+    workflowRun: { workflowRunId: WORKFLOW_ID, businessId: BUSINESS_ID, workflowKind: "WEBSITE_EVIDENCE", workflowVersion: "fixture-v1", requestDigest: "f".repeat(64) },
+    manifests: [root],
+    promotions: [],
+    evidenceUses: [],
+    manifestEvidenceUses: [],
+    evidenceUseEnds: [],
+    availability: [availability(root)],
+  };
+  const result = projection(partial, "13131313-1313-4313-8313-131313131313");
+  assert.equal(result.state, "INDETERMINATE");
+  assert.equal(result.snapshotComplete, false);
+  assert.equal(result.retentionReviewSuggested, false);
 });
 
 test("replacement endings bind the exact same-business replacement version", () => {
@@ -359,19 +470,149 @@ test("replacement endings bind the exact same-business replacement version", () 
   }), /exact replacement evidence-use version/i);
 });
 
+test("ending records reject forged reason, basis, and replacement combinations", () => {
+  const valid = ending(qualificationUse, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  const coreFor = (record: typeof valid) => ({
+    endVersion: record.endVersion,
+    endId: record.endId,
+    evidenceUseId: record.evidenceUseId,
+    businessId: record.businessId,
+    useType: record.useType,
+    useDigest: record.useDigest,
+    endedAt: record.endedAt,
+    recordedAt: record.recordedAt,
+    reasonCode: record.reasonCode,
+    basis: record.basis,
+    replacementEvidenceUseId: record.replacementEvidenceUseId,
+    replacementEvidenceUseVersion: record.replacementEvidenceUseVersion,
+    replacementEvidenceUseDigest: record.replacementEvidenceUseDigest,
+    actor: record.actor,
+    mode: record.mode,
+    recorderKind: record.recorderKind,
+  });
+  const forgedCore = {
+    ...coreFor(valid),
+    basis: { ...valid.basis, basisType: "EVIDENCE_USE_REPLACEMENT" as const },
+  };
+  assert.throws(() => ArtifactEvidenceUseEndRecordSchema.parse({
+    ...valid,
+    ...forgedCore,
+    endDigest: artifactReferenceDigest(forgedCore),
+  }), /retention completion requires/i);
+
+  const legal = ending(legalUse, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "LEGAL_HOLD_CLEARED");
+  const legalCore = {
+    ...coreFor(legal),
+    reasonCode: "RECORD_RETENTION_COMPLETE" as const,
+    basis: { basisType: "OWNER_RETENTION_REVIEW" as const, basisRecordId: "review", basisRecordVersion: "v1", basisDigest: "b".repeat(64) },
+    actor: { actorUserId: "owner", role: "OWNER" as const },
+  };
+  assert.throws(() => ArtifactEvidenceUseEndRecordSchema.parse({
+    ...legal,
+    ...legalCore,
+    endDigest: artifactReferenceDigest(legalCore),
+  }), /legal-hold ending records require/i);
+});
+
+test("freshness is content-bound, short-lived, and bounded by every source fact", () => {
+  const { facts } = lineageFacts();
+  assert.throws(() => createFixtureArtifactReferenceSnapshotReceipt({
+    snapshotCapturedAt: SNAPSHOT_AT,
+    freshUntil: "2027-08-24T12:00:00.000Z",
+    sourceFacts: facts,
+  }), /five minutes/i);
+
+  const forgedAvailability = { ...facts.availability[0]!, state: "MISSING" as const };
+  assert.throws(() => ArtifactManifestAvailabilitySchema.parse(forgedAvailability), /complete availability receipt/i);
+
+  const tooShort = { ...facts, availability: facts.availability.map((item) => item.manifestId === ROOT_ID
+    ? availability(facts.manifests.find((manifest) => manifest.manifestId === ROOT_ID)!, { validThrough: PROJECTED_AT })
+    : item) };
+  assert.throws(() => projection(tooShort), /remain valid through/i);
+
+  const beforeManifest = { ...facts, availability: facts.availability.map((item) => item.manifestId === LEGAL_ID
+    ? availability(facts.manifests.find((manifest) => manifest.manifestId === LEGAL_ID)!, { checkedAt: "2026-08-24T11:00:00.000Z" })
+    : item) };
+  assert.throws(() => projection(beforeManifest), /before the manifest existed/i);
+
+  const root = ArtifactManifestSchema.parse({
+    ...rootManifest(),
+    verifiedAt: "2026-08-24T12:01:00.000Z",
+  });
+  const futureFacts: ArtifactReferenceSourceFacts = {
+    workflowRun: { workflowRunId: WORKFLOW_ID, businessId: BUSINESS_ID, workflowKind: "WEBSITE_EVIDENCE", workflowVersion: "fixture-v1", requestDigest: "f".repeat(64) },
+    manifests: [root],
+    promotions: [],
+    evidenceUses: [],
+    manifestEvidenceUses: [],
+    evidenceUseEnds: [],
+    availability: [availability(root)],
+  };
+  assert.throws(() => projection(futureFacts), /manifest cannot postdate/i);
+});
+
+test("current verification deterministically rejects a redigested forged assignment", () => {
+  const { facts } = lineageFacts();
+  const result = projection(facts);
+  const uses = result.uses.map((use, index) => {
+    if (index !== 0 || !use.assignments[0]) return use;
+    const original = use.assignments[0];
+    const core = {
+      assignmentId: original.assignmentId,
+      projectionUseId: original.projectionUseId,
+      manifestId: original.manifestId,
+      manifestDigest: original.manifestDigest,
+      retentionClass: original.retentionClass,
+      lineageDepth: original.lineageDepth + 9,
+      assignmentKind: original.assignmentKind,
+    };
+    return { ...use, assignments: [{ ...core, assignmentDigest: artifactReferenceDigest(core) }] };
+  });
+  const projectionCore = {
+    projectionVersion: result.projectionVersion,
+    projectionId: result.projectionId,
+    businessId: result.businessId,
+    lineageRootManifestId: result.lineageRootManifestId,
+    snapshotCapturedAt: result.snapshotCapturedAt,
+    projectedAt: result.projectedAt,
+    freshUntil: result.freshUntil,
+    snapshotComplete: result.snapshotComplete,
+    completenessAssurance: result.completenessAssurance,
+    sourceCounts: result.sourceCounts,
+    sourceFactsDigest: result.sourceFactsDigest,
+    state: result.state,
+    activeUseCount: result.activeUseCount,
+    endedUseCount: result.endedUseCount,
+    ambiguousUseCount: result.ambiguousUseCount,
+    unassignedUseCount: result.unassignedUseCount,
+    requiredRetentionClass: result.requiredRetentionClass,
+    unassignedManifestIds: result.unassignedManifestIds,
+  };
+  const forged = ArtifactReferenceProjectionSchema.parse({
+    ...result,
+    uses,
+    projectionDigest: artifactReferenceDigest({ core: projectionCore, uses }),
+  });
+  assert.equal(verifyArtifactReferenceProjectionCurrent(forged, { checkedAt: PROJECTED_AT, sourceFacts: facts }).state, "CONFLICT");
+});
+
 test("freshness verification detects time expiry and later source facts without granting authority", () => {
   const { facts } = lineageFacts();
   const result = projection(facts);
   assert.deepEqual(verifyArtifactReferenceProjectionCurrent(result, { checkedAt: PROJECTED_AT, sourceFacts: facts }), {
     state: "CURRENT",
     sourceFactsMatch: true,
+    reproducesExactly: true,
     withinFreshnessWindow: true,
+    sourceSnapshotTransactionallyComplete: false,
+    retentionConclusionAuthorized: false,
     releaseAuthorized: false,
     deletionAuthorized: false,
     providerDeleteAuthorized: false,
   });
   const changed = { ...facts, evidenceUseEnds: [ending(qualificationUse, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")] };
   assert.equal(verifyArtifactReferenceProjectionCurrent(result, { checkedAt: PROJECTED_AT, sourceFacts: changed }).state, "STALE");
+  assert.equal(verifyArtifactReferenceProjectionCurrent(result, { checkedAt: "2026-08-24T11:59:30.000Z", sourceFacts: facts }).state, "CONFLICT");
   assert.equal(verifyArtifactReferenceProjectionCurrent(result, { checkedAt: "2026-08-24T12:06:00.000Z", sourceFacts: facts }).state, "STALE");
 });
 
@@ -382,6 +623,7 @@ test("source ordering does not change the projection result", () => {
     workflowRun: facts.workflowRun,
     manifests: [...facts.manifests].reverse(),
     promotions: [...facts.promotions].reverse(),
+    evidenceUses: [...facts.evidenceUses].reverse(),
     manifestEvidenceUses: [...facts.manifestEvidenceUses].reverse(),
     evidenceUseEnds: [...facts.evidenceUseEnds].reverse(),
     availability: [...facts.availability].reverse(),

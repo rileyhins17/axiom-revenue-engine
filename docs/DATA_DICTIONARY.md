@@ -112,14 +112,15 @@
 - Persisted evidence-use links are immutable history, not a live counter. One
   exact use-ending record may close a versioned purpose; a new purpose needs a
   new use ID. Legal hold can end only through explicit compliance clearance.
-- A current-reference projection binds a complete workflow/business lineage,
-  manifests, completed promotions, exact promotion/use links, use endings, and
-  availability facts. Each active use selects the weakest verified-present,
-  unexpired linked copy that satisfies retention. Equal candidates or no valid
-  candidate make the projection indeterminate rather than zero-reference.
-- `NO_CURRENT_REFERENCES` is only a point-in-time retention-review suggestion.
-  Every projection requires a fresh source-digest recheck and fixes release,
-  deletion, provider operations, and cost authority to false/zero.
+- A fixture current-reference projection binds an explicit workflow/business
+  lineage, evidence-use set, completed promotions, exact promotion/use links,
+  use endings, and content-bound availability facts. Each active use selects the
+  weakest verified-present, unexpired linked copy that satisfies retention.
+  Equal candidates or no valid candidate make the projection indeterminate.
+- Fixture snapshots are `FIXTURE_ASSERTED`, never transactionally complete, and
+  cannot produce `NO_CURRENT_REFERENCES` or a retention-review suggestion. Every
+  currentness check replays the deterministic projection, and release, deletion,
+  provider operations, retention conclusions, and cost authority remain false/zero.
 - A release decision reviews every listed use exactly once and is bound to the
   manifest, uses, actor, reason, rationale, and time by a deterministic digest.
   Even an approved release has `providerDeleteAuthorized: false`; a future delete

@@ -4,12 +4,11 @@ import { z } from "zod";
 
 import { ArtifactEvidenceUseSchema } from "@/lib/revenue-engine/artifact-lifecycle";
 import {
-  ARTIFACT_REFERENCE_SNAPSHOT_VERSION,
   ArtifactEvidenceUseEndRecordSchema,
   ArtifactReferenceProjectionSchema,
   artifactReferenceCanonicalJson,
   artifactReferenceDigest,
-  createArtifactReferenceProjection,
+  reproduceArtifactReferenceProjection,
 } from "@/lib/revenue-engine/artifact-reference-projection";
 
 export const ARTIFACT_REFERENCE_PERSISTENCE_PLAN_VERSION = "artifact-reference-persistence-plan-v1";
@@ -49,6 +48,7 @@ const PersistenceMutationSchema = z.object({
 const EvidenceUseEndBundleSchema = z.object({
   record: ArtifactEvidenceUseEndRecordSchema,
   evidenceUse: ArtifactEvidenceUseSchema,
+  replacementUse: ArtifactEvidenceUseSchema.nullable(),
 }).strict();
 
 export const ArtifactReferencePersistenceRequestSchema = z.object({
@@ -86,7 +86,9 @@ export const ArtifactReferencePersistencePlanSchema = z.object({
   preflights: z.array(PersistencePreflightSchema).min(1).max(10_000),
   mutations: z.array(PersistenceMutationSchema).min(1).max(10_000),
   summary: SummarySchema,
-  requiresCompleteSnapshot: z.literal(true),
+  requiresTransactionalSnapshotForRetentionConclusion: z.literal(true),
+  sourceSnapshotTransactionallyComplete: z.literal(false),
+  retentionConclusionAuthorized: z.literal(false),
   requiresExactPreflightMatch: z.literal(true),
   requiresFreshReferenceCheck: z.literal(true),
   mutationAuthorized: z.literal(false),
@@ -212,7 +214,7 @@ export function buildArtifactReferencePersistencePlan(value: unknown): ArtifactR
   const projections = dedupeExact(request.projections, (projection) => projection.projectionId, "Reference projection");
   const endingByUse = new Map<string, (typeof endings)[number]>();
   for (const bundle of endings) {
-    const { record, evidenceUse } = bundle;
+    const { record, evidenceUse, replacementUse } = bundle;
     if (
       record.evidenceUseId !== evidenceUse.useId
       || record.businessId !== evidenceUse.businessId
@@ -222,33 +224,32 @@ export function buildArtifactReferencePersistencePlan(value: unknown): ArtifactR
     ) {
       throw new Error("Evidence-use ending bundle does not match its exact original use.");
     }
+    if (record.reasonCode === "REPLACED_BY_EVIDENCE_USE") {
+      if (
+        !replacementUse
+        || record.replacementEvidenceUseId !== replacementUse.useId
+        || record.replacementEvidenceUseVersion !== replacementUse.recordVersion
+        || record.replacementEvidenceUseDigest !== artifactReferenceDigest(replacementUse)
+        || record.basis.basisRecordId !== replacementUse.useId
+        || record.basis.basisRecordVersion !== replacementUse.recordVersion
+        || record.basis.basisDigest !== artifactReferenceDigest(replacementUse)
+        || replacementUse.businessId !== evidenceUse.businessId
+        || replacementUse.useId === evidenceUse.useId
+        || Date.parse(replacementUse.recordedAt) > Date.parse(record.endedAt)
+      ) {
+        throw new Error("Replacement ending bundle must include the exact same-business replacement use and version.");
+      }
+    } else if (replacementUse !== null) {
+      throw new Error("Only replacement ending bundles may include replacement evidence.");
+    }
     const existing = endingByUse.get(record.evidenceUseId);
     if (existing && existing.record.endId !== record.endId) throw new Error(`Evidence use ${record.evidenceUseId} cannot end twice.`);
     endingByUse.set(record.evidenceUseId, bundle);
   }
   for (const projection of projections) {
-    const recomputed = createArtifactReferenceProjection({
-      projectionVersion: projection.projectionVersion,
-      projectionId: projection.projectionId,
-      businessId: projection.businessId,
-      lineageRootManifestId: projection.lineageRootManifestId,
-      projectedAt: projection.projectedAt,
-      mode: "SHADOW",
-      projectorKind: "FIXTURE",
-      maxCostUsd: 0,
-      sourceFacts: projection.sourceFacts,
-      snapshot: {
-        snapshotVersion: ARTIFACT_REFERENCE_SNAPSHOT_VERSION,
-        snapshotCapturedAt: projection.snapshotCapturedAt,
-        freshUntil: projection.freshUntil,
-        sourceKind: "FIXTURE_COMPLETE_SNAPSHOT",
-        snapshotComplete: projection.snapshotComplete,
-        sourceCounts: projection.sourceCounts,
-        sourceFactsDigest: projection.sourceFactsDigest,
-      },
-    });
+    const recomputed = reproduceArtifactReferenceProjection(projection);
     if (artifactReferenceCanonicalJson(recomputed) !== artifactReferenceCanonicalJson(projection)) {
-      throw new Error("Reference projection must exactly reproduce from its complete source snapshot before persistence.");
+      throw new Error("Reference projection must exactly reproduce from its asserted source snapshot before persistence.");
     }
     for (const ending of projection.sourceFacts.evidenceUseEnds) {
       const supplied = endingByUse.get(ending.evidenceUseId)?.record;
@@ -279,6 +280,8 @@ export function buildArtifactReferencePersistencePlan(value: unknown): ArtifactR
         basisRecordVersion: record.basis.basisRecordVersion,
         basisDigest: record.basis.basisDigest,
         replacementEvidenceUseId: record.replacementEvidenceUseId,
+        replacementEvidenceUseVersion: record.replacementEvidenceUseVersion,
+        replacementEvidenceUseDigest: record.replacementEvidenceUseDigest,
         actorUserId: record.actor.actorUserId,
         actorRole: record.actor.role,
         mode: record.mode,
@@ -311,6 +314,7 @@ export function buildArtifactReferencePersistencePlan(value: unknown): ArtifactR
         projectedAt: projection.projectedAt,
         freshUntil: projection.freshUntil,
         snapshotComplete: bool(projection.snapshotComplete),
+        completenessAssurance: projection.completenessAssurance,
         sourceManifestCount: projection.sourceCounts.manifests,
         sourcePromotionCount: projection.sourceCounts.promotions,
         sourceManifestUseCount: projection.sourceCounts.manifestEvidenceUses,
@@ -408,7 +412,9 @@ export function buildArtifactReferencePersistencePlan(value: unknown): ArtifactR
       providerOperations: 0,
       costUsd: 0,
     },
-    requiresCompleteSnapshot: true,
+    requiresTransactionalSnapshotForRetentionConclusion: true,
+    sourceSnapshotTransactionallyComplete: false,
+    retentionConclusionAuthorized: false,
     requiresExactPreflightMatch: true,
     requiresFreshReferenceCheck: true,
     mutationAuthorized: false,

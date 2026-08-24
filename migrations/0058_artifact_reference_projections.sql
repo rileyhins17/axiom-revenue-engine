@@ -1,7 +1,9 @@
 -- Append-only evidence-use endings and lineage-wide current-reference snapshots.
 --
 -- End records preserve the original use. Projections are valid only for their
--- exact complete source snapshot. Neither record authorizes release or deletion.
+-- exact fixture-asserted source snapshot. A fixture cannot attest transactional
+-- completeness or conclude zero references. Neither record authorizes release
+-- or deletion.
 -- Runtime loading, persistence, and provider activity remain separate gates.
 
 CREATE TABLE "RevenueArtifactEvidenceUseEnd" (
@@ -19,6 +21,8 @@ CREATE TABLE "RevenueArtifactEvidenceUseEnd" (
   "basisRecordVersion" TEXT NOT NULL,
   "basisDigest" TEXT NOT NULL,
   "replacementEvidenceUseId" TEXT,
+  "replacementEvidenceUseVersion" TEXT,
+  "replacementEvidenceUseDigest" TEXT,
   "actorUserId" TEXT NOT NULL,
   "actorRole" TEXT NOT NULL,
   "mode" TEXT NOT NULL,
@@ -39,14 +43,31 @@ CREATE TABLE "RevenueArtifactEvidenceUseEnd" (
   CHECK ("mode" = 'SHADOW'),
   CHECK ("recorderKind" = 'FIXTURE'),
   CHECK (julianday("recordedAt") >= julianday("endedAt")),
-  CHECK (("reasonCode" = 'REPLACED_BY_EVIDENCE_USE' AND "basisType" = 'EVIDENCE_USE_REPLACEMENT' AND "replacementEvidenceUseId" IS NOT NULL)
-    OR ("reasonCode" <> 'REPLACED_BY_EVIDENCE_USE' AND "replacementEvidenceUseId" IS NULL)),
-  CHECK ("replacementEvidenceUseId" IS NULL OR "replacementEvidenceUseId" <> "evidenceUseId"),
+  CHECK (("reasonCode" = 'RECORD_RETENTION_COMPLETE'
+      AND "basisType" = 'OWNER_RETENTION_REVIEW'
+      AND "replacementEvidenceUseId" IS NULL
+      AND "replacementEvidenceUseVersion" IS NULL
+      AND "replacementEvidenceUseDigest" IS NULL)
+    OR ("reasonCode" = 'REPLACED_BY_EVIDENCE_USE'
+      AND "basisType" = 'EVIDENCE_USE_REPLACEMENT'
+      AND "replacementEvidenceUseId" IS NOT NULL
+      AND "replacementEvidenceUseVersion" IS NOT NULL
+      AND "replacementEvidenceUseDigest" IS NOT NULL
+      AND "replacementEvidenceUseId" <> "evidenceUseId"
+      AND "basisRecordId" = "replacementEvidenceUseId"
+      AND "basisRecordVersion" = "replacementEvidenceUseVersion"
+      AND "basisDigest" = "replacementEvidenceUseDigest")
+    OR ("reasonCode" = 'LEGAL_HOLD_CLEARED'
+      AND "basisType" = 'LEGAL_CLEARANCE'
+      AND "replacementEvidenceUseId" IS NULL
+      AND "replacementEvidenceUseVersion" IS NULL
+      AND "replacementEvidenceUseDigest" IS NULL)),
   CHECK (("useType" = 'LEGAL_HOLD' AND "reasonCode" = 'LEGAL_HOLD_CLEARED' AND "basisType" = 'LEGAL_CLEARANCE' AND "actorRole" = 'COMPLIANCE')
     OR ("useType" <> 'LEGAL_HOLD' AND "reasonCode" <> 'LEGAL_HOLD_CLEARED' AND "basisType" <> 'LEGAL_CLEARANCE')),
-  CHECK (length("useDigest") = 64),
-  CHECK (length("basisDigest") = 64),
-  CHECK (length("endDigest") = 64),
+  CHECK (length("useDigest") = 64 AND "useDigest" NOT GLOB '*[^0-9a-f]*'),
+  CHECK (length("basisDigest") = 64 AND "basisDigest" NOT GLOB '*[^0-9a-f]*'),
+  CHECK ("replacementEvidenceUseDigest" IS NULL OR (length("replacementEvidenceUseDigest") = 64 AND "replacementEvidenceUseDigest" NOT GLOB '*[^0-9a-f]*')),
+  CHECK (length("endDigest") = 64 AND "endDigest" NOT GLOB '*[^0-9a-f]*'),
   CHECK (json_valid("endJson")),
   CHECK ("requiresRetentionReview" = 1),
   CHECK ("releaseAuthorized" = 0),
@@ -71,6 +92,7 @@ CREATE TABLE "RevenueArtifactReferenceProjection" (
   "projectedAt" DATETIME NOT NULL,
   "freshUntil" DATETIME NOT NULL,
   "snapshotComplete" INTEGER NOT NULL,
+  "completenessAssurance" TEXT NOT NULL,
   "sourceManifestCount" INTEGER NOT NULL,
   "sourcePromotionCount" INTEGER NOT NULL,
   "sourceManifestUseCount" INTEGER NOT NULL,
@@ -99,15 +121,16 @@ CREATE TABLE "RevenueArtifactReferenceProjection" (
   "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CHECK (julianday("projectedAt") >= julianday("snapshotCapturedAt")),
   CHECK (julianday("freshUntil") >= julianday("projectedAt")),
-  CHECK ("snapshotComplete" = 1),
+  CHECK ("snapshotComplete" = 0),
+  CHECK ("completenessAssurance" = 'FIXTURE_ASSERTED'),
   CHECK ("sourceManifestCount" >= 1 AND "sourceManifestCount" <= 100),
   CHECK ("sourcePromotionCount" >= 0 AND "sourcePromotionCount" <= 200),
   CHECK ("sourceManifestUseCount" >= 0 AND "sourceManifestUseCount" <= 1000),
   CHECK ("sourceEvidenceUseCount" >= 0 AND "sourceEvidenceUseCount" <= 1000),
   CHECK ("sourceUseEndCount" >= 0 AND "sourceUseEndCount" <= 1000),
   CHECK ("sourceAvailabilityCount" = "sourceManifestCount"),
-  CHECK (length("sourceFactsDigest") = 64),
-  CHECK (length("projectionDigest") = 64),
+  CHECK (length("sourceFactsDigest") = 64 AND "sourceFactsDigest" NOT GLOB '*[^0-9a-f]*'),
+  CHECK (length("projectionDigest") = 64 AND "projectionDigest" NOT GLOB '*[^0-9a-f]*'),
   CHECK (json_valid("sourceFactsJson")),
   CHECK (json_valid("projectionJson")),
   CHECK ("state" IN ('ACTIVE_REFERENCES', 'LEGAL_HOLD_ACTIVE', 'NO_CURRENT_REFERENCES', 'INDETERMINATE')),
@@ -118,11 +141,14 @@ CREATE TABLE "RevenueArtifactReferenceProjection" (
   CHECK ("requiredRetentionClass" IS NULL OR "requiredRetentionClass" IN ('QUALIFICATION_180D', 'OUTREACH_ACTIVE', 'LEGAL_HOLD')),
   CHECK (("activeUseCount" = 0 AND "requiredRetentionClass" IS NULL)
     OR ("activeUseCount" > 0 AND "requiredRetentionClass" IS NOT NULL)),
-  CHECK (("state" = 'NO_CURRENT_REFERENCES' AND "activeUseCount" = 0 AND "ambiguousUseCount" = 0 AND "unassignedUseCount" = 0)
+  CHECK ("activeUseCount" + "endedUseCount" = "sourceEvidenceUseCount"),
+  CHECK ("ambiguousUseCount" <= "activeUseCount" AND "unassignedUseCount" <= "activeUseCount"),
+  CHECK (("state" = 'NO_CURRENT_REFERENCES' AND "snapshotComplete" = 1 AND "activeUseCount" = 0 AND "ambiguousUseCount" = 0 AND "unassignedUseCount" = 0)
     OR "state" <> 'NO_CURRENT_REFERENCES'),
-  CHECK (("state" = 'INDETERMINATE' AND ("ambiguousUseCount" > 0 OR "unassignedUseCount" > 0))
+  CHECK (("state" = 'INDETERMINATE' AND ("snapshotComplete" = 0 OR "ambiguousUseCount" > 0 OR "unassignedUseCount" > 0))
     OR "state" <> 'INDETERMINATE'),
-  CHECK ("retentionReviewSuggested" IN (0, 1)),
+  CHECK (("state" = 'NO_CURRENT_REFERENCES' AND "retentionReviewSuggested" = 1)
+    OR ("state" <> 'NO_CURRENT_REFERENCES' AND "retentionReviewSuggested" = 0)),
   CHECK ("validOnlyForSourceFactsDigest" = 1),
   CHECK ("requiresFreshReferenceCheck" = 1),
   CHECK ("releaseAuthorized" = 0),
@@ -160,8 +186,8 @@ CREATE TABLE "RevenueArtifactReferenceProjectionUse" (
   CHECK (("assignmentState" = 'UNIQUE' AND "currentCandidateCount" = 1)
     OR ("assignmentState" = 'AMBIGUOUS' AND "currentCandidateCount" > 1)
     OR ("assignmentState" IN ('UNASSIGNED', 'ENDED') AND "currentCandidateCount" = 0)),
-  CHECK (length("useDigest") = 64),
-  CHECK (length("rowDigest") = 64),
+  CHECK (length("useDigest") = 64 AND "useDigest" NOT GLOB '*[^0-9a-f]*'),
+  CHECK (length("rowDigest") = 64 AND "rowDigest" NOT GLOB '*[^0-9a-f]*'),
   CHECK (json_valid("rowJson")),
   FOREIGN KEY ("projectionId") REFERENCES "RevenueArtifactReferenceProjection" ("id") ON DELETE RESTRICT,
   FOREIGN KEY ("evidenceUseId") REFERENCES "RevenueArtifactEvidenceUse" ("id") ON DELETE RESTRICT,
@@ -184,12 +210,11 @@ CREATE TABLE "RevenueArtifactReferenceProjectionAssignment" (
   CHECK ("retentionClass" IN ('QUALIFICATION_180D', 'OUTREACH_ACTIVE', 'LEGAL_HOLD')),
   CHECK ("lineageDepth" >= 0 AND "lineageDepth" <= 100),
   CHECK ("assignmentKind" IN ('UNIQUE_CURRENT', 'AMBIGUOUS_CURRENT')),
-  CHECK (length("manifestDigest") = 64),
-  CHECK (length("assignmentDigest") = 64),
+  CHECK (length("manifestDigest") = 64 AND "manifestDigest" NOT GLOB '*[^0-9a-f]*'),
+  CHECK (length("assignmentDigest") = 64 AND "assignmentDigest" NOT GLOB '*[^0-9a-f]*'),
   CHECK (json_valid("assignmentJson")),
   FOREIGN KEY ("projectionUseId") REFERENCES "RevenueArtifactReferenceProjectionUse" ("id") ON DELETE RESTRICT,
   FOREIGN KEY ("manifestId") REFERENCES "RevenueArtifactManifest" ("id") ON DELETE RESTRICT
 );
 CREATE UNIQUE INDEX "RevenueArtifactReferenceProjectionAssignment_use_manifest_key" ON "RevenueArtifactReferenceProjectionAssignment" ("projectionUseId", "manifestId");
 CREATE UNIQUE INDEX "RevenueArtifactReferenceProjectionAssignment_digest_key" ON "RevenueArtifactReferenceProjectionAssignment" ("assignmentDigest");
-

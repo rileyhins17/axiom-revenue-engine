@@ -147,17 +147,20 @@ and artifact plans are separate from retry receipts. The validation-only planner
 rejects blocked resume histories and checks every primary or alternate identity
 candidate before proposing ordered insert-if-absent SQL. It deliberately has no
 database executor or transaction: all mutation, resume, execution, provider, and
-cost authority remains false. All 57 migrations pass from zero in isolated local
+cost authority remains false. All 58 migrations pass from zero in isolated local
 D1, but migration 0057 has not been applied to staging or production.
 
 Evidence-use endings and current-reference reasoning are now explicit without
 turning a historical link into a mutable counter. One immutable ending binds the
 exact use, effective time, owner/compliance basis, and actor. A lineage-wide
-projection then checks a complete, fresh snapshot of workflow identity,
-manifests, completed promotions, use links, endings, and storage availability.
+  fixture projection then checks a short-lived asserted set of workflow identity,
+  manifests, completed promotions, exact uses/links, endings, and content-bound
+  storage availability.
 For each active use it chooses the weakest valid copy that still satisfies the
 required retention. Equal candidates or a missing valid copy remain
-`INDETERMINATE`; all-ended uses can produce only a retention-review suggestion.
+  `INDETERMINATE`. Because no atomic D1 loader exists yet, fixture snapshots are
+  explicitly incomplete and even all-ended asserted uses cannot suggest that
+  retention review or deletion is safe.
 Migration 0058 and its collision-complete persistence plan grant no mutation,
 release, deletion, provider, or cost authority and have not been applied to
 staging or production.

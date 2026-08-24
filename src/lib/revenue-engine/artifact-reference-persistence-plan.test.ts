@@ -20,6 +20,7 @@ import {
   artifactReferenceDigest,
   createArtifactEvidenceUseEndRecord,
   createArtifactReferenceProjection,
+  createFixtureArtifactManifestAvailability,
   createFixtureArtifactReferenceSnapshotReceipt,
   type ArtifactReferenceSourceFacts,
 } from "@/lib/revenue-engine/artifact-reference-projection";
@@ -41,7 +42,7 @@ const END_ID = "66666666-6666-4666-8666-666666666666";
 const PROJECTION_ID = "77777777-7777-4777-8777-777777777777";
 const SNAPSHOT_AT = "2026-08-24T11:59:00.000Z";
 const PROJECTED_AT = "2026-08-24T12:00:00.000Z";
-const FRESH_UNTIL = "2026-08-24T12:05:00.000Z";
+const FRESH_UNTIL = "2026-08-24T12:04:00.000Z";
 const SHA256 = "c".repeat(64);
 
 const activeUse: ArtifactEvidenceUse = {
@@ -64,13 +65,13 @@ function fixture() {
     manifestVersion: ARTIFACT_MANIFEST_VERSION,
     manifestId: MANIFEST_ID,
     workflowId: WORKFLOW_ID,
-    retentionClass: "QUALIFICATION_180D",
+    retentionClass: "SHADOW_30D",
     verifiedAt: "2026-08-24T09:00:00.000Z",
     provenance: { receiptType: "ARTIFACT_WRITE", receiptId: MANIFEST_ID },
     items: [{
       kind: "BROWSER_MEASUREMENT",
       artifactRef: `artifact:sha256:${SHA256}`,
-      objectKey: artifactObjectKey("QUALIFICATION_180D", "BROWSER_MEASUREMENT", SHA256),
+      objectKey: artifactObjectKey("SHADOW_30D", "BROWSER_MEASUREMENT", SHA256),
       byteLength: 128,
       sha256: SHA256,
       etag: "etag-reference-persistence",
@@ -90,7 +91,34 @@ function fixture() {
     sourceManifest: manifest,
     evidenceUses: [activeUse, endedUse],
   });
-  assert.equal(promotionPlan.action, "NO_COPY_REQUIRED");
+  assert.equal(promotionPlan.action, "COPY_REQUIRED");
+  const promotionItems = promotionPlan.items.map((item) => ({
+    kind: item.kind,
+    artifactRef: item.artifactRef,
+    objectKey: item.targetObjectKey,
+    byteLength: item.byteLength,
+    sha256: item.sha256,
+    operation: "CREATED" as const,
+    etag: "etag-reference-persistence-promoted",
+    uploadedAt: "2026-08-24T10:10:00.000Z",
+  }));
+  const promotedManifest = ArtifactManifestSchema.parse({
+    manifestVersion: ARTIFACT_MANIFEST_VERSION,
+    manifestId: PROMOTION_ID,
+    workflowId: WORKFLOW_ID,
+    retentionClass: "QUALIFICATION_180D",
+    verifiedAt: "2026-08-24T10:10:00.000Z",
+    provenance: { receiptType: "ARTIFACT_PROMOTION", receiptId: PROMOTION_ID },
+    items: promotionItems.map((item) => ({
+      kind: item.kind,
+      artifactRef: item.artifactRef,
+      objectKey: item.objectKey,
+      byteLength: item.byteLength,
+      sha256: item.sha256,
+      etag: item.etag,
+      uploadedAt: item.uploadedAt,
+    })),
+  });
   const promotionReceipt = ArtifactPromotionReceiptSchema.parse({
     contractVersion: ARTIFACT_LIFECYCLE_CONTRACT_VERSION,
     promotionId: PROMOTION_ID,
@@ -98,21 +126,21 @@ function fixture() {
     mode: "SHADOW",
     executorKind: "FIXTURE",
     providerCopyPerformed: false,
-    sourceRetentionClass: "QUALIFICATION_180D",
+    sourceRetentionClass: "SHADOW_30D",
     targetRetentionClass: "QUALIFICATION_180D",
-    action: "NO_COPY_REQUIRED",
-    plannedItemCount: 0,
+    action: "COPY_REQUIRED",
+    plannedItemCount: promotionPlan.items.length,
     startedAt: "2026-08-24T10:10:00.000Z",
     completedAt: "2026-08-24T10:10:00.000Z",
-    fixtureHeadReads: 0,
-    fixtureCopyAttempts: 0,
+    fixtureHeadReads: promotionPlan.items.length,
+    fixtureCopyAttempts: promotionPlan.items.length,
     providerClassAOperations: 0,
     providerClassBOperations: 0,
     costUsd: 0,
     rollbackAction: "NONE_KEEP_CONTENT_ADDRESSED_ORPHANS",
     outcome: "COMPLETED",
-    items: [],
-    resultManifest: manifest,
+    items: promotionItems,
+    resultManifest: promotedManifest,
     failure: null,
   });
   const endRecord = createArtifactEvidenceUseEndRecord({
@@ -136,26 +164,26 @@ function fixture() {
   });
   const facts: ArtifactReferenceSourceFacts = {
     workflowRun: { workflowRunId: WORKFLOW_ID, businessId: BUSINESS_ID, workflowKind: "WEBSITE_EVIDENCE", workflowVersion: "fixture-v1", requestDigest: "f".repeat(64) },
-    manifests: [manifest],
+    manifests: [manifest, promotedManifest],
     promotions: [{ plan: promotionPlan, receipt: promotionReceipt }],
+    evidenceUses: [activeUse, endedUse],
     manifestEvidenceUses: [activeUse, endedUse].map((evidenceUse) => ({
-      linkId: `${MANIFEST_ID}:${evidenceUse.useId}`,
-      manifestId: MANIFEST_ID,
+      linkId: `${PROMOTION_ID}:${evidenceUse.useId}`,
+      manifestId: PROMOTION_ID,
       evidenceUse,
       viaPromotionId: PROMOTION_ID,
       linkedAt: promotionReceipt.completedAt,
     })),
     evidenceUseEnds: [endRecord],
-    availability: [{
-      manifestId: MANIFEST_ID,
+    availability: [manifest, promotedManifest].map((item) => createFixtureArtifactManifestAvailability({
+      manifestId: item.manifestId,
       availabilityVersion: "artifact-manifest-availability-v1",
       state: "VERIFIED_PRESENT",
       checkedAt: SNAPSHOT_AT,
       validThrough: FRESH_UNTIL,
-      expiresAt: "2027-02-20T09:00:00.000Z",
-      receiptDigest: "e".repeat(64),
+      expiresAt: item.retentionClass === "SHADOW_30D" ? "2026-09-23T09:00:00.000Z" : "2027-02-20T09:00:00.000Z",
       checkerKind: "FIXTURE",
-    }],
+    })),
   };
   const snapshot = createFixtureArtifactReferenceSnapshotReceipt({ snapshotCapturedAt: SNAPSHOT_AT, freshUntil: FRESH_UNTIL, sourceFacts: facts });
   const projection = createArtifactReferenceProjection({
@@ -170,7 +198,7 @@ function fixture() {
     sourceFacts: facts,
     snapshot,
   });
-  return { manifest, promotionPlan, promotionReceipt, endRecord, projection };
+  return { manifests: [manifest, promotedManifest], promotionPlan, promotionReceipt, endRecord, projection };
 }
 
 function request() {
@@ -184,7 +212,7 @@ function request() {
       mode: "SHADOW",
       plannerKind: "FIXTURE",
       maxCostUsd: 0,
-      evidenceUseEnds: [{ record: value.endRecord, evidenceUse: endedUse }],
+      evidenceUseEnds: [{ record: value.endRecord, evidenceUse: endedUse, replacementUse: null }],
       projections: [value.projection],
     } as const,
   };
@@ -202,19 +230,21 @@ function freshDatabase(withBaseRows = true) {
     .run(BUSINESS_ID, "Reference Persistence Fixture", "reference-persistence.example");
   database.prepare(`INSERT INTO "RevenueWorkflowRun" ("id", "workflowKind", "workflowVersion", "idempotencyKey", "businessId", "mode", "orchestratorKind", "requestDigest", "requestJson", "maxCostUsd", "requestedAt") VALUES (?, 'WEBSITE_EVIDENCE', 'fixture-v1', 'reference-persistence', ?, 'SHADOW', 'FIXTURE', ?, '{}', 0, ?)`)
     .run(WORKFLOW_ID, BUSINESS_ID, "f".repeat(64), "2026-08-24T08:00:00.000Z");
-  database.prepare(`INSERT INTO "RevenueArtifactManifest" ("id", "workflowRunId", "manifestVersion", "retentionClass", "provenanceReceiptType", "provenanceReceiptId", "verifiedAt", "manifestDigest", "manifestJson") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(MANIFEST_ID, WORKFLOW_ID, value.manifest.manifestVersion, value.manifest.retentionClass, value.manifest.provenance.receiptType, value.manifest.provenance.receiptId, value.manifest.verifiedAt, artifactManifestDigest(value.manifest), artifactReferenceCanonicalJson(value.manifest));
+  for (const manifest of value.manifests) {
+    database.prepare(`INSERT INTO "RevenueArtifactManifest" ("id", "workflowRunId", "manifestVersion", "retentionClass", "provenanceReceiptType", "provenanceReceiptId", "verifiedAt", "manifestDigest", "manifestJson") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(manifest.manifestId, WORKFLOW_ID, manifest.manifestVersion, manifest.retentionClass, manifest.provenance.receiptType, manifest.provenance.receiptId, manifest.verifiedAt, artifactManifestDigest(manifest), artifactReferenceCanonicalJson(manifest));
+  }
   for (const evidenceUse of [activeUse, endedUse]) {
     database.prepare(`INSERT INTO "RevenueArtifactEvidenceUse" ("id", "businessId", "useType", "recordId", "recordVersion", "recordedAt") VALUES (?, ?, ?, ?, ?, ?)`)
       .run(evidenceUse.useId, evidenceUse.businessId, evidenceUse.useType, evidenceUse.recordId, evidenceUse.recordVersion, evidenceUse.recordedAt);
   }
   database.prepare(`INSERT INTO "RevenueArtifactPromotionReceipt" ("id", "workflowRunId", "businessId", "sourceManifestId", "resultManifestId", "contractVersion", "sourceRetentionClass", "targetRetentionClass", "action", "outcome", "planDigest", "receiptDigest", "planJson", "receiptJson", "providerCopyPerformed", "costUsd", "completedAt") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)`)
-    .run(PROMOTION_ID, WORKFLOW_ID, BUSINESS_ID, MANIFEST_ID, MANIFEST_ID, value.promotionReceipt.contractVersion, value.promotionReceipt.sourceRetentionClass, value.promotionReceipt.targetRetentionClass, value.promotionReceipt.action, value.promotionReceipt.outcome, artifactReferenceDigest(value.promotionPlan), artifactReferenceDigest(value.promotionReceipt), artifactReferenceCanonicalJson(value.promotionPlan), artifactReferenceCanonicalJson(value.promotionReceipt), value.promotionReceipt.completedAt);
+    .run(PROMOTION_ID, WORKFLOW_ID, BUSINESS_ID, MANIFEST_ID, PROMOTION_ID, value.promotionReceipt.contractVersion, value.promotionReceipt.sourceRetentionClass, value.promotionReceipt.targetRetentionClass, value.promotionReceipt.action, value.promotionReceipt.outcome, artifactReferenceDigest(value.promotionPlan), artifactReferenceDigest(value.promotionReceipt), artifactReferenceCanonicalJson(value.promotionPlan), artifactReferenceCanonicalJson(value.promotionReceipt), value.promotionReceipt.completedAt);
   for (const evidenceUse of [activeUse, endedUse]) {
     database.prepare(`INSERT INTO "RevenueArtifactPromotionUse" ("id", "promotionId", "evidenceUseId") VALUES (?, ?, ?)`)
       .run(`${PROMOTION_ID}:${evidenceUse.useId}`, PROMOTION_ID, evidenceUse.useId);
     database.prepare(`INSERT INTO "RevenueArtifactManifestEvidenceUse" ("id", "manifestId", "evidenceUseId", "viaPromotionId", "linkedAt") VALUES (?, ?, ?, ?, ?)`)
-      .run(`${MANIFEST_ID}:${evidenceUse.useId}`, MANIFEST_ID, evidenceUse.useId, PROMOTION_ID, value.promotionReceipt.completedAt);
+      .run(`${PROMOTION_ID}:${evidenceUse.useId}`, PROMOTION_ID, evidenceUse.useId, PROMOTION_ID, value.promotionReceipt.completedAt);
   }
   return database;
 }
@@ -315,6 +345,74 @@ test("projection endings require exact bundles and foreign keys reject missing b
   const database = freshDatabase(false);
   try {
     assert.throws(() => database.prepare(plan.mutations[0]!.sql).run(...plan.mutations[0]!.bindings), /FOREIGN KEY constraint failed/);
+  } finally {
+    database.close();
+  }
+});
+
+test("replacement persistence rejects wrong identity, business, time, and version", () => {
+  const replacementUse: ArtifactEvidenceUse = {
+    ...activeUse,
+    useId: "88888888-8888-4888-8888-888888888888",
+    recordId: "qualification:replacement",
+    recordedAt: "2026-08-24T10:30:00.000Z",
+  };
+  const record = createArtifactEvidenceUseEndRecord({
+    endVersion: ARTIFACT_EVIDENCE_USE_END_VERSION,
+    endId: "99999999-9999-4999-8999-999999999999",
+    endedUse,
+    endedAt: "2026-08-24T11:00:00.000Z",
+    recordedAt: "2026-08-24T11:01:00.000Z",
+    reasonCode: "REPLACED_BY_EVIDENCE_USE",
+    basis: {
+      basisType: "EVIDENCE_USE_REPLACEMENT",
+      basisRecordId: replacementUse.useId,
+      basisRecordVersion: replacementUse.recordVersion,
+      basisDigest: artifactReferenceDigest(replacementUse),
+    },
+    replacementUse,
+    actor: { actorUserId: "owner:fixture", role: "OWNER" },
+    mode: "SHADOW",
+    recorderKind: "FIXTURE",
+    maxCostUsd: 0,
+  });
+  const base = request().persistence;
+  const planRequest = (candidate: ArtifactEvidenceUse | null) => ({
+    ...base,
+    evidenceUseEnds: [{ record, evidenceUse: endedUse, replacementUse: candidate }],
+    projections: [],
+  });
+  assert.doesNotThrow(() => buildArtifactReferencePersistencePlan(planRequest(replacementUse)));
+  assert.throws(() => buildArtifactReferencePersistencePlan(planRequest(null)), /exact same-business replacement/i);
+  assert.throws(() => buildArtifactReferencePersistencePlan(planRequest({ ...replacementUse, useId: "aaaaaaaa-1111-4111-8111-111111111111" })), /exact same-business replacement/i);
+  assert.throws(() => buildArtifactReferencePersistencePlan(planRequest({ ...replacementUse, businessId: "business:other" })), /exact same-business replacement/i);
+  assert.throws(() => buildArtifactReferencePersistencePlan(planRequest({ ...replacementUse, recordVersion: "v2" })), /exact same-business replacement/i);
+  assert.throws(() => buildArtifactReferencePersistencePlan(planRequest({ ...replacementUse, recordedAt: "2026-08-24T11:30:00.000Z" })), /exact same-business replacement/i);
+});
+
+test("migration 0058 rejects forged ending semantics and non-hex digests directly", () => {
+  const plan = buildArtifactReferencePersistencePlan(request().persistence);
+  const mutation = plan.mutations.find((item) => item.entity === "EVIDENCE_USE_END");
+  assert.ok(mutation);
+  const columns = [...mutation.sql.slice(mutation.sql.indexOf("("), mutation.sql.indexOf(") VALUES")).matchAll(/"([^"]+)"/g)]
+    .map((match) => match[1]!);
+  const bindingFor = (changes: Record<string, string>) => {
+    const bindings = [...mutation.bindings];
+    for (const [column, value] of Object.entries(changes)) {
+      const index = columns.indexOf(column);
+      assert.notEqual(index, -1);
+      bindings[index] = value;
+    }
+    return bindings;
+  };
+  const database = freshDatabase();
+  const strictInsertSql = mutation.sql.replace("INSERT OR IGNORE", "INSERT");
+  try {
+    assert.throws(() => database.prepare(strictInsertSql).run(...bindingFor({
+      reasonCode: "REPLACED_BY_EVIDENCE_USE",
+      basisType: "EVIDENCE_USE_REPLACEMENT",
+    })), /CHECK constraint failed/);
+    assert.throws(() => database.prepare(strictInsertSql).run(...bindingFor({ useDigest: "g".repeat(64) })), /CHECK constraint failed/);
   } finally {
     database.close();
   }
