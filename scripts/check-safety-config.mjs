@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactReferenceSourceRows, artifactReferenceSourceDecoder, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration] = await Promise.all([
+const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceSourceWriterGuard, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../.env.example", import.meta.url), "utf8"),
@@ -29,10 +29,12 @@ const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap,
   readFile(new URL("../src/lib/revenue-engine/artifact-manifest-availability.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-d1-source-rows.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0056_durable_evidence_receipts.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0057_fenced_evidence_resume_records.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0058_artifact_reference_projections.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0059_atomic_artifact_reference_snapshots.sql", import.meta.url), "utf8"),
+  readFile(new URL("../migrations/0060_artifact_reference_source_writer_guards.sql", import.meta.url), "utf8"),
 ]);
 
 const failures = [];
@@ -192,7 +194,8 @@ for (const table of ["RevenueArtifactEvidenceUseEnd", "RevenueArtifactReferenceP
 }
 forbidMatch("migrations/0058_artifact_reference_projections.sql", artifactReferenceMigration, /\b(?:UPDATE|DELETE\s+FROM|INSERT\s+INTO|CREATE\s+TRIGGER)\b/i, "the additive artifact reference migration must not mutate existing rows or install triggers");
 requireMatch("migrations/0058_artifact_reference_projections.sql", artifactReferenceMigration, /CHECK \("providerDeleteAuthorized" = 0\)/, "artifact reference records must reject provider deletion authority");
-requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /allSourceWritersGuarded:\s*z\.literal\(false\)/, "atomic reference planning must remain blocked until every source writer honors the fence");
+requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /ARTIFACT_REFERENCE_ATOMIC_TARGET_SCHEMA_VERSION\s*=\s*"0060_artifact_reference_source_writer_guards"/, "atomic reference planning must require the guarded schema");
+requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /allSourceWritersGuarded:\s*z\.literal\(true\)/, "atomic reference planning must require every source writer to be database guarded");
 requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /completenessReceiptCreationAuthorized:\s*z\.literal\(false\)/, "validation-only planning must not mint a completeness receipt");
 requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /executionAuthorized:\s*z\.literal\(false\)/, "atomic reference planning must not authorize execution");
 requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /trusted:\s*false as const/, "structural completeness inspection must not become trusted without a D1 executor reload");
@@ -209,12 +212,37 @@ requireMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", a
 requireMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", artifactReferenceSourceDecoder, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "raw-row decoding must not authorize provider operations");
 requireMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", artifactReferenceSourceDecoder, /projectionPersistenceAuthorized:\s*z\.literal\(false\)/, "raw-row decoding must not authorize projection persistence");
 forbidMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", artifactReferenceSourceDecoder, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.head\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "raw-row decoding must not access providers, runtime bindings, databases, network, writes, or deletion");
+requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /allSourceWritersGuarded:\s*z\.literal\(true\)/, "the writer-guard contract must cover every atomic source table");
+requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /trustedExecutorImplemented:\s*z\.literal\(false\)/, "writer guards alone must not claim that the trusted executor exists");
+requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /completenessReceiptCreationAuthorized:\s*z\.literal\(false\)/, "writer guards must not authorize completeness receipt creation");
+requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "writer guards must not authorize provider operations");
+forbidMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.head\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "writer-guard contracts must not access providers, runtime bindings, databases, network, writes, or deletion");
 for (const table of ["RevenueArtifactReferenceSnapshotAttempt", "RevenueArtifactManifestAvailabilityReceipt", "RevenueArtifactReferenceCompletenessReceipt", "RevenueArtifactReferenceSourceSetProof"]) {
   requireMatch("migrations/0059_atomic_artifact_reference_snapshots.sql", artifactReferenceAtomicMigration, new RegExp(`CREATE TABLE \\"${table}\\"`), `${table} must remain an additive atomic-reference table`);
 }
 forbidMatch("migrations/0059_atomic_artifact_reference_snapshots.sql", artifactReferenceAtomicMigration, /\b(?:UPDATE|DELETE\s+FROM|INSERT\s+INTO|CREATE\s+TRIGGER)\b/i, "the additive atomic-reference migration must not mutate existing rows or install triggers");
 requireMatch("migrations/0059_atomic_artifact_reference_snapshots.sql", artifactReferenceAtomicMigration, /CHECK \("retentionConclusionAuthorized" = 0\)/, "atomic reference receipts must reject retention-conclusion authority");
 requireMatch("migrations/0059_atomic_artifact_reference_snapshots.sql", artifactReferenceAtomicMigration, /CHECK \("deletionAuthorized" = 0\)/, "atomic reference records must reject deletion authority");
+const guardedSourceTables = [
+  "RevenueWorkflowRun", "RevenueWorkflowDefinition", "RevenueWorkflowDelivery", "RevenueWorkflowAttempt", "RevenueWorkflowLease",
+  "RevenueWorkflowReceiptRevision", "RevenueWorkflowAttemptClosure", "RevenueArtifactManifest", "RevenueArtifactManifestItem",
+  "RevenueArtifactPromotionReceipt", "RevenueArtifactPromotionUse", "RevenueArtifactManifestEvidenceUse", "RevenueArtifactEvidenceUse",
+  "RevenueArtifactEvidenceUseEnd", "RevenueArtifactManifestAvailabilityReceipt",
+];
+for (const table of guardedSourceTables) {
+  requireMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, new RegExp(`CREATE TRIGGER \\"${table}_reference_source_freeze_insert\\"`), `${table} must block scoped inserts during an active snapshot`);
+  requireMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, new RegExp(`CREATE TRIGGER \\"${table}_reference_source_immutable_update\\"`), `${table} must reject updates`);
+  requireMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, new RegExp(`CREATE TRIGGER \\"${table}_reference_source_immutable_delete\\"`), `${table} must reject deletes`);
+}
+for (const table of ["RevenueArtifactReferenceSnapshotAttempt", "RevenueArtifactReferenceCompletenessReceipt", "RevenueArtifactReferenceSourceSetProof"]) {
+  requireMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, new RegExp(`CREATE TRIGGER \\"${table}_immutable_update\\"`), `${table} must reject updates`);
+  requireMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, new RegExp(`CREATE TRIGGER \\"${table}_immutable_delete\\"`), `${table} must reject deletes`);
+}
+if ((artifactReferenceWriterGuardMigration.match(/CREATE TRIGGER/g) || []).length !== 51) failures.push("migrations/0060_artifact_reference_source_writer_guards.sql: exactly 51 source-freeze and append-only triggers are required");
+requireMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, /ARTIFACT_REFERENCE_SOURCE_FROZEN/, "active source writes must fail with a stable freeze error");
+requireMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, /ARTIFACT_REFERENCE_APPEND_ONLY/, "source and control revisions must fail with a stable append-only error");
+forbidMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, /\b(?:INSERT\s+INTO|UPDATE\s+\"[^\"]+\"\s+SET|DELETE\s+FROM)\b/i, "writer-guard migration must not mutate existing rows");
+forbidMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, /retentionConclusionAuthorized\s*=\s*1|projectionPersistenceAuthorized\s*=\s*1|releaseAuthorized\s*=\s*1|deletionAuthorized\s*=\s*1|providerOperationsAuthorized\s*>\s*0/i, "writer-guard migration must not grant operational authority");
 
 if (failures.length > 0) {
   console.error("Safety configuration check failed:");

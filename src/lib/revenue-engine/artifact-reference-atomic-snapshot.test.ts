@@ -78,7 +78,7 @@ test("builds a deterministic, complete, fail-closed D1 transaction contract", ()
   assert.equal(first.atomicity.api, "D1Database.batch");
   assert.equal(first.atomicity.prepareAndReadInOneBatch, true);
   assert.equal(first.atomicity.commitRechecksAllSourceSets, true);
-  assert.equal(first.allSourceWritersGuarded, false);
+  assert.equal(first.allSourceWritersGuarded, true);
   assert.equal(first.completenessReceiptCreationAuthorized, false);
   assert.equal(first.executionAuthorized, false);
   assert.equal(first.mutationAuthorized, false);

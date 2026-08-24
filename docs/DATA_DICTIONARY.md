@@ -149,6 +149,14 @@
   columns and alternate identities, reconstructs contiguous fenced attempts and
   one sealed terminal result, and validates manifest/promotion/use/replacement
   closure. It has no executor and cannot upgrade a caller observation to trust.
+- Migration 0060 makes all 15 atomic source tables append-only and freezes any
+  scoped insert while an unsealed workflow snapshot satisfies
+  `acquiredAt <= database-now < expiresAt`. The database scope includes alternate
+  workflow identity, every workflow manifest, touching promotions, their links,
+  recursive replacement uses/endings, and availability. Snapshot attempts,
+  completeness receipts, and source-set proofs are immutable too. This satisfies
+  the writer-guard schema precondition but does not implement or authorize the
+  trusted D1 executor.
 - A release decision reviews every listed use exactly once and is bound to the
   manifest, uses, actor, reason, rationale, and time by a deterministic digest.
   Even an approved release has `providerDeleteAuthorized: false`; a future delete

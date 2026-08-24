@@ -162,6 +162,26 @@ Retire entries when the architecture makes them impossible.
   current-reference projection, and future retention conclusions.
 - **Verifying commit:** `588926a`.
 
+## DATA-006 — An application lock was mistaken for a database source freeze
+
+- **Symptom:** an atomic source read could still become stale before its final
+  receipt commit if one retrying, legacy, or future writer skipped the voluntary
+  application fence.
+- **Root cause:** the proposed safety property depended on writer cooperation.
+  It also focused on one lineage root even though the query contract includes a
+  whole workflow forest and recursively linked use records.
+- **Proven fix:** migration 0060 makes all 15 source tables append-only and adds
+  scoped D1 insert triggers that freeze the exact workflow-wide query domain
+  during an active unsealed snapshot. Transaction control records are immutable,
+  and provider availability must be persisted before the claim.
+- **Prevention/test:** the guard contract enumerates one table per source set and
+  all 51 required triggers. Integration tests reject update/delete on every
+  source table and freeze direct, manifest, promotion, recursive-use, and
+  availability inserts while allowing unrelated records and post-seal writes.
+- **Affected area:** trusted snapshot execution, workflow retries, artifact
+  lineage, evidence-use replacement, availability, and future retention logic.
+- **Verifying commit:** pending current checkpoint.
+
 ## AI-001 — Provider/model documentation drift
 
 - **Symptom:** runtime used DeepSeek while setup documentation named Gemini; the

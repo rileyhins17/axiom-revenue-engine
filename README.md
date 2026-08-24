@@ -176,11 +176,8 @@ recheck, insert, post-verification, and committed-row reload before trust.
 Pure TypeScript cannot mint that trusted receipt. Caller-supplied rows create
 only an explicitly untrusted proof, and even a structurally valid completeness
 JSON is reported as incomplete until a future private D1 executor performs and
-reloads the exact transaction. All source writers must also honor the fence;
-they do not yet, so execution, projection persistence, retention conclusions,
-release, deletion, provider operations, and cost remain disabled. Migration
-0059 has been tested only in disposable local databases and is not on staging or
-production.
+reloads the exact transaction. Migration 0059 has been tested only in disposable
+local databases and is not on staging or production.
 
 The 15-set raw-row decoder now validates what those rows mean instead of trusting
 their hashes alone. It parses every stored canonical JSON payload, recomputes its
@@ -197,6 +194,15 @@ is validation-only and uses no D1 or R2 binding. Successful decoding still repor
 `transactionallyTrusted=false`, `snapshotComplete=false`, and zero authority for
 projection persistence, retention, release, deletion, provider operations, or
 cost.
+
+Migration 0060 now enforces the missing writer boundary inside D1. All 15 source
+tables are append-only, and scoped inserts abort while an unsealed snapshot is in
+its half-open active window. The guard follows the whole workflow forest,
+promotion/manifest links, recursive replacement uses, and availability—not only
+the selected root. Provider availability must be persisted before the claim.
+The atomic plan can therefore require `allSourceWritersGuarded=true`, but the
+trusted executor and receipt issuer still do not exist; all runtime and business
+authority remains false. Migration 0060 is also local-only.
 
 ## Verification
 

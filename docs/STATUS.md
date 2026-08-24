@@ -89,6 +89,7 @@ staging; no rebuild code or migration has been deployed to production.
   `b7168a9b52713eb963fb7132064d1556abbd25a8`
 - Artifact-reference raw-row decoder source/documentation checkpoint:
   `588926aed3294d5cf6621834ff06d25212b90977`
+- Artifact-reference source-writer guard checkpoint: pending current commit
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 59 apply, including the fail-closed lockdown, shadow
@@ -611,6 +612,22 @@ Completed gates:
   dependency installation, fail-closed safety, both Cloudflare builds, all 59
   migrations from zero, 326/326 tests, typecheck, zero-warning lint, and both
   no-upload Worker validations.
+- Atomic source-writer guards: additive local-only migration 0060, one scoped
+  freeze plus update/delete immutability triggers for all 15 source tables, and
+  append-only snapshot attempt/completeness/proof controls. The freeze covers
+  the complete workflow query domain and uses database time with a half-open
+  lease. Availability must precede the claim. The atomic plan now requires the
+  guarded schema, but the trusted executor, completeness issuer, persistence,
+  retention, release, deletion, provider, cost, and outreach paths remain off.
+- Source-writer guard checkpoint verification passes 329/329 tests, fail-closed
+  safety, typecheck, zero-warning lint, the secret-sanitized Cloudflare build,
+  the console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. All 60 migrations replayed from zero in isolated
+  local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-46777bd38c2441f389d01e3ee69fdb78`,
+  with 60 migration receipts, 45 source-table triggers, and 51 total triggers.
+  No staging/production migration, deployment, D1/R2/Browser/provider call, or
+  prospect action occurred.
 
 Still required for Phase 1:
 
@@ -644,10 +661,11 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Design the trusted D1 executor and every source-writer fence guard, including
-   atomic source recheck, collision-complete target preflights, ordered insert,
-   rollback, post-verification, and committed-receipt reload. Do not add a live
-   binding or apply migration 0059 until the staging backup/rollback gate passes.
+1. Implement the private trusted D1 executor contract against an injected batch
+   boundary and disposable databases only: claim/read, exact source recheck,
+   collision-complete target preflights, ordered commit, rollback,
+   post-verification, and committed-receipt reload. Do not add a live binding or
+   apply migrations 0059-0060 until the staging backup/rollback gate passes.
 2. Add a fixture-only projection-v2 adapter from one selected decoded lineage;
    keep completeness, projection persistence, and retention conclusions false
    until the trusted committed-receipt reload exists.

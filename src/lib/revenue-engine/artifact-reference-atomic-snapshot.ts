@@ -9,8 +9,8 @@ import {
 export const ARTIFACT_REFERENCE_ATOMIC_QUERY_CONTRACT_VERSION = "artifact-reference-atomic-query-v1";
 export const ARTIFACT_REFERENCE_SNAPSHOT_ATTEMPT_VERSION = "artifact-reference-snapshot-attempt-v1";
 export const ARTIFACT_REFERENCE_COMPLETENESS_RECEIPT_VERSION = "artifact-reference-completeness-receipt-v1";
-export const ARTIFACT_REFERENCE_ATOMIC_PLAN_VERSION = "artifact-reference-atomic-plan-v1";
-export const ARTIFACT_REFERENCE_ATOMIC_TARGET_SCHEMA_VERSION = "0059_atomic_artifact_reference_snapshots";
+export const ARTIFACT_REFERENCE_ATOMIC_PLAN_VERSION = "artifact-reference-atomic-plan-v2";
+export const ARTIFACT_REFERENCE_ATOMIC_TARGET_SCHEMA_VERSION = "0060_artifact_reference_source_writer_guards";
 
 const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 const SqlValueSchema = z.union([z.string(), z.number().finite(), z.null()]);
@@ -128,7 +128,7 @@ export const ArtifactReferenceAtomicPlanSchema = z.object({
   }).strict(),
   commitRequirements: z.array(z.string()).length(9),
   sourceWriterFenceGuardRequired: z.literal(true),
-  allSourceWritersGuarded: z.literal(false),
+  allSourceWritersGuarded: z.literal(true),
   completenessReceiptCreationAuthorized: z.literal(false),
   mutationAuthorized: z.literal(false),
   executionAuthorized: z.literal(false),
@@ -517,7 +517,7 @@ ORDER BY a."id"`,
       "reload the committed receipt before returning any trusted completeness result",
     ],
     sourceWriterFenceGuardRequired: true,
-    allSourceWritersGuarded: false,
+    allSourceWritersGuarded: true,
     completenessReceiptCreationAuthorized: false,
     mutationAuthorized: false,
     executionAuthorized: false,
