@@ -205,6 +205,44 @@ const TrustedExecutionSchema = TrustedExecutionCoreSchema.extend({
 
 export type ArtifactReferenceTrustedD1Execution = z.infer<typeof TrustedExecutionSchema>;
 
+export type ArtifactReferenceFreshMaterializedD1Execution = ArtifactReferenceTrustedD1Execution & {
+  executionPath: "FRESH_COMMIT";
+  decodedSnapshot: z.infer<typeof ArtifactReferenceDecodedSnapshotSchema>;
+  receiptCreationPerformed: true;
+  sourceRowsMaterialized: true;
+};
+
+const trustedExecutionInstances = new WeakSet<object>();
+
+function deepFreeze<T>(value: T): T {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  return Object.freeze(value);
+}
+
+/**
+ * Prevents a structurally similar JSON object from being laundered into the
+ * private in-process trust boundary. Only the exact frozen object returned by
+ * executeArtifactReferenceD1Snapshot can cross into a materialized consumer.
+ */
+export function requireFreshMaterializedArtifactReferenceD1Execution(
+  value: unknown,
+): ArtifactReferenceFreshMaterializedD1Execution {
+  const execution = TrustedExecutionSchema.parse(value);
+  if (!value || typeof value !== "object" || !trustedExecutionInstances.has(value)) {
+    throw new Error("A projectable reference execution must be the exact in-process result of the private D1 executor.");
+  }
+  if (
+    execution.executionPath !== "FRESH_COMMIT"
+    || execution.decodedSnapshot === null
+    || !execution.receiptCreationPerformed
+    || !execution.sourceRowsMaterialized
+  ) {
+    throw new Error("Reference projection requires a fresh D1 commit with materialized source rows; sealed replay is insufficient.");
+  }
+  return execution as ArtifactReferenceFreshMaterializedD1Execution;
+}
+
 const DATABASE_TIME_STATEMENT: ArtifactReferenceD1BatchStatement = {
   statementId: "executor-database-time",
   sql: `SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS "databaseNow"`,
@@ -542,7 +580,9 @@ function trustedResult(
     providerOperationsAuthorized: 0,
     costAuthorizedUsd: 0,
   });
-  return TrustedExecutionSchema.parse({ ...core, executionDigest: artifactReferenceDigest(core) });
+  const execution = deepFreeze(TrustedExecutionSchema.parse({ ...core, executionDigest: artifactReferenceDigest(core) }));
+  trustedExecutionInstances.add(execution);
+  return execution;
 }
 
 function preflightAttemptStatement(plan: ArtifactReferenceAtomicPlan): ArtifactReferenceD1BatchStatement {

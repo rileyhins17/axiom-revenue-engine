@@ -658,7 +658,7 @@ function manifestAvailable(
 ) {
   if (availability.state !== "VERIFIED_PRESENT") return false;
   if (Date.parse(availability.validThrough) < Date.parse(projectedAt)) return false;
-  if (["SHADOW_30D", "QUALIFICATION_180D"].includes(manifest.retentionClass)) {
+  if (manifest.retentionClass === "SHADOW_30D") {
     return availability.expiresAt !== null
       && Date.parse(availability.expiresAt) > Date.parse(projectedAt)
       && Date.parse(availability.expiresAt) > Date.parse(freshUntil);
@@ -713,11 +713,11 @@ export function createArtifactReferenceProjection(value: unknown): ArtifactRefer
     if (Date.parse(record.validThrough) < Date.parse(request.snapshot.freshUntil)) {
       throw new Error("Every availability receipt must remain valid through the projection freshness window.");
     }
-    if (["SHADOW_30D", "QUALIFICATION_180D"].includes(manifest.retentionClass) && record.expiresAt === null) {
-      throw new Error("Expiring manifest classes require an exact expiry fact.");
+    if (manifest.retentionClass === "SHADOW_30D" && record.expiresAt === null) {
+      throw new Error("Shadow manifests require an exact object-expiry fact.");
     }
-    if (["OUTREACH_ACTIVE", "LEGAL_HOLD"].includes(manifest.retentionClass) && record.expiresAt !== null) {
-      throw new Error("Protected manifest classes cannot invent an automatic expiry.");
+    if (manifest.retentionClass !== "SHADOW_30D" && record.expiresAt !== null) {
+      throw new Error("Promoted manifest classes cannot invent an automatic object expiry.");
     }
   }
 

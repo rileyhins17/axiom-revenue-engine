@@ -143,7 +143,7 @@ function availability(
   manifest: ArtifactManifest,
   overrides: Partial<Omit<ArtifactReferenceSourceFacts["availability"][number], "receiptDigest">> = {},
 ) {
-  const expiring = ["SHADOW_30D", "QUALIFICATION_180D"].includes(manifest.retentionClass);
+  const expiring = manifest.retentionClass === "SHADOW_30D";
   return createFixtureArtifactManifestAvailability({
     manifestId: manifest.manifestId,
     availabilityVersion: "artifact-manifest-availability-v1" as const,
@@ -264,18 +264,27 @@ test("all ended fixture uses remain indeterminate without transactional complete
   assert.equal(result.providerDeleteAuthorized, false);
 });
 
-test("expired weaker evidence falls back to a valid stronger copy", () => {
+test("missing weaker evidence falls back to a valid stronger copy", () => {
   const { facts } = lineageFacts();
   facts.evidenceUseEnds = [
     ending(outreachUse, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
     ending(legalUse, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "LEGAL_HOLD_CLEARED"),
   ];
   facts.availability = facts.availability.map((record) => record.manifestId === QUALIFICATION_ID
-    ? availability(facts.manifests.find((manifest) => manifest.manifestId === QUALIFICATION_ID)!, { expiresAt: PROJECTED_AT })
+    ? availability(facts.manifests.find((manifest) => manifest.manifestId === QUALIFICATION_ID)!, { state: "MISSING" })
     : record);
   const result = projection(facts);
   const qualification = result.uses.find((item) => item.evidenceUseId === QUALIFICATION_USE_ID)!;
   assert.deepEqual(qualification.assignments.map((item) => item.manifestId), [OUTREACH_ID]);
+});
+
+test("promoted evidence uses retention review rather than an invented automatic object expiry", () => {
+  const { facts } = lineageFacts();
+  const qualification = facts.manifests.find((manifest) => manifest.manifestId === QUALIFICATION_ID)!;
+  facts.availability = facts.availability.map((record) => record.manifestId === QUALIFICATION_ID
+    ? availability(qualification, { expiresAt: "2027-02-20T09:00:00.000Z" })
+    : record);
+  assert.throws(() => projection(facts), /Promoted manifest classes cannot invent an automatic object expiry/);
 });
 
 test("equal-rank candidates remain ambiguous and block a current-reference conclusion", () => {

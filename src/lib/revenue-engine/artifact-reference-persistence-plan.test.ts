@@ -181,7 +181,7 @@ function fixture() {
       state: "VERIFIED_PRESENT",
       checkedAt: SNAPSHOT_AT,
       validThrough: FRESH_UNTIL,
-      expiresAt: item.retentionClass === "SHADOW_30D" ? "2026-09-23T09:00:00.000Z" : "2027-02-20T09:00:00.000Z",
+      expiresAt: item.retentionClass === "SHADOW_30D" ? "2026-09-23T09:00:00.000Z" : null,
       checkerKind: "FIXTURE",
     })),
   };

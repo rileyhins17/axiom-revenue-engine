@@ -7,6 +7,15 @@ import Database from "better-sqlite3";
 import type { BrowserMeasurementRunner } from "@/lib/revenue-engine/browser-measurement-adapter";
 import { BROWSER_NETWORK_POLICY_VERSION } from "@/lib/revenue-engine/browser-page-evidence";
 import {
+  ARTIFACT_LIFECYCLE_CONTRACT_VERSION,
+  ARTIFACT_MANIFEST_VERSION,
+  ArtifactManifestSchema,
+  ArtifactPromotionReceiptSchema,
+  createArtifactPromotionPlan,
+  type ArtifactEvidenceUse,
+  type ArtifactManifest,
+} from "@/lib/revenue-engine/artifact-lifecycle";
+import {
   createArtifactManifestAvailabilityReceipt,
   type ArtifactManifestObjectAvailability,
 } from "@/lib/revenue-engine/artifact-manifest-availability";
@@ -20,6 +29,11 @@ import {
   type ArtifactReferenceD1BatchStatement,
 } from "@/lib/revenue-engine/artifact-reference-d1-executor";
 import { decodeArtifactReferenceD1SourceSnapshot } from "@/lib/revenue-engine/artifact-reference-d1-source-decoder";
+import {
+  ARTIFACT_REFERENCE_TRUSTED_PROJECTION_VERSION,
+  ArtifactReferenceTrustedProjectionSchema,
+  createArtifactReferenceTrustedProjection,
+} from "@/lib/revenue-engine/artifact-reference-trusted-projection";
 import {
   artifactReferenceCanonicalJson,
   artifactReferenceDigest,
@@ -286,7 +300,7 @@ function insertMutations(database: Database.Database, mutations: Array<{ sql: st
   for (const mutation of mutations) database.prepare(mutation.sql).run(...mutation.bindings);
 }
 
-function availabilityObjects(manifest: Awaited<ReturnType<typeof buildFixture>>["receipt"]["artifactManifests"][number]) {
+function availabilityObjects(manifest: ArtifactManifest) {
   return manifest.items.map((item): ArtifactManifestObjectAvailability => ({
     kind: item.kind,
     artifactRef: item.artifactRef,
@@ -322,6 +336,79 @@ async function buildFixture() {
   return { request, receipt, attempt, claim, revision };
 }
 
+function fixturePromotion(
+  source: ArtifactManifest,
+  promotionId: string,
+  evidenceUses: ArtifactEvidenceUse[],
+  completedAt: string,
+) {
+  const plan = createArtifactPromotionPlan({
+    contractVersion: ARTIFACT_LIFECYCLE_CONTRACT_VERSION,
+    promotionId,
+    workflowId: WORKFLOW_ID,
+    requestedAt: completedAt,
+    mode: "SHADOW",
+    executorKind: "FIXTURE",
+    providerCopyAuthorized: false,
+    maxCostUsd: 0,
+    businessId: BUSINESS_ID,
+    sourceManifest: source,
+    evidenceUses,
+  });
+  const items = plan.items.map((item) => ({
+    kind: item.kind,
+    artifactRef: item.artifactRef,
+    objectKey: item.targetObjectKey,
+    byteLength: item.byteLength,
+    sha256: item.sha256,
+    operation: "CREATED" as const,
+    etag: `fixture-${promotionId}-${item.sha256.slice(0, 16)}`,
+    uploadedAt: completedAt,
+  }));
+  const resultManifest = ArtifactManifestSchema.parse({
+    manifestVersion: ARTIFACT_MANIFEST_VERSION,
+    manifestId: promotionId,
+    workflowId: WORKFLOW_ID,
+    retentionClass: plan.targetRetentionClass,
+    verifiedAt: completedAt,
+    provenance: { receiptType: "ARTIFACT_PROMOTION", receiptId: promotionId },
+    items: items.map((item) => ({
+      kind: item.kind,
+      artifactRef: item.artifactRef,
+      objectKey: item.objectKey,
+      byteLength: item.byteLength,
+      sha256: item.sha256,
+      etag: item.etag,
+      uploadedAt: item.uploadedAt,
+    })),
+  });
+  const receipt = ArtifactPromotionReceiptSchema.parse({
+    contractVersion: ARTIFACT_LIFECYCLE_CONTRACT_VERSION,
+    promotionId,
+    workflowId: WORKFLOW_ID,
+    mode: "SHADOW",
+    executorKind: "FIXTURE",
+    providerCopyPerformed: false,
+    sourceRetentionClass: source.retentionClass,
+    targetRetentionClass: plan.targetRetentionClass,
+    action: plan.action,
+    plannedItemCount: plan.items.length,
+    startedAt: completedAt,
+    completedAt,
+    fixtureHeadReads: plan.items.length,
+    fixtureCopyAttempts: plan.items.length,
+    providerClassAOperations: 0,
+    providerClassBOperations: 0,
+    costUsd: 0,
+    rollbackAction: "NONE_KEEP_CONTENT_ADDRESSED_ORPHANS",
+    outcome: "COMPLETED",
+    items,
+    resultManifest,
+    failure: null,
+  });
+  return { plan, receipt };
+}
+
 type SnapshotTiming = {
   requestedAt: string;
   acquiredAt: string;
@@ -342,9 +429,28 @@ function defaultSnapshotTiming(): SnapshotTiming {
   };
 }
 
-async function persistedDatabaseFixture(timing: SnapshotTiming = defaultSnapshotTiming()) {
+async function persistedDatabaseFixture(
+  timing: SnapshotTiming = defaultSnapshotTiming(),
+  referenceScenario: "NO_USES" | "AMBIGUOUS_QUALIFICATION" = "NO_USES",
+) {
   const fixture = await buildFixture();
   const database = freshDatabase();
+  const rootManifest = fixture.receipt.artifactManifests[0];
+  assert.ok(rootManifest);
+  const evidenceUse: ArtifactEvidenceUse = {
+    useId: "88888888-8888-4888-8888-888888888888",
+    useType: "QUALIFICATION_SNAPSHOT",
+    recordId: "qualification:atomic-decoder-roofing",
+    recordVersion: "v1",
+    businessId: BUSINESS_ID,
+    recordedAt: new Date(Date.parse(timing.snapshotAt) - 30_000).toISOString(),
+  };
+  const promotions = referenceScenario === "AMBIGUOUS_QUALIFICATION"
+    ? [
+        fixturePromotion(rootManifest, "99999999-9999-4999-8999-999999999991", [evidenceUse], new Date(Date.parse(timing.snapshotAt) - 20_000).toISOString()),
+        fixturePromotion(rootManifest, "99999999-9999-4999-8999-999999999992", [evidenceUse], new Date(Date.parse(timing.snapshotAt) - 10_000).toISOString()),
+      ]
+    : [];
   const durable = buildDurableEvidencePersistencePlan({
     persistencePlanVersion: DURABLE_EVIDENCE_PERSISTENCE_PLAN_VERSION,
     targetSchemaVersion: DURABLE_EVIDENCE_TARGET_SCHEMA_VERSION,
@@ -355,7 +461,7 @@ async function persistedDatabaseFixture(timing: SnapshotTiming = defaultSnapshot
     workflowAttemptNumber: 1,
     workflowRequest: fixture.request,
     workflowReceipt: fixture.receipt,
-    promotions: [],
+    promotions,
     releases: [],
   });
   insertMutations(database, durable.mutations);
@@ -381,13 +487,17 @@ async function persistedDatabaseFixture(timing: SnapshotTiming = defaultSnapshot
   });
   insertMutations(database, fenced.mutations);
 
-  for (const [index, manifest] of fixture.receipt.artifactManifests.entries()) {
+  const availableManifests = [
+    ...fixture.receipt.artifactManifests,
+    ...promotions.map((promotion) => promotion.receipt.resultManifest).filter((manifest): manifest is ArtifactManifest => manifest !== null),
+  ];
+  for (const [index, manifest] of availableManifests.entries()) {
     const receipt = createArtifactManifestAvailabilityReceipt({
       receiptId: `70000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
       manifest,
       checkedAt: timing.availabilityCheckedAt,
       validThrough: timing.availabilityValidThrough,
-      expiresAt: "2026-09-20T00:00:00.000Z",
+      expiresAt: manifest.retentionClass === "SHADOW_30D" ? "2026-09-20T00:00:00.000Z" : null,
       checkerKind: "R2_HEAD",
       objects: availabilityObjects(manifest),
     });
@@ -402,7 +512,7 @@ async function persistedDatabaseFixture(timing: SnapshotTiming = defaultSnapshot
     );
   }
 
-  const rootManifestId = fixture.receipt.artifactManifests[0].manifestId;
+  const rootManifestId = rootManifest.manifestId;
   const plan = buildArtifactReferenceAtomicPlan({
     attemptId: SNAPSHOT_ATTEMPT_ID,
     workflowRunId: WORKFLOW_ID,
@@ -609,6 +719,103 @@ test("private D1 executor commits, post-verifies, reloads, and exactly replays o
   assert.deepEqual(replayed.receipt, committed.receipt);
   assert.equal(tableCount(database, "RevenueArtifactReferenceCompletenessReceipt"), 1);
   assert.equal(tableCount(database, "RevenueArtifactReferenceSourceSetProof"), 15);
+  database.close();
+});
+
+test("fresh materialized execution projects a complete no-current-reference observation with zero authority", async () => {
+  const { database, plan } = await persistedDatabaseFixture(currentSnapshotTiming());
+  const execution = await executeArtifactReferenceD1Snapshot(sqliteD1Boundary(database), plan);
+  const result = createArtifactReferenceTrustedProjection({
+    projectionVersion: ARTIFACT_REFERENCE_TRUSTED_PROJECTION_VERSION,
+    projectionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    projectedAt: new Date().toISOString(),
+    mode: "SHADOW",
+    projectorKind: "FRESH_D1_EXECUTION_FIXTURE",
+    maxCostUsd: 0,
+    execution,
+  });
+  assert.deepEqual(ArtifactReferenceTrustedProjectionSchema.parse(result), result);
+  assert.equal(Object.isFrozen(execution), true);
+  assert.equal(Object.isFrozen(execution.receipt), true);
+  assert.equal(result.referenceState, "NO_CURRENT_REFERENCES");
+  assert.equal(result.noCurrentReferencesObserved, true);
+  assert.equal(result.activeUseCount, 0);
+  assert.equal(result.snapshotComplete, true);
+  assert.equal(result.transactionallyTrustedSource, true);
+  assert.equal(result.lineageReplayComplete, true);
+  assert.equal(result.retentionConclusionAuthorized, false);
+  assert.equal(result.projectionPersistenceAuthorized, false);
+  assert.equal(result.projectionPersistencePerformed, false);
+  assert.equal(result.releaseAuthorized, false);
+  assert.equal(result.deletionAuthorized, false);
+  assert.equal(result.providerDeleteAuthorized, false);
+  assert.equal(result.providerDeletePerformed, false);
+  assert.equal(result.providerOperationsAuthorized, 0);
+  assert.equal(result.costAuthorizedUsd, 0);
+  assert.throws(
+    () => ArtifactReferenceTrustedProjectionSchema.parse({ ...result, releaseAuthorized: true }),
+    /Invalid input|false/i,
+  );
+  database.close();
+});
+
+test("trusted projection refuses stale windows, exact replay, and structurally cloned trust claims", async () => {
+  const { database, plan } = await persistedDatabaseFixture(currentSnapshotTiming());
+  const boundary = sqliteD1Boundary(database);
+  const execution = await executeArtifactReferenceD1Snapshot(boundary, plan);
+  const request = {
+    projectionVersion: ARTIFACT_REFERENCE_TRUSTED_PROJECTION_VERSION,
+    projectionId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    projectedAt: execution.receipt.freshUntil,
+    mode: "SHADOW" as const,
+    projectorKind: "FRESH_D1_EXECUTION_FIXTURE" as const,
+    maxCostUsd: 0 as const,
+    execution,
+  };
+  assert.throws(() => createArtifactReferenceTrustedProjection(request), /fresh half-open completeness window/i);
+
+  const replay = await executeArtifactReferenceD1Snapshot(boundary, plan);
+  assert.throws(
+    () => createArtifactReferenceTrustedProjection({ ...request, projectedAt: new Date().toISOString(), execution: replay }),
+    /fresh D1 commit with materialized source rows/i,
+  );
+
+  const cloned = structuredClone(execution);
+  assert.throws(
+    () => createArtifactReferenceTrustedProjection({ ...request, projectedAt: new Date().toISOString(), execution: cloned }),
+    /exact in-process result/i,
+  );
+  const drifted = structuredClone(execution);
+  assert.ok(drifted.decodedSnapshot);
+  drifted.decodedSnapshot.selectedLineage.facts.workflowRun.businessId = "business:forged";
+  assert.throws(
+    () => createArtifactReferenceTrustedProjection({ ...request, projectedAt: new Date().toISOString(), execution: drifted }),
+    /digest|exact decoded facts/i,
+  );
+  database.close();
+});
+
+test("complete projection keeps equal-rank current assignments indeterminate and powerless", async () => {
+  const { database, plan } = await persistedDatabaseFixture(currentSnapshotTiming(), "AMBIGUOUS_QUALIFICATION");
+  const execution = await executeArtifactReferenceD1Snapshot(sqliteD1Boundary(database), plan);
+  const result = createArtifactReferenceTrustedProjection({
+    projectionVersion: ARTIFACT_REFERENCE_TRUSTED_PROJECTION_VERSION,
+    projectionId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    projectedAt: new Date().toISOString(),
+    mode: "SHADOW",
+    projectorKind: "FRESH_D1_EXECUTION_FIXTURE",
+    maxCostUsd: 0,
+    execution,
+  });
+  assert.equal(result.referenceState, "INDETERMINATE");
+  assert.equal(result.manualReviewRequired, true);
+  assert.equal(result.ambiguousUseCount, 1);
+  assert.equal(result.basisProjection.uses[0]?.assignmentState, "AMBIGUOUS");
+  assert.equal(result.basisProjection.uses[0]?.assignments.length, 2);
+  assert.equal(result.retentionConclusionAuthorized, false);
+  assert.equal(result.projectionPersistenceAuthorized, false);
+  assert.equal(result.releaseAuthorized, false);
+  assert.equal(result.deletionAuthorized, false);
   database.close();
 });
 
