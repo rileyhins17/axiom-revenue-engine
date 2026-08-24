@@ -656,7 +656,12 @@ Completed gates:
   `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-36f002cfd22d41ab9d265e9ab43439c3`,
   with 60 migration receipts, 51 triggers, and 15 scoped insert freezes. No
   staging/production migration, deployment, D1/R2/Browser/provider call, secret
-  access, or prospect action occurred. Linux CI is pending for this checkpoint.
+  access, or prospect action occurred.
+- Linux CI run `32703057529` passed every gate on checkpoint
+  `a6109e6bd6fca75180abcb64f1103a8eb149d5bd`: clean dependency installation,
+  fail-closed safety, both Cloudflare builds, all 60 migrations from zero,
+  336/336 tests, typecheck, zero-warning lint, and both no-upload Worker
+  validations.
 
 Still required for Phase 1:
 
