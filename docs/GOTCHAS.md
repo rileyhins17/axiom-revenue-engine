@@ -142,6 +142,26 @@ Retire entries when the architecture makes them impossible.
   projection, retries, and any future release/deletion decision.
 - **Verifying commit:** `98cd88a`.
 
+## DATA-005 — A workflow-wide artifact set was mistaken for one lineage
+
+- **Symptom:** a valid multi-page workflow could look cyclic or disconnected
+  because several independent write manifests were treated as children of one
+  root, while silently selecting one root risked hiding malformed boundary rows.
+- **Root cause:** source-query scope and projection-lineage scope were treated as
+  identical. The source query correctly returns the whole workflow, but a
+  current-reference projection follows one artifact ancestry chain.
+- **Proven fix:** validate every row as a workflow forest, bind the complete
+  forest digest, and then select one explicit root component while retaining the
+  other root IDs. Availability receipts also bind exact observed object metadata
+  so expected-key hashes cannot impersonate R2 proof.
+- **Prevention/test:** the decoder integration test uses a sealed workflow with
+  multiple independent roots and all 15 source sets. It rejects wrong roots,
+  omitted manifest items, schema drift, missing terminal closure, and ambiguous
+  availability; row reordering cannot change the decoded digest.
+- **Affected area:** artifact lineage, atomic source snapshots, R2 availability,
+  current-reference projection, and future retention conclusions.
+- **Verifying commit:** pending current checkpoint.
+
 ## AI-001 — Provider/model documentation drift
 
 - **Symptom:** runtime used DeepSeek while setup documentation named Gemini; the

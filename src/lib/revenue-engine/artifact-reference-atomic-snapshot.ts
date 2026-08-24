@@ -36,7 +36,8 @@ export const ArtifactReferenceSourceSetNameSchema = z.enum([
 
 export type ArtifactReferenceSourceSetName = z.infer<typeof ArtifactReferenceSourceSetNameSchema>;
 
-const SOURCE_SET_ORDER = ArtifactReferenceSourceSetNameSchema.options;
+export const ARTIFACT_REFERENCE_SOURCE_SET_ORDER = ArtifactReferenceSourceSetNameSchema.options;
+const SOURCE_SET_ORDER = ARTIFACT_REFERENCE_SOURCE_SET_ORDER;
 
 const StatementSchema = z.object({
   statementId: z.string().trim().min(1).max(100),

@@ -182,6 +182,22 @@ release, deletion, provider operations, and cost remain disabled. Migration
 0059 has been tested only in disposable local databases and is not on staging or
 production.
 
+The 15-set raw-row decoder now validates what those rows mean instead of trusting
+their hashes alone. It parses every stored canonical JSON payload, recomputes its
+digest, checks every denormalized column and alternate identity, reconstructs one
+sealed workflow result, and verifies the complete artifact forest before selecting
+one explicit lineage root. Other valid workflow roots remain visible rather than
+being silently filtered.
+
+Availability v2 also binds one exact expected-and-observed HEAD record per
+manifest object. A digest of expected keys is insufficient: a usable winner must
+be the only latest `R2_HEAD` receipt, match every object's length, SHA-256 metadata,
+and ETag, and remain fresh at the snapshot boundary. The current implementation
+is validation-only and uses no D1 or R2 binding. Successful decoding still reports
+`transactionallyTrusted=false`, `snapshotComplete=false`, and zero authority for
+projection persistence, retention, release, deletion, provider operations, or
+cost.
+
 ## Verification
 
 ```powershell

@@ -135,6 +135,20 @@
   same source-set digests before commit, one fresh unambiguous R2 HEAD receipt per
   manifest, atomic insert/postverify, and an exact committed-row reload. Migration
   0059 stores that future shape but no executor currently exists or is authorized.
+- One website-evidence workflow can contain several independent artifact roots.
+  Raw decoding validates the complete workflow forest and every boundary row,
+  then selects one explicit root component for projection. Other roots remain
+  visible; they are never silently filtered or treated as children.
+- Availability v2 binds canonically ordered per-object HEAD facts: expected and
+  observed key, kind, artifact reference, length, SHA-256 metadata, and ETag.
+  Its object-set digest covers those observations, not only expected keys. Only
+  one latest, fresh, exact `R2_HEAD` winner per manifest can satisfy structural
+  decoding; fixture, future, stale, missing, unknown, or tied observations block.
+- The 15-set D1 source decoder uses exact-column schemas, parses canonical stored
+  JSON with current domain schemas, recomputes every digest, checks denormalized
+  columns and alternate identities, reconstructs contiguous fenced attempts and
+  one sealed terminal result, and validates manifest/promotion/use/replacement
+  closure. It has no executor and cannot upgrade a caller observation to trust.
 - A release decision reviews every listed use exactly once and is bound to the
   manifest, uses, actor, reason, rationale, and time by a deterministic digest.
   Even an approved release has `providerDeleteAuthorized: false`; a future delete

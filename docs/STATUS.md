@@ -87,6 +87,7 @@ staging; no rebuild code or migration has been deployed to production.
   `98cd88ad918ae09d08d8ddf66e30338f444a0d0a`
 - Atomic artifact-reference documentation checkpoint:
   `b7168a9b52713eb963fb7132064d1556abbd25a8`
+- Artifact-reference raw-row decoder checkpoint: pending current commit
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 59 apply, including the fail-closed lockdown, shadow
@@ -590,6 +591,21 @@ Completed gates:
   observations, 15 exact source-set proofs, future completeness receipt shape,
   generated D1 transaction SQL, exact-expiry takeover tests, and an explicit
   untrusted-only boundary with no executor or receipt issuer.
+- Artifact-reference raw-row decoding: strict schemas and canonical JSON/digest/
+  denormalized-column reconciliation for all 15 source sets, one exact sealed
+  workflow result, explicit multi-root workflow-forest validation, selected-root
+  facts, recursive replacement closure, and fresh per-object R2 HEAD receipt
+  selection. In-memory D1 tests exercise the generated source SQL; trust,
+  projection persistence, retention, release, deletion, provider operations, and
+  cost all remain disabled.
+- Raw-row decoder checkpoint verification passes 326/326 tests, safety checks,
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build, explicit
+  default console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. All 59 migrations replayed from zero in isolated
+  local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-d7399a703f4d4486a783f7a305e644df`,
+  including all four migration-0059 tables. No staging/production migration,
+  deployment, D1/R2/Browser/provider call, or prospect action occurred.
 
 Still required for Phase 1:
 
@@ -623,15 +639,13 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Implement the validation-only raw-row decoder for all 15 atomic source sets:
-   verify every stored JSON/denormalized column and alternate identity, require
-   one exact sealed workflow result, resolve fresh unambiguous availability, and
-   reproduce normalized reference facts. Keep the result untrusted and add no
-   D1 executor.
-2. Design the trusted D1 executor and every source-writer fence guard, including
+1. Design the trusted D1 executor and every source-writer fence guard, including
    atomic source recheck, collision-complete target preflights, ordered insert,
    rollback, post-verification, and committed-receipt reload. Do not add a live
    binding or apply migration 0059 until the staging backup/rollback gate passes.
+2. Add a fixture-only projection-v2 adapter from one selected decoded lineage;
+   keep completeness, projection persistence, and retention conclusions false
+   until the trusted committed-receipt reload exists.
 3. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
    smoke test; do not add a binding or make a live request until R2, budget,
    rollback, and owner approval gates are recorded.

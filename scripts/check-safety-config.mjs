@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration] = await Promise.all([
+const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactReferenceSourceRows, artifactReferenceSourceDecoder, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../.env.example", import.meta.url), "utf8"),
@@ -26,6 +26,9 @@ const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap,
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-projection.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-persistence-plan.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/artifact-manifest-availability.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/artifact-reference-d1-source-rows.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0056_durable_evidence_receipts.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0057_fenced_evidence_resume_records.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0058_artifact_reference_projections.sql", import.meta.url), "utf8"),
@@ -195,6 +198,17 @@ requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", art
 requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /trusted:\s*false as const/, "structural completeness inspection must not become trusted without a D1 executor reload");
 forbidMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /@cloudflare|env\.[A-Z_]+|R2Bucket|fetch\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "atomic reference planning must not access providers, runtime bindings, databases, network, writes, or deletion");
 forbidMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /LIMIT\s+1/i, "atomic snapshot queries must inspect every matching identity");
+requireMatch("src/lib/revenue-engine/artifact-manifest-availability.ts", artifactManifestAvailability, /providerOperationsAuthorized:\s*z\.literal\(false\)/, "availability observations must not authorize provider operations");
+requireMatch("src/lib/revenue-engine/artifact-manifest-availability.ts", artifactManifestAvailability, /releaseAuthorized:\s*z\.literal\(false\)/, "availability observations must not authorize release");
+requireMatch("src/lib/revenue-engine/artifact-manifest-availability.ts", artifactManifestAvailability, /deletionAuthorized:\s*z\.literal\(false\)/, "availability observations must not authorize deletion");
+requireMatch("src/lib/revenue-engine/artifact-manifest-availability.ts", artifactManifestAvailability, /costUsd:\s*z\.literal\(0\)/, "availability observations must not authorize cost");
+forbidMatch("src/lib/revenue-engine/artifact-manifest-availability.ts", artifactManifestAvailability, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.head\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "availability validation must not access providers, runtime bindings, databases, network, writes, or deletion");
+forbidMatch("src/lib/revenue-engine/artifact-reference-d1-source-rows.ts", artifactReferenceSourceRows, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.head\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "raw-row schemas must not access providers, runtime bindings, databases, network, writes, or deletion");
+requireMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", artifactReferenceSourceDecoder, /transactionallyTrusted:\s*z\.literal\(false\)/, "raw-row decoding must remain explicitly untrusted");
+requireMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", artifactReferenceSourceDecoder, /snapshotComplete:\s*z\.literal\(false\)/, "raw-row decoding must not claim snapshot completeness");
+requireMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", artifactReferenceSourceDecoder, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "raw-row decoding must not authorize provider operations");
+requireMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", artifactReferenceSourceDecoder, /projectionPersistenceAuthorized:\s*z\.literal\(false\)/, "raw-row decoding must not authorize projection persistence");
+forbidMatch("src/lib/revenue-engine/artifact-reference-d1-source-decoder.ts", artifactReferenceSourceDecoder, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.head\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "raw-row decoding must not access providers, runtime bindings, databases, network, writes, or deletion");
 for (const table of ["RevenueArtifactReferenceSnapshotAttempt", "RevenueArtifactManifestAvailabilityReceipt", "RevenueArtifactReferenceCompletenessReceipt", "RevenueArtifactReferenceSourceSetProof"]) {
   requireMatch("migrations/0059_atomic_artifact_reference_snapshots.sql", artifactReferenceAtomicMigration, new RegExp(`CREATE TABLE \\"${table}\\"`), `${table} must remain an additive atomic-reference table`);
 }
