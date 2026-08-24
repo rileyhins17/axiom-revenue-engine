@@ -39,6 +39,14 @@
 | WorkflowReceipt | One immutable attempt outcome with status, site path, total cost, exact aggregate JSON/digest, completion time, and recording time. |
 | WorkflowStepReceipt | One ordered checkpoint outcome attached to an exact WorkflowReceipt revision, with attempts, timing, digest, item count, warnings, and failure. |
 | DurableEvidencePersistencePlan | Bounded fixture-only expected-state/preflight/insert-if-absent plan for migration 0056; it grants neither database mutation nor workflow resume authority. |
+| WorkflowDefinitionDescriptor | Exact workflow graph, checkpoint codec, and component-version set bound by one digest; version 1 resume has no implicit compatibility fallback. |
+| WorkflowDeliveryRecord | One idempotent receipt of the exact canonical workflow request, definition digest, delivery ID, mode, and receive time. |
+| WorkflowAttemptSnapshot | One numbered execution attempt with immutable identity, status, delivery, request/definition digests, and monotonically increasing fencing token. |
+| WorkflowLeaseClaim | Exact attempt owner, acquisition/expiry window, delivery, and fencing token used to reject stale-worker checkpoints. |
+| WebsiteEvidenceCheckpoint | Full bounded step payload plus content-addressed locator, byte length, output digest, direct committed dependencies, attempt/fence, site path, and commit state. |
+| ArtifactRecoveryRecord | Exact content-addressed write plan and receipt retained across partial failure, deployment interruption, created/reused retry, and no-delete reconciliation. |
+| WorkflowReceiptRevision | Versioned wrapper binding an exact aggregate workflow receipt to its request, definition, and attempt; completed and partial audit results become terminal only when sealed. |
+| FixtureWebsiteEvidenceResumePlan | Deterministic zero-authority decision to block, return terminal, wait, request a first fence, or request a higher-fenced takeover with an exact continuation/reconciliation plan. |
 | CostLedger | Provider usage/cost attached to a run, lead, campaign, and budget period. |
 | KwLeadEvaluationSet | Private 50-lead owner-labelled KW quality gate used to measure engine agreement before live outreach. |
 | PrivateKwImportPlan | Versioned, ignored local seed of canonical research-only businesses, locations, cohort source runs, and source records; it grants no qualification or outreach authority. |
@@ -124,7 +132,25 @@
 - Durable evidence persistence is also validation-only. Migration 0056 can hold
   immutable receipt revisions, but the current module has no D1 executor and
   emits `mutationAuthorized: false` and `resumeAuthorized: false`. A step output
-  digest is not a replay payload; resume needs separately versioned payload or
-  locator, compatibility, lease, and duplicate-delivery contracts.
+  digest is not a replay payload.
+- Fixture resume now requires the full schema-validated payload and locator,
+  current definition digest, dependency-closed graph, exact request/delivery,
+  contiguous attempt history, and an active monotonically fenced lease at every
+  write. A higher fence invalidates an older worker even if its local lease view
+  appears usable.
+- `COMPLETED`, `PARTIAL`, and completed unreachable audit receipts are terminal
+  only after the exact attempt seals them. An active lease otherwise means wait;
+  expiry is exclusive, and takeover must propose both the next attempt number
+  and a higher fencing token from durable history.
+- Browser measurement is a side-effect boundary. Without a committed storage
+  checkpoint, resume falls back to captured subpages and reconciles exact
+  retained artifact plans. Missing prepared receipts require all deterministic
+  plans to be reconciled; object mismatch or invalid-receipt failures block.
+  Content-addressed orphans are retained for lifecycle handling, never rollback
+  deleted.
+- The resume planner is still not a runtime. It cannot persist a checkpoint,
+  acquire a lease, run a step, contact a provider, spend money, or delete an
+  object: `mutationAuthorized`, `executionAuthorized`, and deletion authority
+  remain false, with provider operations and cost fixed at zero.
 - An approval is invalid after content changes, expiry, rejection, or revocation;
   the final provider call recomputes its digest every time.

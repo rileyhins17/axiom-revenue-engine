@@ -128,7 +128,18 @@ insert-if-absent statement, and rejects drift, identity collisions, or manifests
 outside the workflow's receipt/promotion chain. It explicitly grants neither
 database mutation nor resume authority. The migration passes from zero in an
 isolated local D1 store, but it has not been applied to staging or production;
-step payload locators and safe resume planning are the next separate gate.
+the existing tables still do not authorize execution.
+
+The next resume boundary is now specified and tested in fixture-only code. Full
+bounded checkpoint payloads have content-addressed locators, direct dependency
+links, definition/component versions, delivery identity, attempt history, and
+monotonically increasing lease fences. Partial artifact writes keep their exact
+plans and receipts for no-delete reconciliation. The deterministic planner
+returns sealed terminal results, waits for active leases, blocks version or
+integrity drift, or proposes the exact next fence and safe continuation point.
+It cannot acquire a lease, mutate D1, call Browser/R2, execute a workflow, or
+authorize provider cost; additive persistence for these new contracts remains a
+separate checkpoint.
 
 ## Verification
 
