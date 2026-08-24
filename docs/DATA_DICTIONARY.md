@@ -55,6 +55,11 @@
 | ArtifactRecoveryPlan/Receipt | Byte-bound content-addressed plan stored once plus one or more exact fenced retry outcomes with zero provider-write/cost authority and no-delete rollback. |
 | FencedEvidenceResumePersistencePlan | Migration-0057 expected-state/preflight/insert-if-absent plan that rejects blocked resume history, checks every collision candidate, and grants no database or execution authority. |
 | ArtifactReferencePersistencePlan | Migration-0058 collision-complete preflight/insert-if-absent plan for endings, projections, projected uses, and assignments; it grants no mutation, retention-release, deletion, provider, or cost authority. |
+| ArtifactReferenceSnapshotAttempt | One append-only, five-minute-or-shorter attempt/lease claim for a lineage snapshot, with a contiguous attempt number, strictly increasing fencing token, versioned query contract, and zero operational authority. |
+| ArtifactManifestAvailabilityReceipt | Immutable content-bound fixture or R2 HEAD observation for one exact manifest; only a future fresh, unambiguous R2 winner per manifest may satisfy transactional completeness. |
+| ArtifactReferenceSourceSetProof | Canonical count, stable row identities, predicate version, set digest, and proof digest for one of the 15 exact workflow/lineage/use/availability source sets. |
+| ArtifactReferenceCompletenessReceipt | Future transaction-created and reloaded seal binding the winning attempt/fence, all exact source-set proofs, and normalized source facts; its structural schema alone is never trusted and it grants no retention or deletion authority. |
+| ArtifactReferenceAtomicPlan | Validation-only D1 prepare/snapshot and commit/postverify contract. It exposes exact queries and gates but has no database executor, receipt issuer, provider binding, mutation, or runtime authority. |
 | CostLedger | Provider usage/cost attached to a run, lead, campaign, and budget period. |
 | KwLeadEvaluationSet | Private 50-lead owner-labelled KW quality gate used to measure engine agreement before live outreach. |
 | PrivateKwImportPlan | Versioned, ignored local seed of canonical research-only businesses, locations, cohort source runs, and source records; it grants no qualification or outreach authority. |
@@ -121,6 +126,15 @@
   cannot produce `NO_CURRENT_REFERENCES` or a retention-review suggestion. Every
   currentness check replays the deterministic projection, and release, deletion,
   provider operations, retention conclusions, and cost authority remain false/zero.
+- Atomic reference planning derives 15 database source sets from the workflow
+  and lineage root rather than accepting caller-supplied IDs. Each set binds all
+  raw rows, stable IDs, count, predicate version, and digest. Caller observations
+  can produce only an explicitly untrusted proof; structural JSON and digests do
+  not prove a D1 transaction.
+- A future completeness receipt requires a single winning half-open fence, the
+  same source-set digests before commit, one fresh unambiguous R2 HEAD receipt per
+  manifest, atomic insert/postverify, and an exact committed-row reload. Migration
+  0059 stores that future shape but no executor currently exists or is authorized.
 - A release decision reviews every listed use exactly once and is bound to the
   manifest, uses, actor, reason, rationale, and time by a deterministic digest.
   Even an approved release has `providerDeleteAuthorized: false`; a future delete

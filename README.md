@@ -147,7 +147,7 @@ and artifact plans are separate from retry receipts. The validation-only planner
 rejects blocked resume histories and checks every primary or alternate identity
 candidate before proposing ordered insert-if-absent SQL. It deliberately has no
 database executor or transaction: all mutation, resume, execution, provider, and
-cost authority remains false. All 58 migrations pass from zero in isolated local
+cost authority remains false. All 59 migrations pass from zero in isolated local
 D1, but migration 0057 has not been applied to staging or production.
 
 Evidence-use endings and current-reference reasoning are now explicit without
@@ -164,6 +164,23 @@ required retention. Equal candidates or a missing valid copy remain
 Migration 0058 and its collision-complete persistence plan grant no mutation,
 release, deletion, provider, or cost authority and have not been applied to
 staging or production.
+
+The next database boundary is now specified without pretending it is live.
+Migration 0059 adds append-only snapshot attempts/fences, durable manifest
+availability observations, exact source-set proofs, and the future completeness
+receipt shape. The validation-only planner derives 15 complete workflow,
+manifest, promotion, use, ending, and availability queries and requires a single
+Cloudflare D1 batch for prepare plus snapshot. It also requires an atomic source
+recheck, insert, post-verification, and committed-row reload before trust.
+
+Pure TypeScript cannot mint that trusted receipt. Caller-supplied rows create
+only an explicitly untrusted proof, and even a structurally valid completeness
+JSON is reported as incomplete until a future private D1 executor performs and
+reloads the exact transaction. All source writers must also honor the fence;
+they do not yet, so execution, projection persistence, retention conclusions,
+release, deletion, provider operations, and cost remain disabled. Migration
+0059 has been tested only in disposable local databases and is not on staging or
+production.
 
 ## Verification
 

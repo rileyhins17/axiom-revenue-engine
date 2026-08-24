@@ -83,11 +83,14 @@ staging; no rebuild code or migration has been deployed to production.
   `9681e56ad62bf0e7e9b77a57fbd81923338c3378`
 - Artifact reference proof-hardening checkpoint:
   `fb9f4dd4f94a5793a765c6dc553637bc1bb36158`
+- Atomic artifact-reference snapshot source checkpoint:
+  `98cd88ad918ae09d08d8ddf66e30338f444a0d0a`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Local migrations: all 58 apply, including the fail-closed lockdown, shadow
+- Local migrations: all 59 apply, including the fail-closed lockdown, shadow
   Revenue Engine records, content-bound outreach approval, and durable evidence
-  plus fenced resume and current-reference history
+  plus fenced resume, current-reference history, and atomic snapshot receipt
+  contracts
 - Current checkpoint verification rerun 2026-08-21: 160/160 tests, typecheck,
   zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
   build, and Wrangler deploy dry run pass
@@ -444,6 +447,28 @@ staging; no rebuild code or migration has been deployed to production.
   `a82246a`: fail-closed safety, deterministic bindings, a clean Ubuntu
   Cloudflare build, all 58 migrations from zero, 310/310 tests, typecheck, lint,
   and both no-upload Worker validations.
+- A versioned atomic artifact-reference plan now derives 15 exact D1 source sets
+  from the workflow and lineage root: complete fenced workflow history,
+  manifests/items, promotions/uses, manifest links, recursively referenced uses
+  and endings, and every persisted availability candidate. Canonical proofs bind
+  every raw row, stable identity, count, predicate version, and aggregate digest.
+- Migration 0059 adds append-only snapshot attempt/fence claims, content-bound
+  manifest availability receipts, future transaction-sealed completeness
+  receipts, and per-set proofs. Exact expiry permits only a contiguous,
+  strictly-higher-fence takeover; active unsealed attempts block contenders.
+- Caller observations and even structurally valid completeness JSON remain
+  explicitly untrusted. The code cannot mint a trusted receipt, and every
+  execution, projection, retention, release, deletion, provider, and cost gate
+  remains false/zero until a future private D1 transaction rechecks, commits,
+  and reloads the exact row. All source-writer fence guards are also explicitly
+  incomplete, so no executor or binding was added.
+- Atomic snapshot source verification passes 318/318 tests, typecheck,
+  zero-warning targeted lint, and the safety checker. All 59 migrations replayed
+  from zero in isolated local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-3d63dc5743484ceb9ae060e718ba0950`,
+  with 59 migration receipts and all four new tables verified. The full
+  Cloudflare build/dry-run gate and Linux CI remain to be recorded on the
+  documentation checkpoint.
 
 ## Safety and production
 
@@ -452,7 +477,7 @@ staging; no rebuild code or migration has been deployed to production.
 - Even if send configuration is later enabled, the final Gmail call now blocks
   without an unexpired operator approval matching the exact message content.
 - Production D1 is `axiom-ops-omniscient` (58 tables, about 223 MB). Remote schema
-  is still at migration 0052; migrations 0053-0058 have not been applied.
+  is still at migration 0052; migrations 0053-0059 have not been applied.
 - At `2026-08-22T03:03:15Z`, the single global settings row was safely corrected
   from `enabled=1` to `enabled=0`; global, emergency, intake, and follow-up pauses
   all remain `1`. This was one reversible row update after the verified export.
@@ -554,6 +579,11 @@ Completed gates:
   content-bound short-lived availability, deterministic currentness replay,
   weakest-valid protecting-copy selection, collision-complete persistence
   planning, and zero retention/mutation/release/deletion/provider authority.
+- Atomic artifact-reference snapshot contract: additive migration 0059,
+  bounded append-only attempt/fence claims, persisted R2/fixture availability
+  observations, 15 exact source-set proofs, future completeness receipt shape,
+  generated D1 transaction SQL, exact-expiry takeover tests, and an explicit
+  untrusted-only boundary with no executor or receipt issuer.
 
 Still required for Phase 1:
 
@@ -587,16 +617,18 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Specify the atomic D1 loader/transaction contract for exact history reads,
-   base-row preflights, a non-forgeable completeness receipt, fence acquisition,
-   insert-if-absent execution, and post-verification. Keep the executor absent
-   until those tests and a staging migration gate pass.
-2. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
+1. Implement the validation-only raw-row decoder for all 15 atomic source sets:
+   verify every stored JSON/denormalized column and alternate identity, require
+   one exact sealed workflow result, resolve fresh unambiguous availability, and
+   reproduce normalized reference facts. Keep the result untrusted and add no
+   D1 executor.
+2. Design the trusted D1 executor and every source-writer fence guard, including
+   atomic source recheck, collision-complete target preflights, ordered insert,
+   rollback, post-verification, and committed-receipt reload. Do not add a live
+   binding or apply migration 0059 until the staging backup/rollback gate passes.
+3. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
    smoke test; do not add a binding or make a live request until R2, budget,
    rollback, and owner approval gates are recorded.
-3. Design the owner/compliance retention-review UI and release contract; require
-   a newly recomputed current-reference digest and keep provider deletion behind
-   a later explicit gate.
 
 ## Resume instructions
 

@@ -119,6 +119,29 @@ Retire entries when the architecture makes them impossible.
   and future R2 lifecycle cleanup.
 - **Verifying commit:** `fb9f4dd` (hardens the initial `9681e56` slice).
 
+## DATA-004 — A valid digest was mistaken for proof of a complete database snapshot
+
+- **Symptom:** caller-supplied rows could be normalized and hashed into a
+  schema-valid “complete” receipt even though another relevant database row was
+  omitted, read at a different time, or added between read and commit.
+- **Root cause:** content integrity, source completeness, transaction atomicity,
+  and trusted provenance were treated as the same property. D1 Sessions provide
+  sequential consistency, but that alone does not keep one interactive snapshot
+  open while application code computes and later persists a projection.
+- **Proven fix:** derive 15 versioned source predicates from the workflow/lineage
+  root, claim a bounded strictly higher fence, bind every raw row identity/count/
+  digest, and require atomic recheck, insert, post-verification, and committed-row
+  reload. Pure validation code emits only `transactionallyTrusted=false` and
+  cannot mint a completeness receipt.
+- **Prevention/test:** the safety checker locks receipt creation and execution
+  off. Atomic-reference tests cover immutable query drift, generated SQL,
+  missing/duplicate sets, wrong or expired fences, active-lease contention,
+  exact-expiry takeover, forged receipt digests, migration constraints, and the
+  rule that structural receipt parsing never establishes trust.
+- **Affected area:** D1 reference snapshots, artifact availability, retention
+  projection, retries, and any future release/deletion decision.
+- **Verifying commit:** `98cd88a`.
+
 ## AI-001 — Provider/model documentation drift
 
 - **Symptom:** runtime used DeepSeek while setup documentation named Gemini; the
