@@ -85,6 +85,8 @@ staging; no rebuild code or migration has been deployed to production.
   `fb9f4dd4f94a5793a765c6dc553637bc1bb36158`
 - Atomic artifact-reference snapshot source checkpoint:
   `98cd88ad918ae09d08d8ddf66e30338f444a0d0a`
+- Atomic artifact-reference documentation checkpoint:
+  `b7168a9b52713eb963fb7132064d1556abbd25a8`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 59 apply, including the fail-closed lockdown, shadow
@@ -462,13 +464,14 @@ staging; no rebuild code or migration has been deployed to production.
   remains false/zero until a future private D1 transaction rechecks, commits,
   and reloads the exact row. All source-writer fence guards are also explicitly
   incomplete, so no executor or binding was added.
-- Atomic snapshot source verification passes 318/318 tests, typecheck,
-  zero-warning targeted lint, and the safety checker. All 59 migrations replayed
+- Atomic snapshot checkpoint verification passes 318/318 tests, typecheck,
+  zero-warning full lint, safety checks, the secret-sanitized Cloudflare build,
+  explicit default console no-upload dry run, deterministic engine bindings,
+  and the inert engine no-upload dry run. All 59 migrations replayed
   from zero in isolated local D1 at
   `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-3d63dc5743484ceb9ae060e718ba0950`,
-  with 59 migration receipts and all four new tables verified. The full
-  Cloudflare build/dry-run gate and Linux CI remain to be recorded on the
-  documentation checkpoint.
+  with 59 migration receipts and all four new tables verified. Ubuntu CI remains
+  to be recorded for the final clean checkpoint.
 
 ## Safety and production
 
