@@ -160,7 +160,7 @@ Retire entries when the architecture makes them impossible.
   availability; row reordering cannot change the decoded digest.
 - **Affected area:** artifact lineage, atomic source snapshots, R2 availability,
   current-reference projection, and future retention conclusions.
-- **Verifying commit:** pending current checkpoint.
+- **Verifying commit:** `588926a`.
 
 ## AI-001 — Provider/model documentation drift
 
