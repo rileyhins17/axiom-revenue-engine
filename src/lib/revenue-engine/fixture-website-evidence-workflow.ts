@@ -12,6 +12,10 @@ import {
 } from "@/lib/revenue-engine/browser-measurement-adapter";
 import type { BrowserPageEvidence } from "@/lib/revenue-engine/browser-page-evidence";
 import {
+  ArtifactManifestSchema,
+  artifactManifestFromWriteReceipt,
+} from "@/lib/revenue-engine/artifact-lifecycle";
+import {
   ArtifactWriteReceiptSchema,
   browserArtifactRefsFromReceipt,
   createBrowserArtifactWritePlan,
@@ -172,6 +176,7 @@ export const FixtureWebsiteEvidenceWorkflowReceiptSchema = z.object({
   sitePath: z.enum(["CAPTURED", "UNREACHABLE"]).nullable(),
   steps: z.array(WorkflowStepReceiptSchema).length(FIXTURE_WEBSITE_EVIDENCE_WORKFLOW_STEPS.length),
   pages: z.array(WorkflowPageReceiptSchema).max(4),
+  artifactManifests: z.array(ArtifactManifestSchema).max(5),
   pageSelection: WebsitePageSelectionPlanSchema.nullable(),
   auditAssembly: WebsiteAuditAssemblySchema.nullable(),
   audit: DeterministicWebsiteAuditResultSchema.nullable(),
@@ -207,6 +212,21 @@ export const FixtureWebsiteEvidenceWorkflowReceiptSchema = z.object({
   }
   if (receipt.status === "PARTIAL" && receipt.sitePath !== "CAPTURED") {
     context.addIssue({ code: "custom", message: "Only a captured site with evidence gaps can be partial.", path: ["status"] });
+  }
+  const pageArtifactIds = receipt.pages
+    .flatMap((page) => page.artifactReceiptIds)
+    .sort((left, right) => left.localeCompare(right, "en-CA"));
+  const manifestIds = receipt.artifactManifests
+    .map((manifest) => manifest.manifestId)
+    .sort((left, right) => left.localeCompare(right, "en-CA"));
+  if (
+    new Set(manifestIds).size !== manifestIds.length
+    || JSON.stringify(pageArtifactIds) !== JSON.stringify(manifestIds)
+  ) {
+    context.addIssue({ code: "custom", message: "Artifact manifests must exactly match successful page artifact receipts.", path: ["artifactManifests"] });
+  }
+  if (receipt.artifactManifests.some((manifest) => manifest.workflowId !== receipt.workflowId)) {
+    context.addIssue({ code: "custom", message: "Artifact manifests must belong to the website workflow.", path: ["artifactManifests"] });
   }
 });
 
@@ -393,6 +413,9 @@ export async function runFixtureWebsiteEvidenceWorkflow(
     sitePath,
     steps: FIXTURE_WEBSITE_EVIDENCE_WORKFLOW_STEPS.map((step) => steps[step]),
     pages: pages.map(pageReceipt),
+    artifactManifests: pages
+      .flatMap((page) => page.artifactReceipts)
+      .map(artifactManifestFromWriteReceipt),
     pageSelection,
     auditAssembly,
     audit,

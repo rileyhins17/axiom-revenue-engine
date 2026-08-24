@@ -319,6 +319,11 @@ test("complete workflow composes all eight zero-cost evidence checkpoints", asyn
   assert.equal(receipt.pageSelection?.status, "READY");
   assert.equal(receipt.auditAssembly?.status, "READY");
   assert.equal(receipt.audit?.classification, "NO_OPPORTUNITY");
+  assert.equal(receipt.artifactManifests.length, 5);
+  assert.deepEqual(
+    receipt.artifactManifests.map((manifest) => manifest.manifestId).sort(),
+    receipt.pages.flatMap((page) => page.artifactReceiptIds).sort(),
+  );
   assert.deepEqual(receipt.pages.map((page) => page.pageKind), ["HOME", "SERVICE", "ABOUT", "CONTACT"]);
   assert.equal(capture.requests.length, 4);
   assert.equal(browser.requests.length, 5);
@@ -348,6 +353,7 @@ test("retry reuses content-addressed objects and preserves the business result",
   assert.deepEqual(second.pageSelection, first.pageSelection);
   assert.deepEqual(second.auditAssembly, first.auditAssembly);
   assert.deepEqual(second.audit, first.audit);
+  assert.deepEqual(second.artifactManifests, first.artifactManifests);
   assert.equal(second.status, "COMPLETED");
   assert.equal(artifacts.putAttempts, 20);
   assert.equal(artifacts.headReads - readsBeforeRetry, 10);

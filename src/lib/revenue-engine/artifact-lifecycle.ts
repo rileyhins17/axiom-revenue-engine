@@ -119,7 +119,7 @@ export const ArtifactEvidenceUseTypeSchema = z.enum([
   "LEGAL_HOLD",
 ]);
 
-const ArtifactEvidenceUseSchema = z
+export const ArtifactEvidenceUseSchema = z
   .object({
     useId: z.string().uuid(),
     useType: ArtifactEvidenceUseTypeSchema,
@@ -862,6 +862,19 @@ function stableDigest(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
+export function artifactManifestDigest(value: ArtifactManifest) {
+  const manifest = ArtifactManifestSchema.parse(value);
+  return stableDigest({
+    ...manifest,
+    items: [...manifest.items].sort((left, right) => left.kind.localeCompare(right.kind, "en-CA")),
+  });
+}
+
+export function artifactEvidenceUsesDigest(value: ArtifactEvidenceUse[]) {
+  const uses = z.array(ArtifactEvidenceUseSchema).min(1).max(50).parse(value);
+  return stableDigest([...uses].sort((left, right) => left.useId.localeCompare(right.useId, "en-CA")));
+}
+
 export function createArtifactReleaseRecord(value: unknown): ArtifactReleaseRecord {
   const request = ArtifactReleaseRequestSchema.parse(value);
   const manifest = {
@@ -870,8 +883,8 @@ export function createArtifactReleaseRecord(value: unknown): ArtifactReleaseReco
   };
   const uses = [...request.activeEvidenceUses].sort((left, right) => left.useId.localeCompare(right.useId, "en-CA"));
   const reviewedUseIds = [...request.reviewedUseIds].sort((left, right) => left.localeCompare(right, "en-CA"));
-  const manifestDigest = stableDigest(manifest);
-  const evidenceUseDigest = stableDigest(uses);
+  const manifestDigest = artifactManifestDigest(manifest);
+  const evidenceUseDigest = artifactEvidenceUsesDigest(uses);
   const decisionCore = {
     contractVersion: ARTIFACT_LIFECYCLE_CONTRACT_VERSION,
     releaseId: request.releaseId,
