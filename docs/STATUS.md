@@ -383,6 +383,9 @@ staging; no rebuild code or migration has been deployed to production.
   engine no-upload dry run, and all 56 migrations from zero in isolated local D1
   storage. The planner still has no persistence executor and grants no mutation,
   execution, provider-operation, cost, or deletion authority.
+- Linux CI run `32685987966` passed all 13 gates on fenced-resume checkpoint
+  `fbabd3e`, including exact dependencies, a clean Ubuntu Cloudflare build, all
+  56 migrations from zero, 283/283 tests, and both no-upload Worker validations.
 
 ## Safety and production
 
