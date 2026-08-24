@@ -105,17 +105,19 @@ Retire entries when the architecture makes them impossible.
 - **Root cause:** immutable promotion/use history was treated as a mutable current
   assignment instead of evaluating the full lineage, use endings, expiry, and
   verified object availability together.
-- **Proven fix:** keep one immutable ending per use version and build a complete,
-  time-bounded lineage projection. Assign each active use to the weakest valid
-  sufficient copy; preserve equal candidates as ambiguous and missing candidates
-  as indeterminate. A zero-reference result still grants no deletion authority.
+- **Proven fix:** keep one immutable ending per use version and build a
+  time-bounded lineage projection over an explicit use set. Require exact
+  promotion-to-result links, an original write root, content-bound availability,
+  and deterministic replay. A fixture assertion is never treated as a complete
+  database read, so it cannot produce a zero-reference conclusion.
 - **Prevention/test:** `artifact-reference-projection.test.ts` covers legal-hold
-  fallback, expiry fallback, equal-rank ambiguity, no-copy self-edges, stale
-  source facts, all-ended uses, and zero authority. Migration/persistence tests
-  cover idempotency, drift, alternate collisions, multiple matches, and FKs.
+  fallback, expiry fallback, equal-rank ambiguity, no-copy self-edges, omitted
+  links/ancestors, forged assignments, stale/future facts, all-ended fixture
+  assertions, and zero authority. Migration/persistence tests cover exact
+  replacement bundles, SQL constraints, idempotency, drift, collisions, and FKs.
 - **Affected area:** evidence retention, promotion lineage, compliance review,
   and future R2 lifecycle cleanup.
-- **Verifying commit:** pending this checkpoint.
+- **Verifying commit:** `fb9f4dd` (hardens the initial `9681e56` slice).
 
 ## AI-001 — Provider/model documentation drift
 

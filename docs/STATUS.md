@@ -79,11 +79,15 @@ staging; no rebuild code or migration has been deployed to production.
   `6d5db2b1536a93571c241f5e2c3fda9be01e075e`
 - Fenced resume-persistence status checkpoint:
   `32c7ae29b215db32e3af54938ee9efcb9d2f39fb`
+- Artifact current-reference source/documentation checkpoint:
+  `9681e56ad62bf0e7e9b77a57fbd81923338c3378`
+- Artifact reference proof-hardening checkpoint:
+  `fb9f4dd4f94a5793a765c6dc553637bc1bb36158`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Local migrations: all 57 apply, including the fail-closed lockdown, shadow
+- Local migrations: all 58 apply, including the fail-closed lockdown, shadow
   Revenue Engine records, content-bound outreach approval, and durable evidence
-  plus fenced resume history
+  plus fenced resume and current-reference history
 - Current checkpoint verification rerun 2026-08-21: 160/160 tests, typecheck,
   zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
   build, and Wrangler deploy dry run pass
@@ -411,6 +415,31 @@ staging; no rebuild code or migration has been deployed to production.
 - Linux CI run `32688497512` passed all 13 gates on fenced-persistence
   checkpoint `32c7ae2`, including a clean Ubuntu Cloudflare build, all 57
   migrations from zero, 289/289 tests, and both no-upload Worker validations.
+- Additive migration 0058 now stores one immutable ending per exact evidence-use
+  version plus lineage-wide current-reference projections, per-use states, and
+  protecting-manifest candidates. Replacement endings bind the exact replacement
+  ID, record version, and digest; legal hold requires explicit compliance
+  clearance.
+- The deterministic projector selects the weakest verified-present, unexpired
+  manifest that still satisfies each active use. It preserves equal minimum-rank
+  candidates as ambiguous, falls back from expired/weaker or ended stronger
+  purposes safely, treats no-copy promotion as a link rather than a cycle, and
+  refuses a zero-reference result for stale, fixture-asserted, disconnected, or
+  unassigned history. The original root must match the shadow write contract and
+  every promoted manifest/use must close through exact completed history.
+- The validation-only persistence plan reproduces every projection from its
+  asserted source set, checks every primary/alternate collision candidate without
+  `LIMIT 1`, and emits ordered insert-if-absent SQL only. Fixture snapshots are
+  explicitly not transactionally complete, cannot suggest retention review, and
+  currentness requires deterministic replay inside a five-minute evidence window.
+  Mutation, retention conclusion, release, deletion, provider operations, and
+  cost authority remain false/zero; no executor or Cloudflare binding was added.
+- Artifact-reference hardening verification passes 310/310 tests, typecheck,
+  zero-warning lint, safety checks, the secret-sanitized console build, explicit
+  default console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. All 58 migrations replayed from zero in isolated
+  local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-f35f266d5fbc45dbae9063e709324ea8`.
 
 ## Safety and production
 
@@ -419,7 +448,7 @@ staging; no rebuild code or migration has been deployed to production.
 - Even if send configuration is later enabled, the final Gmail call now blocks
   without an unexpired operator approval matching the exact message content.
 - Production D1 is `axiom-ops-omniscient` (58 tables, about 223 MB). Remote schema
-  is still at migration 0052; migrations 0053-0057 have not been applied.
+  is still at migration 0052; migrations 0053-0058 have not been applied.
 - At `2026-08-22T03:03:15Z`, the single global settings row was safely corrected
   from `enabled=1` to `enabled=0`; global, emergency, intake, and follow-up pauses
   all remain `1`. This was one reversible row update after the verified export.
@@ -516,6 +545,11 @@ Completed gates:
   immutable closure/state receipts, separate artifact plans and retry receipts,
   collision-complete preflights, exact idempotency checks, base64-tagged fixture
   bytes, and zero mutation/resume/execution/provider authority.
+- Artifact reference projection: additive migration 0058, immutable use endings,
+  fixture-asserted promotion-lineage snapshots, exact promotion/use closure,
+  content-bound short-lived availability, deterministic currentness replay,
+  weakest-valid protecting-copy selection, collision-complete persistence
+  planning, and zero retention/mutation/release/deletion/provider authority.
 
 Still required for Phase 1:
 
@@ -549,15 +583,16 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Add evidence-use ending and current-reference projection records so retention
-   review can distinguish active from ended uses without inferring deletion
-   authority.
-2. Specify the atomic D1 loader/transaction contract for exact history reads,
-   fence acquisition, insert-if-absent execution, and post-verification. Keep the
-   executor absent until those tests and a staging migration gate pass.
-3. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
+1. Specify the atomic D1 loader/transaction contract for exact history reads,
+   base-row preflights, a non-forgeable completeness receipt, fence acquisition,
+   insert-if-absent execution, and post-verification. Keep the executor absent
+   until those tests and a staging migration gate pass.
+2. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
    smoke test; do not add a binding or make a live request until R2, budget,
    rollback, and owner approval gates are recorded.
+3. Design the owner/compliance retention-review UI and release contract; require
+   a newly recomputed current-reference digest and keep provider deletion behind
+   a later explicit gate.
 
 ## Resume instructions
 

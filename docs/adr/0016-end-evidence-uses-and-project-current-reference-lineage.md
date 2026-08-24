@@ -59,10 +59,11 @@ may introduce transactionally complete snapshots and the
 `NO_CURRENT_REFERENCES` conclusion.
 
 Only completed promotion receipts create lineage edges. A no-copy receipt is a
-use-link event, not a cycle. The root must have `ARTIFACT_WRITE` provenance and
-every promoted manifest must have its exact completed promotion and ancestor
-chain. Every completed promotion use needs its exact result-manifest link and
-every link/use must agree with the explicit use set. Failed promotions,
+use-link event, not a cycle. The root must be `SHADOW_30D`, have `ARTIFACT_WRITE`
+provenance, and match its write receipt identity; every promoted manifest must
+have its exact completed promotion and ancestor chain. Every completed promotion
+use needs its exact result-manifest link and every link/use must agree with the
+explicit use set. Failed promotions,
 disconnected manifests, cross-workflow/business data, retention decreases,
 divergent manifests, missing promotion/use pairs, stale snapshots, and incomplete
 availability fail closed.
@@ -70,8 +71,9 @@ availability fail closed.
 Fixture freshness is capped at five minutes. Availability receipts bind all of
 their fields by digest and must remain valid through the projection window. All
 manifest, promotion, use, link, ending, and availability timestamps must be no
-later than the asserted snapshot. Currentness verification deterministically
-reproduces the full projection; a merely redigested assignment is a conflict.
+later than the asserted snapshot, and availability cannot predate its manifest.
+Currentness cannot begin before `projectedAt` and deterministically reproduces the
+full projection; a merely redigested assignment is a conflict.
 
 For each active use, the projector selects the weakest verified-present,
 unexpired linked manifest whose retention satisfies the policy:
