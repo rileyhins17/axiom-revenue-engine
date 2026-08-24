@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, durableEvidenceMigration] = await Promise.all([
+const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, durableEvidenceMigration, fencedResumeMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../.env.example", import.meta.url), "utf8"),
@@ -22,7 +22,9 @@ const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap,
   readFile(new URL("../src/lib/revenue-engine/fixture-website-evidence-workflow.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/durable-evidence-persistence-plan.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0056_durable_evidence_receipts.sql", import.meta.url), "utf8"),
+  readFile(new URL("../migrations/0057_fenced_evidence_resume_records.sql", import.meta.url), "utf8"),
 ]);
 
 const failures = [];
@@ -148,10 +150,22 @@ requireMatch("src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", f
 requireMatch("src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", fixtureEvidenceResumePlan, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "resume planning must not authorize provider operations");
 requireMatch("src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", fixtureEvidenceResumePlan, /rollbackDeletionAuthorized:\s*z\.literal\(false\)/, "artifact reconciliation must never authorize rollback deletion");
 forbidMatch("src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", fixtureEvidenceResumePlan, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "fixture-only resume planning must not access providers, runtime bindings, databases, network fetch, writes, or deletion");
+requireMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", fencedResumePersistence, /plannerKind:\s*z\.literal\("FIXTURE"\)/, "fenced resume persistence planning must remain fixture-only");
+requireMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", fencedResumePersistence, /maxCostUsd:\s*z\.literal\(0\)/, "fenced resume persistence planning must have zero provider budget");
+requireMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", fencedResumePersistence, /mutationAuthorized:\s*z\.literal\(false\)/, "fenced resume persistence plans must not authorize mutation");
+requireMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", fencedResumePersistence, /resumeAuthorized:\s*z\.literal\(false\)/, "fenced resume persistence plans must not authorize resume");
+requireMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", fencedResumePersistence, /executionAuthorized:\s*z\.literal\(false\)/, "fenced resume persistence plans must not authorize execution");
+requireMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", fencedResumePersistence, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "fenced resume persistence plans must not authorize provider operations");
+forbidMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", fencedResumePersistence, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "fenced resume persistence planning must not access providers, runtime bindings, databases, network fetch, writes, or deletion");
+forbidMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", fencedResumePersistence, /LIMIT\s+1/i, "collision preflights must inspect every matching primary or alternate identity");
 for (const table of ["RevenueWorkflowRun", "RevenueWorkflowReceipt", "RevenueWorkflowStepReceipt", "RevenueWebsitePageSelection", "RevenueArtifactManifest", "RevenueArtifactManifestEvidenceUse", "RevenueArtifactReleaseRecord"]) {
   requireMatch("migrations/0056_durable_evidence_receipts.sql", durableEvidenceMigration, new RegExp(`CREATE TABLE \\\"${table}\\\"`), `${table} must remain an additive durable evidence table`);
 }
 forbidMatch("migrations/0056_durable_evidence_receipts.sql", durableEvidenceMigration, /\b(?:UPDATE|DELETE\s+FROM|INSERT\s+INTO|CREATE\s+TRIGGER)\b/i, "the additive durable evidence migration must not mutate existing rows or install triggers");
+for (const table of ["RevenueWorkflowDefinition", "RevenueWorkflowDelivery", "RevenueWorkflowAttempt", "RevenueWorkflowAttemptClosure", "RevenueWorkflowLease", "RevenueWorkflowReceiptRevision", "RevenueWorkflowCheckpointPayload", "RevenueWorkflowCheckpoint", "RevenueWorkflowCheckpointStateReceipt", "RevenueWorkflowCheckpointDependency", "RevenueArtifactRecoveryPlan", "RevenueArtifactRecoveryReceipt"]) {
+  requireMatch("migrations/0057_fenced_evidence_resume_records.sql", fencedResumeMigration, new RegExp(`CREATE TABLE \\"${table}\\"`), `${table} must remain an additive fenced resume table`);
+}
+forbidMatch("migrations/0057_fenced_evidence_resume_records.sql", fencedResumeMigration, /\b(?:UPDATE|DELETE\s+FROM|INSERT\s+INTO|CREATE\s+TRIGGER)\b/i, "the additive fenced resume migration must not mutate existing rows or install triggers");
 
 if (failures.length > 0) {
   console.error("Safety configuration check failed:");

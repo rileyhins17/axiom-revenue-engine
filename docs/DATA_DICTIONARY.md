@@ -47,6 +47,10 @@
 | ArtifactRecoveryRecord | Exact content-addressed write plan and receipt retained across partial failure, deployment interruption, created/reused retry, and no-delete reconciliation. |
 | WorkflowReceiptRevision | Versioned wrapper binding an exact aggregate workflow receipt to its request, definition, and attempt; completed and partial audit results become terminal only when sealed. |
 | FixtureWebsiteEvidenceResumePlan | Deterministic zero-authority decision to block, return terminal, wait, request a first fence, or request a higher-fenced takeover with an exact continuation/reconciliation plan. |
+| WorkflowAttempt/Closure | Durable attempt identity plus at most one immutable ended-state record; absence of a closure means running, and sealed closure requires its exact terminal receipt. |
+| WorkflowCheckpointPayload/StateReceipt | Content-addressed full fixture payload and stable checkpoint identity plus append-only prepared/committed state, so commit never overwrites recovery history. |
+| ArtifactRecoveryPlan/Receipt | Byte-bound content-addressed plan stored once plus one or more exact fenced retry outcomes with zero provider-write/cost authority and no-delete rollback. |
+| FencedEvidenceResumePersistencePlan | Migration-0057 expected-state/preflight/insert-if-absent plan that rejects blocked resume history, checks every collision candidate, and grants no database or execution authority. |
 | CostLedger | Provider usage/cost attached to a run, lead, campaign, and budget period. |
 | KwLeadEvaluationSet | Private 50-lead owner-labelled KW quality gate used to measure engine agreement before live outreach. |
 | PrivateKwImportPlan | Versioned, ignored local seed of canonical research-only businesses, locations, cohort source runs, and source records; it grants no qualification or outreach authority. |
@@ -152,5 +156,17 @@
   acquire a lease, run a step, contact a provider, spend money, or delete an
   object: `mutationAuthorized`, `executionAuthorized`, and deletion authority
   remain false, with provider operations and cost fixed at zero.
+- Migration 0057 stores stable attempt identity separately from one immutable
+  closure, and checkpoint identity/payload separately from prepared/committed
+  state receipts. Artifact recovery plans are also separate from retry receipts,
+  so an exact failed-then-completed reconciliation does not rewrite the plan.
+- Fenced persistence preflights query every row matching the primary or any
+  alternate unique identity and use no `LIMIT 1`. Missing is safe to insert;
+  exactly one byte-for-byte expected row is idempotent; drift or multiple rows
+  block. A blocked resume decision cannot produce a persistence plan.
+- The migration-0057 planner serializes fixture `Uint8Array` artifact bytes with
+  an explicit base64 tag, but has no loader or D1 executor. Atomic fence claim,
+  decode/revalidation, D1 payload-size policy, and transaction post-verification
+  remain separate release-gated work.
 - An approval is invalid after content changes, expiry, rejection, or revocation;
   the final provider call recomputes its digest every time.

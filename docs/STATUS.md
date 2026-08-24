@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-23 (America/Toronto)
+Last updated: 2026-08-24 (America/Toronto)
 
 ## Plain-English status
 
@@ -75,11 +75,13 @@ staging; no rebuild code or migration has been deployed to production.
   `c3591e9443826271bea9db9cddcc61f6d304ebfa`
 - Fenced evidence-resume documentation checkpoint:
   `7a3e40a47129403a8feae3983d604ecde743caba`
+- Fenced resume-persistence checkpoint: current worktree; exact commit and Linux
+  CI run will be recorded after the checkpoint is pushed
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Local migrations: all 56 apply, including the fail-closed lockdown, shadow
+- Local migrations: all 57 apply, including the fail-closed lockdown, shadow
   Revenue Engine records, content-bound outreach approval, and durable evidence
-  receipts
+  plus fenced resume history
 - Current checkpoint verification rerun 2026-08-21: 160/160 tests, typecheck,
   zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
   build, and Wrangler deploy dry run pass
@@ -386,6 +388,25 @@ staging; no rebuild code or migration has been deployed to production.
 - Linux CI run `32685987966` passed all 13 gates on fenced-resume checkpoint
   `fbabd3e`, including exact dependencies, a clean Ubuntu Cloudflare build, all
   56 migrations from zero, 283/283 tests, and both no-upload Worker validations.
+- Additive migration 0057 now stores the exact workflow definition, delivery,
+  stable attempt identity, fenced lease, full checkpoint payload/locator,
+  dependency graph, checkpoint state receipt, artifact recovery plan/receipt,
+  aggregate receipt revision, and ended-attempt closure needed for recovery.
+- RUNNING attempts are represented by an identity with no closure; ended attempts
+  receive one immutable closure. Checkpoint identity/payload is separate from
+  append-only `PREPARED`/`COMMITTED` receipts, and artifact plans are stored once
+  independently of failed or completed retry receipts.
+- The new validation-only persistence planner refuses any blocked resume history,
+  returns every primary/alternate identity candidate with no `LIMIT 1`, rejects
+  drift or multiple matches, preserves byte payloads with an explicit encoding,
+  and still grants no D1 mutation, resume, execution, provider, or cost authority.
+- Fenced-persistence checkpoint verification passes 289/289 tests, typecheck,
+  zero-warning lint, repository safety, the secret-sanitized Cloudflare build,
+  explicit default console no-upload dry run, deterministic engine bindings, and
+  the inert engine no-upload dry run. All 57 migrations replayed from zero in
+  isolated local D1 directory
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-60ac76a9acb34866b2ed072652c587d5`.
+  Linux CI is pending this checkpoint.
 
 ## Safety and production
 
@@ -394,7 +415,7 @@ staging; no rebuild code or migration has been deployed to production.
 - Even if send configuration is later enabled, the final Gmail call now blocks
   without an unexpired operator approval matching the exact message content.
 - Production D1 is `axiom-ops-omniscient` (58 tables, about 223 MB). Remote schema
-  is still at migration 0052; migrations 0053-0056 have not been applied.
+  is still at migration 0052; migrations 0053-0057 have not been applied.
 - At `2026-08-22T03:03:15Z`, the single global settings row was safely corrected
   from `enabled=1` to `enabled=0`; global, emergency, intake, and follow-up pauses
   all remain `1`. This was one reversible row update after the verified export.
@@ -487,6 +508,10 @@ Completed gates:
   delivery contracts, contiguous attempts, stale-worker fencing, terminal-result
   precedence, dependency-closed continuation, artifact reconciliation, and a
   deterministic zero-authority plan covering crashes and duplicate delivery.
+- Fenced resume persistence: additive migration 0057, stable identity plus
+  immutable closure/state receipts, separate artifact plans and retry receipts,
+  collision-complete preflights, exact idempotency checks, base64-tagged fixture
+  bytes, and zero mutation/resume/execution/provider authority.
 
 Still required for Phase 1:
 
@@ -520,13 +545,12 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Add additive delivery, attempt, fenced-lease, checkpoint payload/locator, and
-   artifact-recovery records plus a validation-only persistence plan. Keep D1
-   mutation and runtime execution authority false until exact preflight,
-   idempotency, transaction, and migration-replay tests pass.
-2. Add evidence-use ending and current-reference projection records so retention
+1. Add evidence-use ending and current-reference projection records so retention
    review can distinguish active from ended uses without inferring deletion
    authority.
+2. Specify the atomic D1 loader/transaction contract for exact history reads,
+   fence acquisition, insert-if-absent execution, and post-verification. Keep the
+   executor absent until those tests and a staging migration gate pass.
 3. Design the separately release-gated Cloudflare Browser/R2 staging adapters and
    smoke test; do not add a binding or make a live request until R2, budget,
    rollback, and owner approval gates are recorded.

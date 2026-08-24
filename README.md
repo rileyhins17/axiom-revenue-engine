@@ -138,8 +138,17 @@ plans and receipts for no-delete reconciliation. The deterministic planner
 returns sealed terminal results, waits for active leases, blocks version or
 integrity drift, or proposes the exact next fence and safe continuation point.
 It cannot acquire a lease, mutate D1, call Browser/R2, execute a workflow, or
-authorize provider cost; additive persistence for these new contracts remains a
-separate checkpoint.
+authorize provider cost.
+
+Additive migration 0057 can now represent that exact recovery history without
+overwriting it. Stable attempts are closed by separate immutable records;
+checkpoint identity/payload is separate from prepared/committed state receipts;
+and artifact plans are separate from retry receipts. The validation-only planner
+rejects blocked resume histories and checks every primary or alternate identity
+candidate before proposing ordered insert-if-absent SQL. It deliberately has no
+database executor or transaction: all mutation, resume, execution, provider, and
+cost authority remains false. All 57 migrations pass from zero in isolated local
+D1, but migration 0057 has not been applied to staging or production.
 
 ## Verification
 

@@ -63,6 +63,41 @@ Retire entries when the architecture makes them impossible.
 - **Verifying commit:** staging inventory confirmed the singular live names on
   2026-08-22; typed v2 repository layer remains pending.
 
+## DATA-002 — A one-row preflight hid alternate identity collisions
+
+- **Symptom:** an idempotency preflight could return the expected primary-key row
+  while a second row matched an alternate unique identity, making an ignored
+  insert look safely idempotent.
+- **Root cause:** the query combined primary and alternate identities with `OR`
+  and `LIMIT 1`, so it never proved how many durable rows matched.
+- **Proven fix:** enforce every alternate identity with a `UNIQUE` index, return
+  all matching rows, and accept only zero rows or one exact expected row.
+- **Prevention/test:**
+  `fenced-evidence-resume-persistence-plan.test.ts` covers stored drift, a real
+  alternate-key collision, and explicit multiple-match rejection; new durable
+  planners must not use `LIMIT 1` for collision preflight.
+- **Affected area:** D1 idempotency, retries, imports, and workflow recovery.
+- **Verifying commit:** current fenced-resume persistence checkpoint; exact commit
+  pending.
+
+## RUN-002 — Mutable snapshots were mistaken for append-only records
+
+- **Symptom:** a valid attempt transition from `RUNNING` to `SEALED`, or a
+  checkpoint transition from `PREPARED` to `COMMITTED`, would require an update
+  or fail exact-preflight validation under the same stable ID.
+- **Root cause:** stable identity and changing state were combined in one
+  supposedly immutable row.
+- **Proven fix:** store stable attempt/checkpoint identity once; represent ended
+  attempts with one immutable closure and checkpoint state with constrained
+  append-only receipts. Store artifact plans separately from retry receipts for
+  the same reason.
+- **Prevention/test:** migration 0057 unique constraints and fenced-persistence
+  tests cover running-without-closure, terminal sealing order, state/retry
+  identity, and exact replay.
+- **Affected area:** durable workflow recovery, fencing, and artifact replay.
+- **Verifying commit:** current fenced-resume persistence checkpoint; exact commit
+  pending.
+
 ## AI-001 — Provider/model documentation drift
 
 - **Symptom:** runtime used DeepSeek while setup documentation named Gemini; the
