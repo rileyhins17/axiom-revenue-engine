@@ -470,8 +470,11 @@ staging; no rebuild code or migration has been deployed to production.
   and the inert engine no-upload dry run. All 59 migrations replayed
   from zero in isolated local D1 at
   `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-3d63dc5743484ceb9ae060e718ba0950`,
-  with 59 migration receipts and all four new tables verified. Ubuntu CI remains
-  to be recorded for the final clean checkpoint.
+  with 59 migration receipts and all four new tables verified.
+- Linux CI run `32694884895` passed every gate on checkpoint `dc6e697`: a clean
+  Ubuntu Cloudflare build, all 59 migrations from zero, 318/318 tests,
+  fail-closed safety, deterministic bindings, typecheck, zero-warning lint, and
+  both no-upload Worker validations.
 
 ## Safety and production
 
