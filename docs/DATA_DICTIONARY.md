@@ -14,8 +14,11 @@
 | ArtifactWriteReceipt | The immutable outcome of a fixture storage attempt, including created/reused items, exact object identity, operation counts, cost, failure point, and no-delete rollback decision. |
 | ArtifactManifest | Verified identity and current retention location for a bounded group of immutable artifacts, derived only from a completed write or promotion receipt. |
 | ArtifactEvidenceUse | Versioned qualification, outreach, consent, touch, or legal-hold record that determines the minimum protection an artifact requires. |
+| ArtifactEvidenceUseEnd | One immutable, basis-backed ending for an exact evidence-use version; it preserves history and grants no release or deletion authority. |
 | ArtifactPromotionPlan/Receipt | Idempotent copy plan and result that preserve content identity while moving evidence only to a stronger retention prefix. |
 | ArtifactManifestEvidenceUse | Immutable link from a promoted manifest to the exact versioned business record that currently requires its retention. |
+| ArtifactReferenceProjection | Immutable, time-bounded lineage snapshot that assigns each active use to the weakest valid sufficient manifest or reports ambiguity/incompleteness. |
+| ArtifactReferenceProjectionUse/Assignment | Queryable per-use state and exact current protecting-manifest candidate(s), including ended, unique, ambiguous, and unassigned outcomes. |
 | ArtifactReleaseRecord | Content-bound owner/compliance retention decision covering every listed evidence use; it records review but cannot itself delete an object. |
 | WebsitePageSelectionPlan | Deterministic zero-cost ranking of one same-site service, about, and contact URL from fresh homepage link evidence, with visible candidate scores, exclusions, completeness, and budget receipt. |
 | WebsiteAuditAssembly | One versioned business-level receipt linking selected page captures, HTML facts, Browser evidence, artifact receipts, freshness, completeness, and per-business budgets to the exact deterministic audit input. |
@@ -51,6 +54,7 @@
 | WorkflowCheckpointPayload/StateReceipt | Content-addressed full fixture payload and stable checkpoint identity plus append-only prepared/committed state, so commit never overwrites recovery history. |
 | ArtifactRecoveryPlan/Receipt | Byte-bound content-addressed plan stored once plus one or more exact fenced retry outcomes with zero provider-write/cost authority and no-delete rollback. |
 | FencedEvidenceResumePersistencePlan | Migration-0057 expected-state/preflight/insert-if-absent plan that rejects blocked resume history, checks every collision candidate, and grants no database or execution authority. |
+| ArtifactReferencePersistencePlan | Migration-0058 collision-complete preflight/insert-if-absent plan for endings, projections, projected uses, and assignments; it grants no mutation, retention-release, deletion, provider, or cost authority. |
 | CostLedger | Provider usage/cost attached to a run, lead, campaign, and budget period. |
 | KwLeadEvaluationSet | Private 50-lead owner-labelled KW quality gate used to measure engine agreement before live outreach. |
 | PrivateKwImportPlan | Versioned, ignored local seed of canonical research-only businesses, locations, cohort source runs, and source records; it grants no qualification or outreach authority. |
@@ -105,9 +109,17 @@
 - A workflow receipt lists the manifest derived from every successful artifact
   write. A promotion source must already be in that receipt or an earlier ordered
   promotion, and a release record cannot introduce evidence outside that chain.
-- Persisted evidence-use links mean "known active use" in version 1. No use-ending
-  record or current-reference projection exists yet, so these records cannot
-  authorize expiry, release, object deletion, or a claimed zero reference count.
+- Persisted evidence-use links are immutable history, not a live counter. One
+  exact use-ending record may close a versioned purpose; a new purpose needs a
+  new use ID. Legal hold can end only through explicit compliance clearance.
+- A current-reference projection binds a complete workflow/business lineage,
+  manifests, completed promotions, exact promotion/use links, use endings, and
+  availability facts. Each active use selects the weakest verified-present,
+  unexpired linked copy that satisfies retention. Equal candidates or no valid
+  candidate make the projection indeterminate rather than zero-reference.
+- `NO_CURRENT_REFERENCES` is only a point-in-time retention-review suggestion.
+  Every projection requires a fresh source-digest recheck and fixes release,
+  deletion, provider operations, and cost authority to false/zero.
 - A release decision reviews every listed use exactly once and is bound to the
   manifest, uses, actor, reason, rationale, and time by a deterministic digest.
   Even an approved release has `providerDeleteAuthorized: false`; a future delete

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, durableEvidenceMigration, fencedResumeMigration] = await Promise.all([
+const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../.env.example", import.meta.url), "utf8"),
@@ -23,8 +23,11 @@ const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap,
   readFile(new URL("../src/lib/revenue-engine/durable-evidence-persistence-plan.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/fixture-website-evidence-resume-plan.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/artifact-reference-projection.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/artifact-reference-persistence-plan.ts", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0056_durable_evidence_receipts.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0057_fenced_evidence_resume_records.sql", import.meta.url), "utf8"),
+  readFile(new URL("../migrations/0058_artifact_reference_projections.sql", import.meta.url), "utf8"),
 ]);
 
 const failures = [];
@@ -158,6 +161,19 @@ requireMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts"
 requireMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", fencedResumePersistence, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "fenced resume persistence plans must not authorize provider operations");
 forbidMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", fencedResumePersistence, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "fenced resume persistence planning must not access providers, runtime bindings, databases, network fetch, writes, or deletion");
 forbidMatch("src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", fencedResumePersistence, /LIMIT\s+1/i, "collision preflights must inspect every matching primary or alternate identity");
+requireMatch("src/lib/revenue-engine/artifact-reference-projection.ts", artifactReferenceProjection, /projectorKind:\s*z\.literal\("FIXTURE"\)/, "artifact reference projection must remain fixture-only");
+requireMatch("src/lib/revenue-engine/artifact-reference-projection.ts", artifactReferenceProjection, /releaseAuthorized:\s*z\.literal\(false\)/, "reference projections must not authorize retention release");
+requireMatch("src/lib/revenue-engine/artifact-reference-projection.ts", artifactReferenceProjection, /deletionAuthorized:\s*z\.literal\(false\)/, "reference projections must not authorize deletion");
+requireMatch("src/lib/revenue-engine/artifact-reference-projection.ts", artifactReferenceProjection, /providerDeleteAuthorized:\s*z\.literal\(false\)/, "reference projections must not authorize provider deletion");
+requireMatch("src/lib/revenue-engine/artifact-reference-projection.ts", artifactReferenceProjection, /maxCostUsd:\s*z\.literal\(0\)/, "artifact reference projection must have zero provider budget");
+forbidMatch("src/lib/revenue-engine/artifact-reference-projection.ts", artifactReferenceProjection, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "artifact reference projection must not access providers, runtime bindings, databases, network, writes, or deletion");
+requireMatch("src/lib/revenue-engine/artifact-reference-persistence-plan.ts", artifactReferencePersistence, /plannerKind:\s*z\.literal\("FIXTURE"\)/, "artifact reference persistence planning must remain fixture-only");
+requireMatch("src/lib/revenue-engine/artifact-reference-persistence-plan.ts", artifactReferencePersistence, /mutationAuthorized:\s*z\.literal\(false\)/, "artifact reference persistence must not authorize database mutation");
+requireMatch("src/lib/revenue-engine/artifact-reference-persistence-plan.ts", artifactReferencePersistence, /retentionReleaseAuthorized:\s*z\.literal\(false\)/, "artifact reference persistence must not authorize retention release");
+requireMatch("src/lib/revenue-engine/artifact-reference-persistence-plan.ts", artifactReferencePersistence, /deletionAuthorized:\s*z\.literal\(false\)/, "artifact reference persistence must not authorize deletion");
+requireMatch("src/lib/revenue-engine/artifact-reference-persistence-plan.ts", artifactReferencePersistence, /providerDeleteAuthorized:\s*z\.literal\(false\)/, "artifact reference persistence must not authorize provider deletion");
+forbidMatch("src/lib/revenue-engine/artifact-reference-persistence-plan.ts", artifactReferencePersistence, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "artifact reference persistence planning must not access providers, runtime bindings, databases, network, writes, or deletion");
+forbidMatch("src/lib/revenue-engine/artifact-reference-persistence-plan.ts", artifactReferencePersistence, /LIMIT\s+1/i, "artifact reference collision preflights must inspect every matching identity");
 for (const table of ["RevenueWorkflowRun", "RevenueWorkflowReceipt", "RevenueWorkflowStepReceipt", "RevenueWebsitePageSelection", "RevenueArtifactManifest", "RevenueArtifactManifestEvidenceUse", "RevenueArtifactReleaseRecord"]) {
   requireMatch("migrations/0056_durable_evidence_receipts.sql", durableEvidenceMigration, new RegExp(`CREATE TABLE \\\"${table}\\\"`), `${table} must remain an additive durable evidence table`);
 }
@@ -166,6 +182,11 @@ for (const table of ["RevenueWorkflowDefinition", "RevenueWorkflowDelivery", "Re
   requireMatch("migrations/0057_fenced_evidence_resume_records.sql", fencedResumeMigration, new RegExp(`CREATE TABLE \\"${table}\\"`), `${table} must remain an additive fenced resume table`);
 }
 forbidMatch("migrations/0057_fenced_evidence_resume_records.sql", fencedResumeMigration, /\b(?:UPDATE|DELETE\s+FROM|INSERT\s+INTO|CREATE\s+TRIGGER)\b/i, "the additive fenced resume migration must not mutate existing rows or install triggers");
+for (const table of ["RevenueArtifactEvidenceUseEnd", "RevenueArtifactReferenceProjection", "RevenueArtifactReferenceProjectionUse", "RevenueArtifactReferenceProjectionAssignment"]) {
+  requireMatch("migrations/0058_artifact_reference_projections.sql", artifactReferenceMigration, new RegExp(`CREATE TABLE \\"${table}\\"`), `${table} must remain an additive artifact reference table`);
+}
+forbidMatch("migrations/0058_artifact_reference_projections.sql", artifactReferenceMigration, /\b(?:UPDATE|DELETE\s+FROM|INSERT\s+INTO|CREATE\s+TRIGGER)\b/i, "the additive artifact reference migration must not mutate existing rows or install triggers");
+requireMatch("migrations/0058_artifact_reference_projections.sql", artifactReferenceMigration, /CHECK \("providerDeleteAuthorized" = 0\)/, "artifact reference records must reject provider deletion authority");
 
 if (failures.length > 0) {
   console.error("Safety configuration check failed:");

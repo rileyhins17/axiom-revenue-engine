@@ -150,6 +150,18 @@ database executor or transaction: all mutation, resume, execution, provider, and
 cost authority remains false. All 57 migrations pass from zero in isolated local
 D1, but migration 0057 has not been applied to staging or production.
 
+Evidence-use endings and current-reference reasoning are now explicit without
+turning a historical link into a mutable counter. One immutable ending binds the
+exact use, effective time, owner/compliance basis, and actor. A lineage-wide
+projection then checks a complete, fresh snapshot of workflow identity,
+manifests, completed promotions, use links, endings, and storage availability.
+For each active use it chooses the weakest valid copy that still satisfies the
+required retention. Equal candidates or a missing valid copy remain
+`INDETERMINATE`; all-ended uses can produce only a retention-review suggestion.
+Migration 0058 and its collision-complete persistence plan grant no mutation,
+release, deletion, provider, or cost authority and have not been applied to
+staging or production.
+
 ## Verification
 
 ```powershell

@@ -96,6 +96,27 @@ Retire entries when the architecture makes them impossible.
 - **Affected area:** durable workflow recovery, fencing, and artifact replay.
 - **Verifying commit:** `6d5db2b`.
 
+## DATA-003 — Historical promotion links looked like current references
+
+- **Symptom:** one evidence use linked through qualification, outreach, and legal
+  copies would make every historical manifest appear permanently active, while
+  choosing only the newest/strongest copy would prevent safe fallback after a
+  stronger purpose ended.
+- **Root cause:** immutable promotion/use history was treated as a mutable current
+  assignment instead of evaluating the full lineage, use endings, expiry, and
+  verified object availability together.
+- **Proven fix:** keep one immutable ending per use version and build a complete,
+  time-bounded lineage projection. Assign each active use to the weakest valid
+  sufficient copy; preserve equal candidates as ambiguous and missing candidates
+  as indeterminate. A zero-reference result still grants no deletion authority.
+- **Prevention/test:** `artifact-reference-projection.test.ts` covers legal-hold
+  fallback, expiry fallback, equal-rank ambiguity, no-copy self-edges, stale
+  source facts, all-ended uses, and zero authority. Migration/persistence tests
+  cover idempotency, drift, alternate collisions, multiple matches, and FKs.
+- **Affected area:** evidence retention, promotion lineage, compliance review,
+  and future R2 lifecycle cleanup.
+- **Verifying commit:** pending this checkpoint.
+
 ## AI-001 — Provider/model documentation drift
 
 - **Symptom:** runtime used DeepSeek while setup documentation named Gemini; the
