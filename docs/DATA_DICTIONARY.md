@@ -152,6 +152,20 @@
   one sealed terminal result, and validates manifest/promotion/use/replacement
   closure. It cannot upgrade a caller observation to trust; only the private
   database executor can do so after commit and reload.
+- A trusted projection-v2 input must be the exact frozen in-process object
+  returned by a fresh executor commit. Schema-shaped clones and exact sealed
+  replays are not materialized source snapshots and cannot be projected. The
+  adapter separately binds the sealed availability-v2 source digest and its
+  deterministic v1 compatibility-replay digest.
+- A transactionally complete selected lineage with zero active evidence uses may
+  report `NO_CURRENT_REFERENCES`. Ambiguous or unassigned active uses remain
+  `INDETERMINATE`. These are reference observations only: retention conclusions,
+  projection persistence, release, deletion, provider work, and cost all remain
+  unauthorized.
+- Only `SHADOW_30D` availability carries an automatic object-expiry fact.
+  `QUALIFICATION_180D` is a review policy for promoted evidence, not an R2
+  lifecycle deletion authorization; all promoted classes reject an invented
+  automatic object expiry.
 - Migration 0060 makes all 15 atomic source tables append-only and freezes any
   scoped insert while an unsealed workflow snapshot satisfies
   `acquiredAt <= database-now < expiresAt`. The database scope includes alternate

@@ -93,6 +93,8 @@ staging; no rebuild code or migration has been deployed to production.
   `7d209816ee9bacb11537d37920ef75efede143c5`
 - Private artifact-reference D1 executor source checkpoint:
   `a9da5ad20e843f528fff7b528dcb8f9d5095fc9b`
+- Trusted artifact-reference projection-v2 source checkpoint:
+  `9e0673be21decd2f70f9f215829a6ab53ba502e3`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 60 apply, including the fail-closed lockdown, shadow
@@ -662,6 +664,28 @@ Completed gates:
   fail-closed safety, both Cloudflare builds, all 60 migrations from zero,
   336/336 tests, typecheck, zero-warning lint, and both no-upload Worker
   validations.
+- Exact-head Linux CI run `32703474283` also passed every gate on the final
+  executor documentation checkpoint `a9a4703385595d074f7d58a757eaed4a011e4476`.
+- Trusted projection-v2 now accepts only the exact frozen in-process result of a
+  fresh D1 commit with materialized rows. It rejects stale windows, receipt-only
+  replay, cloned trust envelopes, and source drift, then replays the selected
+  lineage deterministically. Complete zero-active-use snapshots may report
+  `NO_CURRENT_REFERENCES`; ambiguous or unassigned active uses remain
+  `INDETERMINATE`.
+- The compatibility replay now matches availability v2: only shadow objects may
+  carry automatic object expiry. Qualification's 180-day policy is a retention
+  review boundary, not automatic R2 deletion. Projection persistence, retention
+  conclusions, release, deletion, provider operations, cost, outreach, and every
+  live runtime path remain false/zero/off.
+- Trusted-projection checkpoint verification passes 340/340 tests, fail-closed
+  safety, typecheck, zero-warning lint, the secret-sanitized Cloudflare build,
+  the console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. All 60 migrations replayed from zero in isolated
+  local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-82394009ccd04fa695f01c8e8ab1aedf`,
+  with 60 migration receipts, 51 triggers, and 15 scoped insert freezes. No
+  staging/production migration, deployment, D1/R2/Browser/provider call, secret
+  access, or prospect action occurred.
 
 Still required for Phase 1:
 
@@ -695,15 +719,14 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Add a fixture-only projection-v2 adapter that accepts only a fresh-commit
-   executor result with materialized decoded rows, replays the selected lineage,
-   and still grants no persistence or retention-conclusion authority.
-2. Add adversarial projection-v2 tests for stale receipts, exact sealed replay
-   without materialized rows, source-facts mismatch, no-current-reference cases,
-   ambiguous assignments, and zero-authority output.
-3. Design the separately release-gated R2 HEAD staging adapter and smoke test; do
-   not add a binding, apply migrations 0059-0060, or make a live request until
-   backup, rollback, budget, R2 activation, and owner approval are recorded.
+1. Define a zero-authority R2 HEAD adapter contract around exact manifest-object
+   requests and availability-v2 receipts, using only an injected fixture client;
+   do not add a live binding or request path.
+2. Add adversarial adapter tests for missing/mismatched HEAD metadata, stale
+   windows, object and operation caps, retry determinism, and zero authority.
+3. Write the staging R2 activation, budget, smoke-test, and rollback checklist,
+   then pause before any bucket, binding, live request, or migration 0059–0060
+   apply until the owner explicitly approves it.
 
 ## Resume instructions
 

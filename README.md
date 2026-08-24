@@ -213,6 +213,21 @@ deployment approval, provider authority, projection persistence, retention
 conclusion, release, deletion, outreach, or cost authority. Migrations 0059–0060
 remain unapplied to staging and production.
 
+A fixture-only projection-v2 adapter can now consume only the exact frozen
+in-process result of a fresh D1 commit with materialized source rows. It rejects
+receipt-only replay, cloned “trusted” JSON, source drift, and stale half-open
+freshness windows, then deterministically replays the selected lineage. A
+complete source set with no active uses can finally report
+`NO_CURRENT_REFERENCES`; equal-rank or unassigned candidates remain
+`INDETERMINATE`.
+
+That result is evidence, not permission. It is not persisted and cannot authorize
+a retention conclusion, release, deletion, provider operation, outreach, or
+spend. Only shadow objects carry automatic object expiry in the replay contract;
+the 180-day qualification policy requires a later retention review instead of an
+invented R2 lifecycle delete. The adapter is still disconnected from the Worker,
+and no live resource was touched.
+
 ## Verification
 
 ```powershell

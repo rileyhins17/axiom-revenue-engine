@@ -187,6 +187,27 @@ Retire entries when the architecture makes them impossible.
   lineage, evidence-use replacement, availability, and future retention logic.
 - **Verifying commit:** `7d20981`.
 
+## DATA-007 — A retention review window was mistaken for automatic object expiry
+
+- **Symptom:** the older lineage projector required a future `expiresAt` for
+  `QUALIFICATION_180D`, while availability v2 rejected that same expiry as unsafe
+  for a promoted object. A complete projection failed as soon as qualification
+  evidence entered the lineage.
+- **Root cause:** the 180-day business retention-review policy was represented as
+  if it were direct permission for storage lifecycle deletion. This drifted from
+  the newer rule that promoted evidence stays protected until an explicit
+  reference and release review.
+- **Proven fix:** only `SHADOW_30D` carries automatic object expiry. Qualification,
+  outreach, and legal-hold manifests require no automatic expiry; deterministic
+  projection can still choose them, but later release/deletion remains a separate
+  zero-authority gate.
+- **Prevention/test:** projection, persistence, availability-v2, trusted-adapter,
+  and safety tests reject invented promoted-object expiry while preserving
+  missing-object fallback and the 180-day review policy.
+- **Affected area:** artifact availability, qualification retention, current-
+  reference replay, future R2 lifecycle policy, and deletion safety.
+- **Verifying commit:** `9e0673b`.
+
 ## AI-001 — Provider/model documentation drift
 
 - **Symptom:** runtime used DeepSeek while setup documentation named Gemini; the
