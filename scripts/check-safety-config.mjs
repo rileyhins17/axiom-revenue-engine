@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration] = await Promise.all([
+const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../.env.example", import.meta.url), "utf8"),
@@ -25,9 +25,11 @@ const [wrangler, engineWrangler, example, envSource, packageJson, ci, bootstrap,
   readFile(new URL("../src/lib/revenue-engine/fenced-evidence-resume-persistence-plan.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-projection.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-persistence-plan.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0056_durable_evidence_receipts.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0057_fenced_evidence_resume_records.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0058_artifact_reference_projections.sql", import.meta.url), "utf8"),
+  readFile(new URL("../migrations/0059_atomic_artifact_reference_snapshots.sql", import.meta.url), "utf8"),
 ]);
 
 const failures = [];
@@ -187,6 +189,18 @@ for (const table of ["RevenueArtifactEvidenceUseEnd", "RevenueArtifactReferenceP
 }
 forbidMatch("migrations/0058_artifact_reference_projections.sql", artifactReferenceMigration, /\b(?:UPDATE|DELETE\s+FROM|INSERT\s+INTO|CREATE\s+TRIGGER)\b/i, "the additive artifact reference migration must not mutate existing rows or install triggers");
 requireMatch("migrations/0058_artifact_reference_projections.sql", artifactReferenceMigration, /CHECK \("providerDeleteAuthorized" = 0\)/, "artifact reference records must reject provider deletion authority");
+requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /allSourceWritersGuarded:\s*z\.literal\(false\)/, "atomic reference planning must remain blocked until every source writer honors the fence");
+requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /completenessReceiptCreationAuthorized:\s*z\.literal\(false\)/, "validation-only planning must not mint a completeness receipt");
+requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /executionAuthorized:\s*z\.literal\(false\)/, "atomic reference planning must not authorize execution");
+requireMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /trusted:\s*false as const/, "structural completeness inspection must not become trusted without a D1 executor reload");
+forbidMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /@cloudflare|env\.[A-Z_]+|R2Bucket|fetch\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "atomic reference planning must not access providers, runtime bindings, databases, network, writes, or deletion");
+forbidMatch("src/lib/revenue-engine/artifact-reference-atomic-snapshot.ts", artifactReferenceAtomicSnapshot, /LIMIT\s+1/i, "atomic snapshot queries must inspect every matching identity");
+for (const table of ["RevenueArtifactReferenceSnapshotAttempt", "RevenueArtifactManifestAvailabilityReceipt", "RevenueArtifactReferenceCompletenessReceipt", "RevenueArtifactReferenceSourceSetProof"]) {
+  requireMatch("migrations/0059_atomic_artifact_reference_snapshots.sql", artifactReferenceAtomicMigration, new RegExp(`CREATE TABLE \\"${table}\\"`), `${table} must remain an additive atomic-reference table`);
+}
+forbidMatch("migrations/0059_atomic_artifact_reference_snapshots.sql", artifactReferenceAtomicMigration, /\b(?:UPDATE|DELETE\s+FROM|INSERT\s+INTO|CREATE\s+TRIGGER)\b/i, "the additive atomic-reference migration must not mutate existing rows or install triggers");
+requireMatch("migrations/0059_atomic_artifact_reference_snapshots.sql", artifactReferenceAtomicMigration, /CHECK \("retentionConclusionAuthorized" = 0\)/, "atomic reference receipts must reject retention-conclusion authority");
+requireMatch("migrations/0059_atomic_artifact_reference_snapshots.sql", artifactReferenceAtomicMigration, /CHECK \("deletionAuthorized" = 0\)/, "atomic reference records must reject deletion authority");
 
 if (failures.length > 0) {
   console.error("Safety configuration check failed:");
