@@ -77,6 +77,8 @@ staging; no rebuild code or migration has been deployed to production.
   `7a3e40a47129403a8feae3983d604ecde743caba`
 - Fenced resume-persistence source/documentation checkpoint:
   `6d5db2b1536a93571c241f5e2c3fda9be01e075e`
+- Fenced resume-persistence status checkpoint:
+  `32c7ae29b215db32e3af54938ee9efcb9d2f39fb`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 57 apply, including the fail-closed lockdown, shadow
@@ -406,7 +408,9 @@ staging; no rebuild code or migration has been deployed to production.
   the inert engine no-upload dry run. All 57 migrations replayed from zero in
   isolated local D1 directory
   `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-60ac76a9acb34866b2ed072652c587d5`.
-  Linux CI is pending this checkpoint.
+- Linux CI run `32688497512` passed all 13 gates on fenced-persistence
+  checkpoint `32c7ae2`, including a clean Ubuntu Cloudflare build, all 57
+  migrations from zero, 289/289 tests, and both no-upload Worker validations.
 
 ## Safety and production
 
