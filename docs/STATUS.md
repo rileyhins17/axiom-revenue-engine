@@ -71,6 +71,10 @@ staging; no rebuild code or migration has been deployed to production.
   `4372305279d627991e8d47ff5b717c4a81ecddc2`
 - Durable evidence-receipt documentation/CI checkpoint:
   `48c21491268461071540e5bfc0f3275c18a889fa`
+- Fenced evidence-resume source checkpoint:
+  `c3591e9443826271bea9db9cddcc61f6d304ebfa`
+- Fenced evidence-resume documentation checkpoint:
+  `7a3e40a47129403a8feae3983d604ecde743caba`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 56 apply, including the fail-closed lockdown, shadow
@@ -359,6 +363,26 @@ staging; no rebuild code or migration has been deployed to production.
 - Linux CI run `32682397316` passed all 13 gates on durable-receipt checkpoint
   `48c2149`, including exact dependencies, a clean Ubuntu Cloudflare build, all
   56 migrations from zero, 262/262 tests, and both no-upload Worker validations.
+- The fixture workflow can now emit the full replayable output of every one of
+  its eight steps to an injected fixture-only checkpoint sink. Every artifact
+  attempt is observed before a failed receipt stops the workflow, so an orphaned
+  immutable object cannot disappear from recovery history.
+- The deterministic resume planner binds the current workflow graph and all
+  component versions, exact request/delivery identity, contiguous attempt
+  history, monotonically increasing fencing tokens, exclusive lease expiry, full
+  bounded checkpoint payloads/locators, and direct committed dependencies. It
+  reproduces cross-step audit results rather than trusting a summary digest.
+- Sealed completed, partial, and unreachable audit results are terminal. Active
+  running leases wait; stale or interrupted work can only propose a higher-fenced
+  takeover. Browser/storage interruption falls back before the side-effect
+  boundary and reconciles exact retained plans, while invalid receipts or object
+  identity mismatches block without deleting anything.
+- Resume-contract verification passes 283/283 tests, typecheck, zero-warning
+  lint, repository safety, the secret-sanitized Cloudflare build, explicit
+  default console no-upload dry run, deterministic engine bindings, the inert
+  engine no-upload dry run, and all 56 migrations from zero in isolated local D1
+  storage. The planner still has no persistence executor and grants no mutation,
+  execution, provider-operation, cost, or deletion authority.
 
 ## Safety and production
 
@@ -367,7 +391,7 @@ staging; no rebuild code or migration has been deployed to production.
 - Even if send configuration is later enabled, the final Gmail call now blocks
   without an unexpired operator approval matching the exact message content.
 - Production D1 is `axiom-ops-omniscient` (58 tables, about 223 MB). Remote schema
-  is still at migration 0052; migrations 0053-0055 have not been applied.
+  is still at migration 0052; migrations 0053-0056 have not been applied.
 - At `2026-08-22T03:03:15Z`, the single global settings row was safely corrected
   from `enabled=1` to `enabled=0`; global, emergency, intake, and follow-up pauses
   all remain `1`. This was one reversible row update after the verified export.
@@ -456,6 +480,10 @@ Completed gates:
   attempt revisions, steps bound to the exact revision, queryable page/artifact
   provenance, exact preflight/idempotency planning, drift/collision detection,
   and zero mutation/resume/provider authority.
+- Fenced evidence resume: full payload/locator checkpoints, exact definition and
+  delivery contracts, contiguous attempts, stale-worker fencing, terminal-result
+  precedence, dependency-closed continuation, artifact reconciliation, and a
+  deterministic zero-authority plan covering crashes and duplicate delivery.
 
 Still required for Phase 1:
 
@@ -489,11 +517,10 @@ not activated and the project has incurred zero artifact-storage cost.
 
 ## Next three actions
 
-1. Add versioned checkpoint payload/locator contracts and a deterministic resume
-   planner over persisted receipt revisions, including version drift, stale
-   lease, duplicate delivery, partial-write, and deployment-interruption tests.
-   Keep fixture resume and runtime execution authority false until those tests
-   prove the exact safe continuation point.
+1. Add additive delivery, attempt, fenced-lease, checkpoint payload/locator, and
+   artifact-recovery records plus a validation-only persistence plan. Keep D1
+   mutation and runtime execution authority false until exact preflight,
+   idempotency, transaction, and migration-replay tests pass.
 2. Add evidence-use ending and current-reference projection records so retention
    review can distinguish active from ended uses without inferring deletion
    authority.
