@@ -89,7 +89,8 @@ staging; no rebuild code or migration has been deployed to production.
   `b7168a9b52713eb963fb7132064d1556abbd25a8`
 - Artifact-reference raw-row decoder source/documentation checkpoint:
   `588926aed3294d5cf6621834ff06d25212b90977`
-- Artifact-reference source-writer guard checkpoint: pending current commit
+- Artifact-reference source-writer guard source/documentation checkpoint:
+  `7d209816ee9bacb11537d37920ef75efede143c5`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 59 apply, including the fail-closed lockdown, shadow

@@ -180,7 +180,7 @@ Retire entries when the architecture makes them impossible.
   availability inserts while allowing unrelated records and post-seal writes.
 - **Affected area:** trusted snapshot execution, workflow retries, artifact
   lineage, evidence-use replacement, availability, and future retention logic.
-- **Verifying commit:** pending current checkpoint.
+- **Verifying commit:** `7d20981`.
 
 ## AI-001 — Provider/model documentation drift
 
