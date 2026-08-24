@@ -629,6 +629,10 @@ Completed gates:
   with 60 migration receipts, 45 source-table triggers, and 51 total triggers.
   No staging/production migration, deployment, D1/R2/Browser/provider call, or
   prospect action occurred.
+- Linux CI run `32699873974` passed every gate on checkpoint `bd87195`: clean
+  dependency installation, fail-closed safety, both Cloudflare builds, all 60
+  migrations from zero, 329/329 tests, typecheck, zero-warning lint, and both
+  no-upload Worker validations.
 
 Still required for Phase 1:
 
