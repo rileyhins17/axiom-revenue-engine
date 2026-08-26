@@ -57,6 +57,16 @@ shown as unavailable when they do not exist in v2—legacy data is never guessed
 silently merged. The matching authenticated `GET /api/v1/leads/[businessId]`
 endpoint is private/no-store and read-only.
 
+The Leads list and dossier now share an automated owner acceptance gate. It
+starts the real Next.js application against an isolated synthetic database with
+all migrations, creates a real local operator session, and checks the two owner
+flows in Chromium at desktop and mobile sizes. The gate covers WCAG 2.2 AA
+labels and contrast, keyboard/skip-link focus, reduced motion, 24-pixel target
+minimums, horizontal overflow, mobile navigation clearance, distinct page
+titles, read-only controls, and 10/15-second discoverability budgets. Browser
+requests are restricted to the exact loopback origin; no provider or prospect
+can be contacted by the test.
+
 ## Safe local setup
 
 Requirements: Node.js 22+, npm, and Wrangler through the project dependency.
@@ -269,6 +279,7 @@ activation and rollback gate is documented in
 ```powershell
 npm run check:safety
 npm test
+npm run test:owner-ui
 npm run typecheck
 npm run lint
 npm run build:cloudflare

@@ -16,6 +16,7 @@ import {
   ownerLeadContactQuery,
   parseOwnerLeadJson,
 } from "@/lib/revenue-engine/owner-lead-read-model";
+import { OwnerLeadBusinessIdSchema } from "@/lib/revenue-engine/owner-lead-identity";
 import { normalizePublicWebsiteUrl } from "@/lib/revenue-engine/public-website-url";
 import { DeterministicWebsiteAuditResultSchema } from "@/lib/revenue-engine/website-audit";
 
@@ -23,12 +24,6 @@ export const OWNER_LEAD_DETAIL_READ_MODEL_VERSION = "owner-lead-detail-read-mode
 export const OWNER_LEAD_HISTORY_LIMIT = 100;
 
 const TimestampSchema = z.string().datetime({ offset: true });
-export const OwnerLeadBusinessIdSchema = z.string()
-  .trim()
-  .min(1)
-  .max(128)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9:_-]*$/, "Business identity contains unsupported route characters.");
-
 const DetailCandidateRowSchema = OwnerLeadCandidateRowSchema.extend({
   addressLine: z.string().trim().min(1).max(300).nullable(),
   postalCode: z.string().trim().min(1).max(20).nullable(),

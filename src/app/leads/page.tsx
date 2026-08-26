@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import { OwnerLeadList, OwnerLeadsUnavailable } from "@/components/leads/owner-lead-list";
 import { getDatabase } from "@/lib/cloudflare";
 import {
@@ -7,6 +9,7 @@ import {
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Leads | Axiom Revenue Engine" };
 
 export default async function LeadsPage() {
   await requireSession();

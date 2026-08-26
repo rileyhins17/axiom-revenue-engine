@@ -289,9 +289,11 @@ Retire entries when the architecture makes them impossible.
   non-email lead value instead of ranking record/email counts.
 - **Prevention/test:** projection/read-model tests cover stale/future facts,
   score/snapshot drift, invalid rows, route quality, and zero authority. The
-  owner list has fixture-rendered semantic/content tests, safety-source guards,
-  and a local desktop/mobile browser review; automated detail-flow and owner-task
-  timing coverage remain required.
+  owner list has fixture-rendered semantic/content tests and safety-source
+  guards. `npm run test:owner-ui` now exercises authenticated list/detail flows,
+  exact route identities, WCAG AA, keyboard focus, reduced motion, desktop/mobile
+  layout, read-only controls, and owner discoverability budgets in isolated
+  Chromium; CI installs the pinned browser and runs the same gate.
 - **Affected area:** Today, Leads, System, navigation, and owner read APIs.
 - **Verifying commit:** owner read-model source `bf0c2c4`; first owner Leads
   workspace `5e273fa`.

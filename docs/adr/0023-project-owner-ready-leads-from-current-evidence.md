@@ -140,6 +140,13 @@ Pagination and materialization can be reconsidered only after measured need.
   email/phone links, forms, approval buttons, sends, provider calls, or mutations.
 - Missing screenshot delivery and sales history are labelled as unavailable
   rather than replaced with invented previews or legacy assumptions.
+- A synthetic, isolated Chromium gate now exercises the real authenticated list
+  and detail routes on desktop and mobile. It checks WCAG AA, keyboard/skip-link
+  focus, reduced motion, target size, overflow, mobile navigation clearance,
+  read-only controls, page titles, and owner discoverability time budgets.
+- Business IDs use one typed route contract. Safe delimiters remain readable in
+  generated paths, percent-encoded input is decoded exactly once, and unsafe or
+  double-encoded segments fail before D1.
 - Real results remain empty until v2 website/audit/qualification writers are
   separately implemented and verified; stale legacy records are not backfilled
   into current qualification automatically.
@@ -152,7 +159,7 @@ Pagination and materialization can be reconsidered only after measured need.
    and honest current/empty/error/loading/refresh/blocked states.
 2. [x] Build the lead detail experience from the same projection without
    inventing unavailable history or evidence.
-3. [ ] Add automated keyboard, responsive, accessibility, and owner-task timing
+3. [x] Add automated keyboard, responsive, accessibility, and owner-task timing
    tests.
 4. [ ] Implement separately gated v2 audit/qualification persistence before a
    shadow-data staging deployment.

@@ -31,6 +31,9 @@ jobs:
       - name: Install exact dependencies
         run: npm ci
 
+      - name: Install owner UI browser
+        run: npx playwright install --with-deps chromium
+
       - name: Verify fail-closed configuration
         run: npm run check:safety
 
@@ -47,6 +50,9 @@ jobs:
 
       - name: Unit and characterization tests
         run: npm test
+
+      - name: Owner Leads browser acceptance
+        run: npm run test:owner-ui
 
       - name: Type-check
         run: npm run typecheck

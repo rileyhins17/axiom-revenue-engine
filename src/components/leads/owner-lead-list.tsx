@@ -21,6 +21,7 @@ import type { Route } from "next";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { ownerLeadDetailPath } from "@/lib/revenue-engine/owner-lead-identity";
 import type { OwnerLeadProjection } from "@/lib/revenue-engine/owner-lead-projection";
 import type { OwnerLeadListResponse } from "@/lib/revenue-engine/owner-lead-read-model";
 import { cn } from "@/lib/utils";
@@ -185,7 +186,7 @@ function OwnerLeadCard({ lead, rank }: { lead: OwnerLeadProjection; rank: number
   const AttentionIcon = attention.icon;
   const RouteIcon = ROUTE_ICONS[lead.route.channel];
   const manualRoute = lead.route.readiness === "MANUAL_ACTION";
-  const detailHref = `/leads/${encodeURIComponent(lead.business.businessId)}` as Route;
+  const detailHref = ownerLeadDetailPath(lead.business.businessId) as Route;
 
   return (
     <li className="group px-4 py-5 transition-colors hover:bg-white/[0.018] sm:px-5 sm:py-6">

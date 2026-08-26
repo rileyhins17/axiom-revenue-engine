@@ -123,10 +123,13 @@ requireMatch("package.json", packageJson, /"build:cloudflare"\s*:\s*"[^"]*saniti
 requireMatch("package.json", packageJson, /"cf:engine:typegen:check"\s*:\s*"[^"]*--env-file wrangler\.typegen\.env/, "engine binding generation must ignore local env files");
 requireMatch("package.json", packageJson, /"cf:engine:dry-run"\s*:/, "CI must dry-run the inert engine bundle");
 requireMatch("package.json", packageJson, /scripts\/\*\*\/\*\.test\.ts/, "TypeScript script tests must run in the complete test gate");
+requireMatch("package.json", packageJson, /"test:owner-ui"\s*:\s*"tsx scripts\/verify-owner-ui-acceptance\.ts"/, "the owner UI acceptance gate must have a stable local command");
 requireMatch("package.json", packageJson, /"kw:prepare-import"\s*:\s*"tsx scripts\/prepare-private-kw-import\.ts"/, "the private KW import must use the guarded local CLI");
 requireMatch("package.json", packageJson, /"kw:plan-persistence"\s*:\s*"tsx scripts\/plan-private-kw-persistence\.ts"/, "private persistence planning must use the validation-only CLI");
 requireMatch(".github/workflows/ci.yml", ci, /run:\s*npm run cf:engine:typegen:check/, "CI must verify generated engine bindings");
 requireMatch(".github/workflows/ci.yml", ci, /run:\s*npm run cf:engine:dry-run/, "CI must dry-run the inert engine bundle");
+requireMatch(".github/workflows/ci.yml", ci, /run:\s*npx playwright install --with-deps chromium/, "CI must install the pinned owner UI browser");
+requireMatch(".github/workflows/ci.yml", ci, /run:\s*npm run test:owner-ui/, "CI must run the owner UI acceptance gate");
 forbidMatch("WORKER_DESKTOP_BOOTSTRAP_PROMPT.md", bootstrap, /the-omniscient/i, "stale the-omniscient bootstrap reference is forbidden");
 requireMatch(".gitignore", gitignore, /^data\/$/m, "private local evaluation storage must remain ignored");
 requireMatch("scripts/private-kw-files.ts", privateKwFiles, /data["'],\s*["']kw-evaluation/, "private files must stay in ignored KW storage");

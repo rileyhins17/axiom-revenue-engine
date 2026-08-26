@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/cloudflare";
 import {
-  OwnerLeadBusinessIdSchema,
   readOwnerLeadDetail,
 } from "@/lib/revenue-engine/owner-lead-detail-read-model";
+import { parseOwnerLeadBusinessIdRouteParam } from "@/lib/revenue-engine/owner-lead-identity";
 import { requireApiSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +22,8 @@ export async function GET(
   if ("response" in authResult) return authResult.response;
 
   const routeParams = await params;
-  const identity = OwnerLeadBusinessIdSchema.safeParse(routeParams.businessId);
-  if (!identity.success) {
+  const identity = parseOwnerLeadBusinessIdRouteParam(routeParams.businessId);
+  if (!identity) {
     return NextResponse.json(
       { code: "INVALID_BUSINESS_ID", error: "The lead identity is invalid." },
       { status: 400, headers: PRIVATE_NO_STORE_HEADERS },
@@ -31,7 +31,7 @@ export async function GET(
   }
 
   try {
-    const result = await readOwnerLeadDetail(getDatabase(), identity.data, new Date().toISOString());
+    const result = await readOwnerLeadDetail(getDatabase(), identity, new Date().toISOString());
     if (!result) {
       return NextResponse.json(
         { code: "OWNER_LEAD_NOT_FOUND", error: "No current v2 lead dossier was found." },

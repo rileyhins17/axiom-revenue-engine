@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { D1DatabaseLike } from "@/lib/cloudflare";
+import { OwnerLeadBusinessIdSchema } from "@/lib/revenue-engine/owner-lead-identity";
 import {
   OWNER_LEAD_PROJECTION_VERSION,
   OwnerLeadContactPointSchema,
@@ -22,7 +23,7 @@ const JsonTextSchema = z.string().min(1).max(2_000_000);
 const D1BooleanSchema = z.union([z.literal(0), z.literal(1), z.boolean()]).transform(Boolean);
 
 export const OwnerLeadCandidateRowSchema = z.object({
-  businessId: z.string().trim().min(1).max(128),
+  businessId: OwnerLeadBusinessIdSchema,
   canonicalName: z.string().trim().min(1).max(256),
   normalizedDomain: z.string().trim().min(1).max(253).nullable(),
   independenceStatus: z.enum(["UNKNOWN", "INDEPENDENT", "CHAIN", "FRANCHISE"]),

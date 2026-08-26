@@ -2151,7 +2151,7 @@ body::after {
   font-weight: 650;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #717784;
+  color: #9298a4;
 }
 
 .page-metric-value {
@@ -2164,7 +2164,7 @@ body::after {
 
 .page-metric-detail {
   overflow: hidden;
-  color: #686e79;
+  color: #8d949f;
   font-size: 10.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2413,4 +2413,21 @@ body::after {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Owner acceptance contrast floor. Small operational labels must remain legible
+   against the quiet-control-room surfaces at WCAG AA contrast. */
+.v2-sidebar .text-zinc-500,
+.v2-sidebar .text-zinc-600,
+.v2-sidebar .text-zinc-700,
+.v2-header .text-zinc-500,
+.v2-header .text-zinc-600,
+.v2-header .text-zinc-700,
+nav[aria-label="Primary"] .text-zinc-500,
+nav[aria-label="Primary"] .text-zinc-600,
+nav[aria-label="Primary"] .text-zinc-700,
+[data-owner-content] .text-zinc-500,
+[data-owner-content] .text-zinc-600,
+[data-owner-content] .text-zinc-700 {
+  color: #a1a1aa;
 }

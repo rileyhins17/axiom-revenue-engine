@@ -103,6 +103,8 @@ staging; no rebuild code or migration has been deployed to production.
   `5e273fa83bc65705e7930fd6c8f33e5c508b6ce0`
 - Evidence-first owner lead dossier source checkpoint:
   `e44c7bbdb749e7f439e7e5a892226817a2bfc36d`
+- Owner Leads acceptance checkpoint: the branch HEAD containing this status
+  entry; previous verified checkpoint `ded584857ece8c5c3409225de693877ee26781b8`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 60 apply, including the fail-closed lockdown, shadow
@@ -806,6 +808,40 @@ Completed gates:
   write, mailbox action, secret access, prospect contact, or spend occurred; the
   only write was the removed isolated synthetic preview database. Production and
   staging automation state is unchanged and remains stopped.
+- Exact-head Linux CI run `32969626111` (job `98180042849`) passed all 13 gates
+  on dossier documentation checkpoint
+  `ded584857ece8c5c3409225de693877ee26781b8`, including all 60 migrations and
+  368/368 tests.
+- A repeatable owner acceptance command now starts the real Next.js console on
+  an ephemeral loopback port, applies all 60 migrations to a disposable
+  synthetic database, creates a real local Better Auth operator session, and
+  exercises the ranked Leads list plus evidence dossier in pinned Chromium.
+- The acceptance boundary blocks every browser request outside the exact local
+  origin and starts the app with intake, queueing, sending, follow-ups, scraping,
+  provider credentials, and all cost paths disabled. Successful fixtures and
+  screenshots are removed; bounded failure artifacts remain ignored for local
+  diagnosis only.
+- Four page/viewport states now pass axe-core WCAG 2.2 AA checks, 24-pixel target
+  minimums, responsive overflow checks, reduced-motion checks, distinct titles,
+  read-only control checks, mobile-navigation clearance, and keyboard/visible-
+  focus traversal from the skip link into the first evidence dossier. The last
+  clean local browser run found the list in 258 ms against a 10-second budget
+  and the dossier rationale in 2,872 ms against a 15-second budget at 1440x1000;
+  mobile width remained exactly 390 CSS pixels and external requests were zero.
+- This gate exposed and fixed a real route bug: the list percent-encoded `:` in
+  typed business IDs, while the dynamic route received the encoded text and
+  rejected a valid dossier. One shared identity contract now emits safe readable
+  paths, decodes route input exactly once, and rejects slashes, malformed escapes,
+  and double encoding before D1. Leads/dossiers also gained distinct page titles,
+  a focusable main landmark, and WCAG-AA contrast floors for small operational
+  labels.
+- Owner-acceptance local verification passes fail-closed safety, 372/372 unit and
+  characterization tests, the isolated browser gate, typecheck, zero-warning
+  lint, the secret-sanitized Cloudflare build, console no-upload dry run,
+  deterministic engine bindings, and inert engine no-upload dry run. No
+  deployment, remote migration, configured local/remote D1 write, provider call,
+  mailbox action, prospect contact, secret exposure, or runtime spend occurred.
+  Production and staging automation remain stopped.
 
 Still required for Phase 1:
 
@@ -840,17 +876,19 @@ before approval.
   `docs/runbooks/STAGING_R2_ACTIVATION.md` after the Cloudflare dashboard proves
   it fits inside the existing C$50 ceiling. No R2 resource, binding, operation,
   lifecycle rule, or charge has been created yet.
-- No new owner decision is required for the read-only lead dossier checkpoint.
+- No new owner decision is required for the read-only owner acceptance
+  checkpoint.
 
 ## Next three actions
 
-1. Add automated responsive, keyboard, WCAG contrast/focus/labels/reduced-motion,
-   and Playwright owner-task timing tests before any staging deployment.
-2. Implement the separately gated v2 audit/qualification persistence path needed
+1. Implement the separately gated v2 audit/qualification persistence path needed
    to populate real shadow leads; keep every live writer and provider disabled.
-3. Add private artifact-delivery authorization and expiry contracts so a future
+2. Add private artifact-delivery authorization and expiry contracts so a future
    dossier can display desktop/mobile proof without exposing an R2 object or
    activating R2 before its separate owner gate.
+3. Extend the browser owner gate to approval, emergency-stop, and weekly-review
+   timing only after those real v2 UI actions exist; do not test legacy controls
+   as if they were the finished owner workflow.
 
 ## Resume instructions
 

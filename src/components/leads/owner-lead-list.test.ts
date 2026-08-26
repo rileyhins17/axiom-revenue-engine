@@ -154,7 +154,7 @@ test("owner lead list explains priority, separate scores, exact evidence, and a 
   assert.match(html, /Business phone/);
   assert.match(html, /Manual only/);
   assert.match(html, /Open evidence dossier/);
-  assert.match(html, /href="\/leads\/business%3Aroofing"/);
+  assert.match(html, /href="\/leads\/business:roofing"/);
   assert.match(html, /Read-only · no outreach permission/);
   assert.doesNotMatch(html, />Send</);
   assert.doesNotMatch(html, />Approve</);
