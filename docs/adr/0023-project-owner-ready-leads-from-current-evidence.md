@@ -108,6 +108,14 @@ Pagination and materialization can be reconsidered only after measured need.
 - A business without email can rank above a weaker business that has one.
 - Bad or stale data becomes visible refresh/research work rather than a false lead.
 - The API cannot approve, mutate, send, call a provider, or incur cost.
+- The owner list is rendered directly in an authenticated Server Component from
+  the same bounded read model rather than self-fetching its own HTTP API. It
+  shows separate scores, exact evidence, the best route, and explicit empty,
+  refresh, blocked, loading, rejected-data, and unavailable states.
+- The owner list has no buttons, forms, direct email/phone links, provider calls,
+  or write methods. The safety checker makes those constraints a release gate.
+- Primary navigation and the installed-app shortcut now open `/leads`; `/vault`
+  remains a legacy reference while migration is incomplete.
 - Real results remain empty until v2 website/audit/qualification writers are
   separately implemented and verified; stale legacy records are not backfilled
   into current qualification automatically.
@@ -116,9 +124,11 @@ Pagination and materialization can be reconsidered only after measured need.
 
 ## Action items
 
-1. [ ] Build the owner Leads list and detail UI from this contract using synthetic
-   fixtures and empty/error/loading states.
-2. [ ] Add keyboard, responsive, accessibility, and owner-task timing tests.
-3. [ ] Implement separately gated v2 audit/qualification persistence before a
+1. [x] Build the owner Leads list from this contract using synthetic fixtures
+   and honest current/empty/error/loading/refresh/blocked states.
+2. [ ] Build the lead detail experience from the same projection without
+   inventing unavailable history or evidence.
+3. [ ] Add automated keyboard, responsive, accessibility, and owner-task timing
+   tests.
+4. [ ] Implement separately gated v2 audit/qualification persistence before a
    shadow-data staging deployment.
-

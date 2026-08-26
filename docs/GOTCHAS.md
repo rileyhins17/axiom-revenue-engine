@@ -288,10 +288,13 @@ Retire entries when the architecture makes them impossible.
   The owner lead projection recomputes current qualification and preserves
   non-email lead value instead of ranking record/email counts.
 - **Prevention/test:** projection/read-model tests cover stale/future facts,
-  score/snapshot drift, invalid rows, route quality, and zero authority; owner
-  flow and visual tests remain required for the UI.
+  score/snapshot drift, invalid rows, route quality, and zero authority. The
+  owner list has fixture-rendered semantic/content tests, safety-source guards,
+  and a local desktop/mobile browser review; automated detail-flow and owner-task
+  timing coverage remain required.
 - **Affected area:** Today, Leads, System, navigation, and owner read APIs.
-- **Verifying commit:** owner read-model source `bf0c2c4`; UI verification pending.
+- **Verifying commit:** owner read-model source `bf0c2c4`; first owner Leads
+  workspace `5e273fa`.
 
 ## TYPE-001 — Hand-written Cloudflare bindings hid unsafe assumptions
 

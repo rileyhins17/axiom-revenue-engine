@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-25 (America/Toronto)
+Last updated: 2026-08-26 (America/Toronto)
 
 ## Plain-English status
 
@@ -99,6 +99,8 @@ staging; no rebuild code or migration has been deployed to production.
   `5508e57eb813531f69f42e6b15a5fc6d3419f6f7`
 - Owner-ready lead projection/read-model source checkpoint:
   `bf0c2c489cd3b315ff04843f2968d77ea61a6fc4`
+- Evidence-first owner Leads workspace source checkpoint:
+  `5e273fa83bc65705e7930fd6c8f33e5c508b6ce0`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 60 apply, including the fail-closed lockdown, shadow
@@ -534,8 +536,9 @@ Completed gates:
   deterministic qualification before AI.
 - Additive shadow tables for canonical businesses, evidence, contact routes,
   qualification, coverage, verification, and costs.
-- Leads UI now defaults to priority and exposes a transparent legacy score split;
-  it explicitly says current evidence is still required.
+- The primary Leads workspace now ranks only current v2 evidence, keeps all five
+  quality scores separate, and explains the best supported route. Legacy data is
+  not silently promoted into the owner queue.
 - Phase 0 production safety: non-secret inventory, full export/checksum, Time
   Travel bookmark, master database stop, and legacy cron removal are verified.
 - Inert typed engine: versioned Workflow input/receipt contracts, stable source,
@@ -733,6 +736,36 @@ Completed gates:
   `/api/v1/leads`), console no-upload dry run, deterministic engine bindings, and
   inert engine no-upload dry run. No deployment, remote migration, provider call,
   D1 write, mailbox action, secret access, or prospect contact occurred.
+- Exact-head Linux CI run `32925363253` (job `98047071013`) passed every gate on
+  the final owner-read-model documentation checkpoint
+  `2a131b71a34b33b41551ff316a58820c91c8e32d`: clean install, fail-closed
+  safety, both Cloudflare builds/bindings, all 60 migrations from zero, 354/354
+  tests, typecheck, zero-warning lint, and both no-upload Worker validations.
+- The primary owner navigation and installed-app shortcut now open `/leads`.
+  Its authenticated Server Component reads the bounded v2 owner model directly
+  and renders plain-English priority, all five separate scores, exact
+  why-this-lead evidence links, classification, current data quality, and the
+  strongest supported route. The legacy `/vault` remains available as a
+  migration reference but is no longer the primary Leads destination.
+- The Leads list has honest current, empty, loading, refresh, research, blocked,
+  rejected-data, and unavailable states. It cannot silently substitute legacy
+  rows. Phone, form, and social routes are visibly manual, and the list contains
+  no approval, direct-contact, send, provider, or mutation action.
+- Safety checks now enforce owner authentication, direct use of the bounded read
+  model, read-only copy, and absence of self-fetch, write methods, buttons,
+  forms, or direct email/phone links. Fixture-rendered tests verify semantic
+  headings, all five score labels, exact evidence, manual route copy, fail-closed
+  states, and navigation.
+- A local headed Playwright review used a temporary synthetic route at 1440x1000
+  and 390x844. Desktop and mobile layouts, semantic snapshots, focusable evidence
+  links, score readability, route prominence, and bottom navigation were
+  inspected; the temporary route and screenshots were removed before commit.
+- Owner-Leads workspace local verification passes 360/360 tests, fail-closed
+  safety, typecheck, zero-warning lint, the secret-sanitized Cloudflare build
+  (including dynamic `/leads`), console no-upload dry run, deterministic engine
+  bindings, and inert engine no-upload dry run. No deployment, remote migration,
+  provider request, D1 write, mailbox action, secret access, or prospect contact
+  occurred.
 
 Still required for Phase 1:
 
@@ -770,14 +803,13 @@ before approval.
 
 ## Next three actions
 
-1. Build a fixture-backed owner Leads list from the v1 response contract with
-   plain-English priority, separate scores, why-this-lead evidence, best route,
-   and honest empty/loading/error/refresh/blocked states; keep mutations off.
-2. Add the lead detail experience with current desktop/mobile evidence references,
+1. Add the lead detail experience with current desktop/mobile evidence references,
    critical/important/minor findings, route reasoning, and complete history
    placeholders without inventing unavailable data.
-3. Add responsive, keyboard, WCAG contrast/focus/labels/reduced-motion, and
-   Playwright owner-task timing tests before any staging deployment.
+2. Add automated responsive, keyboard, WCAG contrast/focus/labels/reduced-motion,
+   and Playwright owner-task timing tests before any staging deployment.
+3. Implement the separately gated v2 audit/qualification persistence path needed
+   to populate real shadow leads; keep every live writer and provider disabled.
 
 ## Resume instructions
 

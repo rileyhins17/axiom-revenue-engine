@@ -31,15 +31,20 @@ The final owner experience has five plain-language areas:
 Only verified email can become automated. Phone calls, contact forms, and social
 messages remain manual actions.
 
-The first owner-safe Leads contract is now implemented in source. It recomputes
-current qualification from separate scores, supported website evidence, and the
-best current route; a strong phone/form/social lead does not lose value because
-it lacks email. Stale or conflicting facts become refresh work, and catch-all or
-unverified email cannot displace a legitimate manual route. The authenticated,
-private/no-store `GET /api/v1/leads` endpoint is SELECT-only, bounded to 100
-businesses, and grants no qualification, mutation, outreach, provider, or spend
-authority. It has not been deployed and real v2 audit/qualification writers are
-still pending.
+The first owner-safe Leads workspace is now implemented in source at `/leads`.
+It ranks current v2 businesses, keeps all five quality scores visible, explains
+“why this lead” with exact evidence links, and recommends the strongest supported
+email, phone, form, social, or research route. Phone, form, and social remain
+manual; the list itself contains no approval, direct-contact, or send action.
+Stale, blocked, rejected, empty, loading, and unavailable states stay explicit
+instead of falling back to legacy records or a false “healthy” view.
+
+The workspace reads the same deterministic owner contract as the authenticated,
+private/no-store `GET /api/v1/leads` endpoint. The reader is SELECT-only, bounded
+to 100 businesses, and grants no qualification, mutation, outreach, provider, or
+spend authority. The primary navigation now opens `/leads`; the old `/vault`
+route remains available only as a legacy reference. Nothing in this workspace
+has been deployed, and real v2 audit/qualification writers are still pending.
 
 ## Safe local setup
 
