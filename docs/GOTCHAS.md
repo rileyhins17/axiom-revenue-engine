@@ -283,11 +283,15 @@ Retire entries when the architecture makes them impossible.
 - **Symptom:** attractive status surfaces implied health while replies, workflow,
   mailbox, or business outcomes were unknown.
 - **Root cause:** hardcoded labels and vanity metrics.
-- **Proven fix:** only show a health state from explicit checks and freshness;
-  otherwise show “unknown” or the exact problem.
-- **Prevention/test:** owner-flow and data-accuracy tests.
-- **Affected area:** Today/System/navigation.
-- **Verifying commit:** pending owner-first UI slice.
+- **Proven fix:** only show a health/lead state from explicit checks and
+  freshness; otherwise show refresh, research, blocked, or the exact problem.
+  The owner lead projection recomputes current qualification and preserves
+  non-email lead value instead of ranking record/email counts.
+- **Prevention/test:** projection/read-model tests cover stale/future facts,
+  score/snapshot drift, invalid rows, route quality, and zero authority; owner
+  flow and visual tests remain required for the UI.
+- **Affected area:** Today, Leads, System, navigation, and owner read APIs.
+- **Verifying commit:** owner read-model source `bf0c2c4`; UI verification pending.
 
 ## TYPE-001 — Hand-written Cloudflare bindings hid unsafe assumptions
 

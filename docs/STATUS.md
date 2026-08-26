@@ -97,6 +97,8 @@ staging; no rebuild code or migration has been deployed to production.
   `9e0673be21decd2f70f9f215829a6ab53ba502e3`
 - Bounded manifest HEAD and reconciled retention source checkpoint:
   `5508e57eb813531f69f42e6b15a5fc6d3419f6f7`
+- Owner-ready lead projection/read-model source checkpoint:
+  `bf0c2c489cd3b315ff04843f2968d77ea61a6fc4`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 60 apply, including the fail-closed lockdown, shadow
@@ -710,6 +712,27 @@ Completed gates:
   no-upload dry run. No bucket, binding, provider request, lifecycle rule,
   deployment, remote migration, D1 write, secret access, or prospect action
   occurred.
+- Exact-head Linux CI run `32923727144` passed every gate on the final manifest-
+  HEAD/R2-runbook checkpoint `f17fc5d60142884617979d0f54b2c8206050932a`:
+  clean install, fail-closed safety, both Cloudflare builds/bindings, all 60
+  migrations from zero, 344/344 tests, typecheck, zero-warning lint, and both
+  no-upload Worker validations.
+- Owner lead projection v1 now turns current v2 business, KW location, audit,
+  evidence, contact, verification, and five-score qualification facts into a
+  deterministic owner view. It recomputes qualification, keeps non-email leads
+  valuable, prefers verified named/role email only when current, and routes phone,
+  form, and social as manual work. Stale/future/drifted facts become refresh work;
+  cross-business contamination fails closed.
+- The owner lead D1 reader uses two bounded SELECT-only contracts, validates
+  public URLs and stored JSON, reports malformed rows with bounded codes, and
+  exposes authenticated private/no-store `GET /api/v1/leads` with a maximum of
+  100 candidates. Every qualification, mutation, send, outreach, provider, and
+  cost authority remains false/zero.
+- Owner-read-model local verification passes 354/354 tests, fail-closed safety,
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build (including
+  `/api/v1/leads`), console no-upload dry run, deterministic engine bindings, and
+  inert engine no-upload dry run. No deployment, remote migration, provider call,
+  D1 write, mailbox action, secret access, or prospect contact occurred.
 
 Still required for Phase 1:
 
@@ -747,15 +770,14 @@ before approval.
 
 ## Next three actions
 
-1. Riley either gives the exact staging-R2 approval phrase in the runbook or
-   explicitly defers activation; do not create a bucket, binding, live request,
-   lifecycle rule, or remote migration before that decision.
-2. While R2 remains blocked, define the read-only owner lead projection that
-   ranks businesses from current fit, rebuild need, reachability, timing, and
-   evidence without qualifying stale legacy records or granting outreach.
-3. Build the fixture-backed owner Leads list/detail path around that projection,
-   including plain-English “why this lead,” evidence links, route reasoning,
-   responsive states, and timing/accessibility tests; keep all mutations off.
+1. Build a fixture-backed owner Leads list from the v1 response contract with
+   plain-English priority, separate scores, why-this-lead evidence, best route,
+   and honest empty/loading/error/refresh/blocked states; keep mutations off.
+2. Add the lead detail experience with current desktop/mobile evidence references,
+   critical/important/minor findings, route reasoning, and complete history
+   placeholders without inventing unavailable data.
+3. Add responsive, keyboard, WCAG contrast/focus/labels/reduced-motion, and
+   Playwright owner-task timing tests before any staging deployment.
 
 ## Resume instructions
 

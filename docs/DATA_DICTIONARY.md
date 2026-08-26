@@ -28,6 +28,8 @@
 | VerificationResult | Deliverability, freshness, provider, method, and timestamp for a contact. |
 | QualificationSnapshot | Versioned five-score decision, gates, reasons, and recommended route. |
 | ChannelRoute | Ranked next-contact channel plus manual/automated policy. |
+| OwnerLeadProjection | Read-only, current owner view of one v2 business: separate scores, recomputed qualification, strongest exact evidence, best current route, refresh/block state, and zero operational authority. |
+| OwnerLeadListResponse | Authenticated, private/no-store, bounded list of ranked owner projections plus explicit invalid-row/contact counts and no mutation/outreach/provider/cost authority. |
 | Campaign | Approved audience, offer, policy, budget, and stop conditions. |
 | Variant | Versioned message hypothesis with a 25-first-touch review cap. |
 | Touch | Approved/sent/manual contact attempt with evidence, route, and attribution. |
@@ -71,6 +73,16 @@
 
 - Business identity is resolved from source IDs, normalized domain, phone,
   address, and name; no single weak field is universally authoritative.
+- Owner lead projection never treats email availability as business quality.
+  Route order is verified named email, verified role email, phone, form, social,
+  then research; every non-email route remains manual and every email remains
+  unapproved by the read model.
+- Owner projections accept source evidence up to 90 days old and website audits
+  up to 60 days old. Future/stale facts, score/evidence drift, or qualification
+  predating the audit become explicit refresh work rather than actionable state.
+- The owner reader uses bounded SELECTs over the latest v2 records, normalizes
+  public URLs, rejects cross-business contamination, and returns only exact audit
+  observations as “why this lead.” It cannot write D1 or call a provider.
 - The private KW seed refuses shared domain, phone, or normalized name/location
   signals instead of silently merging possible duplicates. Source-run and record
   IDs remain deterministic for the same import version and input.
