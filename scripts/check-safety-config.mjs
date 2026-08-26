@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration] = await Promise.all([
+const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../src/engine/worker.ts", import.meta.url), "utf8"),
@@ -34,6 +34,9 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-d1-executor.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-trusted-projection.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/owner-lead-projection.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/owner-lead-read-model.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/app/api/v1/leads/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0056_durable_evidence_receipts.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0057_fenced_evidence_resume_records.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0058_artifact_reference_projections.sql", import.meta.url), "utf8"),
@@ -247,6 +250,20 @@ requireMatch("src/lib/revenue-engine/artifact-reference-trusted-projection.ts", 
 requireMatch("src/lib/revenue-engine/artifact-reference-trusted-projection.ts", artifactReferenceTrustedProjection, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "trusted projection must not authorize provider operations");
 forbidMatch("src/lib/revenue-engine/artifact-reference-trusted-projection.ts", artifactReferenceTrustedProjection, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.head\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "fixture-only trusted projection must not access providers, runtime bindings, databases, network, writes, or deletion");
 forbidMatch("src/engine/worker.ts", engineWorker, /artifact-reference-trusted-projection/, "the inert engine must not wire trusted projection to runtime");
+requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /outreachAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize outreach");
+requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /sendAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize sending");
+requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /mutationAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize mutation");
+requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "owner lead projections must not authorize provider operations");
+forbidMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "owner lead projection must remain a pure zero-provider read model");
+requireMatch("src/lib/revenue-engine/owner-lead-read-model.ts", ownerLeadReadModel, /OWNER_LEAD_CANDIDATE_QUERY\s*=\s*`\s*SELECT/, "owner lead D1 access must begin from an explicit SELECT contract");
+requireMatch("src/lib/revenue-engine/owner-lead-read-model.ts", ownerLeadReadModel, /mutationAuthorized:\s*z\.literal\(false\)/, "owner lead list responses must not authorize mutation");
+requireMatch("src/lib/revenue-engine/owner-lead-read-model.ts", ownerLeadReadModel, /outreachAuthorized:\s*z\.literal\(false\)/, "owner lead list responses must not authorize outreach");
+forbidMatch("src/lib/revenue-engine/owner-lead-read-model.ts", ownerLeadReadModel, /\b(?:INSERT|UPDATE|DELETE|REPLACE|DROP|ALTER|CREATE)\b/i, "owner lead D1 access must remain SELECT-only");
+forbidMatch("src/lib/revenue-engine/owner-lead-read-model.ts", ownerLeadReadModel, /@cloudflare|env\.[A-Z_]+|R2Bucket|fetch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "owner lead reader must not access providers, runtime bindings, or mutation methods");
+requireMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /requireApiSession\(request\)/, "owner lead API must require an authenticated session");
+requireMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /export async function GET\(request:\s*Request\)/, "owner lead API must remain read-only GET");
+requireMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /private, no-store/, "owner lead API responses must not be cached publicly");
+forbidMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(|fetch\s*\(/, "owner lead API must not expose mutations or provider requests");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /allSourceWritersGuarded:\s*z\.literal\(true\)/, "the writer-guard contract must cover every atomic source table");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /trustedExecutorImplemented:\s*z\.literal\(true\)/, "the guard contract must accurately report the private disposable-D1 executor");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /completenessReceiptCreationAuthorized:\s*z\.literal\(false\)/, "writer guards must not authorize completeness receipt creation");
