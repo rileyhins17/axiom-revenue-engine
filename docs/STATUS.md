@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-24 (America/Toronto)
+Last updated: 2026-08-25 (America/Toronto)
 
 ## Plain-English status
 
@@ -95,6 +95,8 @@ staging; no rebuild code or migration has been deployed to production.
   `a9da5ad20e843f528fff7b528dcb8f9d5095fc9b`
 - Trusted artifact-reference projection-v2 source checkpoint:
   `9e0673be21decd2f70f9f215829a6ab53ba502e3`
+- Bounded manifest HEAD and reconciled retention source checkpoint:
+  `5508e57eb813531f69f42e6b15a5fc6d3419f6f7`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 60 apply, including the fail-closed lockdown, shadow
@@ -686,6 +688,28 @@ Completed gates:
   with 60 migration receipts, 51 triggers, and 15 scoped insert freezes. No
   staging/production migration, deployment, D1/R2/Browser/provider call, secret
   access, or prospect action occurred.
+- Exact-head Linux CI run `32705487957` passed every gate on the final trusted-
+  projection documentation checkpoint
+  `f95da36cb787cd0e89e1bc328ded610ada3b3f01`: clean install, fail-closed
+  safety, both Cloudflare builds/bindings, all 60 migrations from zero, 340/340
+  tests, typecheck, zero-warning lint, and both no-upload Worker validations.
+- Bounded manifest HEAD adapter v1 now attempts every exact manifest object in
+  canonical order through an injected fixture client. It binds explicit matched,
+  missing, mismatched, malformed, and client-error observations with a ten-object,
+  five-minute, zero-provider-operation, zero-cost ceiling. It always emits a
+  fixture availability receipt and cannot become an R2 winner or authorize
+  persistence, retry, release, deletion, provider work, outreach, or spend.
+- The lower-level artifact policy now agrees with projection v2: only shadow
+  objects have a planned automatic 30-day lifecycle. Qualification evidence has
+  a 180-day review boundary and no automatic delete; outreach and legal hold
+  remain protected as well. The staging activation/rollback procedure is now
+  explicit in `docs/runbooks/STAGING_R2_ACTIVATION.md`.
+- Manifest-HEAD checkpoint local verification passes 344/344 tests, fail-closed
+  safety, typecheck, zero-warning lint, the secret-sanitized Cloudflare build,
+  console no-upload dry run, deterministic engine bindings, and inert engine
+  no-upload dry run. No bucket, binding, provider request, lifecycle rule,
+  deployment, remote migration, D1 write, secret access, or prospect action
+  occurred.
 
 Still required for Phase 1:
 
@@ -703,9 +727,12 @@ Still required for Phase 1:
 
 Approved runtime ceiling: C$50/month excluding ChatGPT/Codex. New paid providers
 or overage billing are not yet authorized. Cost ledger implementation is pending.
-The planned R2 contract uses Standard storage, whose current included allowance
-is 10 GB-month plus one million writes and ten million reads monthly, but R2 is
-not activated and the project has incurred zero artifact-storage cost.
+As checked against Cloudflare's published pricing on 2026-08-25, the planned R2
+contract uses Standard storage, whose included allowance is 10 GB-month plus one
+million Class A and ten million Class B operations monthly. HEAD is Class B. R2
+is not activated and the project has incurred zero artifact-storage cost. The
+dashboard price and any activation commitment must be rechecked immediately
+before approval.
 
 ## Blockers / owner actions
 
@@ -713,20 +740,22 @@ not activated and the project has incurred zero artifact-storage cost.
   Workspace; verify send/receive, MFA, SPF, DKIM, DMARC, and recovery ownership.
 - Confirm who owns replies for each mailbox before the pilot.
 - Later: label the first 50 KW leads strong/weak/wrong with a short reason.
-- R2 activation currently requires a Cloudflare dashboard decision. Approve only
-  if the account shows it fits inside the existing C$50 ceiling; no R2 resource
-  or charge has been created yet.
+- R2 activation currently requires the exact owner phrase in
+  `docs/runbooks/STAGING_R2_ACTIVATION.md` after the Cloudflare dashboard proves
+  it fits inside the existing C$50 ceiling. No R2 resource, binding, operation,
+  lifecycle rule, or charge has been created yet.
 
 ## Next three actions
 
-1. Define a zero-authority R2 HEAD adapter contract around exact manifest-object
-   requests and availability-v2 receipts, using only an injected fixture client;
-   do not add a live binding or request path.
-2. Add adversarial adapter tests for missing/mismatched HEAD metadata, stale
-   windows, object and operation caps, retry determinism, and zero authority.
-3. Write the staging R2 activation, budget, smoke-test, and rollback checklist,
-   then pause before any bucket, binding, live request, or migration 0059–0060
-   apply until the owner explicitly approves it.
+1. Riley either gives the exact staging-R2 approval phrase in the runbook or
+   explicitly defers activation; do not create a bucket, binding, live request,
+   lifecycle rule, or remote migration before that decision.
+2. While R2 remains blocked, define the read-only owner lead projection that
+   ranks businesses from current fit, rebuild need, reachability, timing, and
+   evidence without qualifying stale legacy records or granting outreach.
+3. Build the fixture-backed owner Leads list/detail path around that projection,
+   including plain-English “why this lead,” evidence links, route reasoning,
+   responsive states, and timing/accessibility tests; keep all mutations off.
 
 ## Resume instructions
 

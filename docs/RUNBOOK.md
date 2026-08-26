@@ -50,6 +50,14 @@
 - At 100%: stop all nonessential provider jobs. Never auto-enable overages.
 - Safety, suppression, unsubscribe, and inbound reply handling remain operational.
 
+## Staging R2 activation
+
+Use [`runbooks/STAGING_R2_ACTIVATION.md`](runbooks/STAGING_R2_ACTIVATION.md).
+It requires a separate owner approval, current dashboard pricing, an isolated
+staging binding, synthetic data only, recorded provider operations/cost, and a
+targeted rollback. It does not authorize production, prospect evidence, remote
+D1 migrations, or autonomous work.
+
 ## Weekly owner review (30 minutes)
 
 1. Handle qualified replies and overdue opportunities.

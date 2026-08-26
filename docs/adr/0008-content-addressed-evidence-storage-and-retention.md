@@ -3,6 +3,9 @@
 - Status: accepted
 - Date: 2026-08-22
 
+> Superseded in part by ADRs 0021 and 0022: `QUALIFICATION_180D` is a
+> 180-day owner/compliance review boundary, not an automatic R2 lifecycle delete.
+
 ## Decision
 
 Store future website evidence as private, immutable, content-addressed objects.
@@ -27,7 +30,7 @@ Retention classes are:
 | Class | Planned lifecycle | Purpose |
 |---|---:|---|
 | `SHADOW_30D` | Delete after 30 days | Temporary evaluation and unapproved captures |
-| `QUALIFICATION_180D` | Delete after 180 days | Current evidence for a qualified but uncontacted business |
+| `QUALIFICATION_180D` | Review after 180 days; no automatic deletion | Current evidence for a qualified but uncontacted business |
 | `OUTREACH_ACTIVE` | No automatic expiry | Evidence relied on for contact/compliance records |
 | `LEGAL_HOLD` | No automatic expiry | Explicitly preserved incident or legal evidence |
 
@@ -69,8 +72,8 @@ and [consent-record guidance](https://crtc.gc.ca/eng/com500/guide.htm).
   making retries idempotent and avoiding duplicate storage.
 - Stored-object reconciliation is mandatory; a key alone is not proof that the
   expected bytes exist.
-- Automatic lifecycle rules are allowed only for the two explicitly expiring
-  prefixes. Outreach-active and legal-hold prefixes are excluded.
+- Automatic lifecycle deletion is allowed only for `SHADOW_30D`. Qualification,
+  outreach-active, and legal-hold prefixes are excluded.
 - Partial failures produce receipts and safe orphans, not compensating deletes.
 - Promotion, reference counting, owner release, concrete R2 bindings, lifecycle
   installation, budget telemetry, and staging smoke tests remain separate gates.

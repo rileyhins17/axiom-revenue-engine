@@ -72,9 +72,12 @@ generated output and scanned 1,988 files.
 - The pre-provisioning storage contract is complete at source checkpoint
   `2621f3c1a790516507a78d89ea3ae06e7e738722`. If approved, the bucket must be
   private and use Standard storage, SHA-256 content keys, create-if-absent writes,
-  a 30-day `shadow/30d/v1/` lifecycle, and a 180-day
-  `qualification/180d/v1/` lifecycle. Outreach-active and legal-hold prefixes
-  must not receive an automatic expiry. No bucket or lifecycle rule exists yet.
+  and a 30-day `shadow/30d/v1/` lifecycle. Qualification evidence receives a
+  180-day review boundary, not an automatic lifecycle delete. Qualification,
+  outreach-active, and legal-hold prefixes must not receive automatic expiry.
+  No bucket or lifecycle rule exists yet. The exact approval, activation,
+  synthetic smoke-test, and rollback gate is in
+  [`runbooks/STAGING_R2_ACTIVATION.md`](runbooks/STAGING_R2_ACTIVATION.md).
 - Workflows are created when the typed engine Worker is deployed; there are no
   Workflows in the account today.
 

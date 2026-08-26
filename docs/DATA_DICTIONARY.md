@@ -57,6 +57,7 @@
 | ArtifactReferencePersistencePlan | Migration-0058 collision-complete preflight/insert-if-absent plan for endings, projections, projected uses, and assignments; it grants no mutation, retention-release, deletion, provider, or cost authority. |
 | ArtifactReferenceSnapshotAttempt | One append-only, five-minute-or-shorter attempt/lease claim for a lineage snapshot, with a contiguous attempt number, strictly increasing fencing token, versioned query contract, and zero operational authority. |
 | ArtifactManifestAvailabilityReceipt | Immutable content-bound fixture or R2 HEAD observation for one exact manifest; only a future fresh, unambiguous R2 winner per manifest may satisfy transactional completeness. |
+| ArtifactManifestHeadExecution | Fixture-only, digest-bound attempt over every canonical manifest object with explicit missing/mismatch/error outcomes and zero provider, persistence, retry, release, deletion, or cost authority. |
 | ArtifactReferenceSourceSetProof | Canonical count, stable row identities, predicate version, set digest, and proof digest for one of the 15 exact workflow/lineage/use/availability source sets. |
 | ArtifactReferenceCompletenessReceipt | Private-executor-created and reloaded seal binding the winning attempt/fence, all exact source-set proofs, and normalized source facts; its structural schema alone is never trusted and it grants no retention or deletion authority. |
 | ArtifactReferenceAtomicPlan | Validation-only D1 claim/read/recheck/commit contract. The private executor reconstructs it exactly before use, so redigesting altered control SQL cannot authorize execution. |
@@ -101,10 +102,11 @@
   metadata all match. A partial batch is not rolled back by deletion because an
   immutable object may already be shared; unreferenced shadow objects expire by
   lifecycle instead.
-- Shadow artifacts expire after 30 days and uncontacted qualification artifacts
-  after 180 days. `OUTREACH_ACTIVE` and `LEGAL_HOLD` have no automatic deletion;
-  release requires an approved compliance/owner decision. CRTC guidance does not
-  prescribe one universal CASL record-retention period.
+- Shadow artifacts expire after 30 days. Qualification evidence requires review
+  after 180 days but has no automatic deletion. `OUTREACH_ACTIVE` and
+  `LEGAL_HOLD` also have no automatic deletion; release requires an approved
+  compliance/owner decision. CRTC guidance does not prescribe one universal
+  CASL record-retention period.
 - Retention promotion is monotonic. Evidence uses compute the minimum destination:
   qualification uses require `QUALIFICATION_180D`; approval, consent, and touch
   uses require `OUTREACH_ACTIVE`; legal use requires `LEGAL_HOLD`. Already stronger
@@ -146,6 +148,11 @@
   Its object-set digest covers those observations, not only expected keys. Only
   one latest, fresh, exact `R2_HEAD` winner per manifest can satisfy structural
   decoding; fixture, future, stale, missing, unknown, or tied observations block.
+- Manifest HEAD adapter v1 accepts only an injected fixture client, at most ten
+  exact objects, at most five minutes of freshness, and zero provider Class B
+  operations/cost. Its normalized object shape mirrors the future R2 mapping,
+  but it emits `checkerKind=FIXTURE` and `providerReadPerformed=false`; even an
+  all-matched result cannot become an `R2_HEAD` winner or grant authority.
 - The 15-set D1 source decoder uses exact-column schemas, parses canonical stored
   JSON with current domain schemas, recomputes every digest, checks denormalized
   columns and alternate identities, reconstructs contiguous fenced attempts and

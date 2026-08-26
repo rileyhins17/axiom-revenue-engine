@@ -83,9 +83,10 @@ to Browser Rendering or R2.
 The next storage boundary is also fixture-only. Screenshot and measurement keys
 are derived from their SHA-256 content, writes are create-if-absent, retries reuse
 matching objects, and conflicting objects stop the job. Shadow evidence has a
-planned 30-day lifecycle and uncontacted qualification evidence 180 days;
-outreach/compliance evidence is never assigned a guessed automatic expiry. R2 is
-still disabled and no bucket, binding, object, operation, or charge exists.
+planned 30-day lifecycle. Qualification evidence requires review after 180 days,
+but qualification, outreach, and legal-hold objects never receive an automatic
+expiry. R2 is still disabled and no bucket, binding, object, operation, or charge
+exists.
 
 The audit assembler now combines those bounded inputs across a home, service,
 about, and contact page. It will not call a page set complete unless all four are
@@ -227,6 +228,15 @@ spend. Only shadow objects carry automatic object expiry in the replay contract;
 the 180-day qualification policy requires a later retention review instead of an
 invented R2 lifecycle delete. The adapter is still disconnected from the Worker,
 and no live resource was touched.
+
+A bounded manifest HEAD adapter now exercises the next provider boundary with an
+injected fixture only. It attempts every object once in canonical order, records
+missing/mismatched/malformed/error outcomes, binds exact normalized metadata,
+and enforces a ten-object, five-minute, zero-provider-operation, zero-cost cap.
+Its receipt remains `FIXTURE`, so it cannot impersonate a fresh `R2_HEAD` winner
+or authorize persistence, retry, release, or deletion. The separate staging R2
+activation and rollback gate is documented in
+[`docs/runbooks/STAGING_R2_ACTIVATION.md`](docs/runbooks/STAGING_R2_ACTIVATION.md).
 
 ## Verification
 
