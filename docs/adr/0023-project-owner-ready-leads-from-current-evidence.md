@@ -50,6 +50,23 @@ bounded codes, and never exposes parser/provider exception details.
 Expose the list through authenticated, dynamic `GET /api/v1/leads` with private
 `no-store` response headers and a 1–100 limit. No other HTTP method is defined.
 
+Extend the same projection with a versioned `OwnerLeadDetailResponse` for one
+exact business identity. Its reader uses an exact current-candidate SELECT, the
+existing bounded contact SELECT, and a 101-row SELECT-only timeline query so it
+can return at most 100 events and disclose truncation. The timeline covers only
+v2 source captures, audits, qualification snapshots, contact discoveries, and
+verification results. Outreach, reply, opportunity, and client history remain
+explicitly unavailable until those v2 records exist.
+
+The detail boundary must also prove that the latest website snapshot columns
+match the stored deterministic audit receipt. Desktop, mobile, and DOM artifact
+references remain opaque reference-only facts until private evidence storage is
+enabled; the UI cannot fabricate screenshot previews. Expose the detail through
+authenticated dynamic `/leads/[businessId]` and private/no-store
+`GET /api/v1/leads/[businessId]`. Invalid identities fail before D1 access,
+missing current dossiers return not found, inconsistent records fail closed, and
+no write method is defined.
+
 ## Options considered
 
 ### Option A — Extend the legacy Vault query and UI
@@ -116,6 +133,13 @@ Pagination and materialization can be reconsidered only after measured need.
   or write methods. The safety checker makes those constraints a release gate.
 - Primary navigation and the installed-app shortcut now open `/leads`; `/vault`
   remains a legacy reference while migration is incomplete.
+- Each ranked lead opens an authenticated, read-only evidence dossier with the
+  separate scores, current desktop/mobile/DOM references, severity-grouped audit
+  findings, every supported route, route reasoning, and bounded v2 event history.
+- Contact values are visible for owner judgment but inert: there are no direct
+  email/phone links, forms, approval buttons, sends, provider calls, or mutations.
+- Missing screenshot delivery and sales history are labelled as unavailable
+  rather than replaced with invented previews or legacy assumptions.
 - Real results remain empty until v2 website/audit/qualification writers are
   separately implemented and verified; stale legacy records are not backfilled
   into current qualification automatically.
@@ -126,7 +150,7 @@ Pagination and materialization can be reconsidered only after measured need.
 
 1. [x] Build the owner Leads list from this contract using synthetic fixtures
    and honest current/empty/error/loading/refresh/blocked states.
-2. [ ] Build the lead detail experience from the same projection without
+2. [x] Build the lead detail experience from the same projection without
    inventing unavailable history or evidence.
 3. [ ] Add automated keyboard, responsive, accessibility, and owner-task timing
    tests.

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration] = await Promise.all([
+const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, ownerLeadDetailReadModel, ownerLeadDetailRoute, ownerLeadDetailPage, ownerLeadDetail, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../src/engine/worker.ts", import.meta.url), "utf8"),
@@ -39,6 +39,10 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
   readFile(new URL("../src/app/api/v1/leads/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/app/leads/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/leads/owner-lead-list.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/owner-lead-detail-read-model.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/app/api/v1/leads/[businessId]/route.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/app/leads/[businessId]/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/leads/owner-lead-detail.tsx", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0056_durable_evidence_receipts.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0057_fenced_evidence_resume_records.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0058_artifact_reference_projections.sql", import.meta.url), "utf8"),
@@ -272,6 +276,21 @@ forbidMatch("src/app/leads/page.tsx", ownerLeadsPage, /fetch\s*\(|export async f
 requireMatch("src/components/leads/owner-lead-list.tsx", ownerLeadList, /Read-only shadow view/, "owner Leads UI must state that it is a read-only shadow view");
 requireMatch("src/components/leads/owner-lead-list.tsx", ownerLeadList, /No email, call, form, or social action can start here/, "owner Leads UI must state that no channel action can start from the list");
 forbidMatch("src/components/leads/owner-lead-list.tsx", ownerLeadList, /fetch\s*\(|onClick\s*=|<button|<form|mailto:|tel:/, "owner Leads list must not add client actions, provider calls, or direct contact links");
+requireMatch("src/lib/revenue-engine/owner-lead-detail-read-model.ts", ownerLeadDetailReadModel, /OWNER_LEAD_DETAIL_QUERY\s*=\s*`\s*SELECT/, "owner lead detail D1 access must begin from an explicit exact SELECT contract");
+requireMatch("src/lib/revenue-engine/owner-lead-detail-read-model.ts", ownerLeadDetailReadModel, /V2_SHADOW_ONLY/, "owner lead history must disclose its v2-only scope");
+requireMatch("src/lib/revenue-engine/owner-lead-detail-read-model.ts", ownerLeadDetailReadModel, /sendAuthorized:\s*z\.literal\(false\)/, "owner lead detail responses must not authorize sending");
+forbidMatch("src/lib/revenue-engine/owner-lead-detail-read-model.ts", ownerLeadDetailReadModel, /@cloudflare|env\.[A-Z_]+|R2Bucket|fetch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "owner lead detail reader must not access providers, runtime bindings, or mutation methods");
+requireMatch("src/app/api/v1/leads/[businessId]/route.ts", ownerLeadDetailRoute, /requireApiSession\(request\)/, "owner lead detail API must require an authenticated session");
+requireMatch("src/app/api/v1/leads/[businessId]/route.ts", ownerLeadDetailRoute, /export async function GET\(/, "owner lead detail API must remain read-only GET");
+requireMatch("src/app/api/v1/leads/[businessId]/route.ts", ownerLeadDetailRoute, /private, no-store/, "owner lead detail API responses must not be cached publicly");
+forbidMatch("src/app/api/v1/leads/[businessId]/route.ts", ownerLeadDetailRoute, /export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(|fetch\s*\(/, "owner lead detail API must not expose mutations or provider requests");
+requireMatch("src/app/leads/[businessId]/page.tsx", ownerLeadDetailPage, /await requireSession\(\)/, "owner lead detail page must require an authenticated session before reading data");
+requireMatch("src/app/leads/[businessId]/page.tsx", ownerLeadDetailPage, /readOwnerLeadDetail\(getDatabase\(\)/, "owner lead detail page must use the exact versioned read model directly");
+forbidMatch("src/app/leads/[businessId]/page.tsx", ownerLeadDetailPage, /fetch\s*\(|export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(/, "owner lead detail page must not self-fetch, mutate, or expose write methods");
+requireMatch("src/components/leads/owner-lead-detail.tsx", ownerLeadDetail, /This dossier is read-only/, "owner lead detail UI must state its read-only authority");
+requireMatch("src/components/leads/owner-lead-detail.tsx", ownerLeadDetail, /Preview unavailable until private evidence storage is enabled/, "owner lead detail UI must not pretend opaque artifact references are viewable screenshots");
+requireMatch("src/components/leads/owner-lead-detail.tsx", ownerLeadDetail, /Missing sales history is labelled instead of guessed/, "owner lead detail UI must explain unavailable v2 sales history");
+forbidMatch("src/components/leads/owner-lead-detail.tsx", ownerLeadDetail, /fetch\s*\(|onClick\s*=|<button|<form|mailto:|tel:/, "owner lead detail must not add client actions, provider calls, or direct contact links");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /allSourceWritersGuarded:\s*z\.literal\(true\)/, "the writer-guard contract must cover every atomic source table");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /trustedExecutorImplemented:\s*z\.literal\(true\)/, "the guard contract must accurately report the private disposable-D1 executor");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /completenessReceiptCreationAuthorized:\s*z\.literal\(false\)/, "writer guards must not authorize completeness receipt creation");

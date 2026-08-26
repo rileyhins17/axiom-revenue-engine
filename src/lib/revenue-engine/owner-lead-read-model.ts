@@ -21,7 +21,7 @@ const TimestampSchema = z.string().datetime({ offset: true });
 const JsonTextSchema = z.string().min(1).max(2_000_000);
 const D1BooleanSchema = z.union([z.literal(0), z.literal(1), z.boolean()]).transform(Boolean);
 
-const CandidateRowSchema = z.object({
+export const OwnerLeadCandidateRowSchema = z.object({
   businessId: z.string().trim().min(1).max(128),
   canonicalName: z.string().trim().min(1).max(256),
   normalizedDomain: z.string().trim().min(1).max(253).nullable(),
@@ -52,7 +52,7 @@ const CandidateRowSchema = z.object({
   qualificationCreatedAt: TimestampSchema,
 }).strict();
 
-const ContactRowSchema = z.object({
+export const OwnerLeadContactRowSchema = z.object({
   contactPointId: z.string().trim().min(1).max(128),
   businessId: z.string().trim().min(1).max(128),
   channel: z.enum(["EMAIL", "PHONE", "FORM", "SOCIAL"]),
@@ -70,7 +70,7 @@ const ContactRowSchema = z.object({
   verificationStaleAfter: TimestampSchema.nullable(),
 }).strict();
 
-const SourcePayloadSchema = z.object({
+export const OwnerLeadSourcePayloadSchema = z.object({
   sourceEvidenceUrl: z.string().url().max(2_048),
   websiteUrl: z.string().url().max(2_048).nullable(),
   niche: z.enum(["ROOFING", "HVAC", "LANDSCAPING"]),
@@ -208,7 +208,7 @@ WHERE contact."businessId" IN (${placeholders})
 ORDER BY contact."businessId" ASC, contact."channel" ASC, contact."id" ASC`;
 }
 
-function parseJson(value: string) {
+export function parseOwnerLeadJson(value: string) {
   try {
     return JSON.parse(value) as unknown;
   } catch {
@@ -220,8 +220,8 @@ function normalizePublicUrl(value: string) {
   return normalizePublicWebsiteUrl(value);
 }
 
-function mapContactRow(value: unknown) {
-  const row = ContactRowSchema.parse(value);
+export function mapOwnerLeadContactRow(value: unknown) {
+  const row = OwnerLeadContactRowSchema.parse(value);
   if (!row.sourceUrl || !row.sourceCapturedAt) return null;
   const recipientKind = row.personName
     ? "NAMED_PERSON" as const
@@ -263,16 +263,15 @@ function validateAuditPublicUrls(value: unknown) {
   return audit;
 }
 
-function mapCandidateRow(
-  rawValue: unknown,
+export function mapOwnerLeadCandidate(
+  row: z.infer<typeof OwnerLeadCandidateRowSchema>,
   projectedAt: string,
   contacts: OwnerLeadProjectionInput["contactPoints"],
 ): OwnerLeadProjectionInput {
-  const row = CandidateRowSchema.parse(rawValue);
-  const payload = SourcePayloadSchema.parse(parseJson(row.sourceRawPayloadJson));
-  const audit = validateAuditPublicUrls(parseJson(row.auditJson));
-  const failedGates = StringArraySchema.parse(parseJson(row.qualificationFailedGatesJson));
-  const evidenceClaimIds = StringArraySchema.parse(parseJson(row.qualificationEvidenceClaimIdsJson));
+  const payload = OwnerLeadSourcePayloadSchema.parse(parseOwnerLeadJson(row.sourceRawPayloadJson));
+  const audit = validateAuditPublicUrls(parseOwnerLeadJson(row.auditJson));
+  const failedGates = StringArraySchema.parse(parseOwnerLeadJson(row.qualificationFailedGatesJson));
+  const evidenceClaimIds = StringArraySchema.parse(parseOwnerLeadJson(row.qualificationEvidenceClaimIdsJson));
   const sourceEvidenceUrl = normalizePublicUrl(payload.sourceEvidenceUrl);
   const websiteUrl = payload.websiteUrl ? normalizePublicUrl(payload.websiteUrl) : null;
 
@@ -334,7 +333,7 @@ export async function readOwnerLeadList(
   const limit = boundedLimit(requestedLimit);
   const candidateResult = await database.prepare(OWNER_LEAD_CANDIDATE_QUERY).bind(limit).all<unknown>();
   const candidateRows = candidateResult.results ?? [];
-  const candidateIdentities = candidateRows.map((value) => CandidateRowSchema.safeParse(value))
+  const candidateIdentities = candidateRows.map((value) => OwnerLeadCandidateRowSchema.safeParse(value))
     .filter((result) => result.success)
     .map((result) => result.data.businessId);
   const uniqueBusinessIds = Array.from(new Set(candidateIdentities)).sort();
@@ -348,7 +347,7 @@ export async function readOwnerLeadList(
       .all<unknown>();
     for (const rawContact of contactResult.results ?? []) {
       try {
-        const contact = mapContactRow(rawContact);
+        const contact = mapOwnerLeadContactRow(rawContact);
         if (!contact) {
           ignoredContactRows += 1;
           continue;
@@ -365,7 +364,7 @@ export async function readOwnerLeadList(
   const projections: OwnerLeadProjection[] = [];
   const rejections: z.infer<typeof RejectionSchema>[] = [];
   for (const rawCandidate of candidateRows) {
-    const candidate = CandidateRowSchema.safeParse(rawCandidate);
+    const candidate = OwnerLeadCandidateRowSchema.safeParse(rawCandidate);
     if (!candidate.success) {
       const possibleBusinessId = typeof rawCandidate === "object" && rawCandidate !== null && "businessId" in rawCandidate
         ? String(rawCandidate.businessId).slice(0, 128)
@@ -374,7 +373,7 @@ export async function readOwnerLeadList(
       continue;
     }
     try {
-      const projectionInput = mapCandidateRow(
+      const projectionInput = mapOwnerLeadCandidate(
         candidate.data,
         generatedAt,
         contactsByBusiness.get(candidate.data.businessId) ?? [],
@@ -409,4 +408,3 @@ export async function readOwnerLeadList(
     },
   });
 }
-

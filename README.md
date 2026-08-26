@@ -46,6 +46,17 @@ spend authority. The primary navigation now opens `/leads`; the old `/vault`
 route remains available only as a legacy reference. Nothing in this workspace
 has been deployed, and real v2 audit/qualification writers are still pending.
 
+Each ranked business now opens a read-only dossier at `/leads/[businessId]`.
+The dossier keeps the five quality scores separate; groups current audit findings
+as critical, important, or minor; shows the exact recorded contact routes and why
+one is recommended; and builds a bounded factual timeline from v2 source, audit,
+qualification, contact, and verification records. Opaque desktop, mobile, and DOM
+artifact references are labelled as reference-only until private evidence storage
+is activated. Outreach, reply, opportunity, and client history are explicitly
+shown as unavailable when they do not exist in v2—legacy data is never guessed or
+silently merged. The matching authenticated `GET /api/v1/leads/[businessId]`
+endpoint is private/no-store and read-only.
+
 ## Safe local setup
 
 Requirements: Node.js 22+, npm, and Wrangler through the project dependency.

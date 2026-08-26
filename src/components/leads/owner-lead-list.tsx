@@ -17,6 +17,7 @@ import {
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
+import type { Route } from "next";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -184,6 +185,7 @@ function OwnerLeadCard({ lead, rank }: { lead: OwnerLeadProjection; rank: number
   const AttentionIcon = attention.icon;
   const RouteIcon = ROUTE_ICONS[lead.route.channel];
   const manualRoute = lead.route.readiness === "MANUAL_ACTION";
+  const detailHref = `/leads/${encodeURIComponent(lead.business.businessId)}` as Route;
 
   return (
     <li className="group px-4 py-5 transition-colors hover:bg-white/[0.018] sm:px-5 sm:py-6">
@@ -317,6 +319,12 @@ function OwnerLeadCard({ lead, rank }: { lead: OwnerLeadProjection; rank: number
             ) : null}
 
             <div className="mt-auto pt-4">
+              <Link
+                href={detailHref}
+                className="v2-focus-ring mb-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-emerald-300/25 bg-emerald-300/[0.07] px-3 text-xs font-semibold text-emerald-200 hover:border-emerald-300/35 hover:bg-emerald-300/[0.1] hover:text-emerald-100"
+              >
+                Open evidence dossier <ArrowUpRight className="size-3.5" aria-hidden="true" />
+              </Link>
               {lead.business.websiteUrl ? (
                 <a
                   href={lead.business.websiteUrl}
