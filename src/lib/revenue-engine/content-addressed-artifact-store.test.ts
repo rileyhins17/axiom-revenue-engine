@@ -138,10 +138,17 @@ test("retention classes use lifecycle-safe prefixes without inventing a CASL exp
   assert.deepEqual(ARTIFACT_RETENTION_POLICIES.SHADOW_30D, {
     keyPrefix: "shadow/30d/v1/",
     lifecycleExpirationDays: 30,
+    retentionReviewAfterDays: 30,
     automaticDeletion: true,
     requiresOwnerRelease: false,
   });
-  assert.equal(ARTIFACT_RETENTION_POLICIES.QUALIFICATION_180D.lifecycleExpirationDays, 180);
+  assert.deepEqual(ARTIFACT_RETENTION_POLICIES.QUALIFICATION_180D, {
+    keyPrefix: "qualification/180d/v1/",
+    lifecycleExpirationDays: null,
+    retentionReviewAfterDays: 180,
+    automaticDeletion: false,
+    requiresOwnerRelease: true,
+  });
   assert.equal(ARTIFACT_RETENTION_POLICIES.OUTREACH_ACTIVE.lifecycleExpirationDays, null);
   assert.equal(ARTIFACT_RETENTION_POLICIES.OUTREACH_ACTIVE.requiresOwnerRelease, true);
   assert.equal(ARTIFACT_RETENTION_POLICIES.LEGAL_HOLD.automaticDeletion, false);
@@ -151,12 +158,6 @@ test("retention classes use lifecycle-safe prefixes without inventing a CASL exp
       enabled: true,
       prefix: "shadow/30d/v1/",
       expireAfterDays: 30,
-    },
-    {
-      id: "expire-uncontacted-qualification-evidence-after-180-days",
-      enabled: true,
-      prefix: "qualification/180d/v1/",
-      expireAfterDays: 180,
     },
   ]);
 });

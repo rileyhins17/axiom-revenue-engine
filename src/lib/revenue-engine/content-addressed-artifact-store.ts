@@ -35,24 +35,28 @@ export const ARTIFACT_RETENTION_POLICIES = {
   SHADOW_30D: {
     keyPrefix: "shadow/30d/v1/",
     lifecycleExpirationDays: 30,
+    retentionReviewAfterDays: 30,
     automaticDeletion: true,
     requiresOwnerRelease: false,
   },
   QUALIFICATION_180D: {
     keyPrefix: "qualification/180d/v1/",
-    lifecycleExpirationDays: 180,
-    automaticDeletion: true,
-    requiresOwnerRelease: false,
+    lifecycleExpirationDays: null,
+    retentionReviewAfterDays: 180,
+    automaticDeletion: false,
+    requiresOwnerRelease: true,
   },
   OUTREACH_ACTIVE: {
     keyPrefix: "outreach/active/v1/",
     lifecycleExpirationDays: null,
+    retentionReviewAfterDays: null,
     automaticDeletion: false,
     requiresOwnerRelease: true,
   },
   LEGAL_HOLD: {
     keyPrefix: "legal-hold/v1/",
     lifecycleExpirationDays: null,
+    retentionReviewAfterDays: null,
     automaticDeletion: false,
     requiresOwnerRelease: true,
   },
@@ -67,12 +71,6 @@ export function plannedArtifactLifecycleRules() {
       enabled: true as const,
       prefix: ARTIFACT_RETENTION_POLICIES.SHADOW_30D.keyPrefix,
       expireAfterDays: ARTIFACT_RETENTION_POLICIES.SHADOW_30D.lifecycleExpirationDays,
-    },
-    {
-      id: "expire-uncontacted-qualification-evidence-after-180-days",
-      enabled: true as const,
-      prefix: ARTIFACT_RETENTION_POLICIES.QUALIFICATION_180D.keyPrefix,
-      expireAfterDays: ARTIFACT_RETENTION_POLICIES.QUALIFICATION_180D.lifecycleExpirationDays,
     },
   ];
 }
