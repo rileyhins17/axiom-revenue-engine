@@ -101,6 +101,8 @@ staging; no rebuild code or migration has been deployed to production.
   `bf0c2c489cd3b315ff04843f2968d77ea61a6fc4`
 - Evidence-first owner Leads workspace source checkpoint:
   `5e273fa83bc65705e7930fd6c8f33e5c508b6ce0`
+- Evidence-first owner lead dossier source checkpoint:
+  `e44c7bbdb749e7f439e7e5a892226817a2bfc36d`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 60 apply, including the fail-closed lockdown, shadow
@@ -766,6 +768,44 @@ Completed gates:
   bindings, and inert engine no-upload dry run. No deployment, remote migration,
   provider request, D1 write, mailbox action, secret access, or prospect contact
   occurred.
+- Exact-head Linux CI run `32943097435` (job `98098016868`) passed all 13 gates
+  on owner-Leads documentation checkpoint
+  `653bf5fa1abe79086866d9c072bdbbf00ae6cd65`: clean install, fail-closed
+  safety, both Cloudflare builds/bindings, all 60 migrations from zero, 360/360
+  tests, typecheck, zero-warning lint, and both no-upload Worker validations.
+- Every ranked lead now links to authenticated dynamic `/leads/[businessId]`.
+  Its exact-business reader reuses the deterministic owner projection, validates
+  the current website snapshot against its stored audit receipt, reads every
+  current contact route, and returns at most 100 factual v2 source, audit,
+  qualification, contact, and verification events. Invalid identities fail
+  before D1; missing dossiers return not found; inconsistent facts fail closed.
+- The dossier keeps all five scores visible, leads with the strongest supported
+  observations, groups audit findings as critical/important/minor, explains the
+  recommended route, and shows every recorded contact value without turning it
+  into a direct email, phone, form, social, approval, or send action. Opaque
+  desktop/mobile/DOM artifact references say that preview delivery is not yet
+  available. Outreach, reply, opportunity, and client history remain explicit
+  unavailable placeholders rather than guessed legacy history.
+- Authenticated private/no-store `GET /api/v1/leads/[businessId]` exposes the
+  same zero-authority contract. Safety checks enforce authenticated direct reads,
+  SELECT-only/provider-free data access, read-only copy, no write methods, and no
+  contact-action controls. The detail/list fixture suite and real migration-0054
+  SQL compilation pass; the complete repository suite is now 368/368 tests.
+- A headed Playwright review used a temporary synthetic local D1 and route at
+  1440x1000 and 390x844. Semantic structure, evidence hierarchy, route
+  prominence, long-page readability, and desktop/mobile layout were inspected;
+  mobile document width was 385 CSS pixels inside a 390-pixel viewport. The
+  temporary route, database, screenshots, logs, browser, and dev server were
+  removed before commit. The only browser console failure was the expected local
+  session lookup with no test auth secret; the dossier itself returned 200.
+- Lead-dossier local release verification passes fail-closed safety, 368/368
+  tests, typecheck, zero-warning lint, the secret-sanitized Cloudflare build
+  (including dynamic detail page/API routes), console no-upload dry run,
+  deterministic engine bindings, and inert engine no-upload dry run. No
+  deployment, remote migration, provider request, configured local/remote D1
+  write, mailbox action, secret access, prospect contact, or spend occurred; the
+  only write was the removed isolated synthetic preview database. Production and
+  staging automation state is unchanged and remains stopped.
 
 Still required for Phase 1:
 
@@ -800,16 +840,17 @@ before approval.
   `docs/runbooks/STAGING_R2_ACTIVATION.md` after the Cloudflare dashboard proves
   it fits inside the existing C$50 ceiling. No R2 resource, binding, operation,
   lifecycle rule, or charge has been created yet.
+- No new owner decision is required for the read-only lead dossier checkpoint.
 
 ## Next three actions
 
-1. Add the lead detail experience with current desktop/mobile evidence references,
-   critical/important/minor findings, route reasoning, and complete history
-   placeholders without inventing unavailable data.
-2. Add automated responsive, keyboard, WCAG contrast/focus/labels/reduced-motion,
+1. Add automated responsive, keyboard, WCAG contrast/focus/labels/reduced-motion,
    and Playwright owner-task timing tests before any staging deployment.
-3. Implement the separately gated v2 audit/qualification persistence path needed
+2. Implement the separately gated v2 audit/qualification persistence path needed
    to populate real shadow leads; keep every live writer and provider disabled.
+3. Add private artifact-delivery authorization and expiry contracts so a future
+   dossier can display desktop/mobile proof without exposing an R2 object or
+   activating R2 before its separate owner gate.
 
 ## Resume instructions
 
