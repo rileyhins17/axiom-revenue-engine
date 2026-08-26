@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration] = await Promise.all([
+const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../src/engine/worker.ts", import.meta.url), "utf8"),
@@ -37,6 +37,8 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
   readFile(new URL("../src/lib/revenue-engine/owner-lead-projection.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/owner-lead-read-model.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/app/api/v1/leads/route.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/app/leads/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/leads/owner-lead-list.tsx", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0056_durable_evidence_receipts.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0057_fenced_evidence_resume_records.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0058_artifact_reference_projections.sql", import.meta.url), "utf8"),
@@ -264,6 +266,12 @@ requireMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /requireApiSession
 requireMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /export async function GET\(request:\s*Request\)/, "owner lead API must remain read-only GET");
 requireMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /private, no-store/, "owner lead API responses must not be cached publicly");
 forbidMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(|fetch\s*\(/, "owner lead API must not expose mutations or provider requests");
+requireMatch("src/app/leads/page.tsx", ownerLeadsPage, /await requireSession\(\)/, "owner Leads page must require an authenticated session before reading data");
+requireMatch("src/app/leads/page.tsx", ownerLeadsPage, /readOwnerLeadList\(getDatabase\(\)/, "owner Leads page must use the versioned bounded read model directly");
+forbidMatch("src/app/leads/page.tsx", ownerLeadsPage, /fetch\s*\(|export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(/, "owner Leads page must not self-fetch, mutate, or expose write methods");
+requireMatch("src/components/leads/owner-lead-list.tsx", ownerLeadList, /Read-only shadow view/, "owner Leads UI must state that it is a read-only shadow view");
+requireMatch("src/components/leads/owner-lead-list.tsx", ownerLeadList, /No email, call, form, or social action can start here/, "owner Leads UI must state that no channel action can start from the list");
+forbidMatch("src/components/leads/owner-lead-list.tsx", ownerLeadList, /fetch\s*\(|onClick\s*=|<button|<form|mailto:|tel:/, "owner Leads list must not add client actions, provider calls, or direct contact links");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /allSourceWritersGuarded:\s*z\.literal\(true\)/, "the writer-guard contract must cover every atomic source table");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /trustedExecutorImplemented:\s*z\.literal\(true\)/, "the guard contract must accurately report the private disposable-D1 executor");
 requireMatch("src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", artifactReferenceSourceWriterGuard, /completenessReceiptCreationAuthorized:\s*z\.literal\(false\)/, "writer guards must not authorize completeness receipt creation");

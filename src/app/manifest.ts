@@ -42,7 +42,7 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         name: "Leads",
         short_name: "Leads",
-        url: "/vault",
+        url: "/leads",
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
       {

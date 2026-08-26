@@ -33,10 +33,10 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     title: "Leads",
     label: "Leads",
     description: "Ranked businesses and evidence",
-    url: "/vault",
+    url: "/leads",
     icon: Crosshair,
     shortcut: "⌘2",
-    keywords: ["database", "records", "export", "leads"],
+    keywords: ["ranked", "businesses", "evidence", "leads"],
     badgeKey: "readyForTouch",
   },
   {
