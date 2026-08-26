@@ -44,7 +44,17 @@ private/no-store `GET /api/v1/leads` endpoint. The reader is SELECT-only, bounde
 to 100 businesses, and grants no qualification, mutation, outreach, provider, or
 spend authority. The primary navigation now opens `/leads`; the old `/vault`
 route remains available only as a legacy reference. Nothing in this workspace
-has been deployed, and real v2 audit/qualification writers are still pending.
+has been deployed. A private v2 audit/qualification writer now exists in source,
+but it is not imported by a Worker, route, queue, or provider path.
+
+That writer accepts only an exact sealed website-evidence receipt and persists
+the website snapshot, every evidence claim, a conservative qualification, and
+one assessment receipt through a single D1 batch. Exact retries write nothing;
+collisions or an incomplete existing receipt stop the operation. Reachability
+stays zero and the route stays `RESEARCH` until the separate contact-verification
+phase proves a usable channel. Migration 0061 also makes those shadow assessment
+records append-only. It is tested only in disposable local D1 and has not been
+applied to staging or production.
 
 Each ranked business now opens a read-only dossier at `/leads/[businessId]`.
 The dossier keeps the five quality scores separate; groups current audit findings
@@ -184,7 +194,7 @@ and artifact plans are separate from retry receipts. The validation-only planner
 rejects blocked resume histories and checks every primary or alternate identity
 candidate before proposing ordered insert-if-absent SQL. It deliberately has no
 resume executor: all resume, workflow execution, provider, and cost authority
-remains false. All 60 migrations pass from zero in isolated local
+remains false. All 61 migrations pass from zero in isolated local
 D1, but migration 0057 has not been applied to staging or production.
 
 Evidence-use endings and current-reference reasoning are now explicit without

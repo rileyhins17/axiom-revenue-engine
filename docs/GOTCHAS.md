@@ -209,6 +209,22 @@ Retire entries when the architecture makes them impossible.
 - **Verifying commit:** `5508e57` (reconciles the lower-level policy after the
   initial projection fix in `9e0673b`).
 
+## DATA-008 — Repeat audits reused evidence identities
+
+- **Symptom:** auditing the same business again under the same audit version
+  generated the same evidence-claim IDs, so an append-only database could not
+  preserve both captures even when their observations or timestamps differed.
+- **Root cause:** claim identity included the business, audit version, and check,
+  but omitted the capture identity.
+- **Proven fix:** `website-audit-deterministic-v4` derives each claim ID from a
+  SHA-256 digest of business ID, audit version, capture time, and check ID.
+- **Prevention/test:** repeat-capture tests require disjoint claim sets; the
+  safety checker requires the v4 capture-bound hash; migration 0061 makes website
+  snapshots and evidence claims append-only so accidental reuse fails closed.
+- **Affected area:** website refresh, evidence history, idempotent qualification
+  persistence, and owner lead audit timelines.
+- **Verifying commit:** branch HEAD containing ADR 0024 and migration 0061.
+
 ## AI-001 — Provider/model documentation drift
 
 - **Symptom:** runtime used DeepSeek while setup documentation named Gemini; the

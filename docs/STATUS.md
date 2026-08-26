@@ -103,11 +103,14 @@ staging; no rebuild code or migration has been deployed to production.
   `5e273fa83bc65705e7930fd6c8f33e5c508b6ce0`
 - Evidence-first owner lead dossier source checkpoint:
   `e44c7bbdb749e7f439e7e5a892226817a2bfc36d`
-- Owner Leads acceptance checkpoint: the branch HEAD containing this status
-  entry; previous verified checkpoint `ded584857ece8c5c3409225de693877ee26781b8`
+- Owner Leads acceptance checkpoint:
+  `0dfaafef6cc5b26ceaaec8bcc7344fc77e2ce89f`
+- Atomic shadow-assessment persistence checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `0dfaafef6cc5b26ceaaec8bcc7344fc77e2ce89f`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Local migrations: all 60 apply, including the fail-closed lockdown, shadow
+- Local migrations: all 61 apply, including the fail-closed lockdown, shadow
   Revenue Engine records, content-bound outreach approval, and durable evidence
   plus fenced resume, current-reference history, and atomic snapshot receipt
   contracts
@@ -842,6 +845,37 @@ Completed gates:
   deployment, remote migration, configured local/remote D1 write, provider call,
   mailbox action, prospect contact, secret exposure, or runtime spend occurred.
   Production and staging automation remain stopped.
+- Exact-head Linux CI run `32999604935` (job `98277643017`) passed all 13 gates
+  on owner-acceptance checkpoint
+  `0dfaafef6cc5b26ceaaec8bcc7344fc77e2ce89f`, including the isolated Chromium
+  owner gate, all 60 then-current migrations, and 372/372 tests.
+- The private shadow-assessment boundary now accepts only an exact sealed
+  website-evidence receipt, revalidates its digest/business/audit/evidence
+  identity, and combines current business-fit/timing basis with deterministic
+  rebuild evidence. Reachability remains zero and the route remains `RESEARCH`;
+  no email, contact, consent, provider, or owner-action state is inferred.
+- Migration 0061 adds an append-only assessment receipt and protects website
+  snapshots, capture-specific evidence claims, qualification snapshots, and the
+  receipt from update/delete. The injected D1 executor collision-preflights every
+  identity, checks fresh writes against D1 time, commits all missing rows in one
+  batch with the receipt last, reloads every exact row, and makes an exact replay
+  mutation-free.
+- Deterministic website audits advanced to v4 because repeat captures previously
+  reused claim IDs. Claim identity now includes business, audit version, capture
+  time, and check ID; the assessment boundary independently verifies that
+  identity before persistence.
+- Shadow-assessment local release verification passes fail-closed safety,
+  381/381 tests, typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, console no-upload dry run, deterministic console/engine bindings, inert
+  engine no-upload dry run, all 61 migrations, and the isolated owner browser
+  gate. Browser readiness was 243 ms for the list and 3,642 ms for the dossier;
+  all four WCAG views passed at desktop/mobile widths with zero external
+  requests.
+- Migration 0061 was applied only to ignored local Wrangler state, and all 61
+  migrations were also replayed in the disposable owner-acceptance database.
+  No staging/production migration, deployment, provider call, R2/Browser
+  operation, mailbox action, prospect contact, secret exposure, or runtime spend
+  occurred. Both deployed automation states remain stopped.
 
 Still required for Phase 1:
 
@@ -876,16 +910,17 @@ before approval.
   `docs/runbooks/STAGING_R2_ACTIVATION.md` after the Cloudflare dashboard proves
   it fits inside the existing C$50 ceiling. No R2 resource, binding, operation,
   lifecycle rule, or charge has been created yet.
-- No new owner decision is required for the read-only owner acceptance
+- No new owner decision is required for the shadow-assessment persistence
   checkpoint.
 
 ## Next three actions
 
-1. Implement the separately gated v2 audit/qualification persistence path needed
-   to populate real shadow leads; keep every live writer and provider disabled.
-2. Add private artifact-delivery authorization and expiry contracts so a future
+1. Add private artifact-delivery authorization and expiry contracts so a future
    dossier can display desktop/mobile proof without exposing an R2 object or
    activating R2 before its separate owner gate.
+2. Design the separately gated private invocation/import path that can feed the
+   sealed assessment writer from owner-approved KW records; keep staging
+   migration, Workers, providers, contact discovery, and every live writer off.
 3. Extend the browser owner gate to approval, emergency-stop, and weekly-review
    timing only after those real v2 UI actions exist; do not test legacy controls
    as if they were the finished owner workflow.

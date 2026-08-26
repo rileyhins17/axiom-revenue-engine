@@ -161,5 +161,7 @@ Pagination and materialization can be reconsidered only after measured need.
    inventing unavailable history or evidence.
 3. [x] Add automated keyboard, responsive, accessibility, and owner-task timing
    tests.
-4. [ ] Implement separately gated v2 audit/qualification persistence before a
-   shadow-data staging deployment.
+4. [x] Implement separately gated v2 audit/qualification persistence before a
+   shadow-data staging deployment. ADR 0024 keeps the writer private, requires
+   an exact sealed receipt, and persists audit/evidence/qualification/assessment
+   rows atomically with zero live authority.

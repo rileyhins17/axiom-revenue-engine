@@ -27,6 +27,8 @@
 | ConsentEvidence | Recorded lawful basis and public-source context for a contact action. |
 | VerificationResult | Deliverability, freshness, provider, method, and timestamp for a contact. |
 | QualificationSnapshot | Versioned five-score decision, gates, reasons, and recommended route. |
+| RevenueLeadAssessment | Deterministic, content-bound combination of one sealed website audit, explicit business-fit/timing basis, conservative research-only qualification, refresh time, and zero operational authority. |
+| RevenueLeadAssessmentReceipt | Append-only D1 receipt linking one exact workflow receipt, website snapshot, evidence set, and qualification snapshot committed in one batch. |
 | ChannelRoute | Ranked next-contact channel plus manual/automated policy. |
 | OwnerLeadProjection | Read-only, current owner view of one v2 business: separate scores, recomputed qualification, strongest exact evidence, best current route, refresh/block state, and zero operational authority. |
 | OwnerLeadListResponse | Authenticated, private/no-store, bounded list of ranked owner projections plus explicit invalid-row/contact counts and no mutation/outreach/provider/cost authority. |
@@ -77,6 +79,14 @@
   Route order is verified named email, verified role email, phone, form, social,
   then research; every non-email route remains manual and every email remains
   unapproved by the read model.
+- Shadow assessment persistence also refuses to infer reachability from website
+  or source data. It stores reachability zero and route `RESEARCH`; contact and
+  verification records must later prove a usable channel under a separate gate.
+- An assessment starts only from the exact sealed terminal workflow-receipt
+  revision. Its website snapshot, capture-specific evidence claims,
+  qualification, and assessment receipt commit atomically and reload exactly.
+  Migration 0061 makes all four record types append-only and grants no runtime,
+  outreach, send, provider, or cost authority.
 - Owner projections accept source evidence up to 90 days old and website audits
   up to 60 days old. Future/stale facts, score/evidence drift, or qualification
   predating the audit become explicit refresh work rather than actionable state.

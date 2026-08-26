@@ -249,3 +249,35 @@ test("captured input fails closed without a final URL and page evidence", () => 
   };
   assert.equal(DeterministicWebsiteAuditInputSchema.safeParse(uncapturedMobileWithMeasurements).success, false);
 });
+
+test("repeated audits cannot reuse evidence claim identities across capture times", () => {
+  const missingAt = (capturedAt: string) => {
+    const input = modernSite();
+    input.siteState = "NO_SITE";
+    input.requestedUrl = null;
+    input.finalUrl = null;
+    input.statusCode = 0;
+    input.redirectCount = 0;
+    input.capturedAt = capturedAt;
+    input.desktopArtifactRef = null;
+    input.mobileArtifactRef = null;
+    input.domArtifactRef = null;
+    input.pages = [];
+    input.resourceProbes = [];
+    input.mobile = {
+      captured: false,
+      horizontalOverflow: null,
+      navigationUsable: null,
+      textReadable: null,
+      minimumTapTargetPx: null,
+    };
+    return input;
+  };
+  const first = auditWebsiteDeterministically(missingAt("2026-08-20T12:00:00.000Z"));
+  const second = auditWebsiteDeterministically(missingAt("2026-08-21T12:00:00.000Z"));
+
+  assert.equal(first.claims.length, 1);
+  assert.equal(second.claims.length, 1);
+  assert.notEqual(first.claims[0]?.claimId, second.claims[0]?.claimId);
+  assert.match(first.claims[0]?.claimId ?? "", /^claim:v4:[a-f0-9]{64}$/);
+});

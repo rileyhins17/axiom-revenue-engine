@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, ownerLeadDetailReadModel, ownerLeadDetailRoute, ownerLeadDetailPage, ownerLeadDetail, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration] = await Promise.all([
+const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, leadAssessment, leadAssessmentD1, websiteAudit, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, ownerLeadDetailReadModel, ownerLeadDetailRoute, ownerLeadDetailPage, ownerLeadDetail, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration, leadAssessmentMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../src/engine/worker.ts", import.meta.url), "utf8"),
@@ -34,6 +34,9 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-d1-executor.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-trusted-projection.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/artifact-reference-source-writer-guard.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/lead-assessment.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/lead-assessment-d1.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/website-audit.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/owner-lead-projection.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/owner-lead-read-model.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/app/api/v1/leads/route.ts", import.meta.url), "utf8"),
@@ -48,6 +51,7 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
   readFile(new URL("../migrations/0058_artifact_reference_projections.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0059_atomic_artifact_reference_snapshots.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0060_artifact_reference_source_writer_guards.sql", import.meta.url), "utf8"),
+  readFile(new URL("../migrations/0061_shadow_lead_assessment_receipts.sql", import.meta.url), "utf8"),
 ]);
 
 const failures = [];
@@ -259,6 +263,44 @@ requireMatch("src/lib/revenue-engine/artifact-reference-trusted-projection.ts", 
 requireMatch("src/lib/revenue-engine/artifact-reference-trusted-projection.ts", artifactReferenceTrustedProjection, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "trusted projection must not authorize provider operations");
 forbidMatch("src/lib/revenue-engine/artifact-reference-trusted-projection.ts", artifactReferenceTrustedProjection, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.head\s*\(|\.put\s*\(|\.delete\s*\(|\.prepare\s*\(|\.batch\s*\(/, "fixture-only trusted projection must not access providers, runtime bindings, databases, network, writes, or deletion");
 forbidMatch("src/engine/worker.ts", engineWorker, /artifact-reference-trusted-projection/, "the inert engine must not wire trusted projection to runtime");
+requireMatch("src/lib/revenue-engine/website-audit.ts", websiteAudit, /DETERMINISTIC_WEBSITE_AUDIT_VERSION\s*=\s*"website-audit-deterministic-v4"/, "repeatable audit evidence must use the capture-aware v4 identity");
+requireMatch("src/lib/revenue-engine/website-audit.ts", websiteAudit, /deterministicWebsiteAuditClaimId\(businessId:\s*string,\s*capturedAt:\s*string,\s*checkId:\s*string\)[\s\S]*?createHash\("sha256"\)[\s\S]*?\$\{capturedAt\}[\s\S]*?\$\{checkId\}/, "evidence claim identity must bind the capture time and check identity");
+requireMatch("src/lib/revenue-engine/lead-assessment.ts", leadAssessment, /deterministicWebsiteAuditClaimId\(business\.id,\s*receipt\.audit\.capturedAt,\s*check\.checkId\)/, "assessment persistence must verify each deterministic evidence identity");
+requireMatch("src/lib/revenue-engine/lead-assessment.ts", leadAssessment, /closureStatus:\s*z\.literal\("SEALED"\)/, "shadow assessment must require a sealed workflow receipt");
+requireMatch("src/lib/revenue-engine/lead-assessment.ts", leadAssessment, /recommendedChannel:\s*z\.literal\("RESEARCH"\)/, "unverified reachability must remain a research route");
+requireMatch("src/lib/revenue-engine/lead-assessment.ts", leadAssessment, /reachability:\s*0/, "audit persistence must not infer reachability");
+requireMatch("src/lib/revenue-engine/lead-assessment.ts", leadAssessment, /runtimeConnected:\s*z\.literal\(false\)/, "assessment output must remain disconnected from runtime");
+requireMatch("src/lib/revenue-engine/lead-assessment.ts", leadAssessment, /outreachAuthorized:\s*z\.literal\(false\)/, "assessment output must not authorize outreach");
+requireMatch("src/lib/revenue-engine/lead-assessment.ts", leadAssessment, /sendAuthorized:\s*z\.literal\(false\)/, "assessment output must not authorize sending");
+requireMatch("src/lib/revenue-engine/lead-assessment.ts", leadAssessment, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "assessment output must not authorize provider operations");
+forbidMatch("src/lib/revenue-engine/lead-assessment.ts", leadAssessment, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.put\s*\(|\.delete\s*\(/, "assessment construction must remain deterministic and provider-free");
+requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION\s*=\s*"0061_shadow_lead_assessment_receipts"/, "the private assessment executor must require the append-only assessment schema");
+requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /Pick<D1Database,\s*"prepare"\s*\|\s*"batch">/, "the private assessment adapter must use the generated narrow D1 binding type");
+requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /FROM "RevenueWorkflowReceiptRevision" receipt[\s\S]*?JOIN "RevenueWorkflowAttemptClosure" closure[\s\S]*?closure\."terminalReceiptId" = receipt\."id"/, "assessment persistence must begin from the exact terminal workflow receipt");
+requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /boundary\.batch\(missingPlans\.map\(\(plan\) => plan\.insert\)\)/, "assessment records must commit through one D1 batch boundary");
+requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /strftime\('%Y-%m-%dT%H:%M:%fZ', 'now'\)[\s\S]*?assertFreshAssessmentClock\(databaseTimeResult, assessment\.assessedAt\)/, "fresh assessment time must be checked against the D1 clock");
+requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /reloadResults[\s\S]*?Committed assessment row failed exact reload/, "assessment persistence must reload and verify committed rows");
+requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /runtimeConnected:\s*z\.literal\(false\)/, "the private assessment executor must remain disconnected from runtime");
+requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /outreachAuthorized:\s*z\.literal\(false\)/, "the private assessment executor must not authorize outreach");
+requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /sendAuthorized:\s*z\.literal\(false\)/, "the private assessment executor must not authorize sending");
+requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "the private assessment executor must not authorize provider operations");
+requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /costAuthorizedUsd:\s*z\.literal\(0\)/, "the private assessment executor must keep provider cost authority at zero");
+forbidMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /LIMIT\s+1/i, "assessment collision preflights must inspect every matching primary or alternate identity");
+forbidMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /env\.[A-Z_]+|R2Bucket|fetch\s*\(|\.head\s*\(|\.put\s*\(|\.delete\s*\(/, "the private assessment executor must not access runtime bindings, providers, network, or deletion paths");
+forbidMatch("src/engine/worker.ts", engineWorker, /lead-assessment(?:-d1)?/, "the inert engine must not wire shadow assessment persistence to runtime");
+requireMatch("migrations/0061_shadow_lead_assessment_receipts.sql", leadAssessmentMigration, /CREATE TABLE "RevenueLeadAssessmentReceipt"/, "the assessment receipt table must remain additive");
+for (const column of ["outreachAuthorized", "sendAuthorized", "providerOperationsAuthorized", "costAuthorizedUsd"]) {
+  requireMatch("migrations/0061_shadow_lead_assessment_receipts.sql", leadAssessmentMigration, new RegExp(`CHECK \\(\"${column}\" = 0\\)`), `${column} must be database constrained to zero`);
+}
+for (const table of ["RevenueWebsiteSnapshot", "RevenueEvidenceClaim", "RevenueQualificationSnapshot"]) {
+  requireMatch("migrations/0061_shadow_lead_assessment_receipts.sql", leadAssessmentMigration, new RegExp(`CREATE TRIGGER \"${table}_assessment_immutable_update\"`), `${table} must reject updates`);
+  requireMatch("migrations/0061_shadow_lead_assessment_receipts.sql", leadAssessmentMigration, new RegExp(`CREATE TRIGGER \"${table}_assessment_immutable_delete\"`), `${table} must reject deletes`);
+}
+requireMatch("migrations/0061_shadow_lead_assessment_receipts.sql", leadAssessmentMigration, /CREATE TRIGGER "RevenueLeadAssessmentReceipt_immutable_update"/, "assessment receipts must reject updates");
+requireMatch("migrations/0061_shadow_lead_assessment_receipts.sql", leadAssessmentMigration, /CREATE TRIGGER "RevenueLeadAssessmentReceipt_immutable_delete"/, "assessment receipts must reject deletes");
+if ((leadAssessmentMigration.match(/CREATE TRIGGER/g) || []).length !== 8) failures.push("migrations/0061_shadow_lead_assessment_receipts.sql: exactly 8 append-only triggers are required");
+requireMatch("migrations/0061_shadow_lead_assessment_receipts.sql", leadAssessmentMigration, /REVENUE_LEAD_ASSESSMENT_APPEND_ONLY/, "assessment revisions must fail with a stable append-only error");
+forbidMatch("migrations/0061_shadow_lead_assessment_receipts.sql", leadAssessmentMigration, /\b(?:INSERT\s+INTO|UPDATE\s+\"[^\"]+\"\s+SET|DELETE\s+FROM)\b/i, "assessment migration must not mutate existing rows");
 requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /outreachAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize outreach");
 requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /sendAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize sending");
 requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /mutationAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize mutation");

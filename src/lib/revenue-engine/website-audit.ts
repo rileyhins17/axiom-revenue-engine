@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
+
 import { z } from "zod";
 
 import { EvidenceClaimSchema, type EvidenceClaim } from "@/lib/revenue-engine/evidence";
 
-export const DETERMINISTIC_WEBSITE_AUDIT_VERSION = "website-audit-deterministic-v3";
+export const DETERMINISTIC_WEBSITE_AUDIT_VERSION = "website-audit-deterministic-v4";
 
 export const WebsiteSiteStateSchema = z.enum(["NO_SITE", "UNREACHABLE", "CAPTURED"]);
 export const WebsiteClassificationSchema = z.enum([
@@ -297,6 +299,13 @@ function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+export function deterministicWebsiteAuditClaimId(businessId: string, capturedAt: string, checkId: string) {
+  const digest = createHash("sha256")
+    .update(`${businessId}\u0000${DETERMINISTIC_WEBSITE_AUDIT_VERSION}\u0000${capturedAt}\u0000${checkId}`)
+    .digest("hex");
+  return `claim:v4:${digest}`;
+}
+
 function classificationFor(input: DeterministicWebsiteAuditInput, checks: AuditCheck[]) {
   if (input.siteState === "NO_SITE") return "NO_SITE_NEW_BUILD" as const;
   if (input.siteState === "UNREACHABLE") return "REBUILD" as const;
@@ -319,7 +328,7 @@ export function auditWebsiteDeterministically(value: DeterministicWebsiteAuditIn
 
   const addCheck = (check: CheckInput) => {
     const claimId = check.outcome === "FAIL"
-      ? `claim:${input.businessId}:${DETERMINISTIC_WEBSITE_AUDIT_VERSION}:${check.checkId}`
+      ? deterministicWebsiteAuditClaimId(input.businessId, input.capturedAt, check.checkId)
       : null;
     checks.push(AuditCheckSchema.parse({
       checkId: check.checkId,
