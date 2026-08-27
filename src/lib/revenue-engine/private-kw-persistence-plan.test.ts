@@ -80,8 +80,8 @@ test("planned SQL matches migration 0054 and remains idempotent in isolated memo
   const database = freshShadowDatabase();
   try {
     for (const item of plan.preflights) {
-      const existing = database.prepare(item.selectSql).get(...item.bindings) as Record<string, unknown> | undefined;
-      assert.deepEqual(verifyPersistencePreflight(item, existing || null), { state: "MISSING", matches: true });
+      const existing = database.prepare(item.selectSql).all(...item.bindings) as Record<string, unknown>[];
+      assert.deepEqual(verifyPersistencePreflight(item, existing), { state: "MISSING", matches: true });
     }
     for (const item of plan.mutations) database.prepare(item.sql).run(...item.bindings);
 
@@ -96,7 +96,7 @@ test("planned SQL matches migration 0054 and remains idempotent in isolated memo
     assert.equal((database.prepare('SELECT "status" FROM "RevenueBusiness"').get() as { status: string }).status, "RESEARCH_ONLY");
 
     for (const item of plan.preflights) {
-      const existing = database.prepare(item.selectSql).get(...item.bindings) as Record<string, unknown>;
+      const existing = database.prepare(item.selectSql).all(...item.bindings) as Record<string, unknown>[];
       assert.deepEqual(verifyPersistencePreflight(item, existing), { state: "EXACT_MATCH", matches: true });
     }
     for (const item of plan.mutations) database.prepare(item.sql).run(...item.bindings);
@@ -115,7 +115,7 @@ test("preflight fingerprint detects drift before an insert can be treated as ide
     database.prepare('UPDATE "RevenueBusiness" SET "canonicalName" = ?').run("Conflicting Name");
     const businessCheck = plan.preflights.find((item) => item.entity === "BUSINESS");
     assert.ok(businessCheck);
-    const existing = database.prepare(businessCheck.selectSql).get(...businessCheck.bindings) as Record<string, unknown>;
+    const existing = database.prepare(businessCheck.selectSql).all(...businessCheck.bindings) as Record<string, unknown>[];
     assert.deepEqual(verifyPersistencePreflight(businessCheck, existing), { state: "CONFLICT", matches: false });
   } finally {
     database.close();
@@ -135,7 +135,7 @@ test("preflight detects unique-domain and source-owned-ID collisions under diffe
         ("id", "canonicalName", "normalizedDomain", "normalizedPhone", "independenceStatus", "status")
       VALUES (?, ?, ?, ?, ?, ?)
     `).run("business:conflict", "Conflicting Business", normalizedDomain, null, "UNKNOWN", "RESEARCH_ONLY");
-    const domainConflict = database.prepare(businessCheck.selectSql).get(...businessCheck.bindings) as Record<string, unknown>;
+    const domainConflict = database.prepare(businessCheck.selectSql).all(...businessCheck.bindings) as Record<string, unknown>[];
     assert.deepEqual(verifyPersistencePreflight(businessCheck, domainConflict), { state: "CONFLICT", matches: false });
 
     const sourceRunMutation = plan.mutations.find((item) => item.entity === "SOURCE_RUN");
@@ -148,8 +148,37 @@ test("preflight detects unique-domain and source-owned-ID collisions under diffe
         ("id", "sourceRunId", "sourceOwnedId", "businessId", "rawPayloadJson", "identitySignalsJson", "capturedAt")
       VALUES (?, ?, ?, NULL, '{}', '{}', ?)
     `).run("source-record:conflict", sourceRecordMutation.bindings[1], sourceRecordMutation.bindings[2], "2026-08-22T20:55:00.000Z");
-    const sourceConflict = database.prepare(sourceRecordCheck.selectSql).get(...sourceRecordCheck.bindings) as Record<string, unknown>;
+    const sourceConflict = database.prepare(sourceRecordCheck.selectSql).all(...sourceRecordCheck.bindings) as Record<string, unknown>[];
     assert.deepEqual(verifyPersistencePreflight(sourceRecordCheck, sourceConflict), { state: "CONFLICT", matches: false });
+  } finally {
+    database.close();
+  }
+});
+
+test("preflight rejects multiple identity matches even when the first row is exact", () => {
+  const plan = buildPrivateKwPersistencePlan(preparePrivateKwImport(sourceInput()));
+  const database = freshShadowDatabase();
+  try {
+    for (const item of plan.mutations) database.prepare(item.sql).run(...item.bindings);
+    const businessCheck = plan.preflights.find((item) => item.entity === "BUSINESS");
+    const businessMutation = plan.mutations.find((item) => item.entity === "BUSINESS");
+    assert.ok(businessCheck && businessMutation);
+
+    database.prepare(`
+      INSERT INTO "RevenueBusiness"
+        ("id", "canonicalName", "normalizedDomain", "normalizedPhone", "independenceStatus", "status")
+      VALUES (?, ?, NULL, ?, ?, ?)
+    `).run(
+      "business:alternate-phone-collision",
+      "Alternate Collision",
+      businessMutation.bindings[3],
+      "UNKNOWN",
+      "RESEARCH_ONLY",
+    );
+
+    const matches = database.prepare(businessCheck.selectSql).all(...businessCheck.bindings) as Record<string, unknown>[];
+    assert.equal(matches.length, 2);
+    assert.deepEqual(verifyPersistencePreflight(businessCheck, matches), { state: "CONFLICT", matches: false });
   } finally {
     database.close();
   }

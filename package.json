@@ -33,7 +33,8 @@
     "cf:engine:dev": "wrangler dev --config wrangler.engine.jsonc --local --env-file wrangler.typegen.env",
     "cf:engine:dry-run": "wrangler deploy --config wrangler.engine.jsonc --dry-run --autoconfig false",
     "kw:prepare-import": "tsx scripts/prepare-private-kw-import.ts",
-    "kw:plan-persistence": "tsx scripts/plan-private-kw-persistence.ts"
+    "kw:plan-persistence": "tsx scripts/plan-private-kw-persistence.ts",
+    "kw:execute-assessment": "tsx scripts/execute-private-kw-assessment.ts"
   },
   "dependencies": {
     "@cloudflare/playwright": "^1.1.2",

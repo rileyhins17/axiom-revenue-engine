@@ -236,6 +236,16 @@
 - A saved private persistence artifact is not trusted executable input. Any
   future loader must revalidate the source import, reproduce the canonical plan,
   require exact preflight matches, and stop on collision or drift.
+- The guarded local assessment command accepts the original prepared source plan,
+  not a saved persistence artifact. Persistence plan v2 queries every primary or
+  alternate identity without `LIMIT 1`; the command requires exactly one expected
+  row for every planned source entity before it can call the sealed assessment
+  writer. Zero rows, multiple rows, or field drift stop execution.
+- Local shadow approval authorizes one append-only assessment write only. It
+  binds the exact source-plan digest, evaluation candidate, sealed workflow
+  receipt, business-fit/timing basis, scores, policy blocks, reviewer, and
+  assessment timestamp. It cannot create source/workflow/contact rows, infer
+  reachability, call providers, or authorize outreach.
 - Durable evidence persistence is also validation-only. Migration 0056 can hold
   immutable receipt revisions, but the current module has no D1 executor and
   emits `mutationAuthorized: false` and `resumeAuthorized: false`. A step output

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactDeliveryAuthorization, artifactDeliveryFixture, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, leadAssessment, leadAssessmentD1, websiteAudit, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, ownerLeadDetailReadModel, ownerLeadDetailRoute, ownerLeadDetailPage, ownerLeadDetail, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration, leadAssessmentMigration] = await Promise.all([
+const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, privateKwAssessmentInvocation, privateKwAssessmentCli, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactDeliveryAuthorization, artifactDeliveryFixture, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, leadAssessment, leadAssessmentD1, websiteAudit, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, ownerLeadDetailReadModel, ownerLeadDetailRoute, ownerLeadDetailPage, ownerLeadDetail, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration, leadAssessmentMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../src/engine/worker.ts", import.meta.url), "utf8"),
@@ -15,6 +15,8 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
   readFile(new URL("./private-kw-files.ts", import.meta.url), "utf8"),
   readFile(new URL("./plan-private-kw-persistence.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/private-kw-persistence-plan.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/private-kw-assessment-invocation.ts", import.meta.url), "utf8"),
+  readFile(new URL("./execute-private-kw-assessment.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/browser-measurement-adapter.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/content-addressed-artifact-store.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/website-audit-assembly.ts", import.meta.url), "utf8"),
@@ -132,6 +134,7 @@ requireMatch("package.json", packageJson, /scripts\/\*\*\/\*\.test\.ts/, "TypeSc
 requireMatch("package.json", packageJson, /"test:owner-ui"\s*:\s*"tsx scripts\/verify-owner-ui-acceptance\.ts"/, "the owner UI acceptance gate must have a stable local command");
 requireMatch("package.json", packageJson, /"kw:prepare-import"\s*:\s*"tsx scripts\/prepare-private-kw-import\.ts"/, "the private KW import must use the guarded local CLI");
 requireMatch("package.json", packageJson, /"kw:plan-persistence"\s*:\s*"tsx scripts\/plan-private-kw-persistence\.ts"/, "private persistence planning must use the validation-only CLI");
+requireMatch("package.json", packageJson, /"kw:execute-assessment"\s*:\s*"tsx scripts\/execute-private-kw-assessment\.ts"/, "private assessment execution must use the guarded ignored-local CLI");
 requireMatch(".github/workflows/ci.yml", ci, /run:\s*npm run cf:engine:typegen:check/, "CI must verify generated engine bindings");
 requireMatch(".github/workflows/ci.yml", ci, /run:\s*npm run cf:engine:dry-run/, "CI must dry-run the inert engine bundle");
 requireMatch(".github/workflows/ci.yml", ci, /run:\s*npx playwright install --with-deps chromium/, "CI must install the pinned owner UI browser");
@@ -148,6 +151,22 @@ requireMatch("src/lib/revenue-engine/private-kw-import.ts", privateKwImport, /ou
 requireMatch("src/lib/revenue-engine/private-kw-persistence-plan.ts", privateKwPersistence, /mutationAuthorized:\s*false/, "private persistence plans must not authorize mutation");
 requireMatch("src/lib/revenue-engine/private-kw-persistence-plan.ts", privateKwPersistence, /qualificationRows:\s*0/, "private persistence plans must not create qualification rows");
 requireMatch("src/lib/revenue-engine/private-kw-persistence-plan.ts", privateKwPersistence, /outreachRows:\s*0/, "private persistence plans must not create outreach rows");
+requireMatch("src/lib/revenue-engine/private-kw-persistence-plan.ts", privateKwPersistence, /PRIVATE_KW_PERSISTENCE_PLAN_VERSION\s*=\s*"kw-private-persistence-plan-v2"/, "private persistence preflights must use the collision-complete v2 contract");
+forbidMatch("src/lib/revenue-engine/private-kw-persistence-plan.ts", privateKwPersistence, /LIMIT\s+1/i, "private persistence preflights must inspect every matching identity");
+requireMatch("src/lib/revenue-engine/private-kw-assessment-invocation.ts", privateKwAssessmentInvocation, /localAssessmentMutationAuthorized:\s*z\.literal\(true\)/, "an owner invocation must explicitly authorize only the local assessment write");
+requireMatch("src/lib/revenue-engine/private-kw-assessment-invocation.ts", privateKwAssessmentInvocation, /sourceMutationAuthorized:\s*z\.literal\(false\)/, "owner assessment approval must not authorize source mutation");
+requireMatch("src/lib/revenue-engine/private-kw-assessment-invocation.ts", privateKwAssessmentInvocation, /contactDiscoveryAuthorized:\s*z\.literal\(false\)/, "owner assessment approval must not authorize contact discovery");
+requireMatch("src/lib/revenue-engine/private-kw-assessment-invocation.ts", privateKwAssessmentInvocation, /outreachAuthorized:\s*z\.literal\(false\)/, "owner assessment approval must not authorize outreach");
+requireMatch("src/lib/revenue-engine/private-kw-assessment-invocation.ts", privateKwAssessmentInvocation, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "owner assessment approval must authorize zero provider operations");
+forbidMatch("src/lib/revenue-engine/private-kw-assessment-invocation.ts", privateKwAssessmentInvocation, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.put\s*\(|\.delete\s*\(/, "owner assessment invocation must remain deterministic and provider-free");
+requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /inspectPrivateKwDatabase/, "private assessment execution must use an inspected ignored local database");
+requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /assertExactSourceMaterialization/, "private assessment execution must prove exact source materialization first");
+requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /assertCanonicalRevenueSchema/, "private assessment execution must reject modified Revenue tables, indexes, and triggers");
+requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /executePrivateRevenueLeadAssessmentD1/, "private assessment execution must use the sealed assessment writer");
+requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /sourceMutationPerformed:\s*false/, "private assessment execution must report no source mutation");
+requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /providerOperationsAuthorized:\s*0/, "private assessment execution must authorize zero provider operations");
+forbidMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /wrangler|--remote|deploy|fetch\s*\(|env\.[A-Z_]+|@cloudflare|R2Bucket/i, "private assessment execution must not access Cloudflare, providers, network, or remote resources");
+forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-assessment-invocation|execute-private-kw-assessment/, "the inert engine must not wire owner-approved local assessment execution to runtime");
 requireMatch("src/lib/revenue-engine/browser-measurement-adapter.ts", browserMeasurementAdapter, /runnerKind:\s*z\.literal\("FIXTURE"\)/, "browser measurement requests must remain fixture-only");
 requireMatch("src/lib/revenue-engine/browser-measurement-adapter.ts", browserMeasurementAdapter, /artifactWriteAuthorized:\s*z\.literal\(false\)/, "browser measurement drafts must not authorize artifact writes");
 requireMatch("src/lib/revenue-engine/browser-measurement-adapter.ts", browserMeasurementAdapter, /maxCostUsd:\s*z\.literal\(0\)/, "browser measurement requests must have zero provider budget");

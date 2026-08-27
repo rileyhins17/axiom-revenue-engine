@@ -51,6 +51,23 @@ mutation. The output says `mutationAuthorized: false`. Any future executor must
 revalidate the original versioned input, reproduce the same plan from trusted
 code, pass every exact preflight, and receive a separate release approval.
 
+The first separately approved assessment executor now exists for an ignored
+local SQLite database only. Codex will prepare the invocation after Riley reviews
+one record; Riley does not need to hand-author JSON. The command is:
+
+```powershell
+npm run kw:execute-assessment -- --source-plan data/kw-evaluation/plan.json --invocation data/kw-evaluation/assessment.json --database data/kw-evaluation/shadow.sqlite
+```
+
+It requires migrations 0054–0061, every exact source row, and the exact terminal
+sealed website-evidence receipt to already exist in that local file. It rechecks
+all alternate identities and rejects missing, changed, or multiple matches. The
+approval binds one candidate, one receipt, the reviewed scoring evidence, and a
+current timestamp. A successful run creates only immutable website/evidence,
+qualification, and assessment rows; reachability remains zero and the route is
+`RESEARCH`. It cannot load source/workflow data, discover contacts, use
+Cloudflare, call a provider, spend money, or contact anyone.
+
 ## What Riley will do
 
 For each business, the app will show its website capture, the engine's scores,

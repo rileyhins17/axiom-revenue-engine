@@ -24,6 +24,20 @@ export function resolvePrivateKwDataPath(value: string) {
   return resolved;
 }
 
+export function resolvePrivateKwDatabasePath(value: string) {
+  const resolved = path.resolve(REPOSITORY_ROOT, value);
+  if (!isInside(PRIVATE_DATA_ROOT, resolved)) {
+    throw new Error("Private KW databases must stay inside data/kw-evaluation/.");
+  }
+  if (path.dirname(resolved) !== PRIVATE_DATA_ROOT) {
+    throw new Error("Private KW databases must be direct children of data/kw-evaluation/.");
+  }
+  if (path.extname(resolved).toLocaleLowerCase("en-CA") !== ".sqlite") {
+    throw new Error("Private KW databases must use the .sqlite extension.");
+  }
+  return resolved;
+}
+
 async function assertSafePrivateRoot() {
   await mkdir(PRIVATE_DATA_ROOT, { recursive: true });
   if ((await lstat(PRIVATE_DATA_ROOT)).isSymbolicLink()) {
@@ -52,6 +66,19 @@ export async function writePrivateKwJson(value: string, data: unknown) {
     await handle.writeFile(`${JSON.stringify(data, null, 2)}\n`, "utf8");
   } finally {
     await handle.close();
+  }
+  return file;
+}
+
+export async function inspectPrivateKwDatabase(value: string, maxBytes: number) {
+  const file = resolvePrivateKwDatabasePath(value);
+  await assertSafePrivateRoot();
+  if ((await lstat(file)).isSymbolicLink()) {
+    throw new Error("Private KW database files cannot be symbolic links.");
+  }
+  const inputStats = await stat(file);
+  if (!inputStats.isFile() || inputStats.size > maxBytes) {
+    throw new Error(`The private KW database must be a SQLite file no larger than ${maxBytes} bytes.`);
   }
   return file;
 }

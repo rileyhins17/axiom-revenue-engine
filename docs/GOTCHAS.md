@@ -75,7 +75,11 @@ Retire entries when the architecture makes them impossible.
 - **Prevention/test:**
   `fenced-evidence-resume-persistence-plan.test.ts` covers stored drift, a real
   alternate-key collision, and explicit multiple-match rejection; new durable
-  planners must not use `LIMIT 1` for collision preflight.
+  planners must not use `LIMIT 1` for collision preflight. The older private KW
+  source planner was upgraded to collision-complete v2 when this repeated there;
+  `private-kw-persistence-plan.test.ts` now proves that an exact primary row plus
+  a second alternate-identity match is a conflict, and the safety gate forbids
+  `LIMIT 1` in that planner.
 - **Affected area:** D1 idempotency, retries, imports, and workflow recovery.
 - **Verifying commit:** `6d5db2b`.
 

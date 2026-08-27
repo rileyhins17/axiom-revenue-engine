@@ -7,7 +7,7 @@ import {
   type PrivateKwImportPlan,
 } from "@/lib/revenue-engine/private-kw-import";
 
-export const PRIVATE_KW_PERSISTENCE_PLAN_VERSION = "kw-private-persistence-plan-v1";
+export const PRIVATE_KW_PERSISTENCE_PLAN_VERSION = "kw-private-persistence-plan-v2";
 export const PRIVATE_KW_TARGET_SCHEMA_VERSION = "0054_revenue_shadow_kernel";
 
 const SqlValueSchema = z.union([z.string(), z.number().finite(), z.null()]);
@@ -138,10 +138,12 @@ function mutation(
 
 export function verifyPersistencePreflight(
   item: PersistencePreflight,
-  existingRow: Record<string, unknown> | null,
+  existingRows: readonly Record<string, unknown>[],
 ) {
   const validated = PersistencePreflightSchema.parse(item);
-  if (!existingRow) return { state: "MISSING" as const, matches: true };
+  if (existingRows.length === 0) return { state: "MISSING" as const, matches: true };
+  if (existingRows.length !== 1) return { state: "CONFLICT" as const, matches: false };
+  const [existingRow] = existingRows;
   const comparable = Object.fromEntries(
     Object.keys(validated.expected).map((key) => [key, existingRow[key] ?? null]),
   );
@@ -204,7 +206,7 @@ export function buildPrivateKwPersistencePlan(value: PrivateKwImportPlan): Priva
     preflights.push(preflight(
       "BUSINESS",
       record.business.id,
-      `SELECT ${Object.keys(business).map((column) => `"${column}"`).join(", ")} FROM "RevenueBusiness" WHERE "id" = ? OR (? IS NOT NULL AND "normalizedDomain" = ?) OR (? IS NOT NULL AND "normalizedPhone" = ?) LIMIT 1`,
+      `SELECT ${Object.keys(business).map((column) => `"${column}"`).join(", ")} FROM "RevenueBusiness" WHERE "id" = ? OR (? IS NOT NULL AND "normalizedDomain" = ?) OR (? IS NOT NULL AND "normalizedPhone" = ?)`,
       business,
       [record.business.id, record.business.normalizedDomain, record.business.normalizedDomain, record.business.normalizedPhone, record.business.normalizedPhone],
     ));
@@ -263,7 +265,7 @@ export function buildPrivateKwPersistencePlan(value: PrivateKwImportPlan): Priva
     preflights.push(preflight(
       "SOURCE_RECORD",
       record.sourceRecord.id,
-      `SELECT ${Object.keys(sourceRecord).map((column) => `"${column}"`).join(", ")} FROM "RevenueSourceRecord" WHERE "id" = ? OR ("sourceRunId" = ? AND "sourceOwnedId" = ?) LIMIT 1`,
+      `SELECT ${Object.keys(sourceRecord).map((column) => `"${column}"`).join(", ")} FROM "RevenueSourceRecord" WHERE "id" = ? OR ("sourceRunId" = ? AND "sourceOwnedId" = ?)`,
       sourceRecord,
       [record.sourceRecord.id, record.sourceRecord.sourceRunId, record.sourceRecord.sourceOwnedId],
     ));

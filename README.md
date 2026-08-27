@@ -56,6 +56,14 @@ phase proves a usable channel. Migration 0061 also makes those shadow assessment
 records append-only. It is tested only in disposable local D1 and has not been
 applied to staging or production.
 
+An owner-approved local invocation path can now call that writer against one
+ignored `.sqlite` database. It re-derives the source plan from trusted code,
+requires every source row to be exactly materialized, binds one reviewed KW
+candidate to one sealed receipt and timestamp, and then permits only the
+append-only assessment write. It cannot import source/workflow rows, discover a
+contact, call a provider, send outreach, migrate staging/production, or use the
+engine Worker.
+
 Each ranked business now opens a read-only dossier at `/leads/[businessId]`.
 The dossier keeps the five quality scores separate; groups current audit findings
 as critical, important, or minor; shows the exact recorded contact routes and why
@@ -344,6 +352,13 @@ a business. A second local-only command can prepare schema-bound preflights with
 `npm run kw:plan-persistence -- --input data/kw-evaluation/plan.json --output data/kw-evaluation/persistence.json`.
 It does not connect to or write a database and its output explicitly carries no
 mutation authority. See the evaluation guide before preparing real private data.
+After an owner has reviewed one record and its sealed local workflow receipt
+already exists, Codex can use the separately gated command
+`npm run kw:execute-assessment -- --source-plan data/kw-evaluation/plan.json --invocation data/kw-evaluation/assessment.json --database data/kw-evaluation/shadow.sqlite`.
+The invocation must contain the exact local-shadow confirmation and a timestamp
+within the assessment writer's five-minute freshness window. The command refuses
+source drift, hidden alternate-identity collisions, missing schema, unsealed
+receipts, non-local paths, and all remote/provider authority.
 
 Legacy resource identifiers are kept only where needed for safe migration. They
 must not be renamed in place or retired until reconciliation, rollback, and the

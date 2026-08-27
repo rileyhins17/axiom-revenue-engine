@@ -107,9 +107,11 @@ staging; no rebuild code or migration has been deployed to production.
   `0dfaafef6cc5b26ceaaec8bcc7344fc77e2ce89f`
 - Atomic shadow-assessment persistence checkpoint:
   `27a909a758306d803d3e9f8cb84f63212f0b8dff`
-- Private artifact-delivery authorization checkpoint: the branch HEAD containing
-  this status entry; previous verified checkpoint
-  `27a909a758306d803d3e9f8cb84f63212f0b8dff`
+- Private artifact-delivery authorization checkpoint:
+  `1ea15efe784c73bade3ee4079e8b3da66700364b`
+- Owner-approved local shadow-assessment invocation checkpoint: the branch HEAD
+  containing this status entry; previous verified checkpoint
+  `1ea15efe784c73bade3ee4079e8b3da66700364b`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 61 apply, including the fail-closed lockdown, shadow
@@ -902,6 +904,39 @@ Completed gates:
   binding, signing secret, R2 bucket/read, deployment, remote migration, provider
   call, mailbox action, prospect contact, secret exposure, or runtime spend
   occurred. Production and staging automation remain stopped.
+- A guarded ignored-local command can now bind one Riley/Aidan-approved KW
+  evaluation candidate to one exact sealed workflow receipt and invoke the
+  append-only assessment writer. Approval binds the source-plan digest,
+  candidate, receipt, business-fit/timing basis, scores, policy blocks, reviewer,
+  and one current timestamp. The command returns only content-derived IDs and
+  counts; reachability stays zero and the route stays `RESEARCH`.
+- The command accepts only direct-child JSON and `.sqlite` files under ignored
+  `data/kw-evaluation/`, opens one existing unattached local database, rebuilds
+  migrations 0054–0061 in memory, and requires every Revenue table, index, and
+  trigger to match exactly. It re-derives source persistence from trusted code
+  and requires every source run/business/location/source row to be one exact
+  existing match before any assessment write.
+- Private KW persistence advanced to collision-complete v2. Business and source-
+  record preflights no longer use `LIMIT 1`; zero rows are missing, one exact row
+  is idempotent, and multiple primary/alternate matches always conflict. This is
+  now locked by an adversarial test and the repository safety scan because the
+  DATA-002 gotcha repeated in the older planner.
+- Local release verification passes 392/392 tests, fail-closed safety, typecheck,
+  zero-warning lint, deterministic console/engine bindings, all 61 local
+  migrations, the secret-sanitized Cloudflare build, and both console/engine
+  no-upload dry runs. The disposable SQLite path proves fresh commit,
+  mutation-free exact replay, hidden alternate-phone collision rejection, and
+  modified-trigger rejection. The owner browser gate passes four desktop/mobile
+  WCAG views with zero external requests; the list was ready in 725 ms and the
+  dossier in 2,815 ms. Its first warmup produced one empty page-error event while
+  all requests returned 200 and the rendered dossier was complete; the immediate
+  clean rerun passed, and the bounded ignored failure artifact was retained for
+  diagnosis. Atomic commit, push, and exact-head Linux CI remain in this cycle.
+- No source/workflow/contact row was written outside disposable test databases;
+  no real KW record was loaded. No Worker/route, staging/production migration,
+  deployment, provider/network call, mailbox action, prospect contact, secret
+  exposure, or runtime spend occurred. Production and staging automation remain
+  stopped.
 
 Still required for Phase 1:
 
@@ -940,15 +975,18 @@ before approval.
   checkpoint.
 - No new owner decision is required for the source-only private artifact-delivery
   checkpoint. R2 activation and any live preview route remain separately gated.
+- No new owner decision is required for the guarded local assessment invocation.
+  A real execution will require Riley or Aidan to review the exact record and
+  supply the explicit local-shadow confirmation at that time.
 
 ## Next three actions
 
-1. Design the separately gated private invocation/import path that can feed the
-   sealed assessment writer from owner-approved KW records; keep staging
-   migration, Workers, providers, contact discovery, and every live writer off.
-2. Define the contact-discovery and verification input contract that can add
+1. Define the contact-discovery and verification input contract that can add
    evidence-backed email, phone, form, social, or research routes without
    treating an email-looking value as reachability or enabling a provider.
+2. Design the separate local source/workflow materialization gate needed before
+   a real approved record can reach this invocation; do not let assessment
+   approval authorize imports, capture, providers, or migrations.
 3. Extend the browser owner gate to approval, emergency-stop, and weekly-review
    timing only after those real v2 UI actions exist; do not test legacy controls
    as if they were the finished owner workflow.

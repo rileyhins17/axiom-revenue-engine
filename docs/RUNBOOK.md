@@ -58,6 +58,34 @@ staging binding, synthetic data only, recorded provider operations/cost, and a
 targeted rollback. It does not authorize production, prospect evidence, remote
 D1 migrations, or autonomous work.
 
+## Owner-approved local KW assessment
+
+This procedure is local shadow evaluation only. It does not import source or
+workflow rows and does not authorize contact discovery, outreach, providers,
+staging, production, or a migration.
+
+1. Keep the prepared source plan, owner-reviewed invocation, and SQLite database
+   as direct children of ignored `data/kw-evaluation/` storage.
+2. Confirm the local database already has migrations 0054–0061, the exact source
+   plan rows, and the exact terminal sealed website-evidence receipt. Never point
+   the command at Wrangler state or a remote database.
+3. Review one candidate's identity, business-fit/timing evidence, scores, and
+   policy blocks. Set `reviewedAt` and `assessedAt` to the same current timestamp,
+   and use the exact confirmation documented by the invocation schema. The fresh
+   assessment must reach SQLite within five minutes.
+4. Execute:
+
+   ```powershell
+   npm run kw:execute-assessment -- --source-plan data/kw-evaluation/plan.json --invocation data/kw-evaluation/assessment.json --database data/kw-evaluation/shadow.sqlite
+   ```
+
+5. Expect `FRESH_COMMIT` once and `EXACT_REPLAY` on an unchanged retry. Stop on
+   `MISSING`, `CONFLICT`, source-plan drift, any non-canonical Revenue table,
+   index or trigger, stale time, or an unsealed receipt; do not work around the
+   gate by editing SQLite.
+6. Verify the owner reader shows the new assessment with reachability zero and
+   route `RESEARCH`. No provider cost or external action should exist.
+
 ## Weekly owner review (30 minutes)
 
 1. Handle qualified replies and overdue opportunities.
