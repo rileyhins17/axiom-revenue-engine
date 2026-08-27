@@ -33,6 +33,8 @@
 | ContactPersistencePlan | Schema-0063 validation-only preflight/append plan for discovery, contact versions, evidence, and verification history. It distinguishes fresh, exact replay, collision, and incomplete history but has no executor or mutation authority. |
 | PrivateKwContactPersistence | Separately owner-approved ignored-local transaction that re-derives the exact validation-only contact plan, checks the complete schema and every collision identity inside SQLite `IMMEDIATE`, inserts only a fresh complete fixture bundle, and reloads it before commit. |
 | RevenuePrivateKwContactPersistenceReceipt | Append-only schema-0065 completion seal inserted last after the exact discovery/contact/evidence/verification bundle; schema 0066 hardens its content-derived identity and exact verification-ID set. It binds the approval, plan, counts, transaction type, and zero consent/downstream authority. |
+| PrivateKwContactReview | No-overwrite owner-readable artifact constructed with a read-only canonical local database. It binds one exact source candidate and reconstructed persisted assessment to fixture discovery/verification evidence, visible scores/routes, `UNASSESSED` consent, and zero mutation/provider/outreach authority. |
+| RevenuePrivateKwContactInvocationReceipt | Append-only schema-0067 final seal retaining the complete reviewed packet and binding it to the exact source-plan digest, assessment receipt/digest, contact materialization, discovery receipt, reviewer, approval time, and zero downstream authority. |
 | QualificationSnapshot | Versioned five-score decision, gates, reasons, and recommended route. |
 | RevenueLeadAssessment | Deterministic, content-bound combination of one sealed website audit, explicit business-fit/timing basis, conservative research-only qualification, refresh time, and zero operational authority. |
 | RevenueLeadAssessmentReceipt | Append-only D1 receipt linking one exact workflow receipt, website snapshot, evidence set, and qualification snapshot committed in one batch. |
@@ -111,6 +113,12 @@
   writes nothing, globally
   reusable evidence may match, and partial or receipt-less discovery-owned state
   is never repaired.
+- Local contact invocation separates review from mutation. Review preparation
+  opens SQLite read-only and reconstructs the assessment from sealed lineage; a
+  different current approval is required before one outer `IMMEDIATE`
+  transaction can persist the contact bundle and schema-0067 receipt. The final
+  receipt retains the full review, and a missing final receipt rolls the contact
+  bundle back rather than leaving detached reachability beside an assessment.
 - Public contact evidence does not imply CASL consent. Discovery and persistence
   retain `UNASSESSED`; a future `ConsentEvidence` decision remains mandatory and
   separate from verification or owner route readiness.

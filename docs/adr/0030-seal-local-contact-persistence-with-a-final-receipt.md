@@ -130,7 +130,7 @@ transaction's authority.
 2. [x] Add the SQLite `IMMEDIATE` executor with full preflight and post-verify.
 3. [x] Prove fresh commit, exact replay, rollback, partial-history rejection,
    reusable evidence, stale approval, and direct-SQL lineage enforcement.
-4. [ ] Design a separate ignored-local contact invocation and owner procedure;
-   do not add a live provider or infer consent.
+4. [x] Add the separate ignored-local review and contact invocation described in
+   ADR 0031; no live provider or consent inference was added.
 5. [ ] Add runtime/provider persistence only after its own owner, privacy, budget,
    deployment, and production release gates.

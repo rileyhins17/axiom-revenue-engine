@@ -35,7 +35,9 @@
     "kw:prepare-import": "tsx scripts/prepare-private-kw-import.ts",
     "kw:plan-persistence": "tsx scripts/plan-private-kw-persistence.ts",
     "kw:materialize-source-workflow": "tsx scripts/materialize-private-kw-source-workflow.ts",
-    "kw:execute-assessment": "tsx scripts/execute-private-kw-assessment.ts"
+    "kw:execute-assessment": "tsx scripts/execute-private-kw-assessment.ts",
+    "kw:prepare-contact-review": "tsx scripts/prepare-private-kw-contact-review.ts",
+    "kw:persist-contacts": "tsx scripts/persist-private-kw-contacts.ts"
   },
   "dependencies": {
     "@cloudflare/playwright": "^1.1.2",

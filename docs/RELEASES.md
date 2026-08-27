@@ -15,6 +15,11 @@
   schema-0065/0066 receipt committed last, write-free exact replay, full rollback,
   collision/partial-history rejection, and no provider, consent, outreach, send,
   remote database, or cost path.
+- Added a read-only reviewed-contact preparation command and a different
+  owner-approved local invocation. Schema 0067 retains the complete review and
+  binds source, sealed assessment, contact materialization, discovery,
+  verification, reviewer, and approval lineage under one outer atomic
+  transaction, without live providers, consent inference, outreach, or spend.
 - Relabelled the owner navigation and made Leads quality-first with transparent
   score components and an explicit stale-evidence warning.
 - Locally verified 160 tests, typecheck, lint, all 55 migrations, Cloudflare build,

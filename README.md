@@ -96,12 +96,20 @@ A separately approved local executor now re-derives that planner from exact
 fixture results and can append one bundle to a canonical ignored SQLite database
 inside an `IMMEDIATE` transaction. Migration 0065 adds a different completion
 receipt that is inserted last; migration 0066 hardens its content-derived identity
-and exact verification set. The receipt requires the whole contact/evidence/verification
-set; exact replay writes nothing, while partial or receipt-less history stops.
-This executor is not a command yet: it has no file reader, Worker, route, provider,
-consent decision, outreach, send, staging/production path, or cost authority.
-Migrations 0062–0066 have been applied only to ignored local state and disposable
-tests—not staging or production.
+and exact verification set. The receipt requires the whole contact/evidence/
+verification set; exact replay writes nothing, while partial or receipt-less
+history stops.
+
+The guarded operator invocation now has two explicit stages. A read-only command
+proves the exact source and persisted assessment lineage, reconstructs fixture
+discovery/verification from reviewed observations, and writes a no-overwrite
+review packet. A separate current owner approval can then persist that exact
+bundle and an immutable migration-0067 receipt under one outer `IMMEDIATE`
+transaction. The receipt retains the full review plus source, assessment,
+contact, reviewer, and approval lineage. Neither command can call a provider,
+infer consent, change qualification, send outreach, use a remote database, or
+spend. Migrations 0062–0067 have been applied only to ignored local state and
+disposable tests—not staging or production.
 
 Each ranked business now opens a read-only dossier at `/leads/[businessId]`.
 The dossier keeps the five quality scores separate; groups current audit findings
@@ -403,6 +411,17 @@ confirmation and a timestamp
 within the assessment writer's five-minute freshness window. The command refuses
 source drift, hidden alternate-identity collisions, missing schema, unsealed
 receipts, non-local paths, and all remote/provider authority.
+
+After the assessment exists, reviewed fixture observations can become a separate
+no-write artifact with
+`npm run kw:prepare-contact-review -- --source-plan data/kw-evaluation/plan.json --draft data/kw-evaluation/contact-draft.json --database data/kw-evaluation/shadow.sqlite --output data/kw-evaluation/contact-review.json`.
+The database is opened read-only and the review output cannot overwrite an
+existing file. Riley or Aidan must then inspect that exact packet and create a
+different current approval before
+`npm run kw:persist-contacts -- --source-plan data/kw-evaluation/plan.json --review data/kw-evaluation/contact-review.json --approval data/kw-evaluation/contact-approval.json --database data/kw-evaluation/shadow.sqlite`.
+The second command persists only the reviewed fixture bundle and final lineage
+receipt. It does not perform live discovery or verification, infer CASL consent,
+change a lead score, or authorize outreach.
 
 Legacy resource identifiers are kept only where needed for safe migration. They
 must not be renamed in place or retired until reconciliation, rollback, and the

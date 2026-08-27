@@ -68,7 +68,7 @@ deployment, or a migration.
 1. Keep the prepared source plan, source/workflow approval, assessment
    invocation, and SQLite database as different direct children of ignored
    `data/kw-evaluation/` storage.
-2. Confirm the local database already has the canonical migrations 0054–0066.
+2. Confirm the local database already has the canonical migrations 0054–0067.
    Database creation/migration is a separate developer setup step; neither
    command below may create or migrate it. Never point either command at Wrangler
    state or a remote database.
@@ -103,19 +103,49 @@ deployment, or a migration.
 
 ## Local contact persistence boundary
 
-The separately approved contact transaction is proven in source and disposable
-tests, but there is intentionally no operator command yet. Do not create a JSON
-shape or call a module manually as a substitute. A later milestone must add a
-guarded ignored-local invocation that constructs exact fixture discovery and
-verification results, presents them for owner review, and supplies the dedicated
-approval. Until then, contact persistence remains unavailable to the operator.
+This procedure can preserve owner-reviewed fixture contact evidence beside one
+exact assessed lead. It does not run live discovery or verification and does not
+authorize CASL consent, qualification changes, outreach, providers, staging,
+production, deployment, or migration.
 
-The executor itself requires canonical migrations 0054–0066, one unattached
-SQLite database, an approval no more than five minutes from the database clock,
-and an entirely fresh or exact-replay bundle. Partial/unreceipted history is a
-hard stop. It cannot run discovery or verification, infer CASL consent, qualify
-a lead, contact a prospect, call a provider, spend, deploy, or touch a remote
-database.
+1. Keep the source plan, contact draft, generated review, final approval, and
+   `.sqlite` database as different direct children of ignored
+   `data/kw-evaluation/` storage. The source/workflow and assessment procedures
+   above must already have completed for the exact business.
+2. Confirm the database already has canonical migrations 0054–0067. Neither
+   command creates or migrates it, and neither accepts Wrangler or remote state.
+3. Prepare the owner-readable review:
+
+   ```powershell
+   npm run kw:prepare-contact-review -- --source-plan data/kw-evaluation/plan.json --draft data/kw-evaluation/contact-draft.json --database data/kw-evaluation/shadow.sqlite --output data/kw-evaluation/contact-review.json
+   ```
+
+   The command opens SQLite read-only, reconstructs the assessment from its
+   sealed workflow receipt, rebuilds fixture discovery and verification from the
+   observations, and creates a no-overwrite review packet. Confirm its business,
+   assessment, evidence sources/times, contact values, route status, and
+   `UNASSESSED` consent state. It must not change any database count.
+4. Riley or Aidan must create a different approval binding the exact review,
+   source-plan digest, assessment receipt/digest, persistence-plan digest, every
+   verification result, reviewer, current timestamp, rationale, and dedicated
+   contact-persistence confirmation. Do not reuse an assessment or source
+   approval. Execute within five minutes:
+
+   ```powershell
+   npm run kw:persist-contacts -- --source-plan data/kw-evaluation/plan.json --review data/kw-evaluation/contact-review.json --approval data/kw-evaluation/contact-approval.json --database data/kw-evaluation/shadow.sqlite
+   ```
+
+5. Expect `FRESH_COMMIT` once and `EXACT_REPLAY` on an unchanged retry. Verify
+   one immutable invocation receipt retains the full review and exact source,
+   assessment, contact-materialization, discovery, verification, reviewer, and
+   approval lineage. Consent and qualification counts must not increase.
+6. Stop on `MISSING`, `CONFLICT`, drift, stale approval, partial or unreceipted
+   history, a non-canonical schema, or failed reload. Never repair contact rows
+   by hand. A final invocation-receipt failure must roll back the contact bundle.
+
+The commands cannot contact a prospect, call a provider, spend, send, deploy, or
+touch a remote database. A future live provider and CASL decision require
+separate owner, privacy, budget, and release gates.
 
 ## Weekly owner review (30 minutes)
 

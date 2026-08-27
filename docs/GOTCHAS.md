@@ -5,6 +5,32 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## DATA-010 — Persisted contact evidence was detached from qualification lineage
+
+- **Symptom:** a contact bundle could be valid for one business yet provide no
+  durable proof of the exact source plan, sealed website assessment, or complete
+  owner-readable evidence packet that justified researching that route.
+- **Root cause:** the schema-0065/0066 completion receipt correctly sealed the
+  contact transaction but intentionally stopped at business/contact lineage; the
+  later operator invocation boundary did not yet exist.
+- **Proven fix:** review preparation now opens canonical local SQLite read-only,
+  reconstructs the persisted assessment from its sealed workflow receipt, and
+  derives fixture contact results into a no-overwrite packet. A separate approval
+  and outer `IMMEDIATE` transaction insert schema 0067's immutable invocation
+  receipt last with the complete review and exact source/assessment/contact
+  lineage.
+- **Prevention/test:** the integration test covers read-only review counts,
+  approval drift with zero writes, final-receipt rollback, fresh commit,
+  mutation-free replay, full-review persistence, missing JSON authority,
+  and update/delete rejection. Database trigger comparisons use `IS NOT 0/1`
+  so missing JSON fields fail closed instead of disappearing into SQLite's
+  three-valued `NULL` logic. The safety scan prevents Worker/provider wiring,
+  binds the review ID to its digest, and requires all downstream authority to
+  remain zero.
+- **Affected area:** lead qualification, contact research, owner review, dossier
+  provenance, local KW evaluation, and future provider adapters.
+- **Verifying commit:** branch HEAD containing ADR 0031 and migration 0067.
+
 ## DATA-009 — A discovery parent receipt was mistaken for transaction completion
 
 - **Symptom:** a contact discovery receipt could exist while one or more contact,

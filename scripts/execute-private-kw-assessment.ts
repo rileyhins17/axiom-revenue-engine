@@ -12,13 +12,6 @@ import {
   type PrivateKwAssessmentInvocationInput,
 } from "../src/lib/revenue-engine/private-kw-assessment-invocation";
 import {
-  PrivateKwImportPlanSchema,
-} from "../src/lib/revenue-engine/private-kw-import";
-import {
-  buildPrivateKwPersistencePlan,
-  verifyPersistencePreflight,
-} from "../src/lib/revenue-engine/private-kw-persistence-plan";
-import {
   inspectPrivateKwDatabase,
   readPrivateKwJson,
   resolvePrivateKwDataPath,
@@ -29,6 +22,7 @@ import {
   assertPrivateKwRequiredTables,
   assertPrivateKwSingleDatabase,
 } from "./private-kw-database";
+import { assertExactPrivateKwSourceMaterialization } from "./private-kw-contact-prerequisites";
 
 const MAX_PRIVATE_PLAN_BYTES = 5_000_000;
 const MAX_PRIVATE_INVOCATION_BYTES = 1_000_000;
@@ -89,19 +83,6 @@ function createBoundary(database: Database.Database): RevenueLeadAssessmentD1Bou
   return { async batch(statements) { return transaction(statements); } };
 }
 
-function assertExactSourceMaterialization(database: Database.Database, sourceValue: unknown) {
-  const source = PrivateKwImportPlanSchema.parse(sourceValue);
-  const persistencePlan = buildPrivateKwPersistencePlan(source);
-  for (const item of persistencePlan.preflights) {
-    const rows = database.prepare(item.selectSql).all(...item.bindings) as Record<string, unknown>[];
-    const result = verifyPersistencePreflight(item, rows);
-    if (result.state !== "EXACT_MATCH") {
-      throw new Error(`Private KW source plan is not exactly materialized (${item.entity}:${result.state}).`);
-    }
-  }
-  return source;
-}
-
 export async function executePrivateKwAssessmentFile(args: string[]) {
   const files = parseArgs(args);
   const [sourceRead, invocationRead, databaseFile] = await Promise.all([
@@ -117,7 +98,7 @@ export async function executePrivateKwAssessmentFile(args: string[]) {
     assertPrivateKwSingleDatabase(database);
     assertPrivateKwRequiredTables(database, REQUIRED_TABLES, "shadow assessment");
     assertCanonicalPrivateKwRevenueSchema(database);
-    const source = assertExactSourceMaterialization(database, sourceRead.value);
+    const source = assertExactPrivateKwSourceMaterialization(database, sourceRead.value);
     const invocation = buildPrivateKwAssessmentInvocation(
       source,
       invocationRead.value as PrivateKwAssessmentInvocationInput,
