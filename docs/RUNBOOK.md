@@ -68,7 +68,7 @@ deployment, or a migration.
 1. Keep the prepared source plan, source/workflow approval, assessment
    invocation, and SQLite database as different direct children of ignored
    `data/kw-evaluation/` storage.
-2. Confirm the local database already has the canonical migrations 0054–0064.
+2. Confirm the local database already has the canonical migrations 0054–0066.
    Database creation/migration is a separate developer setup step; neither
    command below may create or migrate it. Never point either command at Wrangler
    state or a remote database.
@@ -100,6 +100,22 @@ deployment, or a migration.
    gate by editing SQLite.
 7. Verify the owner reader shows the new assessment with reachability zero and
    route `RESEARCH`. No provider cost or external action should exist.
+
+## Local contact persistence boundary
+
+The separately approved contact transaction is proven in source and disposable
+tests, but there is intentionally no operator command yet. Do not create a JSON
+shape or call a module manually as a substitute. A later milestone must add a
+guarded ignored-local invocation that constructs exact fixture discovery and
+verification results, presents them for owner review, and supplies the dedicated
+approval. Until then, contact persistence remains unavailable to the operator.
+
+The executor itself requires canonical migrations 0054–0066, one unattached
+SQLite database, an approval no more than five minutes from the database clock,
+and an entirely fresh or exact-replay bundle. Partial/unreceipted history is a
+hard stop. It cannot run discovery or verification, infer CASL consent, qualify
+a lead, contact a prospect, call a provider, spend, deploy, or touch a remote
+database.
 
 ## Weekly owner review (30 minutes)
 

@@ -5,6 +5,27 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## DATA-009 — A discovery parent receipt was mistaken for transaction completion
+
+- **Symptom:** a contact discovery receipt could exist while one or more contact,
+  evidence-use, or verification children were absent, yet a retry might treat
+  the parent as proof that the approved bundle had completed.
+- **Root cause:** the discovery receipt is both a domain record and a required
+  parent for child insert guards, so it must be written before those children and
+  cannot also be the transaction's final completion marker.
+- **Proven fix:** migration 0065 adds a separate append-only local materialization
+  receipt inserted last under one SQLite `IMMEDIATE` transaction, and migration
+  0066 hardens its content-derived identity and exact verification set. The executor
+  re-derives the trusted plan, rejects partial or unreceipted history, and reloads
+  every exact row before commit.
+- **Prevention/test:** executor tests cover fresh commit, write-free replay,
+  reusable evidence, stale/drifted approval, partial/unreceipted history,
+  direct-SQL forgery, and rollback when the final receipt fails. The safety scan
+  keeps the executor disconnected from files, runtime, providers, and outreach.
+- **Affected area:** contact discovery persistence, evidence lineage,
+  verification history, local KW evaluation, and future runtime adapters.
+- **Verifying commit:** branch HEAD containing ADR 0030 and migrations 0065–0066.
+
 ## GEO-001 — Province leaked into unrelated searches
 
 - **Symptom:** U.S. and western-Canada targets were queried with Ontario wording.

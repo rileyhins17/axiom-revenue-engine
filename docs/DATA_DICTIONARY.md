@@ -31,6 +31,8 @@
 | ContactVerificationResult | Content-bound, channel-specific fixture result for one exact discovery candidate. It can recommend owner email review or a manual phone/form/social action, but cannot persist, approve outreach, or authorize sending. |
 | VerificationResult | Append-only persisted deliverability/availability receipt bound to one exact contact-point version and source result, with freshness, derived owner status/action, and zero operational authority. |
 | ContactPersistencePlan | Schema-0063 validation-only preflight/append plan for discovery, contact versions, evidence, and verification history. It distinguishes fresh, exact replay, collision, and incomplete history but has no executor or mutation authority. |
+| PrivateKwContactPersistence | Separately owner-approved ignored-local transaction that re-derives the exact validation-only contact plan, checks the complete schema and every collision identity inside SQLite `IMMEDIATE`, inserts only a fresh complete fixture bundle, and reloads it before commit. |
+| RevenuePrivateKwContactPersistenceReceipt | Append-only schema-0065 completion seal inserted last after the exact discovery/contact/evidence/verification bundle; schema 0066 hardens its content-derived identity and exact verification-ID set. It binds the approval, plan, counts, transaction type, and zero consent/downstream authority. |
 | QualificationSnapshot | Versioned five-score decision, gates, reasons, and recommended route. |
 | RevenueLeadAssessment | Deterministic, content-bound combination of one sealed website audit, explicit business-fit/timing basis, conservative research-only qualification, refresh time, and zero operational authority. |
 | RevenueLeadAssessmentReceipt | Append-only D1 receipt linking one exact workflow receipt, website snapshot, evidence set, and qualification snapshot committed in one batch. |
@@ -103,6 +105,12 @@
   receipt. Current owner state is projected from the latest version/verification.
   Migrations 0062–0063 reject loose inserts, lineage/payload drift, and every
   update/delete.
+- Local contact persistence requires a separate approval bound to the discovery,
+  every verification result, and the re-derived plan. Schema 0065's final receipt,
+  hardened by schema 0066, is distinct from the discovery parent: exact replay
+  writes nothing, globally
+  reusable evidence may match, and partial or receipt-less discovery-owned state
+  is never repaired.
 - Public contact evidence does not imply CASL consent. Discovery and persistence
   retain `UNASSESSED`; a future `ConsentEvidence` decision remains mandatory and
   separate from verification or owner route readiness.

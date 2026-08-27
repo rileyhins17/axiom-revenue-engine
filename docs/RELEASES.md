@@ -11,6 +11,10 @@
 - Added the pinned OpenAI Responses provider, immutable evidence contracts,
   coverage memory, four quality scores plus confidence, and additive shadow data.
 - Added content-bound human approval as a mandatory final Gmail delivery gate.
+- Added a separately approved ignored-local contact persistence executor with a
+  schema-0065/0066 receipt committed last, write-free exact replay, full rollback,
+  collision/partial-history rejection, and no provider, consent, outreach, send,
+  remote database, or cost path.
 - Relabelled the owner navigation and made Leads quality-first with transparent
   score components and an explicit stale-evidence warning.
 - Locally verified 160 tests, typecheck, lint, all 55 migrations, Cloudflare build,

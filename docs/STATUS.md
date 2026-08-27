@@ -116,12 +116,14 @@ staging; no rebuild code or migration has been deployed to production.
 - Append-only contact/verification persistence checkpoint: the branch HEAD
   containing this status entry; previous verified checkpoint
   `dcb9c5114ec0bdb61d830e9c2d815190dcba9839`
-- Owner-approved local source/workflow materialization checkpoint: the branch
+- Owner-approved local source/workflow materialization checkpoint:
+  `13bbfca89f3c60e0ca561bf023b016a11d3ebe23`
+- Separately approved local contact-persistence executor checkpoint: the branch
   HEAD containing this status entry; previous verified checkpoint
-  `6022ea2b507765aebed31c0e25bf8177992eb44e`
+  `13bbfca89f3c60e0ca561bf023b016a11d3ebe23`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Local migrations: all 64 apply, including the fail-closed lockdown, shadow
+- Local migrations: all 66 apply, including the fail-closed lockdown, shadow
   Revenue Engine records, content-bound outreach approval, and durable evidence
   plus fenced resume, current-reference history, and atomic snapshot receipt
   contracts
@@ -1039,13 +1041,49 @@ Completed gates:
   gate. Browser readiness was 322 ms for the list and 4,152 ms for the dossier;
   four desktop/mobile WCAG views passed with zero external requests. The console
   dry run emitted only the already documented generated duplicate-`options`
-  warnings. Commit, push, and exact-head Linux CI remain to be recorded in this
-  cycle.
+  warnings. Commit `13bbfca89f3c60e0ca561bf023b016a11d3ebe23` is pushed and
+  exact-head Linux CI run `33093774396` passed.
 - No real KW record was imported or assessed. No website/provider request,
   artifact operation, contact action, mailbox/prospect action, staging/production
   database, deployment, secret, or paid runtime was touched. Only migration 0064
   was applied to ignored local Wrangler state; deployed automation remains
   stopped.
+- A separate local contact-persistence approval now binds one exact business,
+  discovery result ID/digest, re-derived schema-0063 validation-plan digest,
+  every verification result ID/digest, reviewer, current timestamp, rationale,
+  and contact-specific confirmation. The trusted builder parses the original
+  fixture results and re-derives SQL; saved plans and caller SQL are not accepted
+  as authority.
+- The typed executor verifies the complete canonical migrations 0054–0066 schema
+  and one unattached SQLite database before opening a single `IMMEDIATE`
+  transaction. It collision-checks every row, permits only a completely fresh
+  discovery-owned bundle or exact replay, commits its separate completion receipt
+  last, and reloads every exact row before commit. Exact globally reusable
+  evidence is allowed; a partial bundle or a complete bundle without its final
+  receipt is blocked instead of repaired.
+- Migration 0065 adds the immutable
+  `RevenuePrivateKwContactPersistenceReceipt`. Its direct-SQL guard requires the
+  exact discovery, contact versions, evidence uses/claims, and verification IDs
+  before insert and constrains consent, qualification, provider, outreach, send,
+  and cost authority to zero. Migration 0066 separately hardens the content-
+  derived receipt identity and bidirectional, duplicate-free verification set.
+- The executor is not an operator command: it has no file reader, CLI, Worker,
+  route, queue, Cloudflare binding, discovery/verification provider, consent
+  decision, outreach, send, staging, or production path. The engine Worker cannot
+  import it.
+- Local contact-executor verification passes fail-closed safety, 426/426 tests,
+  typecheck, zero-warning lint, all 66 local migrations, deterministic console
+  and engine bindings, the secret-sanitized Cloudflare build, and explicit
+  console plus inert-engine no-upload dry runs. The owner browser gate also
+  passed four desktop/mobile WCAG scans with zero external requests; list readiness
+  was 694 ms and dossier readiness was 3,323 ms. The console dry run emitted only
+  the already documented generated duplicate-`options` warnings. Commit, push,
+  and exact-head Linux CI remain to be recorded in this cycle.
+- No real contact evidence was discovered, verified, imported, or persisted.
+  No consent record, lead score, message, mailbox/prospect action, provider or
+  network request, remote database, deployment, secret, or paid runtime was
+  touched. Only migrations 0065–0066 were added to ignored local Wrangler state;
+  production and staging automation remain stopped.
 
 Still required for Phase 1:
 
@@ -1090,9 +1128,11 @@ before approval.
 - No new owner decision is required for the fixture-only contact contract. A
   provider, paid verification credit, contact persistence path, consent decision,
   or live route remains separately gated.
-- No new owner decision is required for the validation-only append persistence
-  contract. A local executor, live provider, consent decision, staging/production
-  migration, outreach action, or send remains separately gated.
+- No new owner decision is required for the local contact-persistence executor.
+  It cannot yet be invoked from files or by an operator. A real ignored-local
+  contact bundle will require Riley or Aidan to review the exact evidence and
+  supply the dedicated contact-persistence confirmation; providers, consent,
+  staging/production migration, outreach, and send remain separately gated.
 - No new owner decision is required for the source/workflow materialization
   framework. A real execution requires Riley or Aidan to review the exact source
   plan and deterministic audit input and supply the dedicated confirmation;
@@ -1100,12 +1140,13 @@ before approval.
 
 ## Next three actions
 
-1. Design a separately approved local contact-persistence executor with one
-   transactional recheck/commit/post-verify boundary; do not connect a provider,
-   infer consent, or grant qualification/outreach/send authority.
-2. Add a separate ignored-local contact invocation only after that executor is
-   proven; keep discovery/verification fixture-bound and require another owner
-   approval before any real contact evidence can persist.
+1. Add a separate ignored-local contact invocation around the proven executor;
+   reconstruct fixture discovery/verification from reviewed inputs, require the
+   exact existing business/assessment lineage and a current owner approval, and
+   do not connect a live provider or infer consent.
+2. Make the owner dossier acceptance fixture consume one executor-produced
+   persisted contact bundle instead of loose planner inserts, without adding a
+   UI mutation, approval action, provider, or send path.
 3. Extend the browser owner gate to approval, emergency-stop, and weekly-review
    timing only after those real v2 UI actions exist; do not test legacy controls
    as if they were the finished owner workflow.

@@ -133,5 +133,6 @@ private 50-lead evaluation but cannot be promoted into runtime execution authori
 2. [x] Add migration 0064, the local transaction executor, CLI, and atomic replay,
    rollback, collision, schema-drift, and assessment-bridge tests.
 3. [x] Document the private procedure and keep the engine Worker disconnected.
-4. [ ] Build the separately approved contact-persistence executor without adding
-   provider, consent, qualification, outreach, send, or cost authority.
+4. [x] Build the separately approved contact-persistence executor without adding
+   provider, consent, qualification, outreach, send, or cost authority. See ADR
+   0030.

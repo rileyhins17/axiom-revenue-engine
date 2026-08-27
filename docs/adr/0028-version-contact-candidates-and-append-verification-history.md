@@ -90,7 +90,8 @@ rather than a mutable source of truth. This option was selected.
 2. [x] Add deterministic persistence planning, replay/collision evaluation, and
    adversarial disposable-database tests.
 3. [x] Update the synthetic owner acceptance fixture and current-route reader.
-4. [ ] Build a separately approved local executor only after its source/workflow
+4. [x] Build a separately approved local executor only after its source/workflow
    materialization and transactional post-verification boundary are designed.
+   See ADR 0030.
 5. [ ] Keep live providers, consent decisions, outreach, and sending behind
    separate owner and runtime release gates.

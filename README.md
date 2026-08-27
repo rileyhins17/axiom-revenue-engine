@@ -90,10 +90,18 @@ The append-only storage boundary for those contracts now exists in migrations
 gain new immutable discovery versions; exact public evidence is stored once and
 linked to every version that used it; verification refreshes append rather than
 overwriting prior state. Collision checks distinguish a fresh plan, exact replay,
-and corrupt/incomplete history. The planner has no database executor or runtime
-connection, cannot infer consent, and grants zero mutation, qualification,
-provider, outreach, send, and cost authority. Migrations 0062–0063 have been applied
-only to ignored local state and disposable tests—not staging or production.
+and corrupt/incomplete history. The planner itself remains zero-authority.
+
+A separately approved local executor now re-derives that planner from exact
+fixture results and can append one bundle to a canonical ignored SQLite database
+inside an `IMMEDIATE` transaction. Migration 0065 adds a different completion
+receipt that is inserted last; migration 0066 hardens its content-derived identity
+and exact verification set. The receipt requires the whole contact/evidence/verification
+set; exact replay writes nothing, while partial or receipt-less history stops.
+This executor is not a command yet: it has no file reader, Worker, route, provider,
+consent decision, outreach, send, staging/production path, or cost authority.
+Migrations 0062–0066 have been applied only to ignored local state and disposable
+tests—not staging or production.
 
 Each ranked business now opens a read-only dossier at `/leads/[businessId]`.
 The dossier keeps the five quality scores separate; groups current audit findings
