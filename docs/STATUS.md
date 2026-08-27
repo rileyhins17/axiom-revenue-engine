@@ -111,12 +111,14 @@ staging; no rebuild code or migration has been deployed to production.
   `1ea15efe784c73bade3ee4079e8b3da66700364b`
 - Owner-approved local shadow-assessment invocation checkpoint:
   `427ca67f76580d0cd44ef1337e12656fd2dfaa9d`
-- Evidence-backed contact discovery/verification contract checkpoint: the
-  branch HEAD containing this status entry; previous verified checkpoint
-  `427ca67f76580d0cd44ef1337e12656fd2dfaa9d`
+- Evidence-backed contact discovery/verification contract checkpoint:
+  `dcb9c5114ec0bdb61d830e9c2d815190dcba9839`
+- Append-only contact/verification persistence checkpoint: the branch HEAD
+  containing this status entry; previous verified checkpoint
+  `dcb9c5114ec0bdb61d830e9c2d815190dcba9839`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Local migrations: all 61 apply, including the fail-closed lockdown, shadow
+- Local migrations: all 63 apply, including the fail-closed lockdown, shadow
   Revenue Engine records, content-bound outreach approval, and durable evidence
   plus fenced resume, current-reference history, and atomic snapshot receipt
   contracts
@@ -968,6 +970,43 @@ Completed gates:
   mailbox action, prospect contact, deployment, remote migration, secret
   exposure, or runtime spend occurred. Production and staging automation remain
   stopped.
+- Migration 0062 now stores exact discovery receipts, versioned contact points,
+  reusable public evidence plus discovery-owned evidence-use links, and versioned
+  verification receipts. New contact/verification inserts must satisfy the full
+  content-bound contract; all five record types reject update/delete with a
+  stable append-only error. Existing legacy rows remain readable but are now
+  immutable.
+- Migration 0063 adds four independent direct-SQL lineage guards. Receipt counts
+  must match the embedded candidate/evidence set; a contact version must be one
+  exact candidate from its parent result; an evidence-use link must reference an
+  exact claim inside that candidate; and every stored verification payload must
+  agree with its contact, observation, projection, timestamps, and zero-authority
+  fields. It adds no data mutation or operational authority.
+- Stable `candidateId` is no longer confused with one mutable database row. A
+  later discovery of the same route appends a new contact-point version bound to
+  its discovery result and candidate digest, while later verification refreshes
+  append distinct receipts. Consent stays `UNASSESSED`; neither public
+  publication nor deliverability creates a consent record.
+- A deterministic schema-0063 persistence planner now emits every exact
+  prerequisite/collision preflight and append-only insert needed for one
+  discovery bundle. It blocks multiple identity matches, divergent rows,
+  discovery-owned orphans, and an existing receipt with missing children; exact
+  globally reusable evidence is allowed. It reports `FRESH_PLAN` or
+  `EXACT_REPLAY` but has no executor and grants zero database, mutation,
+  qualification, provider, outreach, send, consent, or cost authority.
+- The owner reader now selects the latest immutable version for each stable
+  candidate and derives current owner status from its latest verification.
+  Non-email availability no longer enters the email-deliverability parser. The
+  isolated browser fixture now uses the exact persistence plan rather than loose
+  contact inserts and still passes all four owner views.
+- Contact-persistence local release verification passes fail-closed safety,
+  415/415 tests, typecheck, zero-warning lint, the isolated owner browser gate,
+  the secret-sanitized Cloudflare build, and the explicit console and inert-engine
+  no-upload dry runs. Browser readiness was 320 ms for the list and 3,879 ms for
+  the dossier; desktop/mobile WCAG views passed with zero external requests. No
+  external provider, business website, mailbox, prospect, staging/production
+  database, deployment, secret, or paid runtime was touched. Production and
+  staging automation remain stopped.
 
 Still required for Phase 1:
 
@@ -1012,15 +1051,18 @@ before approval.
 - No new owner decision is required for the fixture-only contact contract. A
   provider, paid verification credit, contact persistence path, consent decision,
   or live route remains separately gated.
+- No new owner decision is required for the validation-only append persistence
+  contract. A local executor, live provider, consent decision, staging/production
+  migration, outreach action, or send remains separately gated.
 
 ## Next three actions
 
-1. Design an append-only contact/verification persistence contract with exact
-   replay/collision checks and no inference of consent; keep it validation-only
-   and disconnected from every provider and runtime.
-2. Design the separate local source/workflow materialization gate needed before
+1. Design the separate local source/workflow materialization gate needed before
    a real approved record can reach this invocation; do not let assessment
    approval authorize imports, capture, providers, or migrations.
+2. Design a separately approved local contact-persistence executor with one
+   transactional recheck/commit/post-verify boundary; do not connect a provider,
+   infer consent, or grant qualification/outreach/send authority.
 3. Extend the browser owner gate to approval, emergency-stop, and weekly-review
    timing only after those real v2 UI actions exist; do not test legacy controls
    as if they were the finished owner workflow.

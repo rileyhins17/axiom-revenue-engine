@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, privateKwAssessmentInvocation, privateKwAssessmentCli, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactDeliveryAuthorization, artifactDeliveryFixture, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, leadAssessment, leadAssessmentD1, contactDiscovery, contactVerification, websiteAudit, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, ownerLeadDetailReadModel, ownerLeadDetailRoute, ownerLeadDetailPage, ownerLeadDetail, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration, leadAssessmentMigration] = await Promise.all([
+const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, privateKwAssessmentInvocation, privateKwAssessmentCli, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactDeliveryAuthorization, artifactDeliveryFixture, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, leadAssessment, leadAssessmentD1, contactDiscovery, contactVerification, contactPersistencePlan, websiteAudit, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, ownerLeadDetailReadModel, ownerLeadDetailRoute, ownerLeadDetailPage, ownerLeadDetail, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration, leadAssessmentMigration, contactPersistenceMigration, contactLineageMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../src/engine/worker.ts", import.meta.url), "utf8"),
@@ -42,6 +42,7 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
   readFile(new URL("../src/lib/revenue-engine/lead-assessment-d1.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/contact-discovery.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/contact-verification.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/contact-persistence-plan.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/website-audit.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/owner-lead-projection.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/owner-lead-read-model.ts", import.meta.url), "utf8"),
@@ -58,6 +59,8 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
   readFile(new URL("../migrations/0059_atomic_artifact_reference_snapshots.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0060_artifact_reference_source_writer_guards.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0061_shadow_lead_assessment_receipts.sql", import.meta.url), "utf8"),
+  readFile(new URL("../migrations/0062_append_only_contact_verification_records.sql", import.meta.url), "utf8"),
+  readFile(new URL("../migrations/0063_harden_contact_record_lineage.sql", import.meta.url), "utf8"),
 ]);
 
 const failures = [];
@@ -325,7 +328,16 @@ requireMatch("src/lib/revenue-engine/contact-verification.ts", contactVerificati
 requireMatch("src/lib/revenue-engine/contact-verification.ts", contactVerification, /maxProviderOperations:\s*z\.literal\(0\)/, "contact verification must have zero provider-operation budget");
 requireMatch("src/lib/revenue-engine/contact-verification.ts", contactVerification, /maxCostUsd:\s*z\.literal\(0\)/, "contact verification must have zero provider cost");
 forbidMatch("src/lib/revenue-engine/contact-verification.ts", contactVerification, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.put\s*\(|\.delete\s*\(/, "fixture contact verification must not access providers, runtime bindings, network, or persistence");
-forbidMatch("src/engine/worker.ts", engineWorker, /contact-(?:discovery|verification)/, "the inert engine must not wire contact discovery or verification to runtime");
+requireMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersistencePlan, /executorImplemented:\s*z\.literal\(false\)/, "contact persistence must remain planning-only");
+requireMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersistencePlan, /REVENUE_CONTACT_PERSISTENCE_TARGET_SCHEMA_VERSION\s*=\s*"0063_harden_contact_record_lineage"/, "contact persistence must require the lineage-guarded schema");
+requireMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersistencePlan, /databaseAccessAuthorized:\s*z\.literal\(false\)/, "contact persistence planning must not authorize database access");
+requireMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersistencePlan, /mutationAuthorized:\s*z\.literal\(false\)/, "contact persistence planning must not authorize mutation");
+requireMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersistencePlan, /consentRows:\s*z\.literal\(0\)/, "contact persistence must not infer consent rows");
+requireMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersistencePlan, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "contact persistence planning must authorize zero provider operations");
+requireMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersistencePlan, /costAuthorizedUsd:\s*z\.literal\(0\)/, "contact persistence planning must authorize zero provider cost");
+forbidMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersistencePlan, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "contact persistence planning must not access providers, runtime bindings, databases, network, or writes");
+forbidMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersistencePlan, /LIMIT\s+1/i, "contact persistence collision preflights must inspect every matching identity");
+forbidMatch("src/engine/worker.ts", engineWorker, /contact-(?:discovery|verification|persistence-plan)/, "the inert engine must not wire contact processing to runtime");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION\s*=\s*"0061_shadow_lead_assessment_receipts"/, "the private assessment executor must require the append-only assessment schema");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /Pick<D1Database,\s*"prepare"\s*\|\s*"batch">/, "the private assessment adapter must use the generated narrow D1 binding type");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /FROM "RevenueWorkflowReceiptRevision" receipt[\s\S]*?JOIN "RevenueWorkflowAttemptClosure" closure[\s\S]*?closure\."terminalReceiptId" = receipt\."id"/, "assessment persistence must begin from the exact terminal workflow receipt");
@@ -353,6 +365,28 @@ requireMatch("migrations/0061_shadow_lead_assessment_receipts.sql", leadAssessme
 if ((leadAssessmentMigration.match(/CREATE TRIGGER/g) || []).length !== 8) failures.push("migrations/0061_shadow_lead_assessment_receipts.sql: exactly 8 append-only triggers are required");
 requireMatch("migrations/0061_shadow_lead_assessment_receipts.sql", leadAssessmentMigration, /REVENUE_LEAD_ASSESSMENT_APPEND_ONLY/, "assessment revisions must fail with a stable append-only error");
 forbidMatch("migrations/0061_shadow_lead_assessment_receipts.sql", leadAssessmentMigration, /\b(?:INSERT\s+INTO|UPDATE\s+\"[^\"]+\"\s+SET|DELETE\s+FROM)\b/i, "assessment migration must not mutate existing rows");
+for (const table of ["RevenueContactDiscoveryReceipt", "RevenueContactEvidenceClaim", "RevenueContactEvidenceUse"]) {
+  requireMatch("migrations/0062_append_only_contact_verification_records.sql", contactPersistenceMigration, new RegExp(`CREATE TABLE \\"${table}\\"`), `${table} must remain an additive contact persistence table`);
+}
+for (const column of ["runtimeConnected", "sourceContactPersistenceAuthorized", "sourceVerificationAuthorized", "outreachAuthorized", "sendAuthorized", "providerOperationsAuthorized", "costAuthorizedUsd"]) {
+  requireMatch("migrations/0062_append_only_contact_verification_records.sql", contactPersistenceMigration, new RegExp(`CHECK \\(\\"${column}\\" = 0\\)`), `${column} must be database constrained to zero`);
+}
+for (const trigger of ["RevenueContactPoint_contract_insert", "RevenueContactEvidenceUse_contract_insert", "RevenueVerificationResult_contract_insert"]) {
+  requireMatch("migrations/0062_append_only_contact_verification_records.sql", contactPersistenceMigration, new RegExp(`CREATE TRIGGER \\"${trigger}\\"`), `${trigger} must enforce the versioned contact contract`);
+}
+if ((contactPersistenceMigration.match(/CREATE TRIGGER/g) || []).length !== 13) failures.push("migrations/0062_append_only_contact_verification_records.sql: exactly 13 contact contract and append-only triggers are required");
+requireMatch("migrations/0062_append_only_contact_verification_records.sql", contactPersistenceMigration, /REVENUE_CONTACT_APPEND_ONLY/, "contact records must fail updates and deletes with a stable error");
+requireMatch("migrations/0062_append_only_contact_verification_records.sql", contactPersistenceMigration, /REVENUE_CONTACT_CONTRACT_REQUIRED/, "loose future contact inserts must fail closed");
+requireMatch("migrations/0062_append_only_contact_verification_records.sql", contactPersistenceMigration, /REVENUE_CONTACT_VERIFICATION_MISMATCH/, "forged verification projections must fail closed");
+forbidMatch("migrations/0062_append_only_contact_verification_records.sql", contactPersistenceMigration, /\b(?:INSERT\s+INTO|UPDATE\s+\"[^\"]+\"\s+SET|DELETE\s+FROM)\b/i, "contact persistence migration must not mutate existing rows");
+for (const trigger of ["RevenueContactDiscoveryReceipt_lineage_insert", "RevenueContactPoint_lineage_insert", "RevenueContactEvidenceUse_lineage_insert", "RevenueVerificationResult_payload_insert"]) {
+  requireMatch("migrations/0063_harden_contact_record_lineage.sql", contactLineageMigration, new RegExp(`CREATE TRIGGER \\"${trigger}\\"`), `${trigger} must close direct-SQL lineage drift`);
+}
+if ((contactLineageMigration.match(/CREATE TRIGGER/g) || []).length !== 4) failures.push("migrations/0063_harden_contact_record_lineage.sql: exactly 4 additional lineage triggers are required");
+for (const error of ["REVENUE_CONTACT_RECEIPT_MISMATCH", "REVENUE_CONTACT_LINEAGE_MISMATCH", "REVENUE_CONTACT_EVIDENCE_LINEAGE_MISMATCH", "REVENUE_CONTACT_VERIFICATION_PAYLOAD_MISMATCH"]) {
+  requireMatch("migrations/0063_harden_contact_record_lineage.sql", contactLineageMigration, new RegExp(error), `${error} must remain a stable fail-closed lineage error`);
+}
+forbidMatch("migrations/0063_harden_contact_record_lineage.sql", contactLineageMigration, /\b(?:INSERT\s+INTO|UPDATE\s+\"[^\"]+\"\s+SET|DELETE\s+FROM|DROP\s+TRIGGER)\b/i, "contact lineage hardening must not mutate rows or remove existing guards");
 requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /outreachAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize outreach");
 requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /sendAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize sending");
 requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /mutationAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize mutation");

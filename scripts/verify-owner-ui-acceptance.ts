@@ -9,6 +9,21 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import Database from "better-sqlite3";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 
+import {
+  REVENUE_CONTACT_DISCOVERY_VERSION,
+  REVENUE_CONTACT_EVIDENCE_VERSION,
+  buildFixtureContactDiscoveryResult,
+  contactDiscoveryDigest,
+  type RevenueContactDiscoveryRequest,
+  type RevenueContactObservation,
+} from "../src/lib/revenue-engine/contact-discovery";
+import { buildRevenueContactPersistencePlan } from "../src/lib/revenue-engine/contact-persistence-plan";
+import {
+  REVENUE_CONTACT_VERIFICATION_VERSION,
+  buildFixtureContactVerificationResult,
+  type RevenueContactVerificationObservation,
+  type RevenueContactVerificationRequest,
+} from "../src/lib/revenue-engine/contact-verification";
 import { qualifyRevenueLead } from "../src/lib/revenue-engine/qualification";
 import { auditWebsiteDeterministically } from "../src/lib/revenue-engine/website-audit";
 
@@ -92,12 +107,116 @@ function fixtureTimestamp(offsetMilliseconds: number) {
   return new Date(Date.now() + offsetMilliseconds).toISOString();
 }
 
+function buildOwnerContactFixture(sourceCapturedAt: string, sourceEvidenceUrl: string) {
+  const requestedAt = new Date(Date.parse(sourceCapturedAt) + 60_000).toISOString();
+  const evidenceCapturedAt = new Date(Date.parse(sourceCapturedAt) + 2 * 60_000).toISOString();
+  const discoveryCompletedAt = new Date(Date.parse(sourceCapturedAt) + 3 * 60_000).toISOString();
+  const discoveryRequest: RevenueContactDiscoveryRequest = {
+    discoveryVersion: REVENUE_CONTACT_DISCOVERY_VERSION,
+    requestId: `contact-discovery-request:${contactDiscoveryDigest("owner-ui-contact-discovery")}`,
+    idempotencyKey: "owner-ui-contact-discovery",
+    businessId: FIXTURE_BUSINESS_ID,
+    websiteUrl: "https://roofing.axiomfixtures.ca/",
+    sourceEvidenceUrl,
+    requestedAt,
+    mode: "SHADOW" as const,
+    adapterKind: "FIXTURE" as const,
+    limits: { maxCandidates: 10, maxProviderOperations: 0 as const, maxCostUsd: 0 as const },
+    authority: {
+      runtimeConnected: false as const,
+      contactPersistenceAuthorized: false as const,
+      verificationAuthorized: false as const,
+      outreachAuthorized: false as const,
+      sendAuthorized: false as const,
+      providerOperationsAuthorized: 0 as const,
+      costAuthorizedUsd: 0 as const,
+    },
+  };
+  const evidence = (
+    method: RevenueContactObservation["evidence"]["method"],
+    observation: string,
+  ): RevenueContactObservation["evidence"] => ({
+    evidenceVersion: REVENUE_CONTACT_EVIDENCE_VERSION,
+    sourceUrl: "https://roofing.axiomfixtures.ca/contact",
+    capturedAt: evidenceCapturedAt,
+    method,
+    observation,
+    confidence: 98,
+    publication: {
+      publiclyPublished: true,
+      contraryContactStatement: "NOT_OBSERVED" as const,
+      roleRelevance: "RELEVANT" as const,
+      consentBasis: "UNASSESSED" as const,
+    },
+  });
+  const observations: RevenueContactObservation[] = [
+    {
+      channel: "PHONE", value: "+15195550123", label: "Main business phone", personName: null, role: null,
+      recipientKind: "BUSINESS", socialPlatform: null,
+      evidence: evidence("HTML_TEL", "The public contact page exposes a tap-to-call main number."),
+    },
+    {
+      channel: "FORM", value: "https://roofing.axiomfixtures.ca/contact", label: "Contact form", personName: null, role: null,
+      recipientKind: "BUSINESS", socialPlatform: null,
+      evidence: evidence("HTML_FORM", "The public contact page exposes a contact form."),
+    },
+    {
+      channel: "EMAIL", value: "hello@roofing.axiomfixtures.ca", label: "General email", personName: null, role: "Office",
+      recipientKind: "ROLE", socialPlatform: null,
+      evidence: evidence("HTML_MAILTO", "The public contact page exposes an office email address."),
+    },
+  ];
+  const discovery = buildFixtureContactDiscoveryResult({ request: discoveryRequest, observations, completedAt: discoveryCompletedAt });
+  const verifications = discovery.candidates
+    .filter((candidate) => candidate.channel === "PHONE" || candidate.channel === "FORM")
+    .map((candidate, index) => {
+      const requested = new Date(Date.parse(discoveryCompletedAt) + (index + 1) * 60_000).toISOString();
+      const verifiedAt = new Date(Date.parse(requested) + 60_000).toISOString();
+      const completedAt = new Date(Date.parse(verifiedAt) + 60_000).toISOString();
+      const staleAfter = new Date(Date.parse(verifiedAt) + 30 * 24 * 60 * 60 * 1_000).toISOString();
+      const verificationRequest: RevenueContactVerificationRequest = {
+        verificationVersion: REVENUE_CONTACT_VERIFICATION_VERSION,
+        requestId: `contact-verification-request:${contactDiscoveryDigest(`owner-ui-contact-verification-${candidate.channel}`)}`,
+        idempotencyKey: `owner-ui-contact-verification-${candidate.channel}`,
+        businessId: FIXTURE_BUSINESS_ID,
+        candidate,
+        requestedAt: requested,
+        mode: "SHADOW" as const,
+        verifierKind: "FIXTURE" as const,
+        limits: { maxProviderOperations: 0 as const, maxCostUsd: 0 as const },
+        authority: {
+          runtimeConnected: false as const,
+          verificationPersistenceAuthorized: false as const,
+          qualificationPersistenceAuthorized: false as const,
+          outreachAuthorized: false as const,
+          sendAuthorized: false as const,
+          providerOperationsAuthorized: 0 as const,
+          costAuthorizedUsd: 0 as const,
+        },
+      };
+      const verificationObservation = {
+        channel: candidate.channel,
+        status: candidate.channel === "PHONE" ? "PUBLISHED" : "AVAILABLE",
+        provider: "FIXTURE",
+        method: "FIXTURE_RECEIPT",
+        evidenceReceiptId: `fixture-verification:owner-ui-${candidate.channel.toLocaleLowerCase("en-CA")}`,
+        sourceUrl: `https://verification.axiomfixtures.ca/receipts/${candidate.channel.toLocaleLowerCase("en-CA")}`,
+        verifiedAt,
+        staleAfter,
+        confidence: 99,
+      } as RevenueContactVerificationObservation;
+      return buildFixtureContactVerificationResult({ request: verificationRequest, observation: verificationObservation, completedAt });
+    });
+  return buildRevenueContactPersistencePlan({ discovery, verifications });
+}
+
 function seedOwnerLead(database: SqliteDatabase) {
   const sourceCapturedAt = fixtureTimestamp(-2 * 60 * 60 * 1_000);
   const capturedAt = fixtureTimestamp(-60 * 60 * 1_000);
   const refreshAfter = new Date(Date.parse(capturedAt) + 60 * 24 * 60 * 60 * 1_000).toISOString();
   const sourceEvidenceUrl = "https://directory.axiomfixtures.ca/business/owner-acceptance-roofing";
   const websiteUrl = "http://roofing.axiomfixtures.ca/";
+  const contactPersistencePlan = buildOwnerContactFixture(sourceCapturedAt, sourceEvidenceUrl);
 
   const audit = auditWebsiteDeterministically({
     businessId: FIXTURE_BUSINESS_ID,
@@ -245,12 +364,9 @@ function seedOwnerLead(database: SqliteDatabase) {
         JSON.stringify(qualification.evidenceClaimIds),
         capturedAt,
       );
-    const contactStatement = database.prepare(`INSERT INTO "RevenueContactPoint"
-      ("id", "businessId", "channel", "value", "label", "personName", "role", "sourceUrl", "sourceCapturedAt", "automationPermitted", "status", "createdAt", "updatedAt")
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`);
-    contactStatement.run("contact:owner-acceptance:phone", FIXTURE_BUSINESS_ID, "PHONE", "+15195550123", "Main business phone", null, null, sourceEvidenceUrl, sourceCapturedAt, "USABLE", sourceCapturedAt, sourceCapturedAt);
-    contactStatement.run("contact:owner-acceptance:form", FIXTURE_BUSINESS_ID, "FORM", "https://roofing.axiomfixtures.ca/contact", "Contact form", null, null, "https://roofing.axiomfixtures.ca/contact", sourceCapturedAt, "USABLE", sourceCapturedAt, sourceCapturedAt);
-    contactStatement.run("contact:owner-acceptance:email", FIXTURE_BUSINESS_ID, "EMAIL", "hello@roofing.axiomfixtures.ca", "General email", null, "office", "https://roofing.axiomfixtures.ca/contact", sourceCapturedAt, "CANDIDATE", sourceCapturedAt, sourceCapturedAt);
+    for (const mutation of contactPersistencePlan.mutations) {
+      database.prepare(mutation.sql).run(...mutation.bindings);
+    }
   });
   insert();
 }

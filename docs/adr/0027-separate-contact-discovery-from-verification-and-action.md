@@ -135,7 +135,7 @@ versioned contract change instead of silent normalization drift.
    outcomes.
 2. [x] Replace the loose stable adapter signatures with the versioned contracts.
 3. [x] Add adversarial unit coverage and repository safety enforcement.
-4. [ ] Design append-only contact/verification persistence separately, including
-   exact replay/collision rules and no inference of consent.
+4. [x] Design append-only contact/verification persistence separately, including
+   exact replay/collision rules and no inference of consent. See ADR 0028.
 5. [ ] Implement a live provider only after owner approval, cost limits, test
    fixtures, privacy review, and a separate runtime release gate.

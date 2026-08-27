@@ -75,6 +75,16 @@ outcomes remain research work. These contracts cannot persist a contact, call a
 provider, approve outreach, spend money, or send, and the engine Worker does not
 execute them.
 
+The append-only storage boundary for those contracts now exists in migrations
+0062–0063 and a validation-only persistence planner. A stable candidate identity can
+gain new immutable discovery versions; exact public evidence is stored once and
+linked to every version that used it; verification refreshes append rather than
+overwriting prior state. Collision checks distinguish a fresh plan, exact replay,
+and corrupt/incomplete history. The planner has no database executor or runtime
+connection, cannot infer consent, and grants zero mutation, qualification,
+provider, outreach, send, and cost authority. Migrations 0062–0063 have been applied
+only to ignored local state and disposable tests—not staging or production.
+
 Each ranked business now opens a read-only dossier at `/leads/[businessId]`.
 The dossier keeps the five quality scores separate; groups current audit findings
 as critical, important, or minor; shows the exact recorded contact routes and why

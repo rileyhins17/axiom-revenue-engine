@@ -192,8 +192,8 @@ SELECT
   contact."sourceUrl" AS "sourceUrl",
   contact."sourceCapturedAt" AS "sourceCapturedAt",
   contact."automationPermitted" AS "automationPermitted",
-  contact."status" AS "contactStatus",
-  verification."status" AS "verificationStatus",
+  COALESCE(verification."ownerStatus", contact."status") AS "contactStatus",
+  CASE WHEN contact."channel" = 'EMAIL' THEN verification."status" ELSE NULL END AS "verificationStatus",
   verification."catchAll" AS "verificationCatchAll",
   verification."verifiedAt" AS "verificationVerifiedAt",
   verification."staleAfter" AS "verificationStaleAfter"
@@ -206,6 +206,17 @@ LEFT JOIN "RevenueVerificationResult" verification ON verification."id" = (
   LIMIT 1
 )
 WHERE contact."businessId" IN (${placeholders})
+  AND (
+    contact."candidateId" IS NULL
+    OR contact."id" = (
+      SELECT latestContact."id"
+      FROM "RevenueContactPoint" latestContact
+      WHERE latestContact."businessId" = contact."businessId"
+        AND latestContact."candidateId" = contact."candidateId"
+      ORDER BY latestContact."sourceCapturedAt" DESC, latestContact."createdAt" DESC, latestContact."id" DESC
+      LIMIT 1
+    )
+  )
 ORDER BY contact."businessId" ASC, contact."channel" ASC, contact."id" ASC`;
 }
 

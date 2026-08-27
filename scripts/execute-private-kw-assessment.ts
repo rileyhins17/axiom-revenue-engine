@@ -118,16 +118,16 @@ function assertCanonicalRevenueSchema(database: Database.Database) {
     reference.pragma("foreign_keys = ON");
     const migrationRoot = new URL("../migrations/", import.meta.url);
     const migrationFiles = readdirSync(migrationRoot)
-      .filter((name) => /^(0054|0055|0056|0057|0058|0059|0060|0061)_.*\.sql$/.test(name))
+      .filter((name) => /^(0054|0055|0056|0057|0058|0059|0060|0061|0062|0063)_.*\.sql$/.test(name))
       .sort();
-    if (migrationFiles.length !== 8) {
+    if (migrationFiles.length !== 10) {
       throw new Error("Canonical local shadow assessment migrations are incomplete.");
     }
     for (const migrationFile of migrationFiles) {
       reference.exec(readFileSync(new URL(migrationFile, migrationRoot), "utf8"));
     }
     if (JSON.stringify(revenueSchemaRows(database)) !== JSON.stringify(revenueSchemaRows(reference))) {
-      throw new Error("Private KW database Revenue schema differs from canonical migrations 0054-0061.");
+      throw new Error("Private KW database Revenue schema differs from canonical migrations 0054-0063.");
     }
   } finally {
     reference.close();

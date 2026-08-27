@@ -24,10 +24,13 @@
 | WebsiteAuditAssembly | One versioned business-level receipt linking selected page captures, HTML facts, Browser evidence, artifact receipts, freshness, completeness, and per-business budgets to the exact deterministic audit input. |
 | EvidenceClaim | One supportable observation with URL/artifact, method, confidence, and audit version. |
 | ContactDiscoveryCandidate | One canonical email, Canadian phone, form, or supported social route for one exact business. It groups immutable public evidence but remains `NOT_VERIFIED`, consent-unassessed, and non-automatable. |
-| ContactPoint | A future persisted email, phone, form, social route, or operator identity candidate; the fixture discovery contract cannot create this row. |
+| ContactDiscoveryReceipt | Append-only record of one exact validated discovery result, its business, candidate/evidence counts, mode, adapter, and zero operational authority. |
+| ContactPoint | One immutable version of a stable email, phone, form, or social candidate. Its row ID binds the discovery result and candidate digest; `candidateId` remains stable across refreshed versions. |
+| ContactEvidenceClaim/Use | Reusable immutable public observation plus the append-only link proving which exact discovery/contact version used it. |
 | ConsentEvidence | Recorded lawful basis and public-source context for a contact action. |
 | ContactVerificationResult | Content-bound, channel-specific fixture result for one exact discovery candidate. It can recommend owner email review or a manual phone/form/social action, but cannot persist, approve outreach, or authorize sending. |
-| VerificationResult | A future persisted deliverability/availability result with freshness, provider, method, and timestamp for a contact. |
+| VerificationResult | Append-only persisted deliverability/availability receipt bound to one exact contact-point version and source result, with freshness, derived owner status/action, and zero operational authority. |
+| ContactPersistencePlan | Schema-0063 validation-only preflight/append plan for discovery, contact versions, evidence, and verification history. It distinguishes fresh, exact replay, collision, and incomplete history but has no executor or mutation authority. |
 | QualificationSnapshot | Versioned five-score decision, gates, reasons, and recommended route. |
 | RevenueLeadAssessment | Deterministic, content-bound combination of one sealed website audit, explicit business-fit/timing basis, conservative research-only qualification, refresh time, and zero operational authority. |
 | RevenueLeadAssessmentReceipt | Append-only D1 receipt linking one exact workflow receipt, website snapshot, evidence set, and qualification snapshot committed in one batch. |
@@ -93,6 +96,14 @@
   unknown. Only a current deliverable named/role address can become an owner-
   reviewable route. Positive phone, form, and social results remain manual;
   generic business inboxes and all ambiguous outcomes remain research work.
+- Stable candidate identity is not a mutable contact row. Each discovery creates
+  a content-bound contact-point version; repeated verification appends another
+  receipt. Current owner state is projected from the latest version/verification.
+  Migrations 0062–0063 reject loose inserts, lineage/payload drift, and every
+  update/delete.
+- Public contact evidence does not imply CASL consent. Discovery and persistence
+  retain `UNASSESSED`; a future `ConsentEvidence` decision remains mandatory and
+  separate from verification or owner route readiness.
 - Shadow assessment persistence also refuses to infer reachability from website
   or source data. It stores reachability zero and route `RESEARCH`; contact and
   verification records must later prove a usable channel under a separate gate.

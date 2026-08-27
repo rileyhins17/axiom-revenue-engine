@@ -66,7 +66,7 @@ staging, production, or a migration.
 
 1. Keep the prepared source plan, owner-reviewed invocation, and SQLite database
    as direct children of ignored `data/kw-evaluation/` storage.
-2. Confirm the local database already has migrations 0054–0061, the exact source
+2. Confirm the local database already has migrations 0054–0063, the exact source
    plan rows, and the exact terminal sealed website-evidence receipt. Never point
    the command at Wrangler state or a remote database.
 3. Review one candidate's identity, business-fit/timing evidence, scores, and
