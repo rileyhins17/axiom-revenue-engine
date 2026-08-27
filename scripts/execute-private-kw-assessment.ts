@@ -1,5 +1,4 @@
 import { pathToFileURL } from "node:url";
-import { readFileSync, readdirSync } from "node:fs";
 
 import Database from "better-sqlite3";
 
@@ -25,6 +24,11 @@ import {
   resolvePrivateKwDataPath,
   resolvePrivateKwDatabasePath,
 } from "./private-kw-files";
+import {
+  assertCanonicalPrivateKwRevenueSchema,
+  assertPrivateKwRequiredTables,
+  assertPrivateKwSingleDatabase,
+} from "./private-kw-database";
 
 const MAX_PRIVATE_PLAN_BYTES = 5_000_000;
 const MAX_PRIVATE_INVOCATION_BYTES = 1_000_000;
@@ -85,55 +89,6 @@ function createBoundary(database: Database.Database): RevenueLeadAssessmentD1Bou
   return { async batch(statements) { return transaction(statements); } };
 }
 
-function assertRequiredSchema(database: Database.Database) {
-  const rows = database.prepare(
-    `SELECT "name" FROM "sqlite_master" WHERE "type" = 'table' AND "name" IN (${REQUIRED_TABLES.map(() => "?").join(", ")})`,
-  ).all(...REQUIRED_TABLES) as { name: string }[];
-  const present = new Set(rows.map((row) => row.name));
-  const missing = REQUIRED_TABLES.filter((table) => !present.has(table));
-  if (missing.length > 0) {
-    throw new Error("Private KW database has not applied the required local shadow assessment schema.");
-  }
-}
-
-type SqliteSchemaRow = {
-  type: string;
-  name: string;
-  tbl_name: string;
-  sql: string | null;
-};
-
-function revenueSchemaRows(database: Database.Database) {
-  return database.prepare(`
-    SELECT "type", "name", "tbl_name", "sql"
-    FROM "sqlite_master"
-    WHERE "name" LIKE 'Revenue%' OR "tbl_name" LIKE 'Revenue%'
-    ORDER BY "type", "name", "tbl_name"
-  `).all() as SqliteSchemaRow[];
-}
-
-function assertCanonicalRevenueSchema(database: Database.Database) {
-  const reference = new Database(":memory:");
-  try {
-    reference.pragma("foreign_keys = ON");
-    const migrationRoot = new URL("../migrations/", import.meta.url);
-    const migrationFiles = readdirSync(migrationRoot)
-      .filter((name) => /^(0054|0055|0056|0057|0058|0059|0060|0061|0062|0063)_.*\.sql$/.test(name))
-      .sort();
-    if (migrationFiles.length !== 10) {
-      throw new Error("Canonical local shadow assessment migrations are incomplete.");
-    }
-    for (const migrationFile of migrationFiles) {
-      reference.exec(readFileSync(new URL(migrationFile, migrationRoot), "utf8"));
-    }
-    if (JSON.stringify(revenueSchemaRows(database)) !== JSON.stringify(revenueSchemaRows(reference))) {
-      throw new Error("Private KW database Revenue schema differs from canonical migrations 0054-0063.");
-    }
-  } finally {
-    reference.close();
-  }
-}
-
 function assertExactSourceMaterialization(database: Database.Database, sourceValue: unknown) {
   const source = PrivateKwImportPlanSchema.parse(sourceValue);
   const persistencePlan = buildPrivateKwPersistencePlan(source);
@@ -159,12 +114,9 @@ export async function executePrivateKwAssessmentFile(args: string[]) {
   const database = new Database(databaseFile, { fileMustExist: true, timeout: 0 });
   try {
     database.pragma("foreign_keys = ON");
-    const attached = database.pragma("database_list") as { name: string; file: string }[];
-    if (attached.length !== 1 || attached[0]?.name !== "main") {
-      throw new Error("Private KW execution requires one unattached local SQLite database.");
-    }
-    assertRequiredSchema(database);
-    assertCanonicalRevenueSchema(database);
+    assertPrivateKwSingleDatabase(database);
+    assertPrivateKwRequiredTables(database, REQUIRED_TABLES, "shadow assessment");
+    assertCanonicalPrivateKwRevenueSchema(database);
     const source = assertExactSourceMaterialization(database, sourceRead.value);
     const invocation = buildPrivateKwAssessmentInvocation(
       source,

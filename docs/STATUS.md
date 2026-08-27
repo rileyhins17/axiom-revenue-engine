@@ -116,9 +116,12 @@ staging; no rebuild code or migration has been deployed to production.
 - Append-only contact/verification persistence checkpoint: the branch HEAD
   containing this status entry; previous verified checkpoint
   `dcb9c5114ec0bdb61d830e9c2d815190dcba9839`
+- Owner-approved local source/workflow materialization checkpoint: the branch
+  HEAD containing this status entry; previous verified checkpoint
+  `6022ea2b507765aebed31c0e25bf8177992eb44e`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Local migrations: all 63 apply, including the fail-closed lockdown, shadow
+- Local migrations: all 64 apply, including the fail-closed lockdown, shadow
   Revenue Engine records, content-bound outreach approval, and durable evidence
   plus fenced resume, current-reference history, and atomic snapshot receipt
   contracts
@@ -1007,6 +1010,42 @@ Completed gates:
   external provider, business website, mailbox, prospect, staging/production
   database, deployment, secret, or paid runtime was touched. Production and
   staging automation remain stopped.
+- A separate ignored-local source/workflow approval now binds the exact private
+  KW source plan, one candidate, deterministic audit input, evidence completion,
+  reviewer, and a source/workflow-specific confirmation. Trusted code re-derives
+  source persistence plus the deterministic audit; it never executes a saved SQL
+  plan or accepts a caller-supplied audit result.
+- The new command requires an existing direct-child `.sqlite` file whose Revenue
+  schema exactly matches migrations 0054–0064. It acquires one SQLite
+  `IMMEDIATE` transaction before collision preflight, inserts only missing exact
+  source and six sealed-workflow rows, inserts its materialization receipt last,
+  and reloads every row before commit. An exact replay writes nothing; a stale
+  approval, partial receipt, drift, or multiple primary/alternate identity match
+  stops.
+- Migration 0064 adds the append-only materialization receipt and a direct-SQL
+  lineage guard requiring one exact sealed, shadow, zero-cost workflow for the
+  approved business. Its database constraints authorize only the named local
+  source/workflow transaction; assessment, schema changes, capture, contacts,
+  providers, outreach, send, and cost remain false or zero.
+- The executable integration test proves the assessment command fails before
+  materialization, succeeds only after the distinct materialization approval,
+  and still performs no source/workflow writes itself. Separate tests prove
+  transaction rollback when the final receipt fails and reject an exact primary
+  business row hidden beside an alternate-phone collision.
+- Source/workflow-materialization local verification passes fail-closed safety,
+  421/421 tests, typecheck, zero-warning repository lint, all 64 local migrations,
+  the secret-sanitized Cloudflare build, deterministic engine bindings, explicit
+  console and inert-engine no-upload dry runs, and the isolated owner browser
+  gate. Browser readiness was 322 ms for the list and 4,152 ms for the dossier;
+  four desktop/mobile WCAG views passed with zero external requests. The console
+  dry run emitted only the already documented generated duplicate-`options`
+  warnings. Commit, push, and exact-head Linux CI remain to be recorded in this
+  cycle.
+- No real KW record was imported or assessed. No website/provider request,
+  artifact operation, contact action, mailbox/prospect action, staging/production
+  database, deployment, secret, or paid runtime was touched. Only migration 0064
+  was applied to ignored local Wrangler state; deployed automation remains
+  stopped.
 
 Still required for Phase 1:
 
@@ -1054,15 +1093,19 @@ before approval.
 - No new owner decision is required for the validation-only append persistence
   contract. A local executor, live provider, consent decision, staging/production
   migration, outreach action, or send remains separately gated.
+- No new owner decision is required for the source/workflow materialization
+  framework. A real execution requires Riley or Aidan to review the exact source
+  plan and deterministic audit input and supply the dedicated confirmation;
+  assessment still requires a separate later approval.
 
 ## Next three actions
 
-1. Design the separate local source/workflow materialization gate needed before
-   a real approved record can reach this invocation; do not let assessment
-   approval authorize imports, capture, providers, or migrations.
-2. Design a separately approved local contact-persistence executor with one
+1. Design a separately approved local contact-persistence executor with one
    transactional recheck/commit/post-verify boundary; do not connect a provider,
    infer consent, or grant qualification/outreach/send authority.
+2. Add a separate ignored-local contact invocation only after that executor is
+   proven; keep discovery/verification fixture-bound and require another owner
+   approval before any real contact evidence can persist.
 3. Extend the browser owner gate to approval, emergency-stop, and weekly-review
    timing only after those real v2 UI actions exist; do not test legacy controls
    as if they were the finished owner workflow.

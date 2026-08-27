@@ -64,6 +64,16 @@ append-only assessment write. It cannot import source/workflow rows, discover a
 contact, call a provider, send outreach, migrate staging/production, or use the
 engine Worker.
 
+A separate owner-approved local materialization gate now fills that exact gap.
+It accepts the original ignored source plan plus a different approval file,
+re-derives the website audit from deterministic inputs, and appends the source
+rows, six-row sealed workflow lineage, and a schema-0064 materialization receipt
+inside one SQLite `IMMEDIATE` transaction. The receipt is inserted last and every
+row is reloaded before commit; exact replay writes nothing and a hidden identity,
+partial receipt, stale approval, or schema drift stops. This gate cannot assess
+or qualify the lead, capture a website, call a provider, persist contacts, send
+outreach, run migrations, deploy, or touch staging/production.
+
 The next contact-quality boundary now exists as fixture-only typed contracts.
 Discovery preserves email, Canadian phone, form, and supported social routes as
 content-bound evidence candidates; an email-shaped string stays explicitly
@@ -223,7 +233,7 @@ and artifact plans are separate from retry receipts. The validation-only planner
 rejects blocked resume histories and checks every primary or alternate identity
 candidate before proposing ordered insert-if-absent SQL. It deliberately has no
 resume executor: all resume, workflow execution, provider, and cost authority
-remains false. All 61 migrations pass from zero in isolated local
+remains false. All 64 migrations pass from zero in isolated local
 D1, but migration 0057 has not been applied to staging or production.
 
 Evidence-use endings and current-reference reasoning are now explicit without
@@ -373,10 +383,15 @@ a business. A second local-only command can prepare schema-bound preflights with
 `npm run kw:plan-persistence -- --input data/kw-evaluation/plan.json --output data/kw-evaluation/persistence.json`.
 It does not connect to or write a database and its output explicitly carries no
 mutation authority. See the evaluation guide before preparing real private data.
-After an owner has reviewed one record and its sealed local workflow receipt
-already exists, Codex can use the separately gated command
+After an owner has reviewed the exact source plan and deterministic audit input,
+Codex can use the separate local-only materialization command
+`npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.
+It requires a fresh, content-bound source/workflow approval; it neither creates
+the database nor runs migrations. Only after that command has sealed and reloaded
+the exact workflow receipt may Codex use the separately approved assessment command
 `npm run kw:execute-assessment -- --source-plan data/kw-evaluation/plan.json --invocation data/kw-evaluation/assessment.json --database data/kw-evaluation/shadow.sqlite`.
-The invocation must contain the exact local-shadow confirmation and a timestamp
+The assessment invocation must contain its different exact local-shadow
+confirmation and a timestamp
 within the assessment writer's five-minute freshness window. The command refuses
 source drift, hidden alternate-identity collisions, missing schema, unsealed
 receipts, non-local paths, and all remote/provider authority.

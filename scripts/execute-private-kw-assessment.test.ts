@@ -41,9 +41,9 @@ test("private assessment databases stay as direct ignored local SQLite files", (
 function applyShadowMigrations(database: Database.Database) {
   const migrationRoot = new URL("../migrations/", import.meta.url);
   const migrationFiles = readdirSync(migrationRoot)
-    .filter((name) => /^(0054|0055|0056|0057|0058|0059|0060|0061|0062|0063)_.*\.sql$/.test(name))
+    .filter((name) => /^(0054|0055|0056|0057|0058|0059|0060|0061|0062|0063|0064)_.*\.sql$/.test(name))
     .sort();
-  assert.equal(migrationFiles.length, 10);
+  assert.equal(migrationFiles.length, 11);
   for (const migrationFile of migrationFiles) {
     database.exec(readFileSync(new URL(migrationFile, migrationRoot), "utf8"));
   }

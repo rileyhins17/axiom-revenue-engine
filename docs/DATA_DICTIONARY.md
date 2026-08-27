@@ -77,6 +77,8 @@
 | KwLeadEvaluationSet | Private 50-lead owner-labelled KW quality gate used to measure engine agreement before live outreach. |
 | PrivateKwImportPlan | Versioned, ignored local seed of canonical research-only businesses, locations, cohort source runs, and source records; it grants no qualification or outreach authority. |
 | PrivateKwPersistencePlan | Validation-only, schema-bound expected-state and insert-if-absent plan for the private seed; it has no executor or mutation authority and creates no qualification, contact, or outreach records. |
+| PrivateKwSourceWorkflowMaterialization | Separately owner-approved ignored-local transaction that re-derives one deterministic audit and may append only the exact source plan plus one sealed six-row workflow lineage. It cannot assess, capture, contact, deploy, migrate, call a provider, or spend. |
+| RevenuePrivateKwMaterializationReceipt | Append-only schema-0064 seal committed last after the exact local source/workflow rows; it binds the source-plan, candidate, audit, workflow, approval, row counts, transaction type, and zero downstream authority. |
 
 ## Identity and evidence rules
 
@@ -259,6 +261,16 @@
 - A saved private persistence artifact is not trusted executable input. Any
   future loader must revalidate the source import, reproduce the canonical plan,
   require exact preflight matches, and stop on collision or drift.
+- Source/workflow materialization uses a different owner approval from shadow
+  assessment. It accepts the original source plan and deterministic audit input,
+  re-derives both trusted plans, acquires one SQLite `IMMEDIATE` transaction,
+  checks every primary and alternate identity, appends missing source and sealed
+  workflow rows, commits its receipt last, and reloads every row before commit.
+  Exact replay writes nothing; a receipt with any missing child is corruption.
+- The schema-0064 receipt positively authorizes only this ignored-local source
+  and workflow transaction. Assessment, schema changes, capture, contact work,
+  outreach, send, provider operations, cost, deployment, and staging/production
+  access remain false or zero and require their own later gates.
 - The guarded local assessment command accepts the original prepared source plan,
   not a saved persistence artifact. Persistence plan v2 queries every primary or
   alternate identity without `LIMIT 1`; the command requires exactly one expected

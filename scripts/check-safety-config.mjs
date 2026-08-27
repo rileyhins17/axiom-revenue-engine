@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, privateKwAssessmentInvocation, privateKwAssessmentCli, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactDeliveryAuthorization, artifactDeliveryFixture, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, leadAssessment, leadAssessmentD1, contactDiscovery, contactVerification, contactPersistencePlan, websiteAudit, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, ownerLeadDetailReadModel, ownerLeadDetailRoute, ownerLeadDetailPage, ownerLeadDetail, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration, leadAssessmentMigration, contactPersistenceMigration, contactLineageMigration] = await Promise.all([
+const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwPersistenceCli, privateKwPersistence, privateKwAssessmentInvocation, privateKwAssessmentCli, privateKwMaterialization, privateKwMaterializationCli, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactDeliveryAuthorization, artifactDeliveryFixture, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, leadAssessment, leadAssessmentD1, contactDiscovery, contactVerification, contactPersistencePlan, websiteAudit, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, ownerLeadDetailReadModel, ownerLeadDetailRoute, ownerLeadDetailPage, ownerLeadDetail, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration, leadAssessmentMigration, contactPersistenceMigration, contactLineageMigration, privateKwMaterializationMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../wrangler.engine.jsonc", import.meta.url), "utf8"),
   readFile(new URL("../src/engine/worker.ts", import.meta.url), "utf8"),
@@ -17,6 +17,8 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
   readFile(new URL("../src/lib/revenue-engine/private-kw-persistence-plan.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/private-kw-assessment-invocation.ts", import.meta.url), "utf8"),
   readFile(new URL("./execute-private-kw-assessment.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/revenue-engine/private-kw-source-workflow-materialization.ts", import.meta.url), "utf8"),
+  readFile(new URL("./materialize-private-kw-source-workflow.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/browser-measurement-adapter.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/content-addressed-artifact-store.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/revenue-engine/website-audit-assembly.ts", import.meta.url), "utf8"),
@@ -61,6 +63,7 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
   readFile(new URL("../migrations/0061_shadow_lead_assessment_receipts.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0062_append_only_contact_verification_records.sql", import.meta.url), "utf8"),
   readFile(new URL("../migrations/0063_harden_contact_record_lineage.sql", import.meta.url), "utf8"),
+  readFile(new URL("../migrations/0064_local_source_workflow_materializations.sql", import.meta.url), "utf8"),
 ]);
 
 const failures = [];
@@ -166,7 +169,7 @@ requireMatch("src/lib/revenue-engine/private-kw-assessment-invocation.ts", priva
 forbidMatch("src/lib/revenue-engine/private-kw-assessment-invocation.ts", privateKwAssessmentInvocation, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.put\s*\(|\.delete\s*\(/, "owner assessment invocation must remain deterministic and provider-free");
 requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /inspectPrivateKwDatabase/, "private assessment execution must use an inspected ignored local database");
 requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /assertExactSourceMaterialization/, "private assessment execution must prove exact source materialization first");
-requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /assertCanonicalRevenueSchema/, "private assessment execution must reject modified Revenue tables, indexes, and triggers");
+requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /assertCanonicalPrivateKwRevenueSchema/, "private assessment execution must reject modified Revenue tables, indexes, and triggers");
 requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /executePrivateRevenueLeadAssessmentD1/, "private assessment execution must use the sealed assessment writer");
 requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /sourceMutationPerformed:\s*false/, "private assessment execution must report no source mutation");
 requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /providerOperationsAuthorized:\s*0/, "private assessment execution must authorize zero provider operations");
@@ -338,6 +341,25 @@ requireMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersis
 forbidMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersistencePlan, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "contact persistence planning must not access providers, runtime bindings, databases, network, or writes");
 forbidMatch("src/lib/revenue-engine/contact-persistence-plan.ts", contactPersistencePlan, /LIMIT\s+1/i, "contact persistence collision preflights must inspect every matching identity");
 forbidMatch("src/engine/worker.ts", engineWorker, /contact-(?:discovery|verification|persistence-plan)/, "the inert engine must not wire contact processing to runtime");
+requireMatch("src/lib/revenue-engine/private-kw-source-workflow-materialization.ts", privateKwMaterialization, /PRIVATE_KW_SOURCE_WORKFLOW_TARGET_SCHEMA_VERSION\s*=\s*\n?\s*"0064_local_source_workflow_materializations"/, "private KW materialization must require the append-only receipt schema");
+requireMatch("src/lib/revenue-engine/private-kw-source-workflow-materialization.ts", privateKwMaterialization, /auditWebsiteDeterministically\(input\.auditInput\)/, "private KW materialization must re-derive the deterministic audit from approved inputs");
+requireMatch("src/lib/revenue-engine/private-kw-source-workflow-materialization.ts", privateKwMaterialization, /localSourceMutationAuthorized:\s*z\.literal\(true\)/, "only the explicit local materialization approval may authorize source mutation");
+requireMatch("src/lib/revenue-engine/private-kw-source-workflow-materialization.ts", privateKwMaterialization, /localWorkflowMutationAuthorized:\s*z\.literal\(true\)/, "only the explicit local materialization approval may authorize workflow mutation");
+for (const field of ["localAssessmentMutationAuthorized", "schemaMutationAuthorized", "captureAuthorized", "contactDiscoveryAuthorized", "contactVerificationAuthorized", "outreachAuthorized", "sendAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-source-workflow-materialization.ts", privateKwMaterialization, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in the local materialization contract`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-source-workflow-materialization.ts", privateKwMaterialization, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "local materialization must authorize zero provider operations");
+requireMatch("src/lib/revenue-engine/private-kw-source-workflow-materialization.ts", privateKwMaterialization, /costAuthorizedUsd:\s*z\.literal\(0\)/, "local materialization must authorize zero provider cost");
+requireMatch("src/lib/revenue-engine/private-kw-source-workflow-materialization.ts", privateKwMaterialization, /plan\.records\.at\(-1\)\?\.entity\s*!==\s*"MATERIALIZATION_RECEIPT"/, "the local materialization receipt must remain the final planned insert");
+forbidMatch("src/lib/revenue-engine/private-kw-source-workflow-materialization.ts", privateKwMaterialization, /LIMIT\s+1/i, "local materialization collision preflights must inspect every matching identity");
+forbidMatch("src/lib/revenue-engine/private-kw-source-workflow-materialization.ts", privateKwMaterialization, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "the materialization planner must not access runtime bindings, providers, network, or databases");
+requireMatch("scripts/materialize-private-kw-source-workflow.ts", privateKwMaterializationCli, /execute\.immediate\(\)/, "local source and workflow rows must commit under one SQLite IMMEDIATE transaction");
+requireMatch("scripts/materialize-private-kw-source-workflow.ts", privateKwMaterializationCli, /assertCanonicalPrivateKwRevenueSchema\(database\)/, "local materialization must verify the complete canonical Revenue schema before mutation");
+requireMatch("scripts/materialize-private-kw-source-workflow.ts", privateKwMaterializationCli, /Committed private KW materialization row failed exact reload/, "local materialization must reload every exact row before commit");
+requireMatch("scripts/materialize-private-kw-source-workflow.ts", privateKwMaterializationCli, /missing\.at\(-1\)\?\.entity\s*!==\s*"MATERIALIZATION_RECEIPT"/, "the local executor must commit its receipt last");
+requireMatch("scripts/materialize-private-kw-source-workflow.ts", privateKwMaterializationCli, /inspectPrivateKwDatabase\(files\.database/, "the local executor must stay inside the guarded ignored database boundary");
+forbidMatch("scripts/materialize-private-kw-source-workflow.ts", privateKwMaterializationCli, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|wrangler|migrations apply|\.put\s*\(|\.delete\s*\(/i, "the local materialization executor must not access runtime bindings, providers, network, migration, or deployment paths");
+forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-source-workflow-materialization|materialize-private-kw-source-workflow/, "the inert engine must not wire the local materialization boundary to runtime");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION\s*=\s*"0061_shadow_lead_assessment_receipts"/, "the private assessment executor must require the append-only assessment schema");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /Pick<D1Database,\s*"prepare"\s*\|\s*"batch">/, "the private assessment adapter must use the generated narrow D1 binding type");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /FROM "RevenueWorkflowReceiptRevision" receipt[\s\S]*?JOIN "RevenueWorkflowAttemptClosure" closure[\s\S]*?closure\."terminalReceiptId" = receipt\."id"/, "assessment persistence must begin from the exact terminal workflow receipt");
@@ -387,6 +409,17 @@ for (const error of ["REVENUE_CONTACT_RECEIPT_MISMATCH", "REVENUE_CONTACT_LINEAG
   requireMatch("migrations/0063_harden_contact_record_lineage.sql", contactLineageMigration, new RegExp(error), `${error} must remain a stable fail-closed lineage error`);
 }
 forbidMatch("migrations/0063_harden_contact_record_lineage.sql", contactLineageMigration, /\b(?:INSERT\s+INTO|UPDATE\s+\"[^\"]+\"\s+SET|DELETE\s+FROM|DROP\s+TRIGGER)\b/i, "contact lineage hardening must not mutate rows or remove existing guards");
+requireMatch("migrations/0064_local_source_workflow_materializations.sql", privateKwMaterializationMigration, /CREATE TABLE "RevenuePrivateKwMaterializationReceipt"/, "the private KW materialization receipt table must remain additive");
+for (const column of ["localAssessmentMutationAuthorized", "schemaMutationAuthorized", "captureAuthorized", "contactDiscoveryAuthorized", "contactVerificationAuthorized", "outreachAuthorized", "sendAuthorized", "providerOperationsAuthorized", "costAuthorizedUsd"]) {
+  requireMatch("migrations/0064_local_source_workflow_materializations.sql", privateKwMaterializationMigration, new RegExp(`CHECK \\(\"${column}\" = 0\\)`), `${column} must be database constrained to zero`);
+}
+for (const column of ["localOnly", "localSourceMutationAuthorized", "localWorkflowMutationAuthorized"]) {
+  requireMatch("migrations/0064_local_source_workflow_materializations.sql", privateKwMaterializationMigration, new RegExp(`CHECK \\(\"${column}\" = 1\\)`), `${column} must be database constrained to one`);
+}
+requireMatch("migrations/0064_local_source_workflow_materializations.sql", privateKwMaterializationMigration, /REVENUE_PRIVATE_KW_MATERIALIZATION_LINEAGE_MISMATCH/, "materialization receipts must require exact sealed workflow lineage");
+requireMatch("migrations/0064_local_source_workflow_materializations.sql", privateKwMaterializationMigration, /REVENUE_PRIVATE_KW_MATERIALIZATION_APPEND_ONLY/, "materialization receipts must reject update and delete");
+if ((privateKwMaterializationMigration.match(/CREATE TRIGGER/g) || []).length !== 3) failures.push("migrations/0064_local_source_workflow_materializations.sql: exactly 3 lineage and append-only triggers are required");
+forbidMatch("migrations/0064_local_source_workflow_materializations.sql", privateKwMaterializationMigration, /\b(?:INSERT\s+INTO|UPDATE\s+\"[^\"]+\"\s+SET|DELETE\s+FROM|DROP\s+TRIGGER)\b/i, "the materialization migration must not mutate existing rows or remove guards");
 requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /outreachAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize outreach");
 requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /sendAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize sending");
 requireMatch("src/lib/revenue-engine/owner-lead-projection.ts", ownerLeadProjection, /mutationAuthorized:\s*z\.literal\(false\)/, "owner lead projections must not authorize mutation");

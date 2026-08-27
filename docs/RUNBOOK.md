@@ -58,32 +58,47 @@ staging binding, synthetic data only, recorded provider operations/cost, and a
 targeted rollback. It does not authorize production, prospect evidence, remote
 D1 migrations, or autonomous work.
 
-## Owner-approved local KW assessment
+## Owner-approved local KW materialization and assessment
 
-This procedure is local shadow evaluation only. It does not import source or
-workflow rows and does not authorize contact discovery, outreach, providers,
-staging, production, or a migration.
+This procedure is local shadow evaluation only. Source/workflow materialization
+and assessment are two different owner decisions. Neither authorizes capture,
+contact discovery/verification, outreach, providers, staging, production,
+deployment, or a migration.
 
-1. Keep the prepared source plan, owner-reviewed invocation, and SQLite database
-   as direct children of ignored `data/kw-evaluation/` storage.
-2. Confirm the local database already has migrations 0054–0063, the exact source
-   plan rows, and the exact terminal sealed website-evidence receipt. Never point
-   the command at Wrangler state or a remote database.
-3. Review one candidate's identity, business-fit/timing evidence, scores, and
-   policy blocks. Set `reviewedAt` and `assessedAt` to the same current timestamp,
-   and use the exact confirmation documented by the invocation schema. The fresh
-   assessment must reach SQLite within five minutes.
-4. Execute:
+1. Keep the prepared source plan, source/workflow approval, assessment
+   invocation, and SQLite database as different direct children of ignored
+   `data/kw-evaluation/` storage.
+2. Confirm the local database already has the canonical migrations 0054–0064.
+   Database creation/migration is a separate developer setup step; neither
+   command below may create or migrate it. Never point either command at Wrangler
+   state or a remote database.
+3. Review the source-plan counts and one candidate's identity plus deterministic
+   audit input. The source/workflow approval must bind their exact digests, use
+   its own confirmation phrase, and reach SQLite within five minutes. Execute:
+
+   ```powershell
+   npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite
+   ```
+
+4. Expect `FRESH_COMMIT` once and `EXACT_REPLAY` on an unchanged retry. The
+   command must report a sealed workflow receipt but no assessment. Stop on a
+   hidden identity collision, stale approval, deterministic-input drift,
+   non-canonical schema, partial receipt, or failed exact reload; never repair it
+   by editing SQLite.
+5. Separately review the candidate's business-fit/timing evidence, scores, and
+   policy blocks. Bind the assessment invocation to the sealed receipt from step
+   3, use the different assessment confirmation, and submit its current timestamp
+   within the assessment writer's five-minute window. Execute:
 
    ```powershell
    npm run kw:execute-assessment -- --source-plan data/kw-evaluation/plan.json --invocation data/kw-evaluation/assessment.json --database data/kw-evaluation/shadow.sqlite
    ```
 
-5. Expect `FRESH_COMMIT` once and `EXACT_REPLAY` on an unchanged retry. Stop on
+6. Expect `FRESH_COMMIT` once and `EXACT_REPLAY` on an unchanged retry. Stop on
    `MISSING`, `CONFLICT`, source-plan drift, any non-canonical Revenue table,
    index or trigger, stale time, or an unsealed receipt; do not work around the
    gate by editing SQLite.
-6. Verify the owner reader shows the new assessment with reachability zero and
+7. Verify the owner reader shows the new assessment with reachability zero and
    route `RESEARCH`. No provider cost or external action should exist.
 
 ## Weekly owner review (30 minutes)
