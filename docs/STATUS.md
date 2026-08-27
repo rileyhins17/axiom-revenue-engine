@@ -105,9 +105,11 @@ staging; no rebuild code or migration has been deployed to production.
   `e44c7bbdb749e7f439e7e5a892226817a2bfc36d`
 - Owner Leads acceptance checkpoint:
   `0dfaafef6cc5b26ceaaec8bcc7344fc77e2ce89f`
-- Atomic shadow-assessment persistence checkpoint: the branch HEAD containing
+- Atomic shadow-assessment persistence checkpoint:
+  `27a909a758306d803d3e9f8cb84f63212f0b8dff`
+- Private artifact-delivery authorization checkpoint: the branch HEAD containing
   this status entry; previous verified checkpoint
-  `0dfaafef6cc5b26ceaaec8bcc7344fc77e2ce89f`
+  `27a909a758306d803d3e9f8cb84f63212f0b8dff`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 61 apply, including the fail-closed lockdown, shadow
@@ -876,6 +878,30 @@ Completed gates:
   No staging/production migration, deployment, provider call, R2/Browser
   operation, mailbox action, prospect contact, secret exposure, or runtime spend
   occurred. Both deployed automation states remain stopped.
+- Exact-head Linux CI run `33021717611` (job `98353416589`) passed every gate on
+  shadow-assessment checkpoint
+  `27a909a758306d803d3e9f8cb84f63212f0b8dff`. A separate legacy Cloudflare
+  Workers Builds integration for `axiom-ops-omniscient` reported a blocked/failed
+  check without deploying; the Revenue Engine GitHub Actions gate remained green.
+- Private screenshot delivery now has a canonical HMAC-authenticated grant bound
+  to one exact authenticated user/session, business, website snapshot, logical
+  desktop/mobile screenshot, artifact reference, audit refresh deadline, and
+  artifact expiry. Grants last at most five minutes and possession alone is not
+  sufficient: validation requires the same current session and dossier context.
+- A fixture reader proves that only exact SHA-256-matching WebP bytes can become
+  a same-origin `private, no-store`, `nosniff` response. The browser-facing grant
+  contains no raw user/session identity, R2 URL, bucket, or object key; DOM
+  artifacts cannot be rendered through this boundary. The owner dossier remains
+  honest that previews are unavailable because no route or live reader exists.
+- Artifact-delivery local release verification passes fail-closed safety,
+  387/387 tests, typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, console no-upload dry run, deterministic console/engine bindings, inert
+  engine no-upload dry run, all 61 migrations, and the isolated owner browser
+  gate. Browser readiness was 611 ms for the list and 3,324 ms for the dossier;
+  four desktop/mobile WCAG views passed with zero external requests. No route,
+  binding, signing secret, R2 bucket/read, deployment, remote migration, provider
+  call, mailbox action, prospect contact, secret exposure, or runtime spend
+  occurred. Production and staging automation remain stopped.
 
 Still required for Phase 1:
 
@@ -912,15 +938,17 @@ before approval.
   lifecycle rule, or charge has been created yet.
 - No new owner decision is required for the shadow-assessment persistence
   checkpoint.
+- No new owner decision is required for the source-only private artifact-delivery
+  checkpoint. R2 activation and any live preview route remain separately gated.
 
 ## Next three actions
 
-1. Add private artifact-delivery authorization and expiry contracts so a future
-   dossier can display desktop/mobile proof without exposing an R2 object or
-   activating R2 before its separate owner gate.
-2. Design the separately gated private invocation/import path that can feed the
+1. Design the separately gated private invocation/import path that can feed the
    sealed assessment writer from owner-approved KW records; keep staging
    migration, Workers, providers, contact discovery, and every live writer off.
+2. Define the contact-discovery and verification input contract that can add
+   evidence-backed email, phone, form, social, or research routes without
+   treating an email-looking value as reachability or enabling a provider.
 3. Extend the browser owner gate to approval, emergency-stop, and weekly-review
    timing only after those real v2 UI actions exist; do not test legacy controls
    as if they were the finished owner workflow.

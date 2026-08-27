@@ -50,6 +50,11 @@ before approval because pricing can change.
   `cf:r2:smoke:staging` commands exist, are fixture-tested, count provider
   operations, accept only fixed staging inputs, and cannot persist D1 rows,
   start Workflows, or authorize outreach.
+- [ ] Any separate owner-preview candidate uses the ADR 0025 same-origin delivery
+  boundary: authenticated session plus exact dossier match, five-minute maximum
+  grant, WebP-only integrity validation, private/no-store response, and no R2
+  URL or object key returned to the browser. This R2 activation alone does not
+  authorize or deploy an owner-preview route.
 - [ ] The pre-change configuration, deployed staging version if one exists, and
   exact rollback commit are recorded in the change record.
 - [ ] Migrations 0059 and 0060 remain unapplied remotely unless separately

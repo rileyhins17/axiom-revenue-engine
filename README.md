@@ -284,6 +284,16 @@ or authorize persistence, retry, release, or deletion. The separate staging R2
 activation and rollback gate is documented in
 [`docs/runbooks/STAGING_R2_ACTIVATION.md`](docs/runbooks/STAGING_R2_ACTIVATION.md).
 
+Private screenshot delivery now has a fixture-proven authorization contract too.
+A desktop/mobile preview grant is HMAC-authenticated, bound to the exact signed-in
+session and current business/snapshot/artifact, and expires within five minutes
+or sooner when the audit or artifact expires. Valid bytes are streamed through a
+same-origin private/no-store response with strict image and anti-sniffing headers;
+the browser never receives an R2 URL, bucket, object key, user ID, or raw session
+ID. DOM artifacts cannot be rendered through this boundary. No route, R2 reader,
+binding, secret, deployment, or live provider operation exists yet, so the owner
+dossier correctly continues to label previews unavailable.
+
 ## Verification
 
 ```powershell

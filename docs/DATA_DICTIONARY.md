@@ -62,6 +62,8 @@
 | ArtifactReferenceSnapshotAttempt | One append-only, five-minute-or-shorter attempt/lease claim for a lineage snapshot, with a contiguous attempt number, strictly increasing fencing token, versioned query contract, and zero operational authority. |
 | ArtifactManifestAvailabilityReceipt | Immutable content-bound fixture or R2 HEAD observation for one exact manifest; only a future fresh, unambiguous R2 winner per manifest may satisfy transactional completeness. |
 | ArtifactManifestHeadExecution | Fixture-only, digest-bound attempt over every canonical manifest object with explicit missing/mismatch/error outcomes and zero provider, persistence, retry, release, deletion, or cost authority. |
+| ArtifactDeliveryGrant | Canonical HMAC-authenticated, five-minute-or-shorter authorization bound to one authenticated session, exact business/snapshot/screenshot reference, website freshness, and artifact expiry; it contains no R2 URL or object key. |
+| FixtureArtifactDeliveryExecution | Fixture-only proof that an authorized desktop/mobile WebP can be integrity-checked and returned with private same-origin headers while provider, mutation, outreach, send, and cost authority remain zero. |
 | ArtifactReferenceSourceSetProof | Canonical count, stable row identities, predicate version, set digest, and proof digest for one of the 15 exact workflow/lineage/use/availability source sets. |
 | ArtifactReferenceCompletenessReceipt | Private-executor-created and reloaded seal binding the winning attempt/fence, all exact source-set proofs, and normalized source facts; its structural schema alone is never trusted and it grants no retention or deletion authority. |
 | ArtifactReferenceAtomicPlan | Validation-only D1 claim/read/recheck/commit contract. The private executor reconstructs it exactly before use, so redigesting altered control SQL cannot authorize execution. |
@@ -82,6 +84,12 @@
 - Shadow assessment persistence also refuses to infer reachability from website
   or source data. It stores reachability zero and route `RESEARCH`; contact and
   verification records must later prove a usable channel under a separate gate.
+- Owner screenshot delivery requires the current authenticated user/session and
+  exact business, website snapshot, logical viewport, artifact reference,
+  website refresh deadline, and artifact expiry to match a signed grant. The
+  grant is capped at five minutes, streams only integrity-checked WebP through a
+  same-origin private/no-store response, and never exposes an R2 URL or object
+  key. DOM artifacts are not renderable under this contract.
 - An assessment starts only from the exact sealed terminal workflow-receipt
   revision. Its website snapshot, capture-specific evidence claims,
   qualification, and assessment receipt commit atomically and reload exactly.
