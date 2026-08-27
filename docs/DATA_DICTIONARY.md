@@ -23,9 +23,11 @@
 | WebsitePageSelectionPlan | Deterministic zero-cost ranking of one same-site service, about, and contact URL from fresh homepage link evidence, with visible candidate scores, exclusions, completeness, and budget receipt. |
 | WebsiteAuditAssembly | One versioned business-level receipt linking selected page captures, HTML facts, Browser evidence, artifact receipts, freshness, completeness, and per-business budgets to the exact deterministic audit input. |
 | EvidenceClaim | One supportable observation with URL/artifact, method, confidence, and audit version. |
-| ContactPoint | Email, phone, form, social route, or operator identity candidate. |
+| ContactDiscoveryCandidate | One canonical email, Canadian phone, form, or supported social route for one exact business. It groups immutable public evidence but remains `NOT_VERIFIED`, consent-unassessed, and non-automatable. |
+| ContactPoint | A future persisted email, phone, form, social route, or operator identity candidate; the fixture discovery contract cannot create this row. |
 | ConsentEvidence | Recorded lawful basis and public-source context for a contact action. |
-| VerificationResult | Deliverability, freshness, provider, method, and timestamp for a contact. |
+| ContactVerificationResult | Content-bound, channel-specific fixture result for one exact discovery candidate. It can recommend owner email review or a manual phone/form/social action, but cannot persist, approve outreach, or authorize sending. |
+| VerificationResult | A future persisted deliverability/availability result with freshness, provider, method, and timestamp for a contact. |
 | QualificationSnapshot | Versioned five-score decision, gates, reasons, and recommended route. |
 | RevenueLeadAssessment | Deterministic, content-bound combination of one sealed website audit, explicit business-fit/timing basis, conservative research-only qualification, refresh time, and zero operational authority. |
 | RevenueLeadAssessmentReceipt | Append-only D1 receipt linking one exact workflow receipt, website snapshot, evidence set, and qualification snapshot committed in one batch. |
@@ -81,6 +83,16 @@
   Route order is verified named email, verified role email, phone, form, social,
   then research; every non-email route remains manual and every email remains
   unapproved by the read model.
+- Contact discovery and verification are separate gates. Discovery keeps the
+  canonical value plus every source URL, capture time, method, confidence,
+  publication state, contrary-contact-statement state, role relevance, and
+  unassessed consent state. It cannot claim reachability. Verification binds one
+  result to the exact business, candidate ID/digest, channel, and value; it cannot
+  infer consent, approval, or send authority.
+- Email verification distinguishes deliverable, undeliverable, catch-all, and
+  unknown. Only a current deliverable named/role address can become an owner-
+  reviewable route. Positive phone, form, and social results remain manual;
+  generic business inboxes and all ambiguous outcomes remain research work.
 - Shadow assessment persistence also refuses to infer reachability from website
   or source data. It stores reachability zero and route `RESEARCH`; contact and
   verification records must later prove a usable channel under a separate gate.

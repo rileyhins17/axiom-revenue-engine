@@ -64,6 +64,17 @@ append-only assessment write. It cannot import source/workflow rows, discover a
 contact, call a provider, send outreach, migrate staging/production, or use the
 engine Worker.
 
+The next contact-quality boundary now exists as fixture-only typed contracts.
+Discovery preserves email, Canadian phone, form, and supported social routes as
+content-bound evidence candidates; an email-shaped string stays explicitly
+unverified and consent-unassessed. Verification is a separate channel-specific
+receipt bound to that exact business and candidate. A current deliverable
+named/role email can become owner-reviewable, while positive phone, form, and
+social results remain manual. Catch-all, generic, unknown, stale, or negative
+outcomes remain research work. These contracts cannot persist a contact, call a
+provider, approve outreach, spend money, or send, and the engine Worker does not
+execute them.
+
 Each ranked business now opens a read-only dossier at `/leads/[businessId]`.
 The dossier keeps the five quality scores separate; groups current audit findings
 as critical, important, or minor; shows the exact recorded contact routes and why

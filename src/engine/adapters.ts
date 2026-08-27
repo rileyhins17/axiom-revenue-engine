@@ -1,5 +1,13 @@
 import type { DeterministicWebsiteAuditResult } from "@/lib/revenue-engine/website-audit";
 import type { WebsiteCaptureResult } from "@/lib/revenue-engine/website-capture";
+import type {
+  RevenueContactDiscoveryRequest,
+  RevenueContactDiscoveryResult,
+} from "@/lib/revenue-engine/contact-discovery";
+import type {
+  RevenueContactVerificationRequest,
+  RevenueContactVerificationResult,
+} from "@/lib/revenue-engine/contact-verification";
 
 export type AdapterCostReceipt = {
   provider: string;
@@ -64,31 +72,12 @@ export interface WebsiteCaptureAdapter {
   }): Promise<AdapterResult<WebsiteCaptureResult>>;
 }
 
-export type ContactCandidate = {
-  channel: "EMAIL" | "PHONE" | "FORM" | "SOCIAL";
-  value: string;
-  label: string | null;
-  evidenceUrl: string;
-  capturedAt: string;
-};
-
 export interface ContactAdapter {
-  discover(input: AdapterContext & {
-    businessId: string;
-    websiteUrl: string | null;
-  }): Promise<AdapterResult<{ contacts: ContactCandidate[] }>>;
+  discover(input: AdapterContext & { request: RevenueContactDiscoveryRequest }): Promise<AdapterResult<RevenueContactDiscoveryResult>>;
 }
 
-export type EmailVerificationResult = {
-  address: string;
-  status: "DELIVERABLE" | "UNDELIVERABLE" | "RISKY" | "UNKNOWN";
-  checkedAt: string;
-  staleAt: string;
-  providerReceiptId: string | null;
-};
-
 export interface VerificationAdapter {
-  verify(input: AdapterContext & { address: string }): Promise<AdapterResult<EmailVerificationResult>>;
+  verify(input: AdapterContext & { request: RevenueContactVerificationRequest }): Promise<AdapterResult<RevenueContactVerificationResult>>;
 }
 
 export type ApprovedEmailDraft = {

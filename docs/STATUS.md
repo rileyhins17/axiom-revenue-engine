@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-26 (America/Toronto)
+Last updated: 2026-08-27 (America/Toronto)
 
 ## Plain-English status
 
@@ -109,9 +109,11 @@ staging; no rebuild code or migration has been deployed to production.
   `27a909a758306d803d3e9f8cb84f63212f0b8dff`
 - Private artifact-delivery authorization checkpoint:
   `1ea15efe784c73bade3ee4079e8b3da66700364b`
-- Owner-approved local shadow-assessment invocation checkpoint: the branch HEAD
-  containing this status entry; previous verified checkpoint
-  `1ea15efe784c73bade3ee4079e8b3da66700364b`
+- Owner-approved local shadow-assessment invocation checkpoint:
+  `427ca67f76580d0cd44ef1337e12656fd2dfaa9d`
+- Evidence-backed contact discovery/verification contract checkpoint: the
+  branch HEAD containing this status entry; previous verified checkpoint
+  `427ca67f76580d0cd44ef1337e12656fd2dfaa9d`
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 61 apply, including the fail-closed lockdown, shadow
@@ -937,6 +939,35 @@ Completed gates:
   deployment, provider/network call, mailbox action, prospect contact, secret
   exposure, or runtime spend occurred. Production and staging automation remain
   stopped.
+- Contact discovery and verification now have separate content-bound v1
+  contracts. Discovery canonicalizes evidence-backed email, Canadian phone,
+  form, and supported social candidates, retains every source/time/method/
+  confidence/publication fact, and marks every route `NOT_VERIFIED`, consent-
+  unassessed, and non-automatable. Empty discovery produces research work rather
+  than invented reachability.
+- Verification binds one channel-specific fixture receipt to the exact business
+  and candidate digest. Only a current deliverable named/role email becomes an
+  owner-reviewable email route; generic business inboxes, catch-all, unknown,
+  and negative outcomes remain research. Positive phone, form, and social
+  results become manual routes only. All results retain zero provider, cost,
+  persistence, outreach, send, and autonomous-email authority.
+- Stable adapter interfaces now use those exact contracts. The safety scan
+  requires fixture-only/zero-authority fields, forbids provider/runtime/database
+  access in both modules, and prevents the inert Worker from wiring them.
+  Fifteen new tests cover multi-source evidence, channel normalization, empty
+  research, identity conflicts, generic-email impersonation, stale/private
+  proof, caps, cross-business/channel drift, catch-all/freshness semantics,
+  manual-only routes, and redigested semantic tampering.
+- Contact-contract local release verification passes fail-closed safety,
+  407/407 tests, typecheck, zero-warning lint, deterministic console/engine
+  bindings, all 61 local migrations, the secret-sanitized Cloudflare build, both
+  console/engine no-upload dry runs, and the isolated owner browser gate. No
+  external browser requests occurred; the desktop list was ready in 324 ms and
+  the dossier in 3,368 ms, both inside their 10/15-second owner budgets. No
+  provider, network request, contact/verification persistence, Worker/route,
+  mailbox action, prospect contact, deployment, remote migration, secret
+  exposure, or runtime spend occurred. Production and staging automation remain
+  stopped.
 
 Still required for Phase 1:
 
@@ -978,12 +1009,15 @@ before approval.
 - No new owner decision is required for the guarded local assessment invocation.
   A real execution will require Riley or Aidan to review the exact record and
   supply the explicit local-shadow confirmation at that time.
+- No new owner decision is required for the fixture-only contact contract. A
+  provider, paid verification credit, contact persistence path, consent decision,
+  or live route remains separately gated.
 
 ## Next three actions
 
-1. Define the contact-discovery and verification input contract that can add
-   evidence-backed email, phone, form, social, or research routes without
-   treating an email-looking value as reachability or enabling a provider.
+1. Design an append-only contact/verification persistence contract with exact
+   replay/collision checks and no inference of consent; keep it validation-only
+   and disconnected from every provider and runtime.
 2. Design the separate local source/workflow materialization gate needed before
    a real approved record can reach this invocation; do not let assessment
    approval authorize imports, capture, providers, or migrations.
