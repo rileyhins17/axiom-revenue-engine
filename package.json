@@ -34,6 +34,7 @@
     "cf:engine:dry-run": "wrangler deploy --config wrangler.engine.jsonc --dry-run --autoconfig false",
     "kw:prepare-import": "tsx scripts/prepare-private-kw-import.ts",
     "kw:plan-persistence": "tsx scripts/plan-private-kw-persistence.ts",
+    "kw:prepare-shadow-slice": "tsx scripts/prepare-private-kw-shadow-slice.ts",
     "kw:materialize-source-workflow": "tsx scripts/materialize-private-kw-source-workflow.ts",
     "kw:execute-assessment": "tsx scripts/execute-private-kw-assessment.ts",
     "kw:prepare-contact-review": "tsx scripts/prepare-private-kw-contact-review.ts",

@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-27 (America/Toronto)
+Last updated: 2026-08-28 (America/Toronto)
 
 ## Plain-English status
 
@@ -127,6 +127,9 @@ staging; no rebuild code or migration has been deployed to production.
 - Executor-backed owner dossier fixture checkpoint: the branch HEAD containing
   this status entry; previous verified checkpoint
   `673e949eaca19c738507d7249f18e3281bb67a31`.
+- Bounded ten-business KW shadow-slice checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `d87c6bbc2b6cc7f50706e6f000cf8165512a851b`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1146,6 +1149,34 @@ Completed gates:
   outreach, mailbox/prospect action, remote database, deployment, secret, or
   paid runtime was touched. The executor ran only against a disposable synthetic
   SQLite browser-test database; production and staging automation remain stopped.
+- The first real-business integration cohort is now a content-bound manifest of
+  exactly ten manually reviewed, independent KW businesses. It refuses source
+  evidence older than 90 days, source-plan or candidate drift, duplicate
+  identities, unknown/chain status, and a mix with fewer than two businesses in
+  any pilot city or niche.
+- Its five phases are fixed as source/workflow, current website evidence,
+  assessment, contact review, and owner dossier. Every phase remains a different
+  approval gate; the manifest starts at `SOURCE_REVIEWED` and cannot claim later
+  progress without future receipt-bound work.
+- `kw:prepare-shadow-slice` reads only two ignored local JSON inputs and writes
+  one no-overwrite ignored manifest. Repository safety checks keep the planner
+  and command disconnected from databases, runtime bindings, providers,
+  networking, Cloudflare, and the engine Worker, with every mutation, capture,
+  consent, qualification, mailbox, outreach, deployment, and send authority
+  false and provider/cost authority zero.
+- Bounded-shadow-slice local release verification is green: fail-closed safety,
+  432/432 tests, typecheck, zero-warning lint, deterministic console and engine
+  bindings, the secret-sanitized Cloudflare build, explicit console plus inert-
+  engine no-upload dry runs, and the final sequential owner browser gate passed.
+  The browser gate scanned four desktop/mobile WCAG views, made zero external
+  requests, and met the owner budgets with 1,170 ms list readiness and 2,321 ms
+  dossier readiness. The console dry run emitted only the already documented
+  generated duplicate-`options` warnings.
+- No real business was selected and no private business record was committed.
+  No source acquisition, website capture, Browser/R2 operation, contact
+  discovery or verification, consent decision, qualification change, database,
+  deployment, mailbox/prospect action, provider operation, secret, or paid
+  runtime was touched; production and staging automation remain stopped.
 
 Still required for Phase 1:
 
@@ -1201,19 +1232,24 @@ before approval.
   framework. A real execution requires Riley or Aidan to review the exact source
   plan and deterministic audit input and supply the dedicated confirmation;
   assessment still requires a separate later approval.
+- No new owner decision was required to define the bounded shadow-slice
+  contract. Populating it with ten real businesses requires Riley or Aidan to
+  review the exact identities, independence, market, niche, and source evidence;
+  any live source, Browser, R2, or verification-provider use remains a separate
+  privacy/budget decision.
 
 ## Next three actions
 
-1. Define the bounded ten-business KW shadow slice that moves real, manually
-   reviewed source records through current website evidence, assessment, contact
-   review, and the dossier with no send; keep any live source, Browser, storage,
-   or verification provider behind a separate privacy/budget approval.
-2. Add an owner-readable, read-only contact-review section to the dossier from
+1. Add an owner-readable, read-only contact-review section to the dossier from
    the persisted invocation receipt, then make the latest Leads/dossier build
    available in isolated staging only after its release gate is approved.
-3. Prepare the first 50-lead owner-labelling workflow so Riley's strong/weak/wrong
+2. Prepare the first 50-lead owner-labelling workflow so Riley's strong/weak/wrong
    decisions and reasons can become the measured quality baseline without
    enabling acquisition, providers, outreach, or send.
+3. Populate the ignored ten-business manifest only after Riley or Aidan reviews
+   the exact real records and the separate private-research/source decision is
+   recorded; do not infer approval for Browser, storage, verification, or any
+   downstream phase from the manifest.
 
 ## Resume instructions
 

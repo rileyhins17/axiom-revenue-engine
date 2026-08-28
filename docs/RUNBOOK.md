@@ -58,6 +58,40 @@ staging binding, synthetic data only, recorded provider operations/cost, and a
 targeted rollback. It does not authorize production, prospect evidence, remote
 D1 migrations, or autonomous work.
 
+## Prepare the bounded ten-business KW shadow slice
+
+This creates the durable scope for the first real-business integration proof. It
+does not execute any phase of the pipeline.
+
+1. Keep the exact prepared source plan, owner-reviewed selection, and generated
+   manifest as three different direct children of ignored
+   `data/kw-evaluation/` storage.
+2. Select exactly ten businesses already present in the source plan. Each must
+   be manually confirmed as the correct independent business in Kitchener,
+   Waterloo, or Cambridge and in roofing, HVAC, or landscaping. Source evidence
+   must be no more than 90 days old.
+3. Keep at least two businesses from each city and each niche. The selection
+   file must bind the source-plan digest, exact business/candidate IDs, reviewer,
+   review time, rationale, and the contract's all-false/zero authority block.
+4. Prepare the no-overwrite manifest:
+
+   ```powershell
+   npm run kw:prepare-shadow-slice -- --source-plan data/kw-evaluation/plan.json --selection data/kw-evaluation/shadow-slice-selection.json --output data/kw-evaluation/shadow-slice-manifest.json
+   ```
+
+5. Confirm the output says ten selected/manual/independent businesses,
+   `SOURCE_REVIEWED`, and
+   `SOURCE_WORKFLOW_MATERIALIZATION_APPROVAL`. Confirm all five ordered phases
+   require separate approval and none is authorized by the manifest.
+6. Stop on stale evidence, duplicate identity, source-plan drift, imbalance, or
+   an unconfirmed/unknown chain status. Never loosen the manifest to make a
+   candidate fit.
+
+The manifest cannot read or write a database, call a provider, capture a site,
+infer consent, change qualification, deploy, send, or spend. Populate it with
+real records only after the separate private-research decision. Each later phase
+uses its own gate below; never treat this manifest as batch-execution approval.
+
 ## Owner-approved local KW materialization and assessment
 
 This procedure is local shadow evaluation only. Source/workflow materialization

@@ -51,6 +51,24 @@ mutation. The output says `mutationAuthorized: false`. Any future executor must
 revalidate the original versioned input, reproduce the same plan from trusted
 code, pass every exact preflight, and receive a separate release approval.
 
+Before the full 50-lead labelling exercise, a ten-business integration slice can
+be defined from the exact source plan:
+
+```powershell
+npm run kw:prepare-shadow-slice -- --source-plan data/kw-evaluation/plan.json --selection data/kw-evaluation/shadow-slice-selection.json --output data/kw-evaluation/shadow-slice-manifest.json
+```
+
+Riley or Aidan must first verify each selected business's identity, independent
+status, city, and niche. The ten must include at least two businesses from each
+pilot city and each pilot niche, and their source evidence must be no more than
+90 days old. The output binds that review to the exact source plan and records
+the five-step path from source/workflow through the owner dossier.
+
+This is a scope manifest, not a run command. Every phase still needs its own
+approval and receipt. The manifest authorizes no database write, live source,
+Browser Rendering, storage, discovery/verification provider, consent decision,
+qualification, mailbox sync, outreach, deployment, send, or spend.
+
 The first separately approved assessment executor now exists for an ignored
 local SQLite database only. Codex will prepare the invocation after Riley reviews
 one record; Riley does not need to hand-author JSON. The command is:

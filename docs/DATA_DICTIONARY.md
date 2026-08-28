@@ -81,6 +81,7 @@
 | KwLeadEvaluationSet | Private 50-lead owner-labelled KW quality gate used to measure engine agreement before live outreach. |
 | PrivateKwImportPlan | Versioned, ignored local seed of canonical research-only businesses, locations, cohort source runs, and source records; it grants no qualification or outreach authority. |
 | PrivateKwPersistencePlan | Validation-only, schema-bound expected-state and insert-if-absent plan for the private seed; it has no executor or mutation authority and creates no qualification, contact, or outreach records. |
+| PrivateKwShadowSliceManifest | Content-bound, ignored-local scope for exactly ten manually reviewed independent KW businesses, their balanced city/niche mix, ordered integration phases, current checkpoint, and next separate gate; it grants no execution, provider, mutation, deployment, outreach, send, or cost authority. |
 | PrivateKwSourceWorkflowMaterialization | Separately owner-approved ignored-local transaction that re-derives one deterministic audit and may append only the exact source plan plus one sealed six-row workflow lineage. It cannot assess, capture, contact, deploy, migrate, call a provider, or spend. |
 | RevenuePrivateKwMaterializationReceipt | Append-only schema-0064 seal committed last after the exact local source/workflow rows; it binds the source-plan, candidate, audit, workflow, approval, row counts, transaction type, and zero downstream authority. |
 

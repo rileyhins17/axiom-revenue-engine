@@ -399,6 +399,12 @@ a business. A second local-only command can prepare schema-bound preflights with
 `npm run kw:plan-persistence -- --input data/kw-evaluation/plan.json --output data/kw-evaluation/persistence.json`.
 It does not connect to or write a database and its output explicitly carries no
 mutation authority. See the evaluation guide before preparing real private data.
+Before exercising the real-business chain, exactly ten manually reviewed,
+independent candidates can be sealed into a balanced plan-only manifest with
+`npm run kw:prepare-shadow-slice -- --source-plan data/kw-evaluation/plan.json --selection data/kw-evaluation/shadow-slice-selection.json --output data/kw-evaluation/shadow-slice-manifest.json`.
+The manifest preserves the source checkpoint and five required phase gates, but
+authorizes none of them; it cannot access a database, website, provider, runtime,
+deployment, or prospect.
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.
