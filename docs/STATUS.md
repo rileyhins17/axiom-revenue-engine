@@ -10,7 +10,11 @@ locally and on Linux. Production has now been inventoried and backed up: legacy
 email/intake work is stopped, the redundant master database switch is off, and
 the legacy five-minute cron was removed so a paused engine no longer writes an
 empty run every five minutes. The rebuild console is live only in isolated
-staging; no rebuild code or migration has been deployed to production.
+staging; no rebuild code or migration has been deployed to production. The new
+Quality Lab is now locally verified: Riley can load one exact 50-business review
+packet, inspect the evidence and five separate scores, label leads Strong, Weak,
+or Wrong, and export a resumable checkpoint without changing qualification,
+contacting anyone, or spending money.
 
 ## Verified checkpoint
 
@@ -136,6 +140,9 @@ staging; no rebuild code or migration has been deployed to production.
 - Resumable owner-labelling checkpoint: the branch HEAD containing this status
   entry; previous verified checkpoint
   `9b74b4e00f87c0feca3c06a2bd29b5bced92a3e6`.
+- Owner Quality Lab checkpoint: the branch HEAD containing this status entry;
+  previous verified checkpoint
+  `3bcd8eef36b386187c7eb72803515b65269bf71d`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1235,6 +1242,38 @@ Completed gates:
   database write, external website, provider, mailbox, prospect, remote
   database, staging/production resource, deployment, secret, or paid runtime
   was touched. Spend impact is C$0 and every autonomous capability remains off.
+- The owner-first Quality Lab is implemented in the current worktree at
+  `/leads/evaluation`. It validates the exact fixed 50-business checkpoint,
+  shows the business, audit, five separate scores, engine verdict, and
+  URL-backed evidence, then lets Riley or Aidan choose Strong/Weak/Wrong with a
+  controlled reason and optional note. Drafts resume only for the exact packet
+  digest; export creates the existing immutable review-submission contract.
+- The Quality Lab route requires an authenticated session, accepts only bounded
+  JSON, returns private/no-store responses, and has no database or provider
+  binding. The UI cannot acquire, qualify, assess consent, contact, send, deploy,
+  or spend. The existing guarded local command remains the only recorder of a
+  downloaded batch.
+- The complete release gate now passes: fail-closed safety, 449/449 tests,
+  standalone typecheck, zero-warning lint, secret-sanitized OpenNext/Cloudflare
+  build, and explicit default-environment Wrangler no-upload dry run. Wrangler
+  emitted only the existing generated duplicate-`options` warnings; every
+  autonomous switch and cap shown by the dry run remains off or zero.
+- The final isolated owner browser gate passes six desktop/mobile WCAG views,
+  made zero external requests, found the ranked lead in 492 ms against a
+  10-second budget, and opened its evidence dossier in 2,361 ms against a
+  15-second budget. It also loaded the exact 50-business packet, recorded and
+  downloaded one zero-authority Strong fixture review, then proved the draft
+  resumes only for that packet on desktop and mobile.
+- A hydration readiness race discovered during acceptance is now closed: the
+  file input remains disabled until the Quality Lab client is ready, and the
+  browser gate waits for that exact state. The gate also clears only this
+  repository's generated `.next` directory before starting Next dev, preventing
+  stale OpenNext production chunks from causing a first-run SyntaxError. The
+  corrected gotcha and automated browser proof are part of this checkpoint.
+- No real business data or owner review was created. No database, website,
+  provider, mailbox, prospect, staging/production resource, deployment, secret,
+  or paid runtime was touched. Spend impact is C$0 and all autonomous capabilities
+  remain off.
 
 Still required for Phase 1:
 
@@ -1302,19 +1341,21 @@ before approval.
   framework. Using it with actual businesses requires current assessed records
   and Riley or Aidan's explicit labels and reasons; those reviews grant no
   downstream authority.
+- No new product decision is required for the verified Quality Lab. Publishing
+  it to isolated staging remains a separate release-gated deployment decision.
 
 ## Next three actions
 
-1. Build the owner-first evaluation screen on the immutable labelling contract
-   so Riley can choose Strong/Weak/Wrong and a reason without handling JSON or
-   enabling acquisition, providers, outreach, or send.
-2. Assemble the exact isolated-staging release packet for the current Leads,
+1. Assemble the exact isolated-staging release packet for the current Leads,
    dossier, and quality-review build; do not deploy it until the separate
    staging release gate is explicitly approved.
-3. Populate the ignored ten-business manifest only after Riley or Aidan reviews
+2. Populate the ignored ten-business manifest only after Riley or Aidan reviews
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
+3. Add receipt-bound per-business progress to the ten-business manifest so an
+   interrupted shadow run can resume exact completed phases without replaying
+   work or losing the owner-approved scope.
 
 ## Resume instructions
 

@@ -47,6 +47,15 @@ route remains available only as a legacy reference. Nothing in this workspace
 has been deployed. A private v2 audit/qualification writer now exists in source,
 but it is not imported by a Worker, route, queue, or provider path.
 
+The owner quality-calibration workspace is also implemented in source at
+`/leads/evaluation`. Riley loads the exact prepared 50-business checkpoint,
+compares the engine's verdict with the five visible scores and supporting
+evidence, selects Strong/Weak/Wrong plus a plain-language reason, and downloads
+an immutable review batch. Unfinished work stays in browser storage bound to the
+exact packet digest. The screen cannot read or write D1, call a provider, change
+qualification or consent, contact a business, send, deploy, or spend. It has not
+been published to staging.
+
 That writer accepts only an exact sealed website-evidence receipt and persists
 the website snapshot, every evidence claim, a conservative qualification, and
 one assessment receipt through a single D1 batch. Exact retries write nothing;
@@ -447,6 +456,10 @@ quota without editing the database or granting acquisition, provider,
 qualification, consent, outreach, send, deployment, or spend authority. Real
 evaluation progress remains 0/50 until actual businesses are assessed and Riley
 reviews them.
+
+Riley normally creates the review file through the authenticated Quality Lab at
+`/leads/evaluation`; Codex then runs the guarded recording command. Hand-written
+JSON is only a fallback for engineering recovery.
 
 Legacy resource identifiers are kept only where needed for safe migration. They
 must not be renamed in place or retired until reconciliation, rollback, and the

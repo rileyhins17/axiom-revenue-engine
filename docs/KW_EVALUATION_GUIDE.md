@@ -106,9 +106,15 @@ provider, or spend. It refuses to begin review with fewer or more than the fixed
 cohort growth cannot invalidate completed labels.
 
 Riley can review any convenient batch instead of finishing all 50 in one sitting.
-Codex will normally prepare a separate `owner-reviews.json` file that identifies
-the exact packet, contains Strong/Weak/Wrong choices, at least one reason per
-choice, and an optional note. Record that batch as a new checkpoint with:
+The authenticated Quality Lab at `/leads/evaluation` now provides the owner
+workflow in source: load the exact prepared checkpoint, inspect the business,
+five scores, and URL-backed evidence, choose Strong/Weak/Wrong plus a reason,
+and download `owner-reviews.json`. Drafts stay in that browser and are restored
+only when the exact same packet digest is loaded again. The screen has no
+database or provider binding and cannot change qualification, assess consent,
+contact anyone, send, deploy, or spend.
+
+Record the downloaded batch as a new checkpoint with:
 
 ```powershell
 npm run kw:record-owner-labels -- --packet data/kw-evaluation/owner-labeling.json --reviews data/kw-evaluation/owner-reviews.json --output data/kw-evaluation/owner-labeling-next.json
@@ -118,8 +124,9 @@ Never overwrite the prior packet. Every output names its parent and has a new
 content-derived identity, so a future Codex task resumes from the latest file
 without rebuilding chat history. Changed packets, duplicate decisions, unknown
 leads, attempts to relabel a completed entry, and reviews dated before the packet
-all fail closed. This is the durable file workflow; the owner-facing app screen
-will use the same contract in a later UI milestone.
+all fail closed. This is the durable file workflow used by the owner-facing
+screen. The screen is implemented and tested locally but has not been published
+to staging.
 
 ## What Riley will do
 

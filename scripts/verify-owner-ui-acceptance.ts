@@ -30,6 +30,7 @@ import {
   type PrivateKwContactPersistenceApproval,
 } from "../src/lib/revenue-engine/private-kw-contact-persistence";
 import { qualifyRevenueLead } from "../src/lib/revenue-engine/qualification";
+import { buildCompleteOwnerLabelingPacketFixture } from "../src/lib/revenue-engine/test-support/owner-labeling-fixture";
 import { auditWebsiteDeterministically } from "../src/lib/revenue-engine/website-audit";
 import { executePrivateKwContactPersistenceForLocalDatabase } from "./private-kw-contact-persistence-executor";
 
@@ -698,6 +699,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
   const externalRequests: string[] = [];
   const browserErrors: string[] = [];
   const badResponses: string[] = [];
+  const ownerLabelingPacket = buildCompleteOwnerLabelingPacketFixture();
+  const firstEvaluationBusiness = ownerLabelingPacket.entries[0]!.businessName;
   let stage = "startup";
   try {
     browser = await chromium.launch({ headless: true });
@@ -769,6 +772,52 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await assertResponsive(page, "desktop dossier");
     await assertReducedMotion(page, "desktop dossier");
 
+    stage = "desktop quality lab";
+    await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
+    await page.locator("[data-quality-lab-ready='true']").waitFor();
+    assert.equal(await page.title(), "Quality Lab | Axiom Revenue Engine");
+    await page.getByLabel("Choose owner-review checkpoint").setInputFiles({
+      name: "owner-labeling-checkpoint.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
+    });
+    await page.getByRole("heading", { level: 2, name: firstEvaluationBusiness }).waitFor();
+    await page.getByText("Verified the exact 50-business checkpoint. No outreach was enabled.").waitFor();
+    await page.getByRole("button", { name: /^Strong/ }).click();
+    await page.getByRole("checkbox", { name: "Good commercial fit" }).check();
+    assert.equal(await page.getByRole("button", { name: /^Strong/ }).getAttribute("aria-pressed"), "true");
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download 1 review" }).click();
+    const download = await downloadPromise;
+    const downloadedPath = await download.path();
+    assert(downloadedPath, "Quality Lab must download an immutable owner-review checkpoint.");
+    const submission = JSON.parse(await readFile(downloadedPath, "utf8")) as Record<string, unknown>;
+    assert.equal(submission.packetDigest, ownerLabelingPacket.packetDigest);
+    assert.equal((submission.decisions as Array<{ label: string }>)[0]?.label, "STRONG");
+    assert.equal(submission.databaseMutationAuthorized, false);
+    assert.equal(submission.qualificationAuthorized, false);
+    assert.equal(submission.outreachAuthorized, false);
+    assert.equal(submission.sendAuthorized, false);
+    assert.equal(submission.providerOperationsAuthorized, 0);
+    assert.equal(submission.costAuthorizedUsd, 0);
+    assert.equal(await page.locator("a[href^='mailto:'], a[href^='tel:']").count(), 0);
+    await assertWcag(page, "desktop quality lab");
+    await assertResponsive(page, "desktop quality lab");
+    await assertReducedMotion(page, "desktop quality lab");
+
+    stage = "desktop quality lab resume";
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator("[data-quality-lab-ready='true']").waitFor();
+    await page.getByLabel("Choose owner-review checkpoint").setInputFiles({
+      name: "owner-labeling-checkpoint.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
+    });
+    await page.getByText("Verified the exact checkpoint and restored this browser's draft.").waitFor();
+    assert.equal(await page.getByRole("button", { name: /^Strong/ }).getAttribute("aria-pressed"), "true");
+    assert.equal(await page.getByRole("checkbox", { name: "Good commercial fit" }).isChecked(), true);
+
     stage = "mobile leads";
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
@@ -789,6 +838,21 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await assertReducedMotion(page, "mobile dossier");
     await assertMobileNavigationClear(page);
 
+    stage = "mobile quality lab";
+    await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
+    await page.locator("[data-quality-lab-ready='true']").waitFor();
+    await page.getByLabel("Choose owner-review checkpoint").setInputFiles({
+      name: "owner-labeling-checkpoint.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
+    });
+    await page.getByRole("heading", { level: 2, name: firstEvaluationBusiness }).waitFor();
+    assert.equal(await page.getByRole("button", { name: /^Strong/ }).getAttribute("aria-pressed"), "true");
+    await assertWcag(page, "mobile quality lab");
+    await assertResponsive(page, "mobile quality lab");
+    await assertReducedMotion(page, "mobile quality lab");
+
     assert.deepEqual(externalRequests, [], "The owner acceptance browser attempted an external request.");
     assert.deepEqual(browserErrors, [], `Browser errors: ${browserErrors.join(" | ")}`);
     assert.deepEqual(badResponses, [], `Local server failures: ${badResponses.join(" | ")}`);
@@ -798,7 +862,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
       desktopDossierReadyMs,
       desktopWidth,
       mobileWidth,
-      pagesScanned: 4,
+      pagesScanned: 6,
       externalRequests: externalRequests.length,
     } satisfies AcceptanceResult;
   } catch (error) {
@@ -825,6 +889,10 @@ async function run() {
     database.close();
     const port = await freeLoopbackPort();
     const baseUrl = `http://127.0.0.1:${port}`;
+    // OpenNext leaves production assets in `.next`. A fresh Next dev server can
+    // briefly serve those files beside newly compiled development chunks, so
+    // clear only this repository's generated Next directory before startup.
+    await rm(join(REPOSITORY_ROOT, ".next"), { recursive: true, force: true });
     server = startNextServer(baseUrl, databasePath, serverLogs);
     await waitForServer(baseUrl, server);
     result = await runBrowserAcceptance(baseUrl, outputDirectory);

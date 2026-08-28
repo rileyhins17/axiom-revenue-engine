@@ -20,6 +20,7 @@ import {
 import type { Route } from "next";
 import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { ownerLeadDetailPath } from "@/lib/revenue-engine/owner-lead-identity";
 import type { OwnerLeadProjection } from "@/lib/revenue-engine/owner-lead-projection";
@@ -119,6 +120,11 @@ export function OwnerLeadList({ data }: { data: OwnerLeadListResponse }) {
             <ShieldCheck className="size-3" aria-hidden="true" />
             Read-only shadow view
           </span>
+        }
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/leads/evaluation">Open Quality Lab <ArrowUpRight aria-hidden="true" /></Link>
+          </Button>
         }
         metrics={[
           {

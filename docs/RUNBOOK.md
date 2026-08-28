@@ -199,10 +199,12 @@ changing the private database or enabling any pipeline action.
    npm run kw:prepare-owner-labeling -- --source-plan data/kw-evaluation/plan.json --database data/kw-evaluation/shadow.sqlite --output data/kw-evaluation/owner-labeling.json
    ```
 
-4. Review its business identity, evidence, audit, engine label, and five separate
-   scores. Create a separate submission bound to the exact packet ID and digest,
-   choose `STRONG`, `WEAK`, or `WRONG`, provide at least one allowed reason, and
-   add an optional note. Partial batches are allowed.
+4. Sign in to the local console, open `/leads/evaluation`, and load the prepared
+   packet. Review each business identity, audit, five scores, engine label, and
+   exact evidence; choose `STRONG`, `WEAK`, or `WRONG`, at least one offered
+   reason, and an optional note. Partial batches are allowed. Download the review
+   file when the batch is complete. Browser drafts resume only for the same
+   packet digest; they are not durable system truth until step 5 records them.
 5. Record the batch into a different no-overwrite checkpoint:
 
    ```powershell
@@ -215,8 +217,10 @@ changing the private database or enabling any pipeline action.
 7. Stop on source, assessment, packet, digest, timestamp, identity, or decision
    drift. Do not repair the checkpoint by hand.
 
-Both commands are ignored-local only. They authorize no database mutation,
-provider or network operation, acquisition, qualification change, consent
+Both commands are ignored-local only. The Quality Lab validation route is
+authenticated, private/no-store, bounded to JSON, and has no database or provider
+binding. Together they authorize no database mutation, provider or network
+operation, acquisition, qualification change, consent
 decision, outreach, sending, deployment, remote database, or spend.
 
 ## Weekly owner review (30 minutes)

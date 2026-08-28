@@ -83,6 +83,11 @@ const ownerUiAcceptance = await readFile(new URL("./verify-owner-ui-acceptance.t
 const privateKwOwnerLabeling = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-labeling.ts", import.meta.url), "utf8");
 const privateKwOwnerLabelingPrepareCli = await readFile(new URL("./prepare-private-kw-owner-labeling.ts", import.meta.url), "utf8");
 const privateKwOwnerLabelingRecordCli = await readFile(new URL("./record-private-kw-owner-labels.ts", import.meta.url), "utf8");
+const ownerLabelingWorkspace = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-workspace.ts", import.meta.url), "utf8");
+const ownerLabelingUpload = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-upload.ts", import.meta.url), "utf8");
+const ownerLabelingRoute = await readFile(new URL("../src/app/api/v1/leads/evaluation/validate/route.ts", import.meta.url), "utf8");
+const ownerLabelingPage = await readFile(new URL("../src/app/leads/evaluation/page.tsx", import.meta.url), "utf8");
+const ownerLabelingComponent = await readFile(new URL("../src/components/leads/owner-lead-evaluation-workspace.tsx", import.meta.url), "utf8");
 const stagingMarker = '"staging": {';
 const stagingIndex = wrangler.indexOf(stagingMarker);
 const staging = stagingIndex >= 0 ? wrangler.slice(stagingIndex) : "";
@@ -461,6 +466,26 @@ requireMatch("scripts/record-private-kw-owner-labels.ts", privateKwOwnerLabeling
 requireMatch("scripts/record-private-kw-owner-labels.ts", privateKwOwnerLabelingRecordCli, /writePrivateKwJson\(files\.output, next\)/, "owner-label recording must create a no-overwrite ignored checkpoint");
 forbidMatch("scripts/record-private-kw-owner-labels.ts", privateKwOwnerLabelingRecordCli, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|Database|fetch\s*\(|\.prepare\s*\(|\.run\s*\(|\.batch\s*\(|\.put\s*\(|\.delete\s*\(/, "owner-label recording must not access a database, runtime, provider, or network");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-owner-labeling|prepare-private-kw-owner-labeling|record-private-kw-owner-labels/, "the inert engine must not wire owner labeling to runtime");
+requireMatch("src/lib/revenue-engine/owner-labeling-workspace.ts", ownerLabelingWorkspace, /entries:\s*z\.array\(WorkspaceEntrySchema\)\.length\(50\)/, "the owner workspace must require the fixed 50-business evaluation set");
+for (const field of ["databaseMutationAuthorized", "qualificationAuthorized", "consentDecisionAuthorized", "outreachAuthorized", "sendAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/owner-labeling-workspace.ts", ownerLabelingWorkspace, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in the owner workspace response`);
+}
+requireMatch("src/lib/revenue-engine/owner-labeling-workspace.ts", ownerLabelingWorkspace, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "the owner workspace must authorize zero provider operations");
+requireMatch("src/lib/revenue-engine/owner-labeling-workspace.ts", ownerLabelingWorkspace, /costAuthorizedUsd:\s*z\.literal\(0\)/, "the owner workspace must authorize zero spend");
+forbidMatch("src/lib/revenue-engine/owner-labeling-workspace.ts", ownerLabelingWorkspace, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.run\s*\(|\.batch\s*\(|\.put\s*\(|\.delete\s*\(/, "owner workspace composition must remain pure and provider-free");
+forbidMatch("src/lib/revenue-engine/owner-labeling-upload.ts", ownerLabelingUpload, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.run\s*\(|\.batch\s*\(|\.put\s*\(|\.delete\s*\(/, "owner checkpoint validation must not access providers, databases, or writes");
+requireMatch("src/app/api/v1/leads/evaluation/validate/route.ts", ownerLabelingRoute, /requireApiSession\(request\)/, "owner checkpoint validation must require an authenticated session");
+requireMatch("src/app/api/v1/leads/evaluation/validate/route.ts", ownerLabelingRoute, /export async function POST\(request:\s*Request\)/, "owner checkpoint validation must remain one explicit validation-only POST");
+requireMatch("src/app/api/v1/leads/evaluation/validate/route.ts", ownerLabelingRoute, /readOwnerLabelingPacketRequest\(request\)/, "owner checkpoint validation must enforce the bounded upload parser");
+requireMatch("src/app/api/v1/leads/evaluation/validate/route.ts", ownerLabelingRoute, /private, no-store/, "owner checkpoint validation responses must not be cached publicly");
+forbidMatch("src/app/api/v1/leads/evaluation/validate/route.ts", ownerLabelingRoute, /getDatabase|D1Database|R2Bucket|\.run\s*\(|\.put\s*\(|\.delete\s*\(|export async function (?:GET|PUT|PATCH|DELETE)/, "owner checkpoint validation must not read or mutate a database, artifact store, or expose another method");
+requireMatch("src/app/leads/evaluation/page.tsx", ownerLabelingPage, /await requireSession\(\)/, "the Quality Lab page must require an authenticated session");
+forbidMatch("src/app/leads/evaluation/page.tsx", ownerLabelingPage, /getDatabase|fetch\s*\(|export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(/, "the Quality Lab page must not read a database, self-fetch, or expose write methods");
+requireMatch("src/components/leads/owner-lead-evaluation-workspace.tsx", ownerLabelingComponent, /fetch\("\/api\/v1\/leads\/evaluation\/validate"/, "the Quality Lab may call only its authenticated same-origin validation route");
+if ((ownerLabelingComponent.match(/fetch\s*\(/g) || []).length !== 1) failures.push("src/components/leads/owner-lead-evaluation-workspace.tsx: exactly one same-origin validation fetch is allowed");
+requireMatch("src/components/leads/owner-lead-evaluation-workspace.tsx", ownerLabelingComponent, /Review only · no outreach/, "the Quality Lab must state its review-only authority");
+forbidMatch("src/components/leads/owner-lead-evaluation-workspace.tsx", ownerLabelingComponent, /mailto:|tel:|\/api\/outreach|\/api\/send|\.prepare\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "the Quality Lab must not expose contact actions, mutation endpoints, or storage writes");
+forbidMatch("src/engine/worker.ts", engineWorker, /owner-labeling-workspace|owner-labeling-upload|leads\/evaluation/, "the inert engine must not wire the owner Quality Lab to runtime execution");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION\s*=\s*"0061_shadow_lead_assessment_receipts"/, "the private assessment executor must require the append-only assessment schema");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /Pick<D1Database,\s*"prepare"\s*\|\s*"batch">/, "the private assessment adapter must use the generated narrow D1 binding type");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /FROM "RevenueWorkflowReceiptRevision" receipt[\s\S]*?JOIN "RevenueWorkflowAttemptClosure" closure[\s\S]*?closure\."terminalReceiptId" = receipt\."id"/, "assessment persistence must begin from the exact terminal workflow receipt");

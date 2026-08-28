@@ -358,24 +358,28 @@ Retire entries when the architecture makes them impossible.
 - **Affected area:** qualification and UI.
 - **Verifying commit:** foundation began at `d5f0e52`; v3 gates pending.
 
-## BUILD-006 — The browser gate raced a Cloudflare build through shared `.next`
+## BUILD-006 — The browser gate inherited or raced incompatible `.next` assets
 
 - **Symptom:** the authenticated owner UI rendered normally and local requests
   returned 200, but Playwright intermittently reported an empty error or
   `SyntaxError: Invalid or unexpected token` during navigation.
-- **Root cause:** the owner browser gate and Wrangler/OpenNext build were launched
-  concurrently. Both use the repository's `.next` output, so the build could
-  replace a JavaScript asset while the browser-test dev server was serving it.
+- **Root cause:** OpenNext and the Next.js development server share `.next`.
+  Concurrent execution can replace a served chunk, while a sequential first
+  development run can briefly inherit production assets left by OpenNext before
+  its development chunks finish replacing them.
 - **Proven fix:** let every Next/OpenNext/Cloudflare build and dry run exit before
-  starting `npm run test:owner-ui`. Preserve detailed page-error name/message/
-  stack diagnostics; do not suppress syntax errors or blank errors globally.
-- **Prevention/test:** `AGENTS.md` now forbids concurrent execution of these
-  commands. GitHub CI already runs them sequentially, and every local release
-  cycle must do the same.
+  starting `npm run test:owner-ui`, then remove only the repository's generated
+  `.next` directory before starting the isolated development server. Preserve
+  detailed page-error name/message/stack diagnostics; do not suppress syntax
+  errors or blank errors globally.
+- **Prevention/test:** `AGENTS.md` forbids concurrent execution, and the owner UI
+  acceptance command now clears its exact generated `.next` directory before
+  server startup. GitHub CI and every local release cycle run the commands
+  sequentially.
 - **Affected area:** owner UI acceptance, Next.js development server, OpenNext,
   Wrangler dry runs, Windows/OneDrive workspaces, and local release evidence.
-- **Verifying commit:** branch HEAD containing the sequential browser-gate rule
-  and the executor-backed owner dossier fixture.
+- **Verifying commit:** branch HEAD containing the sequential browser-gate rule,
+  exact `.next` cleanup, and six-view Quality Lab acceptance.
 
 ## BUILD-001 — Local success did not equal Linux/Cloudflare success
 
