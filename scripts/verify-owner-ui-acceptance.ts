@@ -24,8 +24,14 @@ import {
   type RevenueContactVerificationObservation,
   type RevenueContactVerificationRequest,
 } from "../src/lib/revenue-engine/contact-verification";
+import {
+  PRIVATE_KW_CONTACT_PERSISTENCE_APPROVAL_CONFIRMATION,
+  PRIVATE_KW_CONTACT_PERSISTENCE_VERSION,
+  type PrivateKwContactPersistenceApproval,
+} from "../src/lib/revenue-engine/private-kw-contact-persistence";
 import { qualifyRevenueLead } from "../src/lib/revenue-engine/qualification";
 import { auditWebsiteDeterministically } from "../src/lib/revenue-engine/website-audit";
+import { executePrivateKwContactPersistenceForLocalDatabase } from "./private-kw-contact-persistence-executor";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
@@ -207,7 +213,46 @@ function buildOwnerContactFixture(sourceCapturedAt: string, sourceEvidenceUrl: s
       } as RevenueContactVerificationObservation;
       return buildFixtureContactVerificationResult({ request: verificationRequest, observation: verificationObservation, completedAt });
     });
-  return buildRevenueContactPersistencePlan({ discovery, verifications });
+  const persistencePlan = buildRevenueContactPersistencePlan({ discovery, verifications });
+  const approval: PrivateKwContactPersistenceApproval = {
+    materializationVersion: PRIVATE_KW_CONTACT_PERSISTENCE_VERSION,
+    businessId: FIXTURE_BUSINESS_ID,
+    discoveryResultId: discovery.discoveryResultId,
+    discoveryResultDigest: discovery.discoveryResultDigest,
+    persistencePlanDigest: persistencePlan.planDigest,
+    verificationResults: verifications
+      .map((verification) => ({
+        verificationResultId: verification.verificationResultId,
+        verificationResultDigest: verification.verificationResultDigest,
+      }))
+      .sort((left, right) => left.verificationResultId.localeCompare(right.verificationResultId, "en-CA")),
+    approval: {
+      decision: "APPROVED_FOR_LOCAL_CONTACT_PERSISTENCE",
+      reviewedBy: "RILEY",
+      reviewedAt: fixtureTimestamp(-10_000),
+      rationale: "Approved the exact synthetic owner acceptance contact bundle for ignored-local persistence.",
+      confirmation: PRIVATE_KW_CONTACT_PERSISTENCE_APPROVAL_CONFIRMATION,
+    },
+    mode: "SHADOW",
+    executionKind: "IGNORED_LOCAL_SQLITE",
+    localDatabaseAccessAuthorized: true,
+    localContactMutationAuthorized: true,
+    localVerificationMutationAuthorized: true,
+    sourceMutationAuthorized: false,
+    workflowMutationAuthorized: false,
+    assessmentMutationAuthorized: false,
+    schemaMutationAuthorized: false,
+    captureAuthorized: false,
+    contactDiscoveryAuthorized: false,
+    contactVerificationAuthorized: false,
+    consentDecisionAuthorized: false,
+    qualificationAuthorized: false,
+    outreachAuthorized: false,
+    sendAuthorized: false,
+    providerOperationsAuthorized: 0,
+    costAuthorizedUsd: 0,
+  };
+  return { discovery, verifications, approval };
 }
 
 function seedOwnerLead(database: SqliteDatabase) {
@@ -216,7 +261,7 @@ function seedOwnerLead(database: SqliteDatabase) {
   const refreshAfter = new Date(Date.parse(capturedAt) + 60 * 24 * 60 * 60 * 1_000).toISOString();
   const sourceEvidenceUrl = "https://directory.axiomfixtures.ca/business/owner-acceptance-roofing";
   const websiteUrl = "http://roofing.axiomfixtures.ca/";
-  const contactPersistencePlan = buildOwnerContactFixture(sourceCapturedAt, sourceEvidenceUrl);
+  const contactFixture = buildOwnerContactFixture(sourceCapturedAt, sourceEvidenceUrl);
 
   const audit = auditWebsiteDeterministically({
     businessId: FIXTURE_BUSINESS_ID,
@@ -364,11 +409,42 @@ function seedOwnerLead(database: SqliteDatabase) {
         JSON.stringify(qualification.evidenceClaimIds),
         capturedAt,
       );
-    for (const mutation of contactPersistencePlan.mutations) {
-      database.prepare(mutation.sql).run(...mutation.bindings);
-    }
   });
   insert();
+  const materialization = executePrivateKwContactPersistenceForLocalDatabase(database, contactFixture);
+  assert.equal(materialization.executionPath, "FRESH_COMMIT");
+  assert.equal(materialization.insertedRows.materializationReceipts, 1);
+  assert.equal(materialization.contactDiscoveryAuthorized, false);
+  assert.equal(materialization.contactVerificationAuthorized, false);
+  assert.equal(materialization.consentDecisionAuthorized, false);
+  assert.equal(materialization.qualificationAuthorized, false);
+  assert.equal(materialization.outreachAuthorized, false);
+  assert.equal(materialization.sendAuthorized, false);
+  assert.equal(materialization.providerOperationsAuthorized, 0);
+  assert.equal(materialization.costAuthorizedUsd, 0);
+  const persistedReceipt = database.prepare(`
+    SELECT "id", "businessId", "discoveryReceiptId", "consentRows",
+      "outreachAuthorized", "sendAuthorized", "providerOperationsAuthorized", "costAuthorizedUsd"
+    FROM "RevenuePrivateKwContactPersistenceReceipt"
+    WHERE "id" = ?
+  `).get(materialization.materializationId) as Record<string, unknown> | undefined;
+  assert.deepEqual(persistedReceipt, {
+    id: materialization.materializationId,
+    businessId: FIXTURE_BUSINESS_ID,
+    discoveryReceiptId: materialization.discoveryResultId,
+    consentRows: 0,
+    outreachAuthorized: 0,
+    sendAuthorized: 0,
+    providerOperationsAuthorized: 0,
+    costAuthorizedUsd: 0,
+  });
+  const replay = executePrivateKwContactPersistenceForLocalDatabase(database, contactFixture);
+  assert.equal(replay.executionPath, "EXACT_REPLAY");
+  assert.deepEqual(replay.insertedRows, {
+    contact: 0,
+    verification: 0,
+    materializationReceipts: 0,
+  });
 }
 
 function startNextServer(baseUrl: string, databasePath: string, logLines: string[]) {
@@ -645,7 +721,11 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     page.on("console", (message) => {
       if (message.type() === "error") browserErrors.push(`${stage} console: ${message.text()}`);
     });
-    page.on("pageerror", (error) => browserErrors.push(`${stage} pageerror: ${error.stack ?? error.message}`));
+    page.on("pageerror", (error) => browserErrors.push(`${stage} pageerror: ${JSON.stringify({
+      name: error.name,
+      message: error.message,
+      stack: error.stack ?? null,
+    })}`));
     page.on("response", (response) => {
       if (response.url().startsWith(baseUrl) && response.status() >= 500) badResponses.push(`${response.status()} ${response.url()}`);
     });
@@ -676,6 +756,9 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Why this is a strong lead" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Website evidence" }).waitFor();
+    await page.getByText("+15195550123", { exact: true }).waitFor();
+    await page.getByText("https://roofing.axiomfixtures.ca/contact", { exact: true }).waitFor();
+    await page.getByText("hello@roofing.axiomfixtures.ca", { exact: true }).waitFor();
     const desktopDossierReadyMs = Math.round(performance.now() - dossierStart);
     assert(desktopDossierReadyMs <= OWNER_DOSSIER_BUDGET_MS, `The lead rationale was not visible within ${OWNER_DOSSIER_BUDGET_MS} ms.`);
     assert.equal(await page.title(), "Lead dossier | Axiom Revenue Engine");

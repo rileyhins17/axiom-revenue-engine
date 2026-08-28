@@ -121,9 +121,12 @@ staging; no rebuild code or migration has been deployed to production.
 - Separately approved local contact-persistence executor checkpoint:
   `6521dcd535bfa613beca939f9438400b5586ffa6`; exact-head Linux CI run
   `33098011119` passed.
-- Reviewed local contact-invocation checkpoint: the branch HEAD containing this
-  status entry; previous verified checkpoint
-  `6521dcd535bfa613beca939f9438400b5586ffa6`.
+- Reviewed local contact-invocation checkpoint:
+  `673e949eaca19c738507d7249f18e3281bb67a31`; exact-head Linux CI run
+  `33125382850` passed.
+- Executor-backed owner dossier fixture checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `673e949eaca19c738507d7249f18e3281bb67a31`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1120,6 +1123,29 @@ Completed gates:
   mailbox, prospect, staging/production database, deployment, secret, or paid
   runtime was touched. Migration 0067 exists only in source, ignored local
   Wrangler state, and disposable tests; deployed automation remains stopped.
+- The authenticated owner list/dossier acceptance database no longer inserts
+  contact planner mutations directly. It now creates one exact synthetic
+  discovery/verification bundle, supplies the dedicated zero-provider local
+  approval, and calls the same fail-closed contact executor used by the guarded
+  local pipeline.
+- The acceptance setup requires a fresh executor commit, the immutable
+  schema-0065/0066 completion receipt, exact reload, and a write-free exact
+  replay before Next.js starts. The desktop dossier must then render the exact
+  executor-produced phone, form, and unverified email routes. A repository
+  safety rule prevents the loose-planner-insert shortcut from returning.
+- Executor-backed dossier local release verification is green: fail-closed
+  safety, 427/427 tests, typecheck, zero-warning lint, deterministic console and
+  engine bindings, the secret-sanitized Cloudflare build, and explicit console
+  plus inert-engine no-upload dry runs passed. The final sequential owner browser
+  gate rendered all three executor-produced routes, passed four desktop/mobile
+  WCAG scans, attempted zero external requests, and met the owner timing budgets;
+  list readiness was 1,126 ms and dossier readiness was 2,479 ms. The console
+  dry run emitted only the already documented generated duplicate-`options`
+  warnings.
+- No real lead, provider request, consent decision, qualification change,
+  outreach, mailbox/prospect action, remote database, deployment, secret, or
+  paid runtime was touched. The executor ran only against a disposable synthetic
+  SQLite browser-test database; production and staging automation remain stopped.
 
 Still required for Phase 1:
 
@@ -1169,6 +1195,8 @@ before approval.
   generated review and provide its different current contact-persistence
   approval. Providers, consent, staging/production migration, outreach, and send
   remain separately gated.
+- No new owner decision is required for the executor-backed synthetic owner
+  dossier gate. It adds no UI action or live capability and has zero spend.
 - No new owner decision is required for the source/workflow materialization
   framework. A real execution requires Riley or Aidan to review the exact source
   plan and deterministic audit input and supply the dedicated confirmation;
@@ -1176,16 +1204,16 @@ before approval.
 
 ## Next three actions
 
-1. Make the owner dossier acceptance fixture consume one executor-produced
-   persisted contact bundle instead of loose planner inserts, without adding a
-   UI mutation, approval action, provider, or send path.
-2. Define the bounded ten-business KW shadow slice that moves real, manually
+1. Define the bounded ten-business KW shadow slice that moves real, manually
    reviewed source records through current website evidence, assessment, contact
    review, and the dossier with no send; keep any live source, Browser, storage,
    or verification provider behind a separate privacy/budget approval.
-3. Add an owner-readable, read-only contact-review section to the dossier from
+2. Add an owner-readable, read-only contact-review section to the dossier from
    the persisted invocation receipt, then make the latest Leads/dossier build
    available in isolated staging only after its release gate is approved.
+3. Prepare the first 50-lead owner-labelling workflow so Riley's strong/weak/wrong
+   decisions and reasons can become the measured quality baseline without
+   enabling acquisition, providers, outreach, or send.
 
 ## Resume instructions
 

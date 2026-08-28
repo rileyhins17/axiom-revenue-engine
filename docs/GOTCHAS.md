@@ -5,6 +5,30 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## DATA-011 — A realistic UI fixture bypassed the writer it claimed to represent
+
+- **Symptom:** the owner dossier browser test rendered plausible contact routes,
+  but its setup executed validation-plan SQL directly. The UI could therefore
+  stay green even if the actual transactional contact executor, completion
+  receipt, or replay rules stopped producing readable rows.
+- **Root cause:** the read surface was originally built before the separately
+  approved executor existed, and its synthetic seed was not upgraded when the
+  writer became authoritative.
+- **Proven fix:** the acceptance seed now inserts only the business/audit/
+  qualification prerequisites directly, then passes exact synthetic discovery,
+  verification, and approval contracts through the real contact executor. It
+  requires a fresh commit, immutable completion receipt, exact reload, and
+  mutation-free replay before the browser starts.
+- **Prevention/test:** the safety scan requires the executor call and receipt
+  query, forbids the former loose-planner loop, and keeps consent, qualification,
+  providers, outreach, send, and cost authority off. The browser must render the
+  executor-produced phone, form, and email routes on authenticated desktop and
+  mobile pages with zero external requests.
+- **Affected area:** owner list/dossier acceptance, writer-reader compatibility,
+  contact provenance, schema migrations, and CI confidence.
+- **Verifying commit:** branch HEAD containing the executor-backed owner dossier
+  fixture and this entry.
+
 ## DATA-010 — Persisted contact evidence was detached from qualification lineage
 
 - **Symptom:** a contact bundle could be valid for one business yet provide no
@@ -333,6 +357,25 @@ Retire entries when the architecture makes them impossible.
   of email and route strong no-email accounts to a manual channel.
 - **Affected area:** qualification and UI.
 - **Verifying commit:** foundation began at `d5f0e52`; v3 gates pending.
+
+## BUILD-006 — The browser gate raced a Cloudflare build through shared `.next`
+
+- **Symptom:** the authenticated owner UI rendered normally and local requests
+  returned 200, but Playwright intermittently reported an empty error or
+  `SyntaxError: Invalid or unexpected token` during navigation.
+- **Root cause:** the owner browser gate and Wrangler/OpenNext build were launched
+  concurrently. Both use the repository's `.next` output, so the build could
+  replace a JavaScript asset while the browser-test dev server was serving it.
+- **Proven fix:** let every Next/OpenNext/Cloudflare build and dry run exit before
+  starting `npm run test:owner-ui`. Preserve detailed page-error name/message/
+  stack diagnostics; do not suppress syntax errors or blank errors globally.
+- **Prevention/test:** `AGENTS.md` now forbids concurrent execution of these
+  commands. GitHub CI already runs them sequentially, and every local release
+  cycle must do the same.
+- **Affected area:** owner UI acceptance, Next.js development server, OpenNext,
+  Wrangler dry runs, Windows/OneDrive workspaces, and local release evidence.
+- **Verifying commit:** branch HEAD containing the sequential browser-gate rule
+  and the executor-backed owner dossier fixture.
 
 ## BUILD-001 — Local success did not equal Linux/Cloudflare success
 

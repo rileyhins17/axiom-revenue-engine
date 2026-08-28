@@ -20,6 +20,10 @@
   binds source, sealed assessment, contact materialization, discovery,
   verification, reviewer, and approval lineage under one outer atomic
   transaction, without live providers, consent inference, outreach, or spend.
+- Replaced the owner dossier browser fixture's loose contact SQL with the proven
+  local contact executor. The acceptance gate now requires a completion receipt,
+  exact reload, mutation-free replay, and exact phone/form/email rendering while
+  retaining zero consent, provider, outreach, send, and cost authority.
 - Relabelled the owner navigation and made Leads quality-first with transparent
   score components and an explicit stale-evidence warning.
 - Locally verified 160 tests, typecheck, lint, all 55 migrations, Cloudflare build,

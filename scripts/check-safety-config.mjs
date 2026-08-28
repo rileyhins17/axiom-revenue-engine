@@ -77,6 +77,7 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
 ]);
 
 const failures = [];
+const ownerUiAcceptance = await readFile(new URL("./verify-owner-ui-acceptance.ts", import.meta.url), "utf8");
 const stagingMarker = '"staging": {';
 const stagingIndex = wrangler.indexOf(stagingMarker);
 const staging = stagingIndex >= 0 ? wrangler.slice(stagingIndex) : "";
@@ -150,6 +151,15 @@ requireMatch("package.json", packageJson, /"cf:engine:typegen:check"\s*:\s*"[^"]
 requireMatch("package.json", packageJson, /"cf:engine:dry-run"\s*:/, "CI must dry-run the inert engine bundle");
 requireMatch("package.json", packageJson, /scripts\/\*\*\/\*\.test\.ts/, "TypeScript script tests must run in the complete test gate");
 requireMatch("package.json", packageJson, /"test:owner-ui"\s*:\s*"tsx scripts\/verify-owner-ui-acceptance\.ts"/, "the owner UI acceptance gate must have a stable local command");
+requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /executePrivateKwContactPersistenceForLocalDatabase\(database, contactFixture\)/, "the owner dossier acceptance fixture must use the proven transactional contact executor");
+requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /FROM "RevenuePrivateKwContactPersistenceReceipt"/, "the owner dossier acceptance fixture must verify the final contact materialization receipt");
+requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /executionPath, "EXACT_REPLAY"/, "the owner dossier acceptance fixture must prove mutation-free replay");
+forbidMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /for \(const mutation of contactPersistencePlan\.mutations\)/, "the owner dossier fixture must not bypass the executor with loose planner inserts");
+for (const field of ["contactDiscoveryAuthorized", "contactVerificationAuthorized", "consentDecisionAuthorized", "qualificationAuthorized", "outreachAuthorized", "sendAuthorized"]) {
+  requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, new RegExp(`${field}: false`), `${field} must remain false in the owner dossier contact fixture`);
+}
+requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /providerOperationsAuthorized: 0/, "the owner dossier contact fixture must authorize zero provider operations");
+requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /costAuthorizedUsd: 0/, "the owner dossier contact fixture must authorize zero cost");
 requireMatch("package.json", packageJson, /"kw:prepare-import"\s*:\s*"tsx scripts\/prepare-private-kw-import\.ts"/, "the private KW import must use the guarded local CLI");
 requireMatch("package.json", packageJson, /"kw:plan-persistence"\s*:\s*"tsx scripts\/plan-private-kw-persistence\.ts"/, "private persistence planning must use the validation-only CLI");
 requireMatch("package.json", packageJson, /"kw:execute-assessment"\s*:\s*"tsx scripts\/execute-private-kw-assessment\.ts"/, "private assessment execution must use the guarded ignored-local CLI");

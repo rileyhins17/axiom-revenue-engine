@@ -88,6 +88,9 @@ npx wrangler deploy --env="" --dry-run --autoconfig false
 ```
 
 Automated tests must use fakes or mail sinks and must never contact prospects.
+Run `npm run test:owner-ui` only after every Next/OpenNext/Cloudflare build or dry
+run has exited. Those commands share `.next`; running them concurrently can swap
+browser assets mid-request and produce a false intermittent `SyntaxError`.
 
 ## Documentation is part of the change
 

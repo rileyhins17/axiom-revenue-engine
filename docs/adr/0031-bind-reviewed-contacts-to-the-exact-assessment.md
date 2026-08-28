@@ -101,10 +101,10 @@ local database space, but the pilot volume is tiny and the durable context is
 more valuable than minimizing a few kilobytes.
 
 The command still reconstructs fixture results rather than calling a provider.
-This is intentional: the next milestone can consume one executor-produced bundle
-in the owner dossier, then the project should move to a bounded real-business
-shadow slice. Provider selection, CASL evidence, paid verification, and live
-runtime wiring retain their own release gates.
+This is intentional: the owner acceptance dossier now consumes one
+executor-produced bundle, and the project can next define a bounded
+real-business shadow slice. Provider selection, CASL evidence, paid
+verification, and live runtime wiring retain their own release gates.
 
 ## Consequences
 
@@ -125,7 +125,7 @@ runtime wiring retain their own release gates.
 2. [x] Add the separately approved atomic invocation command and migration 0067.
 3. [x] Prove no-write review, approval-drift rejection, final-receipt rollback,
    fresh commit, exact replay, full-review persistence, and immutability.
-4. [ ] Make the owner dossier fixture consume one executor-produced contact
+4. [x] Make the owner dossier fixture consume one executor-produced contact
    bundle without adding an owner mutation or send action.
 5. [ ] Run a bounded real-business shadow slice only after its source, privacy,
    provider, budget, and owner-review gates are approved.

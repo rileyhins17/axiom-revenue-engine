@@ -144,6 +144,9 @@ Pagination and materialization can be reconsidered only after measured need.
   and detail routes on desktop and mobile. It checks WCAG AA, keyboard/skip-link
   focus, reduced motion, target size, overflow, mobile navigation clearance,
   read-only controls, page titles, and owner discoverability time budgets.
+- Its contact routes now come from the fail-closed local contact executor, final
+  completion receipt, exact reload, and mutation-free replay. The acceptance
+  fixture can no longer make the dossier pass by executing loose planner SQL.
 - Business IDs use one typed route contract. Safe delimiters remain readable in
   generated paths, percent-encoded input is decoded exactly once, and unsafe or
   double-encoded segments fail before D1.
