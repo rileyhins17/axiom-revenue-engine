@@ -88,6 +88,9 @@ const ownerLabelingUpload = await readFile(new URL("../src/lib/revenue-engine/ow
 const ownerLabelingRoute = await readFile(new URL("../src/app/api/v1/leads/evaluation/validate/route.ts", import.meta.url), "utf8");
 const ownerLabelingPage = await readFile(new URL("../src/app/leads/evaluation/page.tsx", import.meta.url), "utf8");
 const ownerLabelingComponent = await readFile(new URL("../src/components/leads/owner-lead-evaluation-workspace.tsx", import.meta.url), "utf8");
+const stagingConsoleRelease = await readFile(new URL("../src/lib/revenue-engine/staging-console-release.ts", import.meta.url), "utf8");
+const stagingConsoleReleaseVerifier = await readFile(new URL("./verify-staging-console-release.ts", import.meta.url), "utf8");
+const stagingConsoleReleasePacket = await readFile(new URL("../docs/releases/staging/2026-08-28-owner-quality-lab.json", import.meta.url), "utf8");
 const stagingMarker = '"staging": {';
 const stagingIndex = wrangler.indexOf(stagingMarker);
 const staging = stagingIndex >= 0 ? wrangler.slice(stagingIndex) : "";
@@ -486,6 +489,23 @@ if ((ownerLabelingComponent.match(/fetch\s*\(/g) || []).length !== 1) failures.p
 requireMatch("src/components/leads/owner-lead-evaluation-workspace.tsx", ownerLabelingComponent, /Review only · no outreach/, "the Quality Lab must state its review-only authority");
 forbidMatch("src/components/leads/owner-lead-evaluation-workspace.tsx", ownerLabelingComponent, /mailto:|tel:|\/api\/outreach|\/api\/send|\.prepare\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "the Quality Lab must not expose contact actions, mutation endpoints, or storage writes");
 forbidMatch("src/engine/worker.ts", engineWorker, /owner-labeling-workspace|owner-labeling-upload|leads\/evaluation/, "the inert engine must not wire the owner Quality Lab to runtime execution");
+for (const field of ["deploymentAuthorized", "databaseMigrationAuthorized", "engineDeploymentAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/staging-console-release.ts", stagingConsoleRelease, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in every staging console packet`);
+  requireMatch("docs/releases/staging/2026-08-28-owner-quality-lab.json", stagingConsoleReleasePacket, new RegExp(`"${field}"\\s*:\\s*false`), `${field} must remain false in the prepared packet`);
+}
+for (const field of ["providerOperationsAuthorized", "externalWebsiteRequestsAuthorized", "mailboxOperationsAuthorized", "prospectContactsAuthorized", "costAuthorizedCad"]) {
+  requireMatch("src/lib/revenue-engine/staging-console-release.ts", stagingConsoleRelease, new RegExp(`${field}:\\s*z\\.literal\\(0\\)`), `${field} must remain zero in every staging console packet`);
+  requireMatch("docs/releases/staging/2026-08-28-owner-quality-lab.json", stagingConsoleReleasePacket, new RegExp(`"${field}"\\s*:\\s*0`), `${field} must remain zero in the prepared packet`);
+}
+requireMatch("src/lib/revenue-engine/staging-console-release.ts", stagingConsoleRelease, /status:\s*z\.literal\("PENDING"\)[\s\S]*?readiness:\s*z\.literal\("PREPARED_NOT_APPROVED"\)/, "staging packets must require a separate approval and remain not approved");
+requireMatch("src/lib/revenue-engine/staging-console-release.ts", stagingConsoleRelease, /providerSecretNames:\s*EmptyStringArraySchema[\s\S]*?serviceBindings:\s*EmptyStringArraySchema[\s\S]*?queueBindings:\s*EmptyStringArraySchema[\s\S]*?cronTriggers:\s*EmptyStringArraySchema/, "staging console packets must reject provider secrets, services, queues, and crons");
+requireMatch("scripts/verify-staging-console-release.ts", stagingConsoleReleaseVerifier, /execFileSync\("git"/, "the staging packet verifier must use argument-safe Git calls");
+requireMatch("scripts/verify-staging-console-release.ts", stagingConsoleReleaseVerifier, /resolve\(REPOSITORY_ROOT,\s*"docs",\s*"releases",\s*"staging"\)/, "the verifier must restrict packet files to committed staging-release storage");
+requireMatch("scripts/verify-staging-console-release.ts", stagingConsoleReleaseVerifier, /\["ls-files",\s*"--error-unmatch",\s*"--",\s*repositoryPath\][\s\S]*?\["rev-parse",\s*`:\$\{repositoryPath\}`\][\s\S]*?\["hash-object",\s*"--",\s*repositoryPath\]/, "packet verification must require a tracked exact Git blob before trusting the release artifact");
+forbidMatch("scripts/verify-staging-console-release.ts", stagingConsoleReleaseVerifier, /wrangler|https?:\/\/|fetch\s*\(|D1Database|R2Bucket|\.prepare\s*\(|\.run\s*\(|\.batch\s*\(|\.put\s*\(|\.delete\s*\(/i, "packet verification must not access Cloudflare, providers, databases, networks, or deployment commands");
+requireMatch("package.json", packageJson, /"staging:verify-console-release"\s*:\s*"tsx scripts\/verify-staging-console-release\.ts"/, "the exact staging packet verifier must remain available to operators and CI");
+requireMatch(".github/workflows/ci.yml", ci, /fetch-depth:\s*0[\s\S]*?npm run staging:verify-console-release -- docs\/releases\/staging\/2026-08-28-owner-quality-lab\.json/, "Linux CI must fetch exact history and verify the committed staging packet");
+forbidMatch("src/engine/worker.ts", engineWorker, /staging-console-release|verify-staging-console-release/, "the inert engine must not wire staging release packets to runtime execution");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION\s*=\s*"0061_shadow_lead_assessment_receipts"/, "the private assessment executor must require the append-only assessment schema");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /Pick<D1Database,\s*"prepare"\s*\|\s*"batch">/, "the private assessment adapter must use the generated narrow D1 binding type");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /FROM "RevenueWorkflowReceiptRevision" receipt[\s\S]*?JOIN "RevenueWorkflowAttemptClosure" closure[\s\S]*?closure\."terminalReceiptId" = receipt\."id"/, "assessment persistence must begin from the exact terminal workflow receipt");

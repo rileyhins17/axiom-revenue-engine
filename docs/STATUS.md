@@ -14,7 +14,9 @@ staging; no rebuild code or migration has been deployed to production. The new
 Quality Lab is now locally verified: Riley can load one exact 50-business review
 packet, inspect the evidence and five separate scores, label leads Strong, Weak,
 or Wrong, and export a resumable checkpoint without changing qualification,
-contacting anyone, or spending money.
+contacting anyone, or spending money. That exact build now has a verified,
+tamper-evident isolated-staging release packet, but it has not been deployed;
+Linux CI and a separate owner approval remain required.
 
 ## Verified checkpoint
 
@@ -143,6 +145,11 @@ contacting anyone, or spending money.
 - Owner Quality Lab checkpoint: the branch HEAD containing this status entry;
   previous verified checkpoint
   `3bcd8eef36b386187c7eb72803515b65269bf71d`.
+- Isolated-staging console release-packet checkpoint: the branch HEAD containing
+  this status entry. The prepared packet targets exact pushed candidate
+  `cfd3cb24945b86de77d2b730d54f92f2b91532fb` with packet digest
+  `a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9`;
+  deployment approval and Linux CI remain pending.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1274,6 +1281,30 @@ Completed gates:
   provider, mailbox, prospect, staging/production resource, deployment, secret,
   or paid runtime was touched. Spend impact is C$0 and all autonomous capabilities
   remain off.
+- The exact current Leads, dossier, and Quality Lab candidate now has a
+  content-addressed isolated-staging release packet. It binds the pushed commit,
+  Git tree, 18 scoped source blobs, owner routes/APIs, staging Worker and D1,
+  Browser/assets bindings, existing secret name, rollback deployment, local
+  verification receipts, approval state, and packet digest. Reordering or
+  changing any bound value changes the digest; source drift, a wrong target,
+  untracked packet, non-ancestor candidate, or added authority fails verification.
+- The packet is explicitly `PREPARED_NOT_APPROVED`: deployment, migration,
+  engine release, provider use, external website access, mailbox/prospect action,
+  and spend authority are all false or zero. It requires the exact separate
+  phrase `DEPLOY AXIOM REVENUE ENGINE CONSOLE TO ISOLATED STAGING` after exact-head
+  Linux CI passes. A packet is evidence for a decision, not deployment permission.
+- Release-packet verification is green locally: fail-closed safety, 453/453
+  tests, typecheck, zero-warning lint, the secret-sanitized Cloudflare build,
+  default console no-upload dry run, and isolated-staging no-upload dry run all
+  passed. The staging dry run exposed only the isolated D1, Browser Rendering,
+  assets, and fail-closed variables; every autonomous switch and intake/send cap
+  was off or zero. The final browser gate passed six desktop/mobile WCAG views,
+  made zero external requests, loaded the list in 1,151 ms, and loaded the
+  evidence dossier in 2,323 ms. Linux CI is intentionally still pending until
+  this checkpoint is pushed; no staging smoke test can run before a deployment.
+- No Cloudflare upload, deployment, migration, provider request, website fetch,
+  mailbox sync, prospect action, secret change, or paid operation occurred.
+  Spend impact is C$0; production and staging automation remain stopped.
 
 Still required for Phase 1:
 
@@ -1343,12 +1374,16 @@ before approval.
   downstream authority.
 - No new product decision is required for the verified Quality Lab. Publishing
   it to isolated staging remains a separate release-gated deployment decision.
+- No decision was required to prepare and verify the content-bound staging
+  packet. After the packet commit's Linux CI passes, Riley or Aidan may either
+  provide its exact staging-only approval phrase or leave the existing staging
+  version unchanged. No other wording grants deployment authority.
 
 ## Next three actions
 
-1. Assemble the exact isolated-staging release packet for the current Leads,
-   dossier, and quality-review build; do not deploy it until the separate
-   staging release gate is explicitly approved.
+1. Verify exact-head Linux CI for the release-packet commit and record its run
+   ID. If it passes, present the packet digest and staging-only approval choice
+   to Riley or Aidan; do not deploy without the packet's exact phrase.
 2. Populate the ignored ten-business manifest only after Riley or Aidan reviews
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any

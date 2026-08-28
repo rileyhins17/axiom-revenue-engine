@@ -32,6 +32,7 @@
     "cf:engine:typegen:check": "wrangler types --config wrangler.engine.jsonc --env-file wrangler.typegen.env --env-interface RevenueEngineEnv ./src/engine/worker-env.d.ts --check",
     "cf:engine:dev": "wrangler dev --config wrangler.engine.jsonc --local --env-file wrangler.typegen.env",
     "cf:engine:dry-run": "wrangler deploy --config wrangler.engine.jsonc --dry-run --autoconfig false",
+    "staging:verify-console-release": "tsx scripts/verify-staging-console-release.ts",
     "kw:prepare-import": "tsx scripts/prepare-private-kw-import.ts",
     "kw:plan-persistence": "tsx scripts/plan-private-kw-persistence.ts",
     "kw:prepare-shadow-slice": "tsx scripts/prepare-private-kw-shadow-slice.ts",

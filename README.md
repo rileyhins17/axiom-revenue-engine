@@ -56,6 +56,15 @@ exact packet digest. The screen cannot read or write D1, call a provider, change
 qualification or consent, contact a business, send, deploy, or spend. It has not
 been published to staging.
 
+The first isolated-staging console release packet is committed at
+`docs/releases/staging/2026-08-28-owner-quality-lab.json`. It binds the already
+tested Quality Lab commit, exact owner UI/API blobs, isolated staging resources,
+local checks, and the currently deployed rollback version. Verify it with
+`npm run staging:verify-console-release -- docs/releases/staging/2026-08-28-owner-quality-lab.json`.
+The packet explicitly leaves Linux CI, owner approval, deployment, and staging
+smoke checks pending and grants zero migration, provider, mailbox, prospect, or
+spend authority.
+
 That writer accepts only an exact sealed website-evidence receipt and persists
 the website snapshot, every evidence claim, a conservative qualification, and
 one assessment receipt through a single D1 batch. Exact retries write nothing;

@@ -20,6 +20,12 @@
   binds source, sealed assessment, contact materialization, discovery,
   verification, reviewer, and approval lineage under one outer atomic
   transaction, without live providers, consent inference, outreach, or spend.
+- Added a content-addressed isolated-staging console release packet for the
+  Leads list, evidence dossier, and Quality Lab. It binds the exact tested commit,
+  scoped Git blobs, staging D1/Worker bindings, local checks, and rollback
+  version while leaving Linux CI, owner approval, deployment, and smoke checks
+  pending. Packet verification is Git-only and grants no migration, provider,
+  mailbox, prospect, or spend authority.
 - Replaced the owner dossier browser fixture's loose contact SQL with the proven
   local contact executor. The acceptance gate now requires a completion receipt,
   exact reload, mutation-free replay, and exact phone/form/email rendering while

@@ -43,6 +43,41 @@
 - Reconcile lead, send, reply, suppression, opportunity, client, and cost totals.
 - Keep legacy tables/resources through the 30-day stability window.
 
+## Prepare an isolated staging console release
+
+This procedure identifies one exact candidate for the existing isolated console.
+It does not deploy it.
+
+1. Confirm the candidate is already committed, pushed, and locally release-gated.
+2. Run the explicit staging no-upload check:
+
+   ```powershell
+   npx wrangler deploy --env staging --dry-run --autoconfig false
+   ```
+
+   Confirm it names only `axiom-revenue-engine-staging`, Browser, assets, the
+   staging URL, and fail-closed zero/off variables. Stop on a production D1,
+   service, queue, cron, provider secret, or nonzero autonomous cap.
+3. Assemble a committed content-addressed packet under
+   `docs/releases/staging/`. It must bind the exact commit/tree/source blobs,
+   target resources, local checks, prior staging version, rollback action, and
+   every remaining gate. Its authority block stays false/zero.
+4. Verify the packet from local Git objects:
+
+   ```powershell
+   npm run staging:verify-console-release -- docs/releases/staging/<packet>.json
+   ```
+
+5. Push the packet and require Linux CI to verify the same committed candidate.
+6. Stop. A later deployment requires Riley's or Aidan's separate exact approval
+   phrase `DEPLOY AXIOM REVENUE ENGINE CONSOLE TO ISOLATED STAGING`, bound to the
+   packet digest. Do not infer approval from the packet, this runbook, prior chat,
+   implementation approval, or a green CI run.
+
+This gate excludes migrations, R2, the engine Worker, Workflows, Queues,
+providers, external website capture, real-business data, mailboxes, prospect
+contact, and spend.
+
 ## Runtime budget response
 
 - At 70% of C$50: warn Riley and show the largest cost drivers.

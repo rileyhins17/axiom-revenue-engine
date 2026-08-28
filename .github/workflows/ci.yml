@@ -22,6 +22,8 @@ jobs:
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -36,6 +38,9 @@ jobs:
 
       - name: Verify fail-closed configuration
         run: npm run check:safety
+
+      - name: Verify exact isolated-staging console packet
+        run: npm run staging:verify-console-release -- docs/releases/staging/2026-08-28-owner-quality-lab.json
 
       # Wrangler evaluates the custom OpenNext build before checking bindings,
       # so this step also proves the production Cloudflare build.
