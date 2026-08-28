@@ -80,6 +80,9 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
 
 const failures = [];
 const ownerUiAcceptance = await readFile(new URL("./verify-owner-ui-acceptance.ts", import.meta.url), "utf8");
+const privateKwOwnerLabeling = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-labeling.ts", import.meta.url), "utf8");
+const privateKwOwnerLabelingPrepareCli = await readFile(new URL("./prepare-private-kw-owner-labeling.ts", import.meta.url), "utf8");
+const privateKwOwnerLabelingRecordCli = await readFile(new URL("./record-private-kw-owner-labels.ts", import.meta.url), "utf8");
 const stagingMarker = '"staging": {';
 const stagingIndex = wrangler.indexOf(stagingMarker);
 const staging = stagingIndex >= 0 ? wrangler.slice(stagingIndex) : "";
@@ -439,6 +442,25 @@ requireMatch("scripts/persist-private-kw-contacts.ts", privateKwContactInvocatio
 requireMatch("scripts/persist-private-kw-contacts.ts", privateKwContactInvocationCli, /loadExactPrivateKwLeadAssessment\(database, review\.draft\.assessment\)/, "reviewed contact persistence must re-derive exact assessment lineage inside the transaction");
 forbidMatch("scripts/persist-private-kw-contacts.ts", privateKwContactInvocationCli, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|wrangler|migrations apply|\.put\s*\(|\.delete\s*\(/i, "reviewed contact persistence must remain local and provider/deployment-free");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-contact-invocation|private-kw-contact-prerequisites|prepare-private-kw-contact-review|persist-private-kw-contacts/, "the inert engine must not wire reviewed local contact invocation to runtime");
+requireMatch("package.json", packageJson, /"kw:prepare-owner-labeling"\s*:\s*"tsx scripts\/prepare-private-kw-owner-labeling\.ts"/, "the ignored-local owner-labeling preparation command must remain explicit");
+requireMatch("package.json", packageJson, /"kw:record-owner-labels"\s*:\s*"tsx scripts\/record-private-kw-owner-labels\.ts"/, "the immutable owner-label checkpoint command must remain explicit");
+for (const field of ["databaseMutationAuthorized", "sourceMutationAuthorized", "assessmentMutationAuthorized", "qualificationAuthorized", "consentDecisionAuthorized", "outreachAuthorized", "sendAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-owner-labeling.ts", privateKwOwnerLabeling, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in owner-labeling contracts`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-owner-labeling.ts", privateKwOwnerLabeling, /parentPacketId:\s*packet\.packetId/, "owner labels must create a resumable immutable checkpoint chain");
+requireMatch("src/lib/revenue-engine/private-kw-owner-labeling.ts", privateKwOwnerLabeling, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "owner labeling must authorize zero provider operations");
+requireMatch("src/lib/revenue-engine/private-kw-owner-labeling.ts", privateKwOwnerLabeling, /costAuthorizedUsd:\s*z\.literal\(0\)/, "owner labeling must authorize zero provider cost");
+forbidMatch("src/lib/revenue-engine/private-kw-owner-labeling.ts", privateKwOwnerLabeling, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|Database|fetch\s*\(|\.prepare\s*\(|\.run\s*\(|\.batch\s*\(|\.put\s*\(|\.delete\s*\(/, "owner-labeling composition must remain pure and provider-free");
+requireMatch("scripts/prepare-private-kw-owner-labeling.ts", privateKwOwnerLabelingPrepareCli, /readonly:\s*true/, "owner-labeling preparation must open the local database read-only");
+requireMatch("scripts/prepare-private-kw-owner-labeling.ts", privateKwOwnerLabelingPrepareCli, /assertCanonicalPrivateKwRevenueSchema\(database\)/, "owner-labeling preparation must verify the complete canonical schema");
+requireMatch("scripts/prepare-private-kw-owner-labeling.ts", privateKwOwnerLabelingPrepareCli, /loadExactPrivateKwLeadAssessment\(database/, "owner-labeling preparation must reconstruct exact persisted assessment lineage");
+requireMatch("scripts/prepare-private-kw-owner-labeling.ts", privateKwOwnerLabelingPrepareCli, /assertCompletePrivateKwOwnerLabelingCohort\(source\.records\.length, rows\.length\)/, "owner decisions must wait for the fixed 50-business cohort and one exact assessment per business");
+requireMatch("scripts/prepare-private-kw-owner-labeling.ts", privateKwOwnerLabelingPrepareCli, /writePrivateKwJson\(files\.output, packet\)/, "owner-labeling preparation must use guarded no-overwrite ignored output");
+forbidMatch("scripts/prepare-private-kw-owner-labeling.ts", privateKwOwnerLabelingPrepareCli, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.run\s*\(|\.transaction\s*\(|wrangler|migrations apply/i, "owner-labeling preparation must remain SELECT-only, local, provider-free, and deployment-free");
+requireMatch("scripts/record-private-kw-owner-labels.ts", privateKwOwnerLabelingRecordCli, /applyPrivateKwOwnerLabels\(packet, submission\)/, "owner-label recording must revalidate and content-bind the exact checkpoint");
+requireMatch("scripts/record-private-kw-owner-labels.ts", privateKwOwnerLabelingRecordCli, /writePrivateKwJson\(files\.output, next\)/, "owner-label recording must create a no-overwrite ignored checkpoint");
+forbidMatch("scripts/record-private-kw-owner-labels.ts", privateKwOwnerLabelingRecordCli, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|Database|fetch\s*\(|\.prepare\s*\(|\.run\s*\(|\.batch\s*\(|\.put\s*\(|\.delete\s*\(/, "owner-label recording must not access a database, runtime, provider, or network");
+forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-owner-labeling|prepare-private-kw-owner-labeling|record-private-kw-owner-labels/, "the inert engine must not wire owner labeling to runtime");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION\s*=\s*"0061_shadow_lead_assessment_receipts"/, "the private assessment executor must require the append-only assessment schema");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /Pick<D1Database,\s*"prepare"\s*\|\s*"batch">/, "the private assessment adapter must use the generated narrow D1 binding type");
 requireMatch("src/lib/revenue-engine/lead-assessment-d1.ts", leadAssessmentD1, /FROM "RevenueWorkflowReceiptRevision" receipt[\s\S]*?JOIN "RevenueWorkflowAttemptClosure" closure[\s\S]*?closure\."terminalReceiptId" = receipt\."id"/, "assessment persistence must begin from the exact terminal workflow receipt");

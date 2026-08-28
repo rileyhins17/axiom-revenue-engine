@@ -133,6 +133,9 @@ staging; no rebuild code or migration has been deployed to production.
 - Owner contact-review dossier checkpoint: the branch HEAD containing this
   status entry; previous verified checkpoint
   `07a78dd73d8afddefcbdebd113c77dc64e20d85f`.
+- Resumable owner-labelling checkpoint: the branch HEAD containing this status
+  entry; previous verified checkpoint
+  `9b74b4e00f87c0feca3c06a2bd29b5bced92a3e6`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1207,6 +1210,31 @@ Completed gates:
 - No prospect, external website, provider, mailbox, remote database, staging or
   production resource, deployment, secret, or paid runtime was touched. Spend
   impact is C$0, and every automation/sending capability remains stopped.
+- The 50-lead quality gate now has a resumable ignored-local owner workflow. A
+  read-only command reconstructs every selected current assessment from its
+  exact sealed receipt, verifies the complete migration-0054–0067 schema and
+  source materialization, refuses partial or changing cohorts, and produces an
+  owner-readable checkpoint bound to the exact 50-business source plan,
+  assessments, engine policy, evidence, and five scores.
+- Riley or Aidan can label a partial batch Strong, Weak, or Wrong with one or
+  more controlled reasons and an optional note. Recording produces a new
+  content-derived packet that names its parent; it never overwrites or mutates
+  an earlier checkpoint. Packet drift, invented or duplicate leads, predating,
+  and attempts to relabel a completed entry fail closed, allowing another Codex
+  task to resume from the latest exact file without relying on chat history.
+- Owner-labelling verification passed fail-closed safety, 442/442 tests,
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build, and the
+  explicit console plus inert-engine no-upload dry runs. Engine binding types
+  also remain deterministic. The unchanged console type-generation recheck and
+  optional owner-browser rerun later exhausted the Windows host's available
+  memory after repeated OpenNext builds; the required release commands had
+  already passed, no UI/runtime file changed, and the preceding owner-dossier
+  checkpoint retains its green four-view browser evidence. Linux CI remains the
+  clean-host verification after push.
+- No real evaluation lead or review was created; progress remains 0/50. No
+  database write, external website, provider, mailbox, prospect, remote
+  database, staging/production resource, deployment, secret, or paid runtime
+  was touched. Spend impact is C$0 and every autonomous capability remains off.
 
 Still required for Phase 1:
 
@@ -1270,15 +1298,19 @@ before approval.
 - No new owner decision was required for the read-only contact-review dossier.
   Publishing this new build to isolated staging remains a separate release-gated
   deployment and was not inferred from implementation approval.
+- No new owner decision was required to build the resumable owner-labelling
+  framework. Using it with actual businesses requires current assessed records
+  and Riley or Aidan's explicit labels and reasons; those reviews grant no
+  downstream authority.
 
 ## Next three actions
 
-1. Prepare the first 50-lead owner-labelling workflow so Riley's strong/weak/wrong
-   decisions and reasons can become the measured quality baseline without
+1. Build the owner-first evaluation screen on the immutable labelling contract
+   so Riley can choose Strong/Weak/Wrong and a reason without handling JSON or
    enabling acquisition, providers, outreach, or send.
-2. Assemble the exact isolated-staging release packet for the current Leads and
-   dossier build; do not deploy it until the separate staging release gate is
-   explicitly approved.
+2. Assemble the exact isolated-staging release packet for the current Leads,
+   dossier, and quality-review build; do not deploy it until the separate
+   staging release gate is explicitly approved.
 3. Populate the ignored ten-business manifest only after Riley or Aidan reviews
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any

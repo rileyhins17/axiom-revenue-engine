@@ -8,8 +8,9 @@ landscaping. This teaches the engine what Axiom considers a genuinely worthwhile
 opportunity. It is a one-time launch gate, not a weekly chore.
 
 The current progress is **0 of 50 real leads loaded**. The repository now has the
-validated format and scoring gate; real lead records will stay in the private
-database or ignored local evaluation storage, not in Git documentation.
+validated format, scoring gate, and resumable owner-labelling checkpoint; real
+lead records will stay in the private database or ignored local evaluation
+storage, not in Git documentation.
 
 ## Safe private loading
 
@@ -77,7 +78,7 @@ one record; Riley does not need to hand-author JSON. The command is:
 npm run kw:execute-assessment -- --source-plan data/kw-evaluation/plan.json --invocation data/kw-evaluation/assessment.json --database data/kw-evaluation/shadow.sqlite
 ```
 
-It requires migrations 0054–0063, every exact source row, and the exact terminal
+It requires migrations 0054–0067, every exact source row, and the exact terminal
 sealed website-evidence receipt to already exist in that local file. It rechecks
 all alternate identities and rejects missing, changed, or multiple matches. The
 approval binds one candidate, one receipt, the reviewed scoring evidence, and a
@@ -85,6 +86,40 @@ current timestamp. A successful run creates only immutable website/evidence,
 qualification, and assessment rows; reachability remains zero and the route is
 `RESEARCH`. It cannot load source/workflow data, discover contacts, use
 Cloudflare, call a provider, spend money, or contact anyone.
+
+## Resumable owner labelling
+
+After all 50 selected businesses have current assessment receipts in the ignored
+local database, Codex can prepare Riley's review packet with:
+
+```powershell
+npm run kw:prepare-owner-labeling -- --source-plan data/kw-evaluation/plan.json --database data/kw-evaluation/shadow.sqlite --output data/kw-evaluation/owner-labeling.json
+```
+
+The command opens the database read-only, reconstructs each current assessment
+from its exact sealed receipt, and binds the result to the source-plan and
+assessment contents. The output shows the business, city, niche, website audit,
+five visible scores, engine label, evidence, and current review status. It never
+changes the database, a score, qualification, consent, outreach, sending, a
+provider, or spend. It refuses to begin review with fewer or more than the fixed
+50 businesses, or when even one current exact assessment is missing, so later
+cohort growth cannot invalidate completed labels.
+
+Riley can review any convenient batch instead of finishing all 50 in one sitting.
+Codex will normally prepare a separate `owner-reviews.json` file that identifies
+the exact packet, contains Strong/Weak/Wrong choices, at least one reason per
+choice, and an optional note. Record that batch as a new checkpoint with:
+
+```powershell
+npm run kw:record-owner-labels -- --packet data/kw-evaluation/owner-labeling.json --reviews data/kw-evaluation/owner-reviews.json --output data/kw-evaluation/owner-labeling-next.json
+```
+
+Never overwrite the prior packet. Every output names its parent and has a new
+content-derived identity, so a future Codex task resumes from the latest file
+without rebuilding chat history. Changed packets, duplicate decisions, unknown
+leads, attempts to relabel a completed entry, and reviews dated before the packet
+all fail closed. This is the durable file workflow; the owner-facing app screen
+will use the same contract in a later UI milestone.
 
 ## What Riley will do
 
@@ -97,7 +132,7 @@ and the proof behind every finding. Riley chooses one label:
   or another hard mismatch.
 
 Riley then chooses at least one short reason. A note is optional. No email is
-sent from this screen.
+sent from this review.
 
 ## Passing gate
 

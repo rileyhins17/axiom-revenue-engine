@@ -181,6 +181,44 @@ The commands cannot contact a prospect, call a provider, spend, send, deploy, or
 touch a remote database. A future live provider and CASL decision require
 separate owner, privacy, budget, and release gates.
 
+## Resumable KW owner-labelling checkpoint
+
+This procedure records Riley's Strong/Weak/Wrong lead-quality decisions without
+changing the private database or enabling any pipeline action.
+
+1. Keep the exact source plan, existing local SQLite database, current labelling
+   packet, review submission, and next packet as distinct direct children of
+   ignored `data/kw-evaluation/` storage.
+2. Confirm the database has canonical migrations 0054–0067 and contains the
+   exact 50-business source cohort plus one sealed current assessment receipt for
+   every business. The command refuses a partial cohort so completed labels can
+   never be invalidated by adding leads later.
+3. Prepare a no-overwrite packet from the read-only database:
+
+   ```powershell
+   npm run kw:prepare-owner-labeling -- --source-plan data/kw-evaluation/plan.json --database data/kw-evaluation/shadow.sqlite --output data/kw-evaluation/owner-labeling.json
+   ```
+
+4. Review its business identity, evidence, audit, engine label, and five separate
+   scores. Create a separate submission bound to the exact packet ID and digest,
+   choose `STRONG`, `WEAK`, or `WRONG`, provide at least one allowed reason, and
+   add an optional note. Partial batches are allowed.
+5. Record the batch into a different no-overwrite checkpoint:
+
+   ```powershell
+   npm run kw:record-owner-labels -- --packet data/kw-evaluation/owner-labeling.json --reviews data/kw-evaluation/owner-reviews.json --output data/kw-evaluation/owner-labeling-next.json
+   ```
+
+6. Confirm the new packet names the prior packet as its parent and the reviewed,
+   agreement, balance, and gate counts are correct. Use this new packet as the
+   input for the next review batch; never edit or overwrite an older checkpoint.
+7. Stop on source, assessment, packet, digest, timestamp, identity, or decision
+   drift. Do not repair the checkpoint by hand.
+
+Both commands are ignored-local only. They authorize no database mutation,
+provider or network operation, acquisition, qualification change, consent
+decision, outreach, sending, deployment, remote database, or spend.
+
 ## Weekly owner review (30 minutes)
 
 1. Handle qualified replies and overdue opportunities.

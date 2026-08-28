@@ -435,6 +435,19 @@ The second command persists only the reviewed fixture bundle and final lineage
 receipt. It does not perform live discovery or verification, infer CASL consent,
 change a lead score, or authorize outreach.
 
+Current assessed KW leads can also be assembled into a resumable, owner-readable
+quality checkpoint after the fixed 50-business cohort has one exact current
+assessment per business, with
+`npm run kw:prepare-owner-labeling -- --source-plan data/kw-evaluation/plan.json --database data/kw-evaluation/shadow.sqlite --output data/kw-evaluation/owner-labeling.json`.
+Riley's exact Strong/Weak/Wrong decisions can then be recorded in a new immutable
+parent-linked file with
+`npm run kw:record-owner-labels -- --packet data/kw-evaluation/owner-labeling.json --reviews data/kw-evaluation/owner-reviews.json --output data/kw-evaluation/owner-labeling-next.json`.
+This allows partial review batches to survive a lost task or exhausted model
+quota without editing the database or granting acquisition, provider,
+qualification, consent, outreach, send, deployment, or spend authority. Real
+evaluation progress remains 0/50 until actual businesses are assessed and Riley
+reviews them.
+
 Legacy resource identifiers are kept only where needed for safe migration. They
 must not be renamed in place or retired until reconciliation, rollback, and the
 30-day stability gate are complete.
