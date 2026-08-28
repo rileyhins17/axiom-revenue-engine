@@ -756,6 +756,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Why this is a strong lead" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Website evidence" }).waitFor();
+    await page.getByRole("heading", { level: 2, name: "Contact review not recorded" }).waitFor();
     await page.getByText("+15195550123", { exact: true }).waitFor();
     await page.getByText("https://roofing.axiomfixtures.ca/contact", { exact: true }).waitFor();
     await page.getByText("hello@roofing.axiomfixtures.ca", { exact: true }).waitFor();
@@ -781,6 +782,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     stage = "mobile dossier";
     await page.getByRole("link", { name: /Open evidence dossier/i }).first().click();
     await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
+    await page.getByRole("heading", { level: 2, name: "Contact review not recorded" }).waitFor();
     await assertWcag(page, "mobile dossier");
     await assertReadOnlyOwnerSurface(page, "mobile dossier");
     await assertResponsive(page, "mobile dossier");

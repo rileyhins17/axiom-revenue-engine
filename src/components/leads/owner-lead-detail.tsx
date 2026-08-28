@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Building2,
+  ClipboardCheck,
   Clock3,
   ExternalLink,
   FileCode2,
@@ -219,6 +220,7 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
 
       <WebsiteEvidence data={data} />
       <Reachability data={data} />
+      <ContactReviewSection data={data} />
       <HistorySection data={data} />
 
       <section aria-label="Dossier provenance" className="grid gap-3 rounded-2xl border border-white/[0.08] bg-[#0e1014] p-4 text-xs text-zinc-500 sm:grid-cols-3 sm:p-5">
@@ -408,6 +410,106 @@ function Reachability({ data }: { data: OwnerLeadDetailResponse }) {
       {data.ignoredRouteRows > 0 ? (
         <p role="status" className="mt-3 text-[10px] leading-4 text-amber-100/65">{data.ignoredRouteRows} malformed route {data.ignoredRouteRows === 1 ? "record was" : "records were"} omitted.</p>
       ) : null}
+    </section>
+  );
+}
+
+function ContactReviewSection({ data }: { data: OwnerLeadDetailResponse }) {
+  const review = data.contactReview;
+  if (review.state === "NOT_RECORDED") {
+    return (
+      <section aria-labelledby="contact-review" className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.035] p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-amber-300/15 bg-amber-300/[0.05]">
+            <ClipboardCheck className="size-4 text-amber-200" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-200">Owner checkpoint</p>
+            <h2 id="contact-review" className="mt-1 text-lg font-semibold text-white">Contact review not recorded</h2>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-amber-100/70">
+              These routes can be inspected, but the Revenue Engine cannot claim Riley or Aidan reviewed this exact contact packet. Keep it in research until a signed local review receipt exists.
+            </p>
+          </div>
+        </div>
+        <p className="mt-4 rounded-xl border border-white/[0.07] bg-black/20 p-3 text-[11px] leading-5 text-zinc-500">
+          Consent is unassessed. This screen cannot approve qualification, outreach, or sending.
+        </p>
+      </section>
+    );
+  }
+
+  const stale = review.state === "STALE_ASSESSMENT";
+  const reviewer = readableCode(review.reviewedBy);
+  const routeBreakdown = [
+    `${review.summary.emailReviewRoutes} email review`,
+    `${review.summary.manualRoutes} manual`,
+    `${review.summary.researchRoutes} research`,
+  ].join(" · ");
+  return (
+    <section aria-labelledby="contact-review" className={cn(
+      "rounded-2xl border p-4 sm:p-5",
+      stale ? "border-amber-300/18 bg-amber-300/[0.035]" : "border-emerald-300/15 bg-emerald-300/[0.025]",
+    )}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className={cn(
+            "grid size-9 shrink-0 place-items-center rounded-xl border",
+            stale ? "border-amber-300/15 bg-amber-300/[0.05]" : "border-emerald-300/15 bg-emerald-300/[0.05]",
+          )}>
+            <ClipboardCheck className={cn("size-4", stale ? "text-amber-200" : "text-emerald-200")} aria-hidden="true" />
+          </div>
+          <div>
+            <p className={cn("text-[10px] font-semibold uppercase tracking-[0.16em]", stale ? "text-amber-200" : "text-emerald-300")}>Owner checkpoint</p>
+            <h2 id="contact-review" className="mt-1 text-lg font-semibold text-white">Reviewed contact evidence</h2>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-zinc-500">
+              {reviewer} reviewed this exact evidence packet on {formatDateTime(review.reviewedAt)} and approved storing its contact records locally.
+            </p>
+          </div>
+        </div>
+        <span className={cn(
+          "w-fit rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.13em]",
+          stale
+            ? "border-amber-300/20 bg-amber-300/[0.06] text-amber-100"
+            : "border-emerald-300/20 bg-emerald-300/[0.06] text-emerald-200",
+        )}>
+          {stale ? "Older than current assessment" : "Matches current assessment"}
+        </span>
+      </div>
+
+      {stale ? (
+        <p role="status" className="mt-4 rounded-xl border border-amber-300/15 bg-black/20 p-3 text-[11px] leading-5 text-amber-100/75">
+          The website audit or lead score changed after this review. The stored review remains traceable, but it does not approve the current assessment.
+        </p>
+      ) : null}
+
+      <dl className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {[
+          ["Candidates reviewed", review.summary.candidates],
+          ["Verification checks", review.summary.verificationResults],
+          ["Usable routes", review.summary.usableRoutes],
+          ["Assessment", readableCode(review.assessment.classification)],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
+            <dt className="text-[9px] font-semibold uppercase tracking-[0.13em] text-zinc-600">{label}</dt>
+            <dd className="mt-2 text-sm font-semibold text-zinc-200">{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.6fr)]">
+        <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-zinc-600">Why it was approved for local storage</p>
+          <p className="mt-2 text-xs leading-5 text-zinc-300">{review.rationale}</p>
+        </div>
+        <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-zinc-600">Route outcome</p>
+          <p className="mt-2 text-xs leading-5 text-zinc-300">{routeBreakdown}</p>
+        </div>
+      </div>
+
+      <p className="mt-3 rounded-xl border border-rose-300/15 bg-rose-300/[0.035] p-3 text-[11px] leading-5 text-rose-100/75">
+        Consent is still unassessed. This review authorized local contact storage only—not qualification, outreach, sending, provider use, or spend.
+      </p>
     </section>
   );
 }

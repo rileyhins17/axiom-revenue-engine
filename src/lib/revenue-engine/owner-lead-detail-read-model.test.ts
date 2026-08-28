@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import Database from "better-sqlite3";
@@ -7,6 +7,7 @@ import Database from "better-sqlite3";
 import type { D1DatabaseLike, D1PreparedStatementLike } from "@/lib/cloudflare";
 import {
   OWNER_LEAD_DETAIL_QUERY,
+  OWNER_LEAD_CONTACT_REVIEW_QUERY,
   OWNER_LEAD_HISTORY_QUERY,
   OWNER_LEAD_HISTORY_LIMIT,
   readOwnerLeadDetail,
@@ -195,7 +196,7 @@ function fakeDatabase(resultSets: unknown[][]) {
 }
 
 test("detail reader returns exact evidence, all current routes, and honest v2 history scope", async () => {
-  const fake = fakeDatabase([[validCandidate()], [validPhone()], historyRows()]);
+  const fake = fakeDatabase([[validCandidate()], [validPhone()], [], historyRows()]);
   const result = await readOwnerLeadDetail(fake.database, "business:one", GENERATED_AT);
 
   assert(result);
@@ -206,6 +207,20 @@ test("detail reader returns exact evidence, all current routes, and honest v2 hi
   assert.equal(result.routes.length, 1);
   assert.equal(result.routes[0]?.recommended, true);
   assert.equal(result.routes[0]?.readiness, "CURRENT_USABLE");
+  assert.deepEqual(result.contactReview, {
+    state: "NOT_RECORDED",
+    consentBasis: "UNASSESSED",
+    authority: {
+      reviewOnly: true,
+      localStorageOnly: true,
+      consentDecisionAuthorized: false,
+      qualificationAuthorized: false,
+      outreachAuthorized: false,
+      sendAuthorized: false,
+      providerOperationsAuthorized: 0,
+      costAuthorizedUsd: 0,
+    },
+  });
   assert.equal(result.history.events.length, 4);
   assert.equal(result.history.scope, "V2_SHADOW_ONLY");
   assert.deepEqual(result.history.unavailable.map((item) => item.area), ["OUTREACH", "REPLIES", "OPPORTUNITIES", "CLIENTS"]);
@@ -217,10 +232,11 @@ test("detail reader returns exact evidence, all current routes, and honest v2 hi
     providerOperationsAuthorized: 0,
     costAuthorizedUsd: 0,
   });
-  assert.equal(fake.queries.length, 3);
+  assert.equal(fake.queries.length, 4);
   assert(fake.queries.every((query) => /^\s*SELECT\b/i.test(query)));
   assert.deepEqual(fake.bindings[0], ["business:one"]);
-  assert.deepEqual(fake.bindings[2], [
+  assert.deepEqual(fake.bindings[2], ["business:one"]);
+  assert.deepEqual(fake.bindings[3], [
     "business:one",
     "business:one",
     "business:one",
@@ -256,22 +272,30 @@ test("detail reader validates identity before querying and keeps every query bou
 
   assert.match(OWNER_LEAD_DETAIL_QUERY, /WHERE business\."id" = \?/);
   assert.match(OWNER_LEAD_DETAIL_QUERY, /LIMIT 1/);
+  assert.match(OWNER_LEAD_CONTACT_REVIEW_QUERY, /WHERE receipt\."businessId" = \?/);
+  assert.match(OWNER_LEAD_CONTACT_REVIEW_QUERY, /LIMIT 1/);
   assert.match(OWNER_LEAD_HISTORY_QUERY, /LIMIT \?/);
   assert.equal((OWNER_LEAD_HISTORY_QUERY.match(/\?/g) ?? []).length, 6);
   assert.doesNotMatch(
-    `${OWNER_LEAD_DETAIL_QUERY}\n${OWNER_LEAD_HISTORY_QUERY}`,
+    `${OWNER_LEAD_DETAIL_QUERY}\n${OWNER_LEAD_CONTACT_REVIEW_QUERY}\n${OWNER_LEAD_HISTORY_QUERY}`,
     /\b(?:INSERT|UPDATE|DELETE|REPLACE|DROP|ALTER|CREATE)\b/i,
   );
 });
 
-test("detail and history SELECT contracts compile against the real v2 shadow migration", () => {
+test("detail, contact-review, and history SELECT contracts compile against the complete v2 migration chain", () => {
   const database = new Database(":memory:");
   try {
-    database.exec(readFileSync(
-      new URL("../../../migrations/0054_revenue_shadow_kernel.sql", import.meta.url),
-      "utf8",
-    ));
+    const migrationsUrl = new URL("../../../migrations/", import.meta.url);
+    const migrations = readdirSync(migrationsUrl)
+      .filter((name) => /^00(?:5[4-9]|6[0-7])_.*\.sql$/.test(name))
+      .sort((left, right) => left.localeCompare(right, "en-CA"));
+    assert.equal(migrations.at(0)?.startsWith("0054_"), true);
+    assert.equal(migrations.at(-1)?.startsWith("0067_"), true);
+    migrations.forEach((migration) => {
+      database.exec(readFileSync(new URL(migration, migrationsUrl), "utf8"));
+    });
     assert.doesNotThrow(() => database.prepare(OWNER_LEAD_DETAIL_QUERY));
+    assert.doesNotThrow(() => database.prepare(OWNER_LEAD_CONTACT_REVIEW_QUERY));
     assert.doesNotThrow(() => database.prepare(OWNER_LEAD_HISTORY_QUERY));
   } finally {
     database.close();

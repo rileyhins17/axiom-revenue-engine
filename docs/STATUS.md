@@ -130,6 +130,9 @@ staging; no rebuild code or migration has been deployed to production.
 - Bounded ten-business KW shadow-slice checkpoint: the branch HEAD containing
   this status entry; previous verified checkpoint
   `d87c6bbc2b6cc7f50706e6f000cf8165512a851b`.
+- Owner contact-review dossier checkpoint: the branch HEAD containing this
+  status entry; previous verified checkpoint
+  `07a78dd73d8afddefcbdebd113c77dc64e20d85f`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1177,6 +1180,33 @@ Completed gates:
   discovery or verification, consent decision, qualification change, database,
   deployment, mailbox/prospect action, provider operation, secret, or paid
   runtime was touched; production and staging automation remain stopped.
+- The owner dossier now has a plain-language contact-review checkpoint backed
+  by the latest immutable migration-0067 invocation receipt. It says who
+  reviewed the exact packet, when, why local storage was approved, how many
+  candidates/checks/routes were supported, and whether the receipt still matches
+  the current website audit and qualification snapshot.
+- A missing receipt is labelled `Contact review not recorded`; an older receipt
+  is labelled as stale instead of approving the current assessment. The reader
+  validates the complete content-derived invocation JSON and its source,
+  assessment, discovery, materialization, reviewer, and zero-authority lineage.
+  Malformed or tampered proof fails the dossier closed.
+- The UI keeps consent explicitly unassessed and explains that a contact review
+  authorized local record storage only—not qualification, outreach, sending,
+  provider use, or spend. The page remains read-only with no button, form,
+  `mailto:`, or `tel:` action.
+- Owner contact-review local release verification is green: fail-closed safety,
+  434/434 tests, typecheck, zero-warning lint, deterministic console and engine
+  bindings, the secret-sanitized Cloudflare build, and explicit console plus
+  inert-engine no-upload dry runs passed. The final owner browser rerun passed
+  four desktop/mobile WCAG scans, made zero external requests, and met the owner
+  budgets with 1,162 ms list readiness and 2,443 ms dossier readiness. Its first
+  warmup hit the already documented generated-asset `SyntaxError`; the immediate
+  clean rerun passed after every build/dry-run process had exited. The console
+  dry run emitted only the already documented generated duplicate-`options`
+  warnings.
+- No prospect, external website, provider, mailbox, remote database, staging or
+  production resource, deployment, secret, or paid runtime was touched. Spend
+  impact is C$0, and every automation/sending capability remains stopped.
 
 Still required for Phase 1:
 
@@ -1237,15 +1267,18 @@ before approval.
   review the exact identities, independence, market, niche, and source evidence;
   any live source, Browser, R2, or verification-provider use remains a separate
   privacy/budget decision.
+- No new owner decision was required for the read-only contact-review dossier.
+  Publishing this new build to isolated staging remains a separate release-gated
+  deployment and was not inferred from implementation approval.
 
 ## Next three actions
 
-1. Add an owner-readable, read-only contact-review section to the dossier from
-   the persisted invocation receipt, then make the latest Leads/dossier build
-   available in isolated staging only after its release gate is approved.
-2. Prepare the first 50-lead owner-labelling workflow so Riley's strong/weak/wrong
+1. Prepare the first 50-lead owner-labelling workflow so Riley's strong/weak/wrong
    decisions and reasons can become the measured quality baseline without
    enabling acquisition, providers, outreach, or send.
+2. Assemble the exact isolated-staging release packet for the current Leads and
+   dossier build; do not deploy it until the separate staging release gate is
+   explicitly approved.
 3. Populate the ignored ten-business manifest only after Riley or Aidan reviews
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any

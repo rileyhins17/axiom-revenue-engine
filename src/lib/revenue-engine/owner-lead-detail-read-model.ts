@@ -17,10 +17,14 @@ import {
   parseOwnerLeadJson,
 } from "@/lib/revenue-engine/owner-lead-read-model";
 import { OwnerLeadBusinessIdSchema } from "@/lib/revenue-engine/owner-lead-identity";
+import {
+  PrivateKwContactInvocationSchema,
+  privateKwContactInvocationCanonicalJson,
+} from "@/lib/revenue-engine/private-kw-contact-invocation";
 import { normalizePublicWebsiteUrl } from "@/lib/revenue-engine/public-website-url";
 import { DeterministicWebsiteAuditResultSchema } from "@/lib/revenue-engine/website-audit";
 
-export const OWNER_LEAD_DETAIL_READ_MODEL_VERSION = "owner-lead-detail-read-model-v1";
+export const OWNER_LEAD_DETAIL_READ_MODEL_VERSION = "owner-lead-detail-read-model-v2";
 export const OWNER_LEAD_HISTORY_LIMIT = 100;
 
 const TimestampSchema = z.string().datetime({ offset: true });
@@ -91,6 +95,93 @@ const UnavailableHistorySchema = z.object({
   reason: z.string().trim().min(1).max(240),
 }).strict();
 
+const ContactReviewAuthoritySchema = z.object({
+  reviewOnly: z.literal(true),
+  localStorageOnly: z.literal(true),
+  consentDecisionAuthorized: z.literal(false),
+  qualificationAuthorized: z.literal(false),
+  outreachAuthorized: z.literal(false),
+  sendAuthorized: z.literal(false),
+  providerOperationsAuthorized: z.literal(0),
+  costAuthorizedUsd: z.literal(0),
+}).strict();
+
+const MissingContactReviewSchema = z.object({
+  state: z.literal("NOT_RECORDED"),
+  consentBasis: z.literal("UNASSESSED"),
+  authority: ContactReviewAuthoritySchema,
+}).strict();
+
+const RecordedContactReviewSchema = z.object({
+  state: z.enum(["CURRENT", "STALE_ASSESSMENT"]),
+  invocationId: z.string().regex(/^kw-contact-invocation:[a-f0-9]{64}$/),
+  reviewId: z.string().regex(/^kw-contact-review:[a-f0-9]{64}$/),
+  reviewedBy: z.enum(["RILEY", "AIDAN"]),
+  reviewedAt: TimestampSchema,
+  rationale: z.string().trim().min(1).max(1_000),
+  decision: z.literal("APPROVED_FOR_LOCAL_CONTACT_PERSISTENCE"),
+  consentBasis: z.literal("UNASSESSED"),
+  assessment: z.object({
+    receiptId: z.string().regex(/^assessment:[a-f0-9]{64}$/),
+    websiteSnapshotId: z.string().regex(/^website:[a-f0-9]{64}$/),
+    qualificationSnapshotId: z.string().regex(/^qualification:[a-f0-9]{64}$/),
+    classification: z.enum(["REBUILD", "NO_SITE_NEW_BUILD", "MINOR_IMPROVEMENT", "NO_OPPORTUNITY"]),
+  }).strict(),
+  summary: z.object({
+    candidates: z.number().int().min(0).max(25),
+    verificationResults: z.number().int().min(0).max(25),
+    usableRoutes: z.number().int().min(0).max(25),
+    emailReviewRoutes: z.number().int().min(0).max(25),
+    manualRoutes: z.number().int().min(0).max(25),
+    researchRoutes: z.number().int().min(0).max(25),
+  }).strict(),
+  lineage: z.object({
+    materializationReceiptId: z.string().regex(/^kw-contact-persistence:[a-f0-9]{64}$/),
+    discoveryReceiptId: z.string().regex(/^contact-discovery-result:[a-f0-9]{64}$/),
+  }).strict(),
+  authority: ContactReviewAuthoritySchema,
+}).strict();
+
+const OwnerContactReviewSchema = z.discriminatedUnion("state", [
+  MissingContactReviewSchema,
+  RecordedContactReviewSchema,
+]);
+
+const ContactReviewReceiptRowSchema = z.object({
+  invocationId: z.string().regex(/^kw-contact-invocation:[a-f0-9]{64}$/),
+  invocationVersion: z.literal("kw-private-contact-invocation-v1"),
+  invocationDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  reviewId: z.string().regex(/^kw-contact-review:[a-f0-9]{64}$/),
+  reviewDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  sourcePlanDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  businessId: z.string().trim().min(1).max(80),
+  assessmentReceiptId: z.string().regex(/^assessment:[a-f0-9]{64}$/),
+  assessmentDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  materializationReceiptId: z.string().regex(/^kw-contact-persistence:[a-f0-9]{64}$/),
+  discoveryReceiptId: z.string().regex(/^contact-discovery-result:[a-f0-9]{64}$/),
+  invocationJson: z.string().min(2),
+  reviewedBy: z.enum(["RILEY", "AIDAN"]),
+  recordedAt: TimestampSchema,
+  executionKind: z.literal("IGNORED_LOCAL_SQLITE"),
+  localOnly: z.literal(1),
+  localContactMutationAuthorized: z.literal(1),
+  localVerificationMutationAuthorized: z.literal(1),
+  localInvocationReceiptAuthorized: z.literal(1),
+  sourceMutationAuthorized: z.literal(0),
+  workflowMutationAuthorized: z.literal(0),
+  assessmentMutationAuthorized: z.literal(0),
+  schemaMutationAuthorized: z.literal(0),
+  captureAuthorized: z.literal(0),
+  contactDiscoveryExecutionAuthorized: z.literal(0),
+  contactVerificationExecutionAuthorized: z.literal(0),
+  consentDecisionAuthorized: z.literal(0),
+  qualificationAuthorized: z.literal(0),
+  outreachAuthorized: z.literal(0),
+  sendAuthorized: z.literal(0),
+  providerOperationsAuthorized: z.literal(0),
+  costAuthorizedUsd: z.literal(0),
+}).strict();
+
 export const OwnerLeadDetailResponseSchema = z.object({
   readModelVersion: z.literal(OWNER_LEAD_DETAIL_READ_MODEL_VERSION),
   generatedAt: TimestampSchema,
@@ -124,6 +215,7 @@ export const OwnerLeadDetailResponseSchema = z.object({
   }).strict(),
   routes: z.array(DetailContactSchema).max(100),
   ignoredRouteRows: z.number().int().nonnegative(),
+  contactReview: OwnerContactReviewSchema,
   history: z.object({
     scope: z.literal("V2_SHADOW_ONLY"),
     events: z.array(HistoryEventSchema).max(OWNER_LEAD_HISTORY_LIMIT),
@@ -141,6 +233,45 @@ export const OwnerLeadDetailResponseSchema = z.object({
 }).strict();
 
 export type OwnerLeadDetailResponse = z.infer<typeof OwnerLeadDetailResponseSchema>;
+
+export const OWNER_LEAD_CONTACT_REVIEW_QUERY = `
+SELECT
+  receipt."id" AS "invocationId",
+  receipt."invocationVersion" AS "invocationVersion",
+  receipt."invocationDigest" AS "invocationDigest",
+  receipt."reviewId" AS "reviewId",
+  receipt."reviewDigest" AS "reviewDigest",
+  receipt."sourcePlanDigest" AS "sourcePlanDigest",
+  receipt."businessId" AS "businessId",
+  receipt."assessmentReceiptId" AS "assessmentReceiptId",
+  receipt."assessmentDigest" AS "assessmentDigest",
+  receipt."materializationReceiptId" AS "materializationReceiptId",
+  receipt."discoveryReceiptId" AS "discoveryReceiptId",
+  receipt."invocationJson" AS "invocationJson",
+  receipt."reviewedBy" AS "reviewedBy",
+  receipt."recordedAt" AS "recordedAt",
+  receipt."executionKind" AS "executionKind",
+  receipt."localOnly" AS "localOnly",
+  receipt."localContactMutationAuthorized" AS "localContactMutationAuthorized",
+  receipt."localVerificationMutationAuthorized" AS "localVerificationMutationAuthorized",
+  receipt."localInvocationReceiptAuthorized" AS "localInvocationReceiptAuthorized",
+  receipt."sourceMutationAuthorized" AS "sourceMutationAuthorized",
+  receipt."workflowMutationAuthorized" AS "workflowMutationAuthorized",
+  receipt."assessmentMutationAuthorized" AS "assessmentMutationAuthorized",
+  receipt."schemaMutationAuthorized" AS "schemaMutationAuthorized",
+  receipt."captureAuthorized" AS "captureAuthorized",
+  receipt."contactDiscoveryExecutionAuthorized" AS "contactDiscoveryExecutionAuthorized",
+  receipt."contactVerificationExecutionAuthorized" AS "contactVerificationExecutionAuthorized",
+  receipt."consentDecisionAuthorized" AS "consentDecisionAuthorized",
+  receipt."qualificationAuthorized" AS "qualificationAuthorized",
+  receipt."outreachAuthorized" AS "outreachAuthorized",
+  receipt."sendAuthorized" AS "sendAuthorized",
+  receipt."providerOperationsAuthorized" AS "providerOperationsAuthorized",
+  receipt."costAuthorizedUsd" AS "costAuthorizedUsd"
+FROM "RevenuePrivateKwContactInvocationReceipt" receipt
+WHERE receipt."businessId" = ?
+ORDER BY receipt."recordedAt" DESC, receipt."id" DESC
+LIMIT 1`;
 
 export const OWNER_LEAD_DETAIL_QUERY = `
 SELECT
@@ -400,6 +531,127 @@ function assertSnapshotMatchesAudit(
   }
 }
 
+const CONTACT_REVIEW_AUTHORITY = {
+  reviewOnly: true as const,
+  localStorageOnly: true as const,
+  consentDecisionAuthorized: false as const,
+  qualificationAuthorized: false as const,
+  outreachAuthorized: false as const,
+  sendAuthorized: false as const,
+  providerOperationsAuthorized: 0 as const,
+  costAuthorizedUsd: 0 as const,
+};
+
+function sameCanonicalValue(left: unknown, right: unknown) {
+  return privateKwContactInvocationCanonicalJson(left)
+    === privateKwContactInvocationCanonicalJson(right);
+}
+
+function assertContactInvocationLineage(
+  row: z.infer<typeof ContactReviewReceiptRowSchema>,
+  invocation: z.infer<typeof PrivateKwContactInvocationSchema>,
+) {
+  const review = invocation.review;
+  const persistenceApproval = invocation.approval.persistenceApproval;
+  const reviewedApproval = persistenceApproval.approval;
+  if (
+    row.invocationId !== invocation.invocationId
+    || row.invocationVersion !== invocation.invocationVersion
+    || row.invocationDigest !== invocation.invocationDigest
+    || row.reviewId !== invocation.reviewId
+    || row.reviewDigest !== invocation.reviewDigest
+    || row.sourcePlanDigest !== invocation.sourcePlanDigest
+    || row.businessId !== invocation.businessId
+    || row.assessmentReceiptId !== invocation.assessment.assessmentReceiptId
+    || row.assessmentDigest !== invocation.assessment.assessmentDigest
+    || row.materializationReceiptId !== invocation.contactMaterializationId
+    || row.discoveryReceiptId !== review.discovery.discoveryResultId
+    || row.reviewedBy !== reviewedApproval.reviewedBy
+    || row.recordedAt !== reviewedApproval.reviewedAt
+    || row.executionKind !== invocation.authority.executionKind
+    || review.reviewId !== invocation.reviewId
+    || review.reviewDigest !== invocation.reviewDigest
+    || review.sourceImportId !== invocation.sourceImportId
+    || review.sourcePlanDigest !== invocation.sourcePlanDigest
+    || review.business.id !== invocation.businessId
+    || review.draft.businessId !== invocation.businessId
+    || review.draft.sourceImportId !== invocation.sourceImportId
+    || review.draft.sourcePlanDigest !== invocation.sourcePlanDigest
+    || persistenceApproval.businessId !== invocation.businessId
+    || persistenceApproval.discoveryResultId !== review.discovery.discoveryResultId
+    || persistenceApproval.discoveryResultDigest !== review.discovery.discoveryResultDigest
+    || invocation.approval.reviewId !== invocation.reviewId
+    || invocation.approval.reviewDigest !== invocation.reviewDigest
+    || invocation.approval.sourcePlanDigest !== invocation.sourcePlanDigest
+    || invocation.approval.businessId !== invocation.businessId
+    || review.assessment.assessmentReceiptId !== invocation.assessment.assessmentReceiptId
+    || review.assessment.assessmentDigest !== invocation.assessment.assessmentDigest
+    || review.assessment.workflowReceiptId !== invocation.assessment.workflowReceiptId
+    || review.assessment.websiteSnapshotId !== invocation.assessment.websiteSnapshotId
+    || review.assessment.qualificationSnapshotId !== invocation.assessment.qualificationSnapshotId
+    || !sameCanonicalValue(review.draft.assessment, invocation.assessment)
+    || !sameCanonicalValue(invocation.approval.assessment, invocation.assessment)
+  ) {
+    throw new Error("The persisted contact-review receipt does not bind one exact reviewed packet and lineage.");
+  }
+}
+
+export function projectOwnerContactReview(
+  value: unknown,
+  current: Readonly<{
+    businessId: string;
+    websiteSnapshotId: string;
+    qualificationSnapshotId: string;
+  }>,
+) {
+  if (value === null || value === undefined) {
+    return MissingContactReviewSchema.parse({
+      state: "NOT_RECORDED",
+      consentBasis: "UNASSESSED",
+      authority: CONTACT_REVIEW_AUTHORITY,
+    });
+  }
+  const row = ContactReviewReceiptRowSchema.parse(value);
+  if (row.businessId !== current.businessId) {
+    throw new Error("The contact-review lookup returned the wrong business identity.");
+  }
+  const invocation = PrivateKwContactInvocationSchema.parse(parseOwnerLeadJson(row.invocationJson));
+  assertContactInvocationLineage(row, invocation);
+  const approval = invocation.approval.persistenceApproval.approval;
+  const isCurrent = invocation.assessment.websiteSnapshotId === current.websiteSnapshotId
+    && invocation.assessment.qualificationSnapshotId === current.qualificationSnapshotId;
+
+  return RecordedContactReviewSchema.parse({
+    state: isCurrent ? "CURRENT" : "STALE_ASSESSMENT",
+    invocationId: invocation.invocationId,
+    reviewId: invocation.reviewId,
+    reviewedBy: approval.reviewedBy,
+    reviewedAt: approval.reviewedAt,
+    rationale: approval.rationale,
+    decision: approval.decision,
+    consentBasis: invocation.review.summary.consentBasis,
+    assessment: {
+      receiptId: invocation.assessment.assessmentReceiptId,
+      websiteSnapshotId: invocation.assessment.websiteSnapshotId,
+      qualificationSnapshotId: invocation.assessment.qualificationSnapshotId,
+      classification: invocation.review.assessment.classification,
+    },
+    summary: {
+      candidates: invocation.review.summary.candidates,
+      verificationResults: invocation.review.summary.verificationResults,
+      usableRoutes: invocation.review.summary.usableRoutes,
+      emailReviewRoutes: invocation.review.summary.emailReviewRoutes,
+      manualRoutes: invocation.review.summary.manualRoutes,
+      researchRoutes: invocation.review.summary.researchRoutes,
+    },
+    lineage: {
+      materializationReceiptId: row.materializationReceiptId,
+      discoveryReceiptId: row.discoveryReceiptId,
+    },
+    authority: CONTACT_REVIEW_AUTHORITY,
+  });
+}
+
 export async function readOwnerLeadDetail(
   database: D1DatabaseLike,
   businessId: string,
@@ -460,6 +712,22 @@ export async function readOwnerLeadDetail(
       });
     });
 
+  const contactReviewResult = await database
+    .prepare(OWNER_LEAD_CONTACT_REVIEW_QUERY)
+    .bind(exactBusinessId)
+    .all<unknown>();
+  if ((contactReviewResult.results?.length ?? 0) > 1) {
+    throw new Error("The contact-review lookup returned more than one bounded receipt.");
+  }
+  const contactReview = projectOwnerContactReview(
+    contactReviewResult.results?.[0] ?? null,
+    {
+      businessId: exactBusinessId,
+      websiteSnapshotId: candidate.websiteSnapshotId,
+      qualificationSnapshotId: candidate.qualificationSnapshotId,
+    },
+  );
+
   const historyResult = await database
     .prepare(OWNER_LEAD_HISTORY_QUERY)
     .bind(
@@ -518,6 +786,7 @@ export async function readOwnerLeadDetail(
     },
     routes,
     ignoredRouteRows,
+    contactReview,
     history: {
       scope: "V2_SHADOW_ONLY",
       events: historyRows,

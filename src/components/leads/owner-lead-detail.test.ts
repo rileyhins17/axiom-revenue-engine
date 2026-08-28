@@ -199,6 +199,44 @@ function fixtureDetail(): OwnerLeadDetailResponse {
       readiness: "UNVERIFIED",
     }],
     ignoredRouteRows: 0,
+    contactReview: {
+      state: "CURRENT",
+      invocationId: `kw-contact-invocation:${"a".repeat(64)}`,
+      reviewId: `kw-contact-review:${"b".repeat(64)}`,
+      reviewedBy: "RILEY",
+      reviewedAt: "2026-08-24T16:00:00.000Z",
+      rationale: "The published phone and general email were supported by the exact synthetic evidence packet.",
+      decision: "APPROVED_FOR_LOCAL_CONTACT_PERSISTENCE",
+      consentBasis: "UNASSESSED",
+      assessment: {
+        receiptId: `assessment:${"c".repeat(64)}`,
+        websiteSnapshotId: `website:${"d".repeat(64)}`,
+        qualificationSnapshotId: `qualification:${"e".repeat(64)}`,
+        classification: "REBUILD",
+      },
+      summary: {
+        candidates: 2,
+        verificationResults: 2,
+        usableRoutes: 1,
+        emailReviewRoutes: 1,
+        manualRoutes: 1,
+        researchRoutes: 0,
+      },
+      lineage: {
+        materializationReceiptId: `kw-contact-persistence:${"f".repeat(64)}`,
+        discoveryReceiptId: `contact-discovery-result:${"1".repeat(64)}`,
+      },
+      authority: {
+        reviewOnly: true,
+        localStorageOnly: true,
+        consentDecisionAuthorized: false,
+        qualificationAuthorized: false,
+        outreachAuthorized: false,
+        sendAuthorized: false,
+        providerOperationsAuthorized: 0,
+        costAuthorizedUsd: 0,
+      },
+    },
     history: {
       scope: "V2_SHADOW_ONLY",
       events: [{
@@ -264,6 +302,11 @@ test("lead dossier renders an owner-first decision, evidence, routes, and factua
   assert.match(html, /\+15195550123/);
   assert.match(html, /hello@roofing\.example/);
   assert.match(html, /Not verified/);
+  assert.match(html, /Reviewed contact evidence/);
+  assert.match(html, /Matches current assessment/);
+  assert.match(html, /Riley reviewed this exact evidence packet/);
+  assert.match(html, /Consent is still unassessed/);
+  assert.match(html, /local contact storage only/i);
   assert.match(html, /Evidence and decision history/);
   assert.match(html, /Outreach/);
   assert.match(html, /Replies/);
@@ -273,6 +316,43 @@ test("lead dossier renders an owner-first decision, evidence, routes, and factua
   assert.doesNotMatch(html, /<button|<form|mailto:|tel:/);
   assert.doesNotMatch(html, />Send</);
   assert.doesNotMatch(html, />Approve</);
+});
+
+test("lead dossier labels an absent owner contact review instead of implying approval", () => {
+  const detail = fixtureDetail();
+  detail.contactReview = {
+    state: "NOT_RECORDED",
+    consentBasis: "UNASSESSED",
+    authority: {
+      reviewOnly: true,
+      localStorageOnly: true,
+      consentDecisionAuthorized: false,
+      qualificationAuthorized: false,
+      outreachAuthorized: false,
+      sendAuthorized: false,
+      providerOperationsAuthorized: 0,
+      costAuthorizedUsd: 0,
+    },
+  };
+  const html = renderToStaticMarkup(createElement(OwnerLeadDetail, { data: detail }));
+
+  assert.match(html, /Contact review not recorded/);
+  assert.match(html, /cannot claim Riley or Aidan reviewed this exact contact packet/);
+  assert.match(html, /Consent is unassessed/);
+  assert.doesNotMatch(html, /Matches current assessment/);
+});
+
+test("lead dossier keeps an older contact review visible without approving the current assessment", () => {
+  const detail = fixtureDetail();
+  assert.notEqual(detail.contactReview.state, "NOT_RECORDED");
+  if (detail.contactReview.state === "NOT_RECORDED") return;
+  detail.contactReview = { ...detail.contactReview, state: "STALE_ASSESSMENT" };
+  const html = renderToStaticMarkup(createElement(OwnerLeadDetail, { data: detail }));
+
+  assert.match(html, /Older than current assessment/);
+  assert.match(html, /website audit or lead score changed after this review/i);
+  assert.match(html, /does not approve the current assessment/i);
+  assert.doesNotMatch(html, /Matches current assessment/);
 });
 
 test("lead dossier makes every evidence link inspectable while contact values stay inert", () => {

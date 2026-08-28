@@ -43,6 +43,10 @@ import {
   RevenueLeadAssessmentSchema,
   type RevenueLeadAssessment,
 } from "../src/lib/revenue-engine/lead-assessment";
+import {
+  OWNER_LEAD_CONTACT_REVIEW_QUERY,
+  projectOwnerContactReview,
+} from "../src/lib/revenue-engine/owner-lead-detail-read-model";
 import { executePrivateKwAssessmentFile } from "./execute-private-kw-assessment";
 import { materializePrivateKwSourceWorkflowFile } from "./materialize-private-kw-source-workflow";
 import {
@@ -527,6 +531,46 @@ test("prepares a read-only assessed contact review, then persists it only with a
       ).get() as { invocationJson: string }).invocationJson;
       const storedInvocation = JSON.parse(invocationJson) as Record<string, unknown>;
       assert.deepEqual(storedInvocation.review, review);
+      const ownerReceiptRow = verificationDatabase
+        .prepare(OWNER_LEAD_CONTACT_REVIEW_QUERY)
+        .get(selected.business.id) as Record<string, unknown>;
+      const ownerContactReview = projectOwnerContactReview(
+        ownerReceiptRow,
+        {
+          businessId: selected.business.id,
+          websiteSnapshotId: assessment.websiteSnapshotId,
+          qualificationSnapshotId: assessment.qualificationSnapshotId,
+        },
+      );
+      assert.equal(ownerContactReview.state, "CURRENT");
+      assert.equal(ownerContactReview.reviewedBy, "RILEY");
+      assert.equal(ownerContactReview.consentBasis, "UNASSESSED");
+      assert.equal(ownerContactReview.summary.usableRoutes, 1);
+      assert.equal(ownerContactReview.summary.emailReviewRoutes, 1);
+      assert.equal(ownerContactReview.authority.outreachAuthorized, false);
+      assert.equal(ownerContactReview.authority.sendAuthorized, false);
+      const staleOwnerContactReview = projectOwnerContactReview(ownerReceiptRow, {
+        businessId: selected.business.id,
+        websiteSnapshotId: assessment.websiteSnapshotId,
+        qualificationSnapshotId: `qualification:${"f".repeat(64)}`,
+      });
+      assert.equal(staleOwnerContactReview.state, "STALE_ASSESSMENT");
+      const tamperedOwnerInvocation = JSON.parse(ownerReceiptRow.invocationJson as string) as Record<string, unknown>;
+      (tamperedOwnerInvocation.review as Record<string, unknown>).summary = {
+        ...(tamperedOwnerInvocation.review as Record<string, unknown>).summary as Record<string, unknown>,
+        usableRoutes: 25,
+      };
+      assert.throws(
+        () => projectOwnerContactReview(
+          { ...ownerReceiptRow, invocationJson: JSON.stringify(tamperedOwnerInvocation) },
+          {
+            businessId: selected.business.id,
+            websiteSnapshotId: assessment.websiteSnapshotId,
+            qualificationSnapshotId: assessment.qualificationSnapshotId,
+          },
+        ),
+        /identity must bind|reviewed packet and lineage/i,
+      );
       const missingAuthorityRow = verificationDatabase.prepare(
         `SELECT * FROM "RevenuePrivateKwContactInvocationReceipt"`,
       ).get() as Record<string, unknown>;

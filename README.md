@@ -115,7 +115,13 @@ Each ranked business now opens a read-only dossier at `/leads/[businessId]`.
 The dossier keeps the five quality scores separate; groups current audit findings
 as critical, important, or minor; shows the exact recorded contact routes and why
 one is recommended; and builds a bounded factual timeline from v2 source, audit,
-qualification, contact, and verification records. Opaque desktop, mobile, and DOM
+qualification, contact, and verification records. It also reads the latest
+immutable contact-invocation receipt and says, in plain language, whether Riley
+or Aidan reviewed the exact current contact packet, what was approved for local
+storage, and whether a later audit or score made that review stale. Missing or
+invalid review proof is never presented as approval, consent remains explicitly
+unassessed, and the section cannot trigger qualification, outreach, sending,
+provider use, or spend. Opaque desktop, mobile, and DOM
 artifact references are labelled as reference-only until private evidence storage
 is activated. Outreach, reply, opportunity, and client history are explicitly
 shown as unavailable when they do not exist in v2—legacy data is never guessed or
