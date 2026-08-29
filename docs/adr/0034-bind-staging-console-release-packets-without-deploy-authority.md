@@ -46,7 +46,9 @@ A local verifier checks the packet digest and every Git object using argument-sa
 
 1. [x] Add the strict packet contract, digest, scoped Git verifier, and tests.
 2. [x] Assemble the first Quality Lab staging candidate packet.
-3. [ ] Record exact Linux CI evidence against the candidate.
+3. [x] Record exact Linux CI evidence against the candidate: run
+   `33221735787` passed on packet commit
+   `c201122446439914517ea0ec4ce06a94b9cdf8fd`.
 4. [ ] Obtain a separate owner approval bound to the exact packet digest.
 5. [ ] Deploy only the console to isolated staging and perform synthetic smoke
    and rollback-readiness checks.

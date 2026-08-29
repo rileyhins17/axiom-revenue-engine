@@ -16,7 +16,8 @@ packet, inspect the evidence and five separate scores, label leads Strong, Weak,
 or Wrong, and export a resumable checkpoint without changing qualification,
 contacting anyone, or spending money. That exact build now has a verified,
 tamper-evident isolated-staging release packet, but it has not been deployed;
-Linux CI and a separate owner approval remain required.
+exact-head Linux CI is green and only the separate owner deployment approval
+remains required before staging can change.
 
 ## Verified checkpoint
 
@@ -149,7 +150,11 @@ Linux CI and a separate owner approval remain required.
   this status entry. The prepared packet targets exact pushed candidate
   `cfd3cb24945b86de77d2b730d54f92f2b91532fb` with packet digest
   `a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9`;
-  deployment approval and Linux CI remain pending.
+  exact-head Linux CI run `33221735787` passed and deployment approval remains
+  pending.
+- Staging-packet Linux-CI evidence checkpoint: the branch HEAD containing this
+  status entry; previous verified packet commit
+  `c201122446439914517ea0ec4ce06a94b9cdf8fd`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1300,11 +1305,22 @@ Completed gates:
   assets, and fail-closed variables; every autonomous switch and intake/send cap
   was off or zero. The final browser gate passed six desktop/mobile WCAG views,
   made zero external requests, loaded the list in 1,151 ms, and loaded the
-  evidence dossier in 2,323 ms. Linux CI is intentionally still pending until
-  this checkpoint is pushed; no staging smoke test can run before a deployment.
+  evidence dossier in 2,323 ms. Exact-head Linux CI run `33221735787` then
+  passed every step on commit `c201122446439914517ea0ec4ce06a94b9cdf8fd`,
+  including the immutable packet check, deterministic console/engine bindings,
+  all 67 migrations from scratch, 453/453 tests, owner-browser acceptance,
+  typecheck, lint, and both no-upload Worker validations. No staging smoke test
+  can run before a separately approved deployment.
 - No Cloudflare upload, deployment, migration, provider request, website fetch,
   mailbox sync, prospect action, secret change, or paid operation occurred.
   Spend impact is C$0; production and staging automation remain stopped.
+- Recording the terminal Linux-CI result changed documentation only. Its local
+  checkpoint gate also passed fail-closed safety, 453/453 tests, typecheck,
+  zero-warning lint, the secret-sanitized Cloudflare build, and the explicit
+  default-environment no-upload dry run. The final sequential owner-browser
+  acceptance passed six desktop/mobile WCAG views with zero external requests;
+  list readiness was 689 ms and dossier readiness was 2,325 ms. No runtime
+  configuration, release packet, staging resource, or application code changed.
 
 Still required for Phase 1:
 
@@ -1375,15 +1391,18 @@ before approval.
 - No new product decision is required for the verified Quality Lab. Publishing
   it to isolated staging remains a separate release-gated deployment decision.
 - No decision was required to prepare and verify the content-bound staging
-  packet. After the packet commit's Linux CI passes, Riley or Aidan may either
-  provide its exact staging-only approval phrase or leave the existing staging
-  version unchanged. No other wording grants deployment authority.
+  packet. Its exact-head Linux CI run is now green. Riley or Aidan may either
+  provide the exact staging-only approval phrase for packet digest
+  `a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9`
+  or leave the existing staging version unchanged. No other wording grants
+  deployment authority.
 
 ## Next three actions
 
-1. Verify exact-head Linux CI for the release-packet commit and record its run
-   ID. If it passes, present the packet digest and staging-only approval choice
-   to Riley or Aidan; do not deploy without the packet's exact phrase.
+1. Await Riley's or Aidan's exact staging-only approval phrase for packet digest
+   `a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9`.
+   If supplied, create a separate content-bound approval receipt and reverify
+   the packet before any console-only staging deployment.
 2. Populate the ignored ten-business manifest only after Riley or Aidan reviews
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
