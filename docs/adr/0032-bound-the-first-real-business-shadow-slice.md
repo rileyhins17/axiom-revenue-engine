@@ -85,5 +85,6 @@ commercial coverage, and a hard authority boundary. This option was selected.
    stale, independence, and coverage failures with synthetic tests.
 4. [ ] Populate ten real reviewed source records only after the separate private
    research decision; do not scrape or use a paid source implicitly.
-5. [ ] Add receipt-bound per-business progress as each separately approved phase
-   is exercised.
+5. [x] Add immutable, parent-linked, receipt-bound per-business progress. One
+   append records one fixed next phase, exact upstream proof IDs/digests, and the
+   prior business receipt without executing or authorizing that phase.

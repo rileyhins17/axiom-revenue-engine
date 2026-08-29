@@ -70,6 +70,20 @@ approval and receipt. The manifest authorizes no database write, live source,
 Browser Rendering, storage, discovery/verification provider, consent decision,
 qualification, mailbox sync, outreach, deployment, send, or spend.
 
+After a separately approved phase has completed and its authoritative receipts
+have been reloaded and verified, record exactly one business advance into a new
+ignored checkpoint:
+
+```powershell
+npm run kw:record-shadow-progress -- --manifest data/kw-evaluation/shadow-slice-manifest.json --previous data/kw-evaluation/shadow-progress-current.json --receipt data/kw-evaluation/shadow-phase-receipt.json --output data/kw-evaluation/shadow-progress-next.json
+```
+
+Omit `--previous` only for the first receipt in the slice. The command refuses
+phase skipping, an incorrect predecessor, duplicate/reused receipts,
+cross-business evidence, timestamp reversal, tampering, and output overwrite.
+It records proof only and cannot execute a phase or access a database, website,
+provider, mailbox, prospect, deployment, or paid runtime.
+
 The first separately approved assessment executor now exists for an ignored
 local SQLite database only. Codex will prepare the invocation after Riley reviews
 one record; Riley does not need to hand-author JSON. The command is:

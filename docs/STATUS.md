@@ -14,10 +14,13 @@ staging; no rebuild code or migration has been deployed to production. The new
 Quality Lab is now locally verified: Riley can load one exact 50-business review
 packet, inspect the evidence and five separate scores, label leads Strong, Weak,
 or Wrong, and export a resumable checkpoint without changing qualification,
-contacting anyone, or spending money. That exact build now has a verified,
-tamper-evident isolated-staging release packet, but it has not been deployed;
-exact-head Linux CI is green and only the separate owner deployment approval
-remains required before staging can change.
+contacting anyone, or spending money. The first ten-business shadow slice now
+also has an immutable progress ledger: each business advances through one exact
+approved phase at a time and can resume from its last proven receipt after an
+interruption. That exact console build has a verified, tamper-evident
+isolated-staging release packet, but it has not been deployed; exact-head Linux
+CI is green and only the separate owner deployment approval remains required
+before staging can change.
 
 ## Verified checkpoint
 
@@ -155,6 +158,9 @@ remains required before staging can change.
 - Staging-packet Linux-CI evidence checkpoint: the branch HEAD containing this
   status entry; previous verified packet commit
   `c201122446439914517ea0ec4ce06a94b9cdf8fd`.
+- Receipt-bound ten-business progress checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `3ff72df1e7dbf2471906f175b35ffdb94e747282`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1321,6 +1327,32 @@ Completed gates:
   acceptance passed six desktop/mobile WCAG views with zero external requests;
   list readiness was 689 ms and dossier readiness was 2,325 ms. No runtime
   configuration, release packet, staging resource, or application code changed.
+- The ten-business shadow slice now has a content-addressed, parent-linked
+  progress checkpoint for each selected business. It records only five fixed
+  phases—source/workflow materialization, current website evidence, assessment,
+  contact review, and owner dossier acceptance—and derives the next gate from
+  the exact immutable receipt chain rather than an editable status label.
+- Each append advances exactly one business by one phase and binds its manifest,
+  business, candidate, proof receipt ID and digest, supporting receipts,
+  predecessor phase receipt, and completion time. Skipped phases, a wrong
+  predecessor, cross-business proof, reused proof, time reversal, manifest
+  drift, altered summaries, and content tampering all fail closed.
+- A guarded ignored-local command creates the first checkpoint or appends one
+  verified phase receipt to a later checkpoint. Inputs and output must be
+  distinct paths, existing files are never overwritten, and the command has no
+  database, Cloudflare, provider, network, runtime, deployment, acquisition, or
+  contact authority. It records evidence that an already approved phase
+  completed; it cannot execute or approve that phase.
+- Receipt-bound progress verification is green: fail-closed safety, 459/459
+  tests, standalone typecheck, zero-warning lint, the secret-sanitized
+  Cloudflare build, and the explicit default-environment no-upload dry run all
+  pass. The final sequential owner-browser gate passed six desktop/mobile WCAG
+  views with zero external requests; list readiness was 301 ms and dossier
+  readiness was 2,429 ms.
+- No real manifest, business, website evidence, owner decision, or progress
+  record was created. No external website, database, provider, mailbox,
+  prospect, Cloudflare resource, deployment, migration, secret, or paid runtime
+  was touched. Spend impact is C$0 and every autonomous capability remains off.
 
 Still required for Phase 1:
 
@@ -1396,6 +1428,10 @@ before approval.
   `a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9`
   or leave the existing staging version unchanged. No other wording grants
   deployment authority.
+- No new owner decision is required for the receipt-bound shadow progress
+  framework. A real phase can be recorded only after its separate approval,
+  execution, and exact proof receipts already exist; the progress checkpoint
+  grants no downstream authority.
 
 ## Next three actions
 
@@ -1407,9 +1443,10 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Add receipt-bound per-business progress to the ten-business manifest so an
-   interrupted shadow run can resume exact completed phases without replaying
-   work or losing the owner-approved scope.
+3. Build a guarded normalized source/workflow phase-receipt adapter that
+   revalidates the exact materialization and workflow receipts before producing
+   the first progress input; do not execute a workflow, contact a provider, or
+   use live business data.
 
 ## Resume instructions
 

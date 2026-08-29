@@ -61,9 +61,9 @@ The first isolated-staging console release packet is committed at
 tested Quality Lab commit, exact owner UI/API blobs, isolated staging resources,
 local checks, and the currently deployed rollback version. Verify it with
 `npm run staging:verify-console-release -- docs/releases/staging/2026-08-28-owner-quality-lab.json`.
-The packet explicitly leaves Linux CI, owner approval, deployment, and staging
-smoke checks pending and grants zero migration, provider, mailbox, prospect, or
-spend authority.
+Exact packet-commit Linux CI run `33221735787` passed. The packet still leaves
+owner approval, deployment, and staging smoke checks pending and grants zero
+migration, provider, mailbox, prospect, or spend authority.
 
 That writer accepts only an exact sealed website-evidence receipt and persists
 the website snapshot, every evidence claim, a conservative qualification, and
@@ -429,6 +429,11 @@ independent candidates can be sealed into a balanced plan-only manifest with
 The manifest preserves the source checkpoint and five required phase gates, but
 authorizes none of them; it cannot access a database, website, provider, runtime,
 deployment, or prospect.
+Completed work is now recorded beside that immutable manifest as a chain of
+no-overwrite per-business checkpoints. `npm run kw:record-shadow-progress`
+accepts one exact upstream phase receipt at a time, preserves its predecessor and
+prior checkpoint, and advances only that business. It cannot run the phase it
+records, access SQLite/Cloudflare/providers, contact anyone, deploy, or spend.
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

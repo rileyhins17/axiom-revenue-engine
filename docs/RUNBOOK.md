@@ -127,6 +127,36 @@ infer consent, change qualification, deploy, send, or spend. Populate it with
 real records only after the separate private-research decision. Each later phase
 uses its own gate below; never treat this manifest as batch-execution approval.
 
+### Record one completed shadow phase without losing progress
+
+Record progress only after the phase's existing approval, execution, exact
+reload, and receipt verification have succeeded. This command does not perform
+those steps.
+
+1. Keep the immutable manifest, normalized phase-receipt input, previous
+   checkpoint, and next checkpoint as different ignored files.
+2. For the first completed phase, omit `--previous`. For every later append, use
+   the exact latest checkpoint:
+
+   ```powershell
+   npm run kw:record-shadow-progress -- --manifest data/kw-evaluation/shadow-slice-manifest.json --previous data/kw-evaluation/shadow-progress-current.json --receipt data/kw-evaluation/shadow-phase-receipt.json --output data/kw-evaluation/shadow-progress-next.json
+   ```
+
+3. Confirm only the named business advanced one phase and that the output names
+   the previous checkpoint, exact predecessor phase receipt, upstream receipt
+   IDs/digests, current checkpoint, and next separate gate.
+4. Promote the new output to “current” by reference or filename convention; do
+   not overwrite or edit either checkpoint. A later task must resume from the
+   exact latest content-derived checkpoint.
+5. Stop on a skipped phase, wrong predecessor, reused upstream receipt,
+   cross-business evidence, manifest drift, time reversal, digest mismatch, or
+   unknown proof type. Never redigest or hand-repair a failed checkpoint.
+
+The recorder reads and writes bounded ignored JSON only. It cannot inspect or
+mutate a database, validate a provider call, execute Browser Rendering, infer
+consent, change qualification, contact a prospect, deploy, send, or spend. A
+checkpoint proves only that exact already-verified receipts were recorded.
+
 ## Owner-approved local KW materialization and assessment
 
 This procedure is local shadow evaluation only. Source/workflow materialization

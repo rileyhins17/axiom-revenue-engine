@@ -81,6 +81,8 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
 const failures = [];
 const ownerUiAcceptance = await readFile(new URL("./verify-owner-ui-acceptance.ts", import.meta.url), "utf8");
 const privateKwOwnerLabeling = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-labeling.ts", import.meta.url), "utf8");
+const privateKwShadowSliceProgress = await readFile(new URL("../src/lib/revenue-engine/private-kw-shadow-slice-progress.ts", import.meta.url), "utf8");
+const privateKwShadowSliceProgressCli = await readFile(new URL("./record-private-kw-shadow-progress.ts", import.meta.url), "utf8");
 const privateKwOwnerLabelingPrepareCli = await readFile(new URL("./prepare-private-kw-owner-labeling.ts", import.meta.url), "utf8");
 const privateKwOwnerLabelingRecordCli = await readFile(new URL("./record-private-kw-owner-labels.ts", import.meta.url), "utf8");
 const ownerLabelingWorkspace = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-workspace.ts", import.meta.url), "utf8");
@@ -176,6 +178,7 @@ requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /costAu
 requireMatch("package.json", packageJson, /"kw:prepare-import"\s*:\s*"tsx scripts\/prepare-private-kw-import\.ts"/, "the private KW import must use the guarded local CLI");
 requireMatch("package.json", packageJson, /"kw:plan-persistence"\s*:\s*"tsx scripts\/plan-private-kw-persistence\.ts"/, "private persistence planning must use the validation-only CLI");
 requireMatch("package.json", packageJson, /"kw:prepare-shadow-slice"\s*:\s*"tsx scripts\/prepare-private-kw-shadow-slice\.ts"/, "the bounded shadow slice must use the ignored-local plan-only CLI");
+requireMatch("package.json", packageJson, /"kw:record-shadow-progress"\s*:\s*"tsx scripts\/record-private-kw-shadow-progress\.ts"/, "shadow progress must use the guarded ignored-local append-only CLI");
 requireMatch("package.json", packageJson, /"kw:execute-assessment"\s*:\s*"tsx scripts\/execute-private-kw-assessment\.ts"/, "private assessment execution must use the guarded ignored-local CLI");
 requireMatch(".github/workflows/ci.yml", ci, /run:\s*npm run cf:engine:typegen:check/, "CI must verify generated engine bindings");
 requireMatch(".github/workflows/ci.yml", ci, /run:\s*npm run cf:engine:dry-run/, "CI must dry-run the inert engine bundle");
@@ -188,6 +191,8 @@ requireMatch("scripts/private-kw-files.ts", privateKwFiles, /open\(file,\s*"wx"\
 forbidMatch("scripts/prepare-private-kw-import.ts", privateKwCli, /wrangler|--remote|deploy|fetch\s*\(/i, "the private import CLI must not access providers or Cloudflare");
 forbidMatch("scripts/plan-private-kw-persistence.ts", privateKwPersistenceCli, /wrangler|--remote|deploy|fetch\s*\(|better-sqlite3|D1Database/i, "persistence planning must not access a database, provider, or Cloudflare");
 forbidMatch("scripts/prepare-private-kw-shadow-slice.ts", privateKwShadowSliceCli, /wrangler|--remote|\bdeploy\b|fetch\s*\(|better-sqlite3|D1Database|R2Bucket/i, "shadow-slice preparation must not access a database, provider, network, or Cloudflare");
+forbidMatch("scripts/record-private-kw-shadow-progress.ts", privateKwShadowSliceProgressCli, /wrangler|--remote|\bdeploy\b|fetch\s*\(|better-sqlite3|D1Database|R2Bucket|@cloudflare/i, "shadow progress recording must not access a database, provider, network, or Cloudflare");
+requireMatch("scripts/record-private-kw-shadow-progress.ts", privateKwShadowSliceProgressCli, /writePrivateKwJson\(files\.output, checkpoint\)/, "shadow progress must create a new ignored no-overwrite checkpoint");
 requireMatch("src/lib/revenue-engine/private-kw-import.ts", privateKwImport, /costUsd:\s*z\.literal\(0\)/, "private seed imports must have zero provider cost");
 requireMatch("src/lib/revenue-engine/private-kw-import.ts", privateKwImport, /qualificationAuthorized:\s*false/, "private seed imports must not authorize qualification");
 requireMatch("src/lib/revenue-engine/private-kw-import.ts", privateKwImport, /outreachAuthorized:\s*false/, "private seed imports must not authorize outreach");
@@ -204,7 +209,17 @@ for (const field of ["liveSourceAuthorized", "browserCaptureAuthorized", "artifa
 requireMatch("src/lib/revenue-engine/private-kw-shadow-slice.ts", privateKwShadowSlice, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "the shadow-slice manifest must authorize zero provider operations");
 requireMatch("src/lib/revenue-engine/private-kw-shadow-slice.ts", privateKwShadowSlice, /costAuthorizedUsd:\s*z\.literal\(0\)/, "the shadow-slice manifest must authorize zero provider cost");
 forbidMatch("src/lib/revenue-engine/private-kw-shadow-slice.ts", privateKwShadowSlice, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "shadow-slice definition must not access providers, runtime bindings, databases, network, or writes");
+requireMatch("src/lib/revenue-engine/private-kw-shadow-slice-progress.ts", privateKwShadowSliceProgress, /parentCheckpoint:\s*z\.object\(/, "every later shadow progress checkpoint must retain its exact parent");
+requireMatch("src/lib/revenue-engine/private-kw-shadow-slice-progress.ts", privateKwShadowSliceProgress, /previousPhaseReceipt:\s*PhaseReceiptReferenceSchema\.nullable\(\)/, "every later business phase must retain its exact predecessor receipt");
+requireMatch("src/lib/revenue-engine/private-kw-shadow-slice-progress.ts", privateKwShadowSliceProgress, /phaseExecutionAuthorized:\s*z\.literal\(false\)/, "progress records must not authorize phase execution");
+for (const field of ["liveSourceAuthorized", "browserCaptureAuthorized", "artifactStorageAuthorized", "databaseMutationAuthorized", "contactDiscoveryExecutionAuthorized", "contactVerificationExecutionAuthorized", "consentDecisionAuthorized", "qualificationAuthorized", "mailboxSyncAuthorized", "outreachAuthorized", "sendAuthorized", "deploymentAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-shadow-slice-progress.ts", privateKwShadowSliceProgress, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in shadow progress checkpoints`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-shadow-slice-progress.ts", privateKwShadowSliceProgress, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "shadow progress must authorize zero provider operations");
+requireMatch("src/lib/revenue-engine/private-kw-shadow-slice-progress.ts", privateKwShadowSliceProgress, /costAuthorizedUsd:\s*z\.literal\(0\)/, "shadow progress must authorize zero provider cost");
+forbidMatch("src/lib/revenue-engine/private-kw-shadow-slice-progress.ts", privateKwShadowSliceProgress, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "shadow progress definitions must not access providers, runtime bindings, databases, network, or writes");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-shadow-slice/, "the inert engine must not wire the shadow-slice planner to runtime");
+forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-shadow-slice-progress|record-private-kw-shadow-progress/, "the inert engine must not wire shadow progress recording to runtime");
 requireMatch("src/lib/revenue-engine/private-kw-assessment-invocation.ts", privateKwAssessmentInvocation, /localAssessmentMutationAuthorized:\s*z\.literal\(true\)/, "an owner invocation must explicitly authorize only the local assessment write");
 requireMatch("src/lib/revenue-engine/private-kw-assessment-invocation.ts", privateKwAssessmentInvocation, /sourceMutationAuthorized:\s*z\.literal\(false\)/, "owner assessment approval must not authorize source mutation");
 requireMatch("src/lib/revenue-engine/private-kw-assessment-invocation.ts", privateKwAssessmentInvocation, /contactDiscoveryAuthorized:\s*z\.literal\(false\)/, "owner assessment approval must not authorize contact discovery");
