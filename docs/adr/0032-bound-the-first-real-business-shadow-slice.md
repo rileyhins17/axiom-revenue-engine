@@ -92,3 +92,7 @@ commercial coverage, and a hard authority boundary. This option was selected.
    approved materialization, verifies the complete canonical stored row set and
    sealed terminal receipt, and emits the first normalized progress input without
    executing a workflow or mutating SQLite.
+7. [x] Define the content-addressed current-website-evidence proof against the
+   existing fixture workflow, deterministic audit, durable persistence, artifact
+   manifest, and availability contracts. Keep it synthetic-only and require a
+   separate trusted eligibility receipt before any progress append.

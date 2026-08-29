@@ -28,7 +28,7 @@ export const PRIVATE_KW_SHADOW_PROGRESS_PHASES = [
     phase: "CURRENT_WEBSITE_EVIDENCE",
     proofKind: "CURRENT_WEBSITE_EVIDENCE",
     primaryReceiptPattern: /^website-evidence:[a-f0-9]{64}$/,
-    supportingReceiptPatterns: [],
+    supportingReceiptPatterns: [/^website-evidence-eligibility:[a-f0-9]{64}$/],
     completedCheckpoint: "CURRENT_WEBSITE_EVIDENCE_PERSISTED",
     nextRequiredGate: "ASSESSMENT_APPROVAL",
   },

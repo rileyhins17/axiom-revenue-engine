@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-28 (America/Toronto)
+Last updated: 2026-08-29 (America/Toronto)
 
 ## Plain-English status
 
@@ -19,7 +19,10 @@ also has an immutable progress ledger: each business advances through one exact
 approved phase at a time and can resume from its last proven receipt after an
 interruption. Its first source/workflow proof can now be prepared from a
 query-only verification of the exact local receipts instead of being typed by
-hand. That exact console build has a verified, tamper-evident
+hand. The next website-evidence proof is also defined and fail-closed: it proves
+the exact desktop/mobile artifact and audit lineage in synthetic tests, but it
+cannot advance a real business without a separate trusted eligibility receipt
+that does not yet exist. That exact console build has a verified, tamper-evident
 isolated-staging release packet, but it has not been deployed; exact-head Linux
 CI is green and only the separate owner deployment approval remains required
 before staging can change.
@@ -166,6 +169,9 @@ before staging can change.
 - Read-only source/workflow progress-proof checkpoint: the branch HEAD
   containing this status entry; previous verified checkpoint
   `cbfdfd029c6efc5371e06ea073690e64e4bf7d7b`.
+- Synthetic current-website-evidence proof checkpoint: the branch HEAD
+  containing this status entry; previous verified checkpoint
+  `2bdca9c73562fbf386cba1b4c57f699087c93264`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1385,6 +1391,34 @@ Completed gates:
   no staging/production resource, external website, provider, mailbox, prospect,
   secret, migration, deployment, or paid runtime was touched. Spend impact is
   C$0 and every autonomous capability remains off.
+- The `CURRENT_WEBSITE_EVIDENCE` contract now produces one deterministic
+  content-addressed proof only from an exact reviewed manifest business,
+  completed source/workflow predecessor, complete captured fixture workflow,
+  desktop and mobile homepage evidence, ready deterministic audit, durable
+  persistence plan, and the exact full artifact-manifest/availability set.
+- Identity drift, missing or stale artifacts, non-fixture availability,
+  incomplete mobile proof, time reversal, content tampering, and altered
+  authority fail closed. Fixture availability validation now has one reusable
+  public validator; the production R2-winner selector remains stricter and
+  unchanged.
+- The synthetic proof explicitly authorizes no progress append, Browser/R2
+  operation, database mutation, provider work, qualification, outreach,
+  deployment, send, or spend. The progress phase now separately requires a
+  content-addressed `website-evidence-eligibility:*` receipt, and no code creates
+  that trusted receipt yet. This prevents a hand-authored synthetic proof from
+  being mistaken for completion of real website evidence.
+- Focused verification is green: 10/10 proof, progress-chain, and recorder tests
+  pass. The complete checkpoint gate also passes fail-closed safety, 467/467
+  tests, standalone typecheck, zero-warning source lint, the secret-sanitized
+  Cloudflare build, and the explicit default-environment no-upload Wrangler dry
+  run. Wrangler retained only the already documented generated duplicate-key
+  warnings. The final sequential owner-browser gate passed six desktop/mobile
+  WCAG views with zero external requests; list readiness was 741 ms and dossier
+  readiness was 3,330 ms.
+- No Browser Rendering, website fetch, R2 activation/read/write, D1 access,
+  provider call, real business data, progress append, staging/production change,
+  mailbox/prospect action, secret change, deployment, migration, or paid runtime
+  occurred. Spend impact is C$0 and every autonomous capability remains off.
 
 Still required for Phase 1:
 
@@ -1468,6 +1502,10 @@ before approval.
   adapter. Using it with a real business still requires the already separate
   manifest review and source/workflow materialization approval; its output
   grants no phase or downstream authority.
+- No new owner decision is required for the synthetic current-website-evidence
+  proof contract. A real eligibility receipt remains blocked behind the separate
+  privacy/budget decisions for Browser Rendering, R2, and exact durable-state
+  verification; this checkpoint inferred none of those approvals.
 
 ## Next three actions
 
@@ -1479,10 +1517,11 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Define and test the content-addressed `CURRENT_WEBSITE_EVIDENCE` progress
-   proof against the existing durable evidence contracts using synthetic data
-   only; do not run Browser Rendering, activate R2, fetch a live website, or
-   authorize the next phase.
+3. Define and test the immutable `ASSESSMENT` progress proof normalizer against
+   the existing sealed assessment and current-evidence lineage contracts using
+   synthetic data only. Keep it blocked behind the missing trusted website-
+   evidence eligibility receipt; do not mutate D1, assess a real business, or
+   authorize contact work.
 
 ## Resume instructions
 

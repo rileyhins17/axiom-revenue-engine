@@ -149,6 +149,9 @@ function receiptInput(
       supportingReceipts: phase === "SOURCE_WORKFLOW" ? [{
         receiptId: `workflow-receipt:${((seed + 8) % 15 + 1).toString(16).repeat(64)}`,
         receiptDigest: ((seed + 8) % 15 + 1).toString(16).repeat(64),
+      }] : phase === "CURRENT_WEBSITE_EVIDENCE" ? [{
+        receiptId: `website-evidence-eligibility:${((seed + 9) % 15 + 1).toString(16).repeat(64)}`,
+        receiptDigest: ((seed + 9) % 15 + 1).toString(16).repeat(64),
       }] : [],
     },
     previousPhaseReceipt: previous ? {
@@ -264,6 +267,13 @@ test("phase proof type, receipt shape, manifest lineage, and time fail closed", 
 
   const source = appendPrivateKwShadowSliceProgress(manifest, initial, receiptInput(manifest, 0));
   const sourceReceipt = source.records[0].phaseReceipts[0];
+  assert.throws(() => appendPrivateKwShadowSliceProgress(manifest, source, {
+    ...receiptInput(manifest, 0, "CURRENT_WEBSITE_EVIDENCE", sourceReceipt),
+    proof: {
+      ...receiptInput(manifest, 0, "CURRENT_WEBSITE_EVIDENCE", sourceReceipt).proof,
+      supportingReceipts: [],
+    },
+  }), /Supporting receipts/);
   assert.throws(() => appendPrivateKwShadowSliceProgress(manifest, source, {
     ...receiptInput(manifest, 0, "CURRENT_WEBSITE_EVIDENCE", sourceReceipt),
     completedAt: "2026-08-04T14:00:00.000Z",

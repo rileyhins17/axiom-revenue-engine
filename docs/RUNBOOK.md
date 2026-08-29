@@ -177,6 +177,19 @@ mutate a database, validate a provider call, execute Browser Rendering, infer
 consent, change qualification, contact a prospect, deploy, send, or spend. A
 checkpoint proves only that exact already-verified receipts were recorded.
 
+The `CURRENT_WEBSITE_EVIDENCE` proof contract is currently a synthetic-only
+engineering boundary, not an operator command. Its builder can validate the
+exact manifest/predecessor lineage, a complete fixture website workflow,
+desktop and mobile homepage evidence, the deterministic audit, the durable
+persistence plan, every screenshot/measurement manifest, and fresh fixture
+availability observations. Its authority block forbids Browser, R2, database,
+progress, provider, contact, deployment, send, and spend operations. The
+progress recorder additionally requires a separate content-addressed
+`website-evidence-eligibility:*` receipt. No code currently creates that trusted
+receipt, so never hand-author one or use the synthetic proof to advance a real
+business. Live capture, R2 activation/HEAD reads, persistence verification, and
+eligibility remain separate future approvals and implementations.
+
 ## Owner-approved local KW materialization and assessment
 
 This procedure is local shadow evaluation only. Source/workflow materialization

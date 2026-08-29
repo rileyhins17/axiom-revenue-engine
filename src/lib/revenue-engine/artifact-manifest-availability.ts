@@ -157,11 +157,14 @@ export function createArtifactManifestAvailabilityReceipt(value: {
   return ArtifactManifestAvailabilityReceiptSchema.parse({ ...core, receiptDigest: artifactReferenceDigest(core) });
 }
 
-function validateReceiptAgainstManifest(
-  receipt: ArtifactManifestAvailabilityReceipt,
-  manifest: ArtifactManifest,
-  snapshotCapturedAt: string,
-) {
+export function validateArtifactManifestAvailabilityAgainstManifest(value: {
+  receipt: unknown;
+  manifest: unknown;
+  snapshotCapturedAt: string;
+}) {
+  const receipt = ArtifactManifestAvailabilityReceiptSchema.parse(value.receipt);
+  const manifest = ArtifactManifestSchema.parse(value.manifest);
+  const snapshotCapturedAt = TimestampSchema.parse(value.snapshotCapturedAt);
   if (receipt.manifestId !== manifest.manifestId || receipt.manifestDigest !== artifactManifestDigest(manifest)) {
     throw new Error(`Availability receipt ${receipt.receiptId} does not bind manifest ${manifest.manifestId}.`);
   }
@@ -197,6 +200,7 @@ function validateReceiptAgainstManifest(
   if (receipt.expiresAt && Date.parse(receipt.validThrough) > Date.parse(receipt.expiresAt)) {
     throw new Error(`Availability receipt ${receipt.receiptId} claims validity beyond object expiry.`);
   }
+  return receipt;
 }
 
 export function selectFreshR2ManifestAvailability(value: {
@@ -229,8 +233,11 @@ export function selectFreshR2ManifestAvailability(value: {
     if (winner.checkerKind !== "R2_HEAD" || !winner.providerReadPerformed || winner.state !== "VERIFIED_PRESENT") {
       throw new Error(`Manifest ${manifest.manifestId} lacks one fresh verified R2 HEAD winner.`);
     }
-    validateReceiptAgainstManifest(winner, manifest, value.snapshotCapturedAt);
-    return winner;
+    return validateArtifactManifestAvailabilityAgainstManifest({
+      receipt: winner,
+      manifest,
+      snapshotCapturedAt: value.snapshotCapturedAt,
+    });
   }).sort((left, right) => left.manifestId.localeCompare(right.manifestId, "en-CA"));
 
   return {

@@ -24,8 +24,10 @@ export function createPrivateKwShadowSourceWorkflowFixture(options: {
   suffix?: string;
   now?: Date;
   materializationRecordIndex?: number;
+  selectedWebsiteUrl?: string | null;
 } = {}) {
   const suffix = options.suffix ?? "unit";
+  const materializationRecordIndex = options.materializationRecordIndex ?? 0;
   const nowMs = (options.now ?? new Date("2026-08-28T16:00:00.000Z")).getTime();
   const at = (minutesBefore: number) => new Date(nowMs - minutesBefore * 60_000).toISOString();
   const sourceCapturedAt = at(6);
@@ -51,7 +53,7 @@ export function createPrivateKwShadowSourceWorkflowFixture(options: {
       region: "ON" as const,
       country: "CA" as const,
       niche: NICHES[index % NICHES.length],
-      websiteUrl: null,
+      websiteUrl: index === materializationRecordIndex ? options.selectedWebsiteUrl ?? null : null,
       phone: `519555${String(3000 + index)}`,
       addressLine: `${index + 1} Synthetic Street`,
       postalCode: "N2G 1A1",
@@ -100,8 +102,9 @@ export function createPrivateKwShadowSourceWorkflowFixture(options: {
     },
   };
   const manifest = buildPrivateKwShadowSliceManifest(source, sliceInput);
-  const selected = source.records[options.materializationRecordIndex ?? 0];
+  const selected = source.records[materializationRecordIndex];
   if (!selected) throw new Error("Synthetic materialization fixture index is out of range.");
+  const hasWebsite = selected.sourceRecord.websiteUrl !== null;
   const auditInput = {
     businessId: selected.business.id,
     businessName: selected.business.canonicalName,
@@ -109,10 +112,10 @@ export function createPrivateKwShadowSourceWorkflowFixture(options: {
     expectedServices: [selected.niche],
     expectedLocations: [selected.location.city],
     sourceEvidenceUrl: selected.sourceRecord.sourceEvidenceUrl,
-    siteState: "NO_SITE" as const,
-    requestedUrl: null,
+    siteState: hasWebsite ? "UNREACHABLE" as const : "NO_SITE" as const,
+    requestedUrl: selected.sourceRecord.websiteUrl,
     finalUrl: null,
-    statusCode: 0,
+    statusCode: hasWebsite ? 503 : 0,
     redirectCount: 0,
     capturedAt: auditCapturedAt,
     desktopArtifactRef: null,

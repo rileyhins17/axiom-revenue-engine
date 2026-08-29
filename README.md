@@ -440,6 +440,14 @@ ignored SQLite file read-only and query-only, reconstructs the approved plan,
 verifies every exact stored row plus the sealed terminal workflow receipt, and
 writes one no-overwrite normalized input for the progress recorder. It cannot
 execute the workflow or change the database.
+The next current-website-evidence boundary is now defined and tested without a
+live website or provider. Its content-addressed proof binds the exact reviewed
+business and predecessor, completed desktop/mobile homepage capture, deterministic
+audit, durable persistence plan, every screenshot/measurement manifest, and one
+fresh exact availability observation per artifact. The available builder accepts
+fixture evidence only and explicitly cannot create a progress receipt. Real
+progress also requires a separate content-addressed website-evidence eligibility
+receipt; no implementation currently creates that trusted receipt.
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

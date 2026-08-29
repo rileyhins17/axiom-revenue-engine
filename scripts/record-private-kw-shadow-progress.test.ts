@@ -160,7 +160,10 @@ test("the progress CLI appends one proof, preserves its parent, and never overwr
         proofKind: "CURRENT_WEBSITE_EVIDENCE" as const,
         primaryReceiptId: `website-evidence:${"5".repeat(64)}`,
         primaryReceiptDigest: "5".repeat(64),
-        supportingReceipts: [],
+        supportingReceipts: [{
+          receiptId: `website-evidence-eligibility:${"6".repeat(64)}`,
+          receiptDigest: "6".repeat(64),
+        }],
       },
       previousPhaseReceipt: {
         phaseReceiptId: firstPhase.phaseReceiptId,
