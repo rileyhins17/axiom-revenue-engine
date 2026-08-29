@@ -302,7 +302,7 @@ export function privateKwShadowSliceProgressDigest(value: unknown) {
   return createHash("sha256").update(JSON.stringify(canonicalValue(value))).digest("hex");
 }
 
-function progressAuthority() {
+export function privateKwShadowSliceProgressAuthority() {
   return {
     progressRecordingOnly: true as const,
     phaseExecutionAuthorized: false as const,
@@ -413,7 +413,7 @@ export function buildInitialPrivateKwShadowSliceProgress(
     createdAt: manifest.createdAt,
     records,
     summary: progressSummary(records),
-    authority: progressAuthority(),
+    authority: privateKwShadowSliceProgressAuthority(),
   });
 }
 
@@ -509,6 +509,6 @@ export function appendPrivateKwShadowSliceProgress(
     createdAt: phaseReceipt.recordedAt,
     records,
     summary: progressSummary(records),
-    authority: progressAuthority(),
+    authority: privateKwShadowSliceProgressAuthority(),
   });
 }

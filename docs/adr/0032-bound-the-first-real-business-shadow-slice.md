@@ -88,3 +88,7 @@ commercial coverage, and a hard authority boundary. This option was selected.
 5. [x] Add immutable, parent-linked, receipt-bound per-business progress. One
    append records one fixed next phase, exact upstream proof IDs/digests, and the
    prior business receipt without executing or authorizing that phase.
+6. [x] Add the read-only source/workflow proof adapter. It re-derives the exact
+   approved materialization, verifies the complete canonical stored row set and
+   sealed terminal receipt, and emits the first normalized progress input without
+   executing a workflow or mutating SQLite.

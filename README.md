@@ -434,6 +434,12 @@ no-overwrite per-business checkpoints. `npm run kw:record-shadow-progress`
 accepts one exact upstream phase receipt at a time, preserves its predecessor and
 prior checkpoint, and advances only that business. It cannot run the phase it
 records, access SQLite/Cloudflare/providers, contact anyone, deploy, or spend.
+The first source/workflow receipt is not handwritten. After the existing local
+materialization succeeds, `npm run kw:prepare-source-workflow-progress` opens the
+ignored SQLite file read-only and query-only, reconstructs the approved plan,
+verifies every exact stored row plus the sealed terminal workflow receipt, and
+writes one no-overwrite normalized input for the progress recorder. It cannot
+execute the workflow or change the database.
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

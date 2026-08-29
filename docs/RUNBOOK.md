@@ -133,10 +133,30 @@ Record progress only after the phase's existing approval, execution, exact
 reload, and receipt verification have succeeded. This command does not perform
 those steps.
 
-1. Keep the immutable manifest, normalized phase-receipt input, previous
+For the first `SOURCE_WORKFLOW` phase, never hand-author the normalized receipt.
+After `kw:materialize-source-workflow` reports a sealed exact result, prepare it
+from the same reviewed inputs and ignored local database:
+
+```powershell
+npm run kw:prepare-source-workflow-progress -- --manifest data/kw-evaluation/shadow-slice-manifest.json --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite --output data/kw-evaluation/source-workflow-phase-receipt.json
+```
+
+This adapter opens SQLite read-only and query-only, re-derives the approved
+materialization, rejects a non-canonical schema, and requires every expected
+source/workflow row plus the sealed terminal workflow and materialization
+receipts to match exactly. It produces proof for the recorder; it neither
+executes nor approves materialization.
+
+1. Keep the immutable manifest, source plan, materialization approval, local
+   database, normalized phase-receipt input, previous
    checkpoint, and next checkpoint as different ignored files.
-2. For the first completed phase, omit `--previous`. For every later append, use
-   the exact latest checkpoint:
+2. For the first completed source/workflow phase, omit `--previous`:
+
+   ```powershell
+   npm run kw:record-shadow-progress -- --manifest data/kw-evaluation/shadow-slice-manifest.json --receipt data/kw-evaluation/source-workflow-phase-receipt.json --output data/kw-evaluation/shadow-progress-001.json
+   ```
+
+   For every later append, use the exact latest checkpoint:
 
    ```powershell
    npm run kw:record-shadow-progress -- --manifest data/kw-evaluation/shadow-slice-manifest.json --previous data/kw-evaluation/shadow-progress-current.json --receipt data/kw-evaluation/shadow-phase-receipt.json --output data/kw-evaluation/shadow-progress-next.json

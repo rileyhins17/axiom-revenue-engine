@@ -36,6 +36,7 @@
     "kw:prepare-import": "tsx scripts/prepare-private-kw-import.ts",
     "kw:plan-persistence": "tsx scripts/plan-private-kw-persistence.ts",
     "kw:prepare-shadow-slice": "tsx scripts/prepare-private-kw-shadow-slice.ts",
+    "kw:prepare-source-workflow-progress": "tsx scripts/prepare-private-kw-source-workflow-progress.ts",
     "kw:record-shadow-progress": "tsx scripts/record-private-kw-shadow-progress.ts",
     "kw:prepare-owner-labeling": "tsx scripts/prepare-private-kw-owner-labeling.ts",
     "kw:record-owner-labels": "tsx scripts/record-private-kw-owner-labels.ts",

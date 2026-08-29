@@ -17,7 +17,9 @@ or Wrong, and export a resumable checkpoint without changing qualification,
 contacting anyone, or spending money. The first ten-business shadow slice now
 also has an immutable progress ledger: each business advances through one exact
 approved phase at a time and can resume from its last proven receipt after an
-interruption. That exact console build has a verified, tamper-evident
+interruption. Its first source/workflow proof can now be prepared from a
+query-only verification of the exact local receipts instead of being typed by
+hand. That exact console build has a verified, tamper-evident
 isolated-staging release packet, but it has not been deployed; exact-head Linux
 CI is green and only the separate owner deployment approval remains required
 before staging can change.
@@ -161,6 +163,9 @@ before staging can change.
 - Receipt-bound ten-business progress checkpoint: the branch HEAD containing
   this status entry; previous verified checkpoint
   `3ff72df1e7dbf2471906f175b35ffdb94e747282`.
+- Read-only source/workflow progress-proof checkpoint: the branch HEAD
+  containing this status entry; previous verified checkpoint
+  `cbfdfd029c6efc5371e06ea073690e64e4bf7d7b`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1353,6 +1358,33 @@ Completed gates:
   record was created. No external website, database, provider, mailbox,
   prospect, Cloudflare resource, deployment, migration, secret, or paid runtime
   was touched. Spend impact is C$0 and every autonomous capability remains off.
+- The first `SOURCE_WORKFLOW` progress input now has a guarded adapter instead
+  of relying on hand-authored receipt references. It re-derives the exact
+  owner-approved materialization from the manifest, source plan, and approval;
+  then it opens only the ignored local SQLite database read-only and query-only.
+- Preparation requires the canonical migration-0054–0067 Revenue schema and an
+  atomic exact snapshot of every expected source and workflow row. The final
+  materialization receipt, completed workflow receipt, and sealed closure must
+  all match their content-derived IDs, digests, business, candidate, source
+  record, and terminal-receipt lineage. Missing, duplicate, altered, partial,
+  outside-manifest, predating, or non-canonical proof fails closed.
+- The adapter writes one new ignored JSON input through the existing
+  no-overwrite file boundary. It cannot execute or approve the workflow, mutate
+  SQLite, access a provider/network/Cloudflare resource, advance progress,
+  contact anyone, deploy, send, or spend; the separate progress recorder must
+  still validate and append it.
+- Source/workflow progress-proof verification is green: 16/16 focused
+  materialization, adapter, recorder, and progress-chain tests pass. The complete
+  gate also passes fail-closed safety, 463/463 tests, standalone typecheck,
+  zero-warning lint, the secret-sanitized Cloudflare build, and the explicit
+  default-environment no-upload dry run. The final sequential owner-browser gate
+  passed six desktop/mobile WCAG views with zero external requests; list
+  readiness was 1,204 ms and dossier readiness was 2,315 ms.
+- Only synthetic fixtures were used and their ignored temporary files were
+  removed. No real business, manifest, receipt, or progress record was created;
+  no staging/production resource, external website, provider, mailbox, prospect,
+  secret, migration, deployment, or paid runtime was touched. Spend impact is
+  C$0 and every autonomous capability remains off.
 
 Still required for Phase 1:
 
@@ -1432,6 +1464,10 @@ before approval.
   framework. A real phase can be recorded only after its separate approval,
   execution, and exact proof receipts already exist; the progress checkpoint
   grants no downstream authority.
+- No new owner decision is required for the read-only source/workflow proof
+  adapter. Using it with a real business still requires the already separate
+  manifest review and source/workflow materialization approval; its output
+  grants no phase or downstream authority.
 
 ## Next three actions
 
@@ -1443,10 +1479,10 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Build a guarded normalized source/workflow phase-receipt adapter that
-   revalidates the exact materialization and workflow receipts before producing
-   the first progress input; do not execute a workflow, contact a provider, or
-   use live business data.
+3. Define and test the content-addressed `CURRENT_WEBSITE_EVIDENCE` progress
+   proof against the existing durable evidence contracts using synthetic data
+   only; do not run Browser Rendering, activate R2, fetch a live website, or
+   authorize the next phase.
 
 ## Resume instructions
 
