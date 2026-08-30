@@ -106,6 +106,14 @@ commercial coverage, and a hard authority boundary. This option was selected.
    artifact, rejects copied trust, and creates no phase input. Browser/R2
    activation, live D1, durable persistence, and owner approvals remain
    separate.
-10. [ ] Stop on stale evidence, duplicate identity, source-plan drift, imbalance, or
-   an unconfirmed/unknown chain status. Never loosen the manifest to make a
-   candidate fit.
+10. [x] Persist and reload one exact eligibility receipt through append-only
+    schema 0068. The private injected D1 boundary requires the original trusted
+    in-process result for a new commit, revalidates canonical storage after a
+    process loss, and keeps current versus stale history explicit without
+    creating phase input.
+11. [ ] Define a validation-only current-website-evidence phase-input adapter
+    that accepts only the exact current durable reload result and still cannot
+    append progress or authorize downstream work.
+12. [ ] Stop on stale evidence, duplicate identity, source-plan drift, imbalance,
+    or an unconfirmed/unknown chain status. Never loosen the manifest to make a
+    candidate fit.

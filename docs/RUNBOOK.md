@@ -196,12 +196,20 @@ screenshot/measurement manifest. The builder freezes its output and tags the
 exact in-process instance; a copied or hand-addressed JSON receipt is not trusted
 provenance even when its schema and digest are valid.
 
-There is no operator command, durable eligibility persistence/reload boundary,
-or phase-input adapter yet. Never hand-author, copy, or use an eligibility
-receipt to advance a real business. The synthetic tests use local SQLite rows
-and in-memory artifacts only. Live capture, R2 activation/HEAD reads, Cloudflare
-D1 execution, eligibility persistence, and progress remain separate future
-approvals and implementations.
+The durable eligibility persistence/reload boundary now exists in schema 0068,
+but it is deliberately not an operator command or runtime connection. It accepts
+a new row only from the exact in-process eligibility result, commits and reloads
+that row atomically, and later verifies the canonical stored receipt from its
+content-derived ID/digest. Every reload uses the database clock and labels the
+receipt `NOT_YET_CURRENT`, `CURRENT`, or `STALE`; historical storage never
+refreshes evidence. Copied result envelopes cannot cross the new private trusted
+reload guard.
+
+Never hand-author, copy, or use an eligibility receipt to advance a real
+business. There is still no phase-input adapter or progress-append path. The
+synthetic tests use local SQLite rows and in-memory artifacts only. Live capture,
+R2 activation/HEAD reads, Cloudflare D1 execution, applying schema 0068 to a real
+database, and progress remain separate future approvals and implementations.
 
 The `ASSESSMENT` proof contract is also an engineering boundary rather than an
 operator command. It independently rechecks the assessment's content-derived
@@ -213,8 +221,8 @@ progress recorder requires that separate proof reference, but no adapter turns
 the proof into an assessment phase input. The proof authorizes no database read
 or write, qualification execution, contact work, progress append, provider use,
 deployment, send, or spend. Never hand-author an `assessment-proof:*`; the real
-chain remains stopped earlier because no durable trusted eligibility receipt or
-phase-input adapter exists.
+chain remains stopped because no real current eligibility execution, phase-input
+adapter, or progress append exists.
 
 ## Owner-approved local KW materialization and assessment
 
@@ -226,7 +234,7 @@ deployment, or a migration.
 1. Keep the prepared source plan, source/workflow approval, assessment
    invocation, and SQLite database as different direct children of ignored
    `data/kw-evaluation/` storage.
-2. Confirm the local database already has the canonical migrations 0054–0067.
+2. Confirm the local database already has the canonical migrations 0054–0068.
    Database creation/migration is a separate developer setup step; neither
    command below may create or migrate it. Never point either command at Wrangler
    state or a remote database.
@@ -270,7 +278,7 @@ production, deployment, or migration.
    `.sqlite` database as different direct children of ignored
    `data/kw-evaluation/` storage. The source/workflow and assessment procedures
    above must already have completed for the exact business.
-2. Confirm the database already has canonical migrations 0054–0067. Neither
+2. Confirm the database already has canonical migrations 0054–0068. Neither
    command creates or migrates it, and neither accepts Wrangler or remote state.
 3. Prepare the owner-readable review:
 
@@ -313,7 +321,7 @@ changing the private database or enabling any pipeline action.
 1. Keep the exact source plan, existing local SQLite database, current labelling
    packet, review submission, and next packet as distinct direct children of
    ignored `data/kw-evaluation/` storage.
-2. Confirm the database has canonical migrations 0054–0067 and contains the
+2. Confirm the database has canonical migrations 0054–0068 and contains the
    exact 50-business source cohort plus one sealed current assessment receipt for
    every business. The command refuses a partial cohort so completed labels can
    never be invalidated by adding leads later.

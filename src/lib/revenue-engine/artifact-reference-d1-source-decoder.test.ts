@@ -77,6 +77,14 @@ import {
   requireInProcessPrivateKwCurrentWebsiteEvidenceEligibilityReceipt,
 } from "@/lib/revenue-engine/private-kw-current-website-evidence-eligibility";
 import {
+  loadPrivateKwWebsiteEvidenceEligibilityD1,
+  persistPrivateKwWebsiteEvidenceEligibilityD1,
+  requireCurrentPrivateKwWebsiteEvidenceEligibilityD1Result,
+  requireTrustedPrivateKwWebsiteEvidenceEligibilityD1Result,
+  type PrivateKwWebsiteEvidenceEligibilityD1Boundary,
+  type PrivateKwWebsiteEvidenceEligibilityD1Statement,
+} from "@/lib/revenue-engine/private-kw-current-website-evidence-eligibility-d1";
+import {
   PRIVATE_KW_CURRENT_WEBSITE_EVIDENCE_VERSION,
   PrivateKwCurrentWebsiteEvidenceProofSchema,
   privateKwCurrentWebsiteEvidenceAuthority,
@@ -300,6 +308,7 @@ function freshDatabase() {
     "0058_artifact_reference_projections.sql",
     "0059_atomic_artifact_reference_snapshots.sql",
     "0060_artifact_reference_source_writer_guards.sql",
+    "0068_current_website_evidence_eligibility_receipts.sql",
   ]) database.exec(readFileSync(new URL(`../../../migrations/${migration}`, import.meta.url), "utf8"));
   database.prepare(`INSERT INTO "RevenueBusiness"
     ("id", "canonicalName", "normalizedDomain", "independenceStatus", "status")
@@ -808,10 +817,13 @@ async function trustedWebsiteArtifactExecutions(
   return executions;
 }
 
-function sqliteD1Boundary(database: Database.Database): ArtifactReferenceD1BatchBoundary {
+function sqliteD1Boundary(database: Database.Database):
+ArtifactReferenceD1BatchBoundary & PrivateKwWebsiteEvidenceEligibilityD1Boundary {
   return {
     async batch(statements) {
-      return database.transaction((batch: readonly ArtifactReferenceD1BatchStatement[]) => batch.map((statement) => {
+      return database.transaction((batch: readonly (
+        ArtifactReferenceD1BatchStatement | PrivateKwWebsiteEvidenceEligibilityD1Statement
+      )[]) => batch.map((statement) => {
         const prepared = database.prepare(statement.sql);
         if (prepared.reader) {
           return {
@@ -908,6 +920,246 @@ test("current website evidence eligibility binds every exact trusted D1 and R2 m
   database.close();
 });
 
+test("website evidence eligibility commits once and reloads durably without laundering copied JSON", async () => {
+  const timing = currentSnapshotTiming();
+  const { fixture, database } = await persistedDatabaseFixture(timing);
+  const evidence = currentWebsiteEvidenceProof(fixture);
+  const executions = await trustedWebsiteArtifactExecutions(database, fixture, timing);
+  const receipt = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: evidence,
+    trustedExecutionValues: executions,
+    evaluatedAt: new Date().toISOString(),
+  });
+  const boundary = sqliteD1Boundary(database);
+
+  const committed = await persistPrivateKwWebsiteEvidenceEligibilityD1(boundary, receipt);
+  assert.equal(committed.executionPath, "FRESH_COMMIT");
+  assert.equal(committed.freshnessState, "CURRENT");
+  assert.equal(committed.databaseMutationPerformed, true);
+  assert.equal(committed.committedAndReloaded, true);
+  assert.equal(committed.artifactCount, receipt.artifacts.length);
+  assert.equal(committed.artifactsDigest, artifactReferenceDigest(receipt.artifacts));
+  assert.equal(committed.phaseInputCreationAuthorized, false);
+  assert.equal(committed.progressReceiptCreationAuthorized, false);
+  assert.equal(committed.phaseAdvancementAuthorized, false);
+  assert.equal(committed.providerOperationsAuthorized, 0);
+  assert.equal(committed.costAuthorizedUsd, 0);
+  assert.equal(requireCurrentPrivateKwWebsiteEvidenceEligibilityD1Result(committed), committed);
+  assert.equal(tableCount(database, "RevenueCurrentWebsiteEvidenceEligibilityReceipt"), 1);
+
+  const replayed = await persistPrivateKwWebsiteEvidenceEligibilityD1(boundary, receipt);
+  assert.equal(replayed.executionPath, "EXACT_REPLAY");
+  assert.equal(replayed.databaseMutationPerformed, false);
+  assert.deepEqual(replayed.receipt, receipt);
+  assert.equal(tableCount(database, "RevenueCurrentWebsiteEvidenceEligibilityReceipt"), 1);
+
+  const reloaded = await loadPrivateKwWebsiteEvidenceEligibilityD1(boundary, {
+    receiptId: receipt.receiptId,
+    receiptDigest: receipt.receiptDigest,
+  });
+  assert.equal(reloaded.executionPath, "DURABLE_RELOAD");
+  assert.equal(reloaded.freshnessState, "CURRENT");
+  assert.equal(reloaded.databaseMutationPerformed, false);
+  assert.deepEqual(reloaded.receipt, receipt);
+  assert.equal(Object.isFrozen(reloaded), true);
+  assert.equal(Object.isFrozen(reloaded.receipt.artifacts), true);
+  assert.equal(requireTrustedPrivateKwWebsiteEvidenceEligibilityD1Result(reloaded), reloaded);
+  assert.throws(
+    () => requireTrustedPrivateKwWebsiteEvidenceEligibilityD1Result(structuredClone(reloaded)),
+    /exact in-process result/i,
+  );
+
+  let copiedBoundaryCalls = 0;
+  const copiedBoundary: PrivateKwWebsiteEvidenceEligibilityD1Boundary = {
+    async batch(statements) {
+      copiedBoundaryCalls += 1;
+      return boundary.batch(statements);
+    },
+  };
+  await assert.rejects(
+    () => persistPrivateKwWebsiteEvidenceEligibilityD1(copiedBoundary, structuredClone(receipt)),
+    /exact in-process result/i,
+  );
+  assert.equal(copiedBoundaryCalls, 0);
+
+  assert.throws(
+    () => database.prepare(`UPDATE "RevenueCurrentWebsiteEvidenceEligibilityReceipt"
+      SET "manifestDigest" = ? WHERE "id" = ?`).run("f".repeat(64), receipt.receiptId),
+    /REVENUE_WEBSITE_EVIDENCE_ELIGIBILITY_APPEND_ONLY/,
+  );
+  assert.throws(
+    () => database.prepare(`DELETE FROM "RevenueCurrentWebsiteEvidenceEligibilityReceipt"
+      WHERE "id" = ?`).run(receipt.receiptId),
+    /REVENUE_WEBSITE_EVIDENCE_ELIGIBILITY_APPEND_ONLY/,
+  );
+  assert.equal(tableCount(database, "RevenueCurrentWebsiteEvidenceEligibilityReceipt"), 1);
+  database.close();
+});
+
+test("durable website evidence eligibility preserves stale history but refuses current use", async () => {
+  const timing = currentSnapshotTiming();
+  const { fixture, database } = await persistedDatabaseFixture(timing);
+  const evidence = currentWebsiteEvidenceProof(fixture);
+  const executions = await trustedWebsiteArtifactExecutions(database, fixture, timing);
+  const receipt = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: evidence,
+    trustedExecutionValues: executions,
+    evaluatedAt: new Date().toISOString(),
+  });
+  const boundary = sqliteD1Boundary(database);
+  await persistPrivateKwWebsiteEvidenceEligibilityD1(boundary, receipt);
+
+  const staleBoundary: PrivateKwWebsiteEvidenceEligibilityD1Boundary = {
+    async batch(statements) {
+      const results = structuredClone(await boundary.batch(statements)) as Array<{
+        success: true;
+        results: Array<Record<string, string | number | null>>;
+        changes: number;
+      }>;
+      const timeIndex = statements.findIndex(
+        (statement) => statement.statementId === "read:eligibility_database_time",
+      );
+      const time = results[timeIndex]?.results[0];
+      if (time) time.databaseNow = receipt.evidenceFreshThrough;
+      return results;
+    },
+  };
+  const historical = await loadPrivateKwWebsiteEvidenceEligibilityD1(staleBoundary, {
+    receiptId: receipt.receiptId,
+    receiptDigest: receipt.receiptDigest,
+  });
+  assert.equal(historical.freshnessState, "STALE");
+  assert.equal(requireTrustedPrivateKwWebsiteEvidenceEligibilityD1Result(historical), historical);
+  assert.throws(
+    () => requireCurrentPrivateKwWebsiteEvidenceEligibilityD1Result(historical),
+    /not current at the database clock/i,
+  );
+  assert.equal(historical.phaseAdvancementAuthorized, false);
+  assert.equal(historical.runtimeConnected, false);
+  database.close();
+});
+
+test("durable website evidence eligibility refuses reload when any migration writer guard is missing", async () => {
+  const timing = currentSnapshotTiming();
+  const { fixture, database } = await persistedDatabaseFixture(timing);
+  const evidence = currentWebsiteEvidenceProof(fixture);
+  const executions = await trustedWebsiteArtifactExecutions(database, fixture, timing);
+  const receipt = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: evidence,
+    trustedExecutionValues: executions,
+    evaluatedAt: new Date().toISOString(),
+  });
+  const boundary = sqliteD1Boundary(database);
+  const triggerRow = database.prepare(`SELECT "sql" FROM "sqlite_master"
+    WHERE "type" = 'trigger'
+      AND "name" = 'RevenueCurrentWebsiteEvidenceEligibilityReceipt_immutable_delete'`).get() as {
+    sql: string;
+  };
+  database.exec(
+    `DROP TRIGGER "RevenueCurrentWebsiteEvidenceEligibilityReceipt_immutable_delete"`,
+  );
+  await assert.rejects(
+    () => persistPrivateKwWebsiteEvidenceEligibilityD1(boundary, receipt),
+    /every exact migration-0068 writer guard/i,
+  );
+  assert.equal(tableCount(database, "RevenueCurrentWebsiteEvidenceEligibilityReceipt"), 0);
+
+  database.exec(triggerRow.sql);
+  await persistPrivateKwWebsiteEvidenceEligibilityD1(boundary, receipt);
+  database.exec(
+    `DROP TRIGGER "RevenueCurrentWebsiteEvidenceEligibilityReceipt_immutable_delete"`,
+  );
+  await assert.rejects(
+    () => loadPrivateKwWebsiteEvidenceEligibilityD1(boundary, {
+      receiptId: receipt.receiptId,
+      receiptDigest: receipt.receiptDigest,
+    }),
+    /every exact migration-0068 writer guard/i,
+  );
+  assert.equal(tableCount(database, "RevenueCurrentWebsiteEvidenceEligibilityReceipt"), 1);
+  database.close();
+});
+
+test("website evidence eligibility rolls back a forged lineage insert before any receipt persists", async () => {
+  const timing = currentSnapshotTiming();
+  const { fixture, database } = await persistedDatabaseFixture(timing);
+  const evidence = currentWebsiteEvidenceProof(fixture);
+  const executions = await trustedWebsiteArtifactExecutions(database, fixture, timing);
+  const receipt = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: evidence,
+    trustedExecutionValues: executions,
+    evaluatedAt: new Date().toISOString(),
+  });
+  const boundary = sqliteD1Boundary(database);
+  const forgedBoundary: PrivateKwWebsiteEvidenceEligibilityD1Boundary = {
+    async batch(statements) {
+      const forgedStatements = statements.map((statement) => {
+        if (statement.statementId !== "insert:website_evidence_eligibility_receipt") {
+          return statement;
+        }
+        const bindings = [...statement.bindings];
+        bindings[6] = "business:forged-eligibility";
+        return { ...statement, bindings };
+      });
+      return boundary.batch(forgedStatements);
+    },
+  };
+
+  await assert.rejects(
+    () => persistPrivateKwWebsiteEvidenceEligibilityD1(forgedBoundary, receipt),
+    /REVENUE_WEBSITE_EVIDENCE_ELIGIBILITY_LINEAGE_MISMATCH|FOREIGN KEY constraint failed/,
+  );
+  assert.equal(tableCount(database, "RevenueCurrentWebsiteEvidenceEligibilityReceipt"), 0);
+
+  const committed = await persistPrivateKwWebsiteEvidenceEligibilityD1(boundary, receipt);
+  assert.equal(committed.executionPath, "FRESH_COMMIT");
+  assert.equal(tableCount(database, "RevenueCurrentWebsiteEvidenceEligibilityReceipt"), 1);
+  database.close();
+});
+
+test("website evidence eligibility detects replay-row collisions without changing stored history", async () => {
+  const timing = currentSnapshotTiming();
+  const { fixture, database } = await persistedDatabaseFixture(timing);
+  const evidence = currentWebsiteEvidenceProof(fixture);
+  const executions = await trustedWebsiteArtifactExecutions(database, fixture, timing);
+  const receipt = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: evidence,
+    trustedExecutionValues: executions,
+    evaluatedAt: new Date().toISOString(),
+  });
+  const boundary = sqliteD1Boundary(database);
+  await persistPrivateKwWebsiteEvidenceEligibilityD1(boundary, receipt);
+
+  const driftedReloadBoundary: PrivateKwWebsiteEvidenceEligibilityD1Boundary = {
+    async batch(statements) {
+      const results = structuredClone(await boundary.batch(statements)) as Array<{
+        success: true;
+        results: Array<Record<string, string | number | null>>;
+        changes: number;
+      }>;
+      const reloadIndex = statements.findIndex(
+        (statement) => statement.statementId === "read:website_evidence_eligibility_receipt",
+      );
+      const reloadedRow = results[reloadIndex]?.results[0];
+      if (reloadedRow) reloadedRow.manifestDigest = "f".repeat(64);
+      return results;
+    },
+  };
+
+  await assert.rejects(
+    () => persistPrivateKwWebsiteEvidenceEligibilityD1(driftedReloadBoundary, receipt),
+    /does not exactly match its mirrored durable row/i,
+  );
+  assert.equal(tableCount(database, "RevenueCurrentWebsiteEvidenceEligibilityReceipt"), 1);
+
+  const reloaded = await loadPrivateKwWebsiteEvidenceEligibilityD1(boundary, {
+    receiptId: receipt.receiptId,
+    receiptDigest: receipt.receiptDigest,
+  });
+  assert.deepEqual(reloaded.receipt, receipt);
+  database.close();
+});
+
 test("website evidence eligibility rejects copied trust, incomplete coverage, drift, stale windows, and output tampering", async () => {
   const timing = currentSnapshotTiming();
   const { fixture, database } = await persistedDatabaseFixture(timing);
@@ -959,6 +1211,19 @@ test("website evidence eligibility rejects copied trust, incomplete coverage, dr
     ...receipt,
     authority: { ...receipt.authority, phaseAdvancementAuthorized: true },
   }));
+  const { receiptId: _receiptId, receiptDigest: _receiptDigest, ...receiptCore } = receipt;
+  void _receiptId;
+  void _receiptDigest;
+  const stretchedFreshnessCore = {
+    ...receiptCore,
+    evidenceFreshThrough: new Date(Date.parse(receipt.evidenceFreshThrough) + 1_000).toISOString(),
+  };
+  const stretchedFreshnessDigest = artifactReferenceDigest(stretchedFreshnessCore);
+  assert.throws(() => PrivateKwCurrentWebsiteEvidenceEligibilityReceiptSchema.parse({
+    ...stretchedFreshnessCore,
+    receiptId: `website-evidence-eligibility:${stretchedFreshnessDigest}`,
+    receiptDigest: stretchedFreshnessDigest,
+  }), /exact earliest workflow or artifact boundary/i);
   assert.throws(
     () => requireInProcessPrivateKwCurrentWebsiteEvidenceEligibilityReceipt(structuredClone(receipt)),
     /exact in-process result/i,

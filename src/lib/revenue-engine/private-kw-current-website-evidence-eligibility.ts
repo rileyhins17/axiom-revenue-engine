@@ -139,6 +139,31 @@ export const PrivateKwCurrentWebsiteEvidenceEligibilityReceiptSchema =
         path: ["artifacts"],
       });
     }
+    const expectedFreshThrough = earliestTimestamp([
+      new Date(
+        Date.parse(receipt.persistedWorkflow.terminalCompletedAt)
+          + PRIVATE_KW_CURRENT_WEBSITE_EVIDENCE_MAX_AGE_DAYS * 24 * 60 * 60 * 1_000,
+      ).toISOString(),
+      ...receipt.artifacts.flatMap((artifact) => [
+        artifact.completeness.freshUntil,
+        artifact.availability.validThrough,
+        artifact.availability.expiresAt,
+      ]),
+    ]);
+    if (receipt.evidenceFreshThrough !== expectedFreshThrough) {
+      context.addIssue({
+        code: "custom",
+        message: "Website evidence eligibility freshness must equal the exact earliest workflow or artifact boundary.",
+        path: ["evidenceFreshThrough"],
+      });
+    }
+    if (Date.parse(receipt.evaluatedAt) < Date.parse(receipt.websiteEvidence.preparedAt)) {
+      context.addIssue({
+        code: "custom",
+        message: "Website evidence eligibility cannot predate its prepared evidence proof.",
+        path: ["evaluatedAt"],
+      });
+    }
     if (Date.parse(receipt.evaluatedAt) >= Date.parse(receipt.evidenceFreshThrough)) {
       context.addIssue({
         code: "custom",

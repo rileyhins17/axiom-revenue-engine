@@ -2,9 +2,9 @@ import { readFileSync, readdirSync } from "node:fs";
 
 import Database from "better-sqlite3";
 
-export const PRIVATE_KW_CANONICAL_MIGRATION_RANGE = "0054-0067";
-const PRIVATE_KW_MIGRATION_PATTERN = /^(0054|0055|0056|0057|0058|0059|0060|0061|0062|0063|0064|0065|0066|0067)_.*\.sql$/;
-const PRIVATE_KW_MIGRATION_COUNT = 14;
+export const PRIVATE_KW_CANONICAL_MIGRATION_RANGE = "0054-0068";
+const PRIVATE_KW_MIGRATION_PATTERN = /^(0054|0055|0056|0057|0058|0059|0060|0061|0062|0063|0064|0065|0066|0067|0068)_.*\.sql$/;
+const PRIVATE_KW_MIGRATION_COUNT = 15;
 
 type SqliteSchemaRow = {
   type: string;

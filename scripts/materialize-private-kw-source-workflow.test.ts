@@ -246,7 +246,7 @@ test("separate approval atomically materializes source/workflow before assessmen
     }
     await assert.rejects(
       materializePrivateKwSourceWorkflowFile(materializationArgs),
-      /differs from canonical migrations 0054-0067/i,
+      /differs from canonical migrations 0054-0068/i,
     );
   } finally {
     await rm(sourceFile, { force: true });

@@ -287,10 +287,10 @@ test("detail, contact-review, and history SELECT contracts compile against the c
   try {
     const migrationsUrl = new URL("../../../migrations/", import.meta.url);
     const migrations = readdirSync(migrationsUrl)
-      .filter((name) => /^00(?:5[4-9]|6[0-7])_.*\.sql$/.test(name))
+      .filter((name) => /^00(?:5[4-9]|6[0-8])_.*\.sql$/.test(name))
       .sort((left, right) => left.localeCompare(right, "en-CA"));
     assert.equal(migrations.at(0)?.startsWith("0054_"), true);
-    assert.equal(migrations.at(-1)?.startsWith("0067_"), true);
+    assert.equal(migrations.at(-1)?.startsWith("0068_"), true);
     migrations.forEach((migration) => {
       database.exec(readFileSync(new URL(migration, migrationsUrl), "utf8"));
     });

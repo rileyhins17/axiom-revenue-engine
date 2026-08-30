@@ -724,8 +724,27 @@ async function openMobileDossier(page: Page) {
   );
   assert(geometry.linkTop >= 0, `The mobile dossier action is above the visible viewport: ${JSON.stringify(geometry)}`);
   assert.equal(await link.getAttribute("href"), `/leads/${FIXTURE_BUSINESS_ID}`);
-  await link.click();
-  await page.waitForURL(new RegExp(`/leads/${FIXTURE_BUSINESS_ID}$`), { waitUntil: "domcontentloaded" });
+  const pointerTarget = await link.evaluate((element) => {
+    const rectangle = element.getBoundingClientRect();
+    const targetX = rectangle.left + rectangle.width / 2;
+    const targetY = rectangle.top + rectangle.height / 2;
+    const hit = document.elementFromPoint(
+      targetX,
+      targetY,
+    );
+    return {
+      targetX,
+      targetY,
+      hitTag: hit?.tagName ?? null,
+      hitText: hit?.textContent?.trim() ?? null,
+      ownedByLink: hit === element || element.contains(hit) || hit?.closest("a") === element,
+    };
+  });
+  assert(pointerTarget.ownedByLink, `The mobile dossier link does not own its pointer target: ${JSON.stringify(pointerTarget)}`);
+  await Promise.all([
+    page.waitForURL(new RegExp(`/leads/${FIXTURE_BUSINESS_ID}$`)),
+    page.mouse.click(pointerTarget.targetX, pointerTarget.targetY),
+  ]);
 }
 
 async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
@@ -911,6 +930,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     } satisfies AcceptanceResult;
   } catch (error) {
     if (page) await page.screenshot({ path: join(outputDirectory, "owner-ui-failure.png"), fullPage: true }).catch(() => undefined);
+    if (error instanceof Error) error.message = `${stage} at ${page?.url() ?? "no page"}: ${error.message}`;
     throw error;
   } finally {
     await browser?.close().catch(() => undefined);

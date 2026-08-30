@@ -426,17 +426,27 @@ Retire entries when the architecture makes them impossible.
   but an automated pointer action stayed on `/leads` until its route assertion
   timed out.
 - **Root cause:** scrolling a far-down action only “into view” does not prove its
-  actual click target is clear of a fixed bottom navigation layer. Browser
-  actionability and visual presence alone were too weak for this owner task.
+  actual click target is clear of a fixed bottom navigation layer. Locator click
+  actionability can also perform its own last-moment scroll after a geometry
+  check; on the long mobile lead card that intermittently left Next's link on
+  the current `/leads` route even though the earlier rectangle was clear.
+  Browser actionability and visual presence alone were too weak for this owner
+  task.
 - **Proven fix:** center the dossier action in the mobile viewport, measure its
   rectangle against the fixed primary navigation, verify its exact destination,
-  then click and require the exact dossier URL before evaluating the page.
+  prove `elementFromPoint` at the link centre belongs to that anchor, and click
+  that already-proven coordinate without allowing another locator auto-scroll.
+  Start the exact-URL wait before the pointer click and include the failing stage
+  plus current URL in diagnostics.
 - **Prevention/test:** `npm run test:owner-ui` now proves the unobscured mobile
-  action and exact navigation as part of all six desktop/mobile owner views.
+  pointer target and exact navigation as part of all six desktop/mobile owner
+  views. Two consecutive post-fix runs passed after the intermittent failure was
+  reproduced.
 - **Affected area:** mobile Leads owner task, fixed primary navigation, and
   Playwright release acceptance.
-- **Verifying commit:** branch HEAD containing the assessment-progress proof
-  checkpoint and hardened owner UI gate.
+- **Verifying commit:** branch HEAD containing ADR 0035 and the coordinate-bound
+  mobile owner UI gate; earlier geometry work began with the assessment-progress
+  proof checkpoint.
 
 ## TYPE-001 — Hand-written Cloudflare bindings hid unsafe assumptions
 

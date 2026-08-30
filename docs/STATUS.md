@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-29 (America/Toronto)
+Last updated: 2026-08-30 (America/Toronto)
 
 ## Plain-English status
 
@@ -23,9 +23,12 @@ hand. The next website-evidence proof and trusted eligibility boundary are now
 defined and fail-closed: the first binds the desktop/mobile artifact and audit
 lineage, while the second requires one fresh transaction-sealed D1/R2 result per
 exact content-addressed artifact. Copied JSON cannot impersonate either trusted
-execution or eligibility provenance. There is still no durable eligibility
-persistence or phase-input adapter, so this cannot advance a real business. The
-following assessment proof is now equally
+execution or eligibility provenance. The exact eligibility result can now be
+stored once and reloaded after a lost task through an append-only, database-clock
+checked boundary; expired receipts remain history instead of becoming current
+again. There is still no operator command, live database connection, or
+phase-input adapter, so this cannot advance a real business. The following
+assessment proof is now equally
 fail-closed: it binds the exact website evidence, audit, immutable assessment,
 and database result in synthetic tests, but it cannot create or advance a real
 phase. That exact console build has a verified, tamper-evident
@@ -184,12 +187,18 @@ before staging can change.
 - Trusted current-website-evidence eligibility checkpoint: the branch HEAD
   containing this status entry; previous verified checkpoint
   `675ed2d4938d44a042640f145cf40d46c63f731a`.
+- Durable current-website-evidence eligibility persistence checkpoint: the
+  branch HEAD containing this status entry; previous verified checkpoint
+  `799fb575fd9b9dcdee2b3ea0ba93560db20548a5`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Local migrations: all 67 apply, including the fail-closed lockdown, shadow
+- Source migrations: all 68 replay from zero, including the fail-closed
+  lockdown, shadow
   Revenue Engine records, content-bound outreach approval, and durable evidence
-  plus fenced resume, current-reference history, and atomic snapshot receipt
-  contracts
+  plus fenced resume, current-reference history, atomic snapshot receipts, and
+  the append-only eligibility receipt. Canonical ignored-local schema is now
+  0054–0068; migration 0068 has not been applied to an existing real-business,
+  staging, or production database
 - Current checkpoint verification rerun 2026-08-21: 160/160 tests, typecheck,
   zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
   build, and Wrangler deploy dry run pass
@@ -1498,6 +1507,50 @@ Completed gates:
   progress record, mailbox, prospect, staging/production resource, secret,
   deployment, migration, or paid runtime was touched. Spend impact is C$0 and
   every autonomous capability remains off.
+- Migration 0068 now defines one append-only durable website-evidence
+  eligibility receipt. Its insert guard binds the canonical receipt to the
+  exact stored business, sealed workflow, terminal artifact set, manifest
+  digests, completeness receipts, availability source-set proofs, and current
+  R2 HEAD receipts while constraining every phase/provider/outreach/cost field
+  to zero.
+- The private injected D1 boundary accepts a fresh row only from the exact
+  frozen in-process eligibility result. It commits and reloads that row in one
+  batch, replays it idempotently, and lets a later process reload the exact
+  canonical receipt by content-derived ID and digest. Copied inputs are rejected
+  before database access, and copied output envelopes cannot impersonate the
+  module-private durable reload result.
+- Every reload uses database time and keeps `NOT_YET_CURRENT`, `CURRENT`, and
+  `STALE` distinct. An expired receipt remains verifiable audit history but
+  fails the current-result guard. Persistence therefore survives a lost Codex
+  task without extending evidence freshness or granting progress.
+- Focused durable-eligibility verification passes 21/21 transaction/evidence
+  tests. It also proves every exact migration-0068 writer guard before trusting
+  a durable row, SQL-gates the fresh insert on those same guards so a failed
+  post-batch check cannot leave a row behind, proves atomic rollback on forged
+  lineage, rejects a drifted replay result without changing stored history, and
+  re-derives the exact earliest workflow/artifact freshness boundary so
+  redigested JSON cannot resurrect expired evidence. The complete release gate
+  passes fail-closed safety, 479/479 tests,
+  standalone typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, and the explicit default-environment no-upload Wrangler dry run.
+  Wrangler retained only the documented generated duplicate-key warnings.
+- The first owner-browser run correctly rejected the new table because the
+  canonical ignored-local schema fingerprint still stopped at migration 0067.
+  The single canonical range, affected tests, operator docs, and fixture setup
+  now agree on 0054–0068. No schema mismatch is hidden or auto-repaired.
+- A reproduced intermittent mobile link timeout also strengthened the existing
+  fixed-navigation gate. It now proves the link centre is the active pointer
+  target, clicks that exact already-verified coordinate without a second
+  locator auto-scroll, starts the exact URL wait first, and reports the failing
+  stage and current URL. Five consecutive final six-view desktop/mobile WCAG
+  runs passed with zero external requests; the final release run found the next
+  lead in 332 ms and opened the dossier in 852 ms.
+- Only synthetic in-memory SQLite and fixture artifacts were used. Migration
+  0068 was replayed in tests but not applied to an ignored real-business,
+  staging, or production database. No Browser/R2/Cloudflare D1/provider,
+  real-business, progress, mailbox, prospect, secret, deployment, or paid
+  runtime operation occurred. Spend impact is C$0 and every autonomous
+  capability remains off.
 
 Still required for Phase 1:
 
@@ -1592,6 +1645,10 @@ before approval.
   evidence eligibility contract. Real Browser capture, R2 activation/HEAD
   reads, Cloudflare D1 execution, durable eligibility persistence, phase
   recording, and any downstream assessment remain separately approval-gated.
+- No new owner decision is required for the disconnected durable eligibility
+  schema and adapter. Applying migration 0068 to any real or remote database,
+  connecting the Cloudflare D1 adapter, creating an operator command, or using a
+  receipt as phase input remains a separate reviewed and approval-gated change.
 
 ## Next three actions
 
@@ -1603,11 +1660,11 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Define the durable website-evidence eligibility persistence-and-reload
-   boundary so a future task can verify one exact stored eligibility receipt
-   without trusting copied JSON. Keep Browser/R2 activation, live D1 execution,
-   phase-input creation, real data, progress, providers, and spend separately
-   blocked.
+3. Define the validation-only current-website-evidence phase-input adapter. It
+   must accept only an exact `CURRENT` durable D1 reload result, recheck the
+   manifest business and predecessor chain, and create no progress receipt or
+   authority. Keep migration apply, Browser/R2 activation, live D1 wiring, real
+   data, progress append, providers, and spend separately blocked.
 
 ## Resume instructions
 
