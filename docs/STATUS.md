@@ -26,12 +26,15 @@ exact content-addressed artifact. Copied JSON cannot impersonate either trusted
 execution or eligibility provenance. The exact eligibility result can now be
 stored once and reloaded after a lost task through an append-only, database-clock
 checked boundary; expired receipts remain history instead of becoming current
-again. There is still no operator command, live database connection, or
-phase-input adapter, so this cannot advance a real business. The following
-assessment proof is now equally
-fail-closed: it binds the exact website evidence, audit, immutable assessment,
-and database result in synthetic tests, but it cannot create or advance a real
-phase. That exact console build has a verified, tamper-evident
+again. A separate validation-only adapter can now derive the next normalized
+phase input only from the exact in-process current durable reload, after
+rechecking the ten-business scope, business, predecessor, proof lineage, and
+time window. It cannot append progress, create a checkpoint, access a provider,
+or authorize execution, and there is still no operator command, live database
+connection, or guarded append boundary. The following assessment proof is now
+equally fail-closed: it binds the exact website evidence, audit, immutable
+assessment, and database result in synthetic tests, but it cannot create or
+advance a real phase. That exact console build has a verified, tamper-evident
 isolated-staging release packet, but it has not been deployed; exact-head Linux
 CI is green and only the separate owner deployment approval remains required
 before staging can change.
@@ -190,6 +193,9 @@ before staging can change.
 - Durable current-website-evidence eligibility persistence checkpoint: the
   branch HEAD containing this status entry; previous verified checkpoint
   `799fb575fd9b9dcdee2b3ea0ba93560db20548a5`.
+- Current-website-evidence phase-input checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `8116e9b1c365bf4dde6cbf5a25347e7a135ebd6c`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Source migrations: all 68 replay from zero, including the fail-closed
@@ -1551,6 +1557,30 @@ Completed gates:
   real-business, progress, mailbox, prospect, secret, deployment, or paid
   runtime operation occurred. Spend impact is C$0 and every autonomous
   capability remains off.
+- The validation-only `CURRENT_WEBSITE_EVIDENCE` adapter now accepts only the
+  exact frozen in-process `CURRENT` result of a `DURABLE_RELOAD`. Fresh commit
+  and replay responses, copied envelopes, stale history, wrong predecessors,
+  proof drift, and false chronology fail closed.
+- It rechecks the exact ten-business manifest/checkpoint scope, selected
+  business and URLs, source/workflow predecessor, website proof, durable
+  eligibility receipt, sealed workflow/audit/artifact lineage, and half-open
+  evidence window before returning one frozen zero-authority normalized phase
+  input. The existing progress checkpoint remains unchanged.
+- Static safety enforcement prevents this adapter from importing the generic
+  progress appender or phase-receipt builder, connecting to the inert Worker,
+  reading a runtime binding/database/provider, mutating data, or authorizing
+  execution. There is no operator command or live-data path.
+- Focused website-evidence transaction/progress verification passes 24/24
+  tests. The complete release gate passes fail-closed safety, 482/482 tests,
+  standalone typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, and the explicit default-environment no-upload Wrangler dry run.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 419 ms and the dossier in
+  428 ms. Only synthetic in-memory SQLite and fixture artifacts were used; no
+  real business, progress record, Browser/R2/Cloudflare D1/provider, mailbox,
+  prospect, secret, staging/production resource, deployment, migration, or paid
+  runtime operation occurred. Spend impact is C$0 and every autonomous
+  capability remains off.
 
 Still required for Phase 1:
 
@@ -1647,8 +1677,14 @@ before approval.
   recording, and any downstream assessment remain separately approval-gated.
 - No new owner decision is required for the disconnected durable eligibility
   schema and adapter. Applying migration 0068 to any real or remote database,
-  connecting the Cloudflare D1 adapter, creating an operator command, or using a
-  receipt as phase input remains a separate reviewed and approval-gated change.
+  connecting the Cloudflare D1 adapter, creating an operator command, or
+  recording the derived input as progress remains a separate reviewed and
+  approval-gated change.
+- No new owner decision is required for the validation-only website-evidence
+  phase-input adapter. It adds no live operation or progress mutation. Applying
+  migration 0068, connecting live D1/Browser/R2, using real businesses, or
+  recording the input through a future guarded append boundary remains
+  separately reviewed and approval-gated.
 
 ## Next three actions
 
@@ -1660,11 +1696,11 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Define the validation-only current-website-evidence phase-input adapter. It
-   must accept only an exact `CURRENT` durable D1 reload result, recheck the
-   manifest business and predecessor chain, and create no progress receipt or
-   authority. Keep migration apply, Browser/R2 activation, live D1 wiring, real
-   data, progress append, providers, and spend separately blocked.
+3. Define a separate validation-only website-evidence progress-append boundary.
+   It must accept only the exact module-private phase input and unchanged parent
+   checkpoint, append at most one idempotent receipt in memory, and grant no
+   execution authority. Keep operator commands, migration apply, Browser/R2,
+   live D1, real data, providers, deployment, and spend separately blocked.
 
 ## Resume instructions
 

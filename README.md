@@ -450,7 +450,12 @@ progress also requires a separate content-addressed website-evidence eligibility
 receipt. The private schema-0068 D1 boundary can now atomically persist and
 reload the exact trusted in-process receipt, then distinguish current evidence
 from immutable stale history using the database clock. It has no operator
-command, runtime import, live database binding, or phase-input authority.
+command, runtime import, or live database binding. A separate validation-only
+adapter can derive the normalized `CURRENT_WEBSITE_EVIDENCE` phase input only
+from the exact in-process `CURRENT` durable reload. It rechecks the exact
+ten-business manifest scope, selected business, source/workflow predecessor,
+website proof, receipt lineage, and time window; it cannot append progress,
+create a checkpoint, access a provider, or authorize execution.
 The following assessment boundary is normalized in the same fail-closed style.
 A synthetic-only `assessment-proof:*` binds the exact manifest business,
 completed website-evidence phase, website proof and eligibility reference,
@@ -458,8 +463,9 @@ sealed workflow/audit lineage, immutable assessment, and committed-and-reloaded
 persistence result. The progress recorder requires that proof as a separate
 supporting receipt for `ASSESSMENT`; the builder cannot create a phase receipt,
 read or mutate a database, execute qualification, discover contacts, or advance
-the chain. Because no real current eligibility execution or phase-input adapter
-exists, no real assessment can use this proof to claim progress.
+the chain. Because no real current eligibility execution or guarded
+progress-append boundary exists, no real assessment can use this proof to claim
+progress.
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

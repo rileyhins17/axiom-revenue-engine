@@ -85,10 +85,28 @@ import {
   type PrivateKwWebsiteEvidenceEligibilityD1Statement,
 } from "@/lib/revenue-engine/private-kw-current-website-evidence-eligibility-d1";
 import {
+  buildPrivateKwCurrentWebsiteEvidenceProgressInput,
+  requireInProcessPrivateKwCurrentWebsiteEvidenceProgressInput,
+} from "@/lib/revenue-engine/private-kw-current-website-evidence-progress";
+import {
   PRIVATE_KW_CURRENT_WEBSITE_EVIDENCE_VERSION,
   PrivateKwCurrentWebsiteEvidenceProofSchema,
   privateKwCurrentWebsiteEvidenceAuthority,
 } from "@/lib/revenue-engine/private-kw-current-website-evidence";
+import {
+  PrivateKwShadowSliceManifestSchema,
+  privateKwShadowSliceDigest,
+} from "@/lib/revenue-engine/private-kw-shadow-slice";
+import {
+  PRIVATE_KW_SHADOW_PHASE_RECEIPT_VERSION,
+  PrivateKwShadowSlicePhaseReceiptInputSchema,
+  appendPrivateKwShadowSliceProgress,
+  buildInitialPrivateKwShadowSliceProgress,
+  privateKwShadowSliceProgressAuthority,
+} from "@/lib/revenue-engine/private-kw-shadow-slice-progress";
+import {
+  createPrivateKwShadowSourceWorkflowFixture,
+} from "@/lib/revenue-engine/test-support/private-kw-shadow-source-workflow-fixture";
 import {
   WEBSITE_CAPTURE_MAX_REDIRECTS,
   WEBSITE_CAPTURE_MAX_RESPONSE_BYTES,
@@ -781,6 +799,141 @@ function currentWebsiteEvidenceProof(fixture: Awaited<ReturnType<typeof buildFix
   });
 }
 
+function progressContextForWebsiteEvidence(
+  fixture: Awaited<ReturnType<typeof buildFixture>>,
+) {
+  const baseManifest = createPrivateKwShadowSourceWorkflowFixture({
+    suffix: "durable-eligibility-progress",
+    now: new Date(REQUESTED_AT),
+  }).manifest;
+  const baseRecord = baseManifest.records[0];
+  if (!baseRecord) throw new Error("Website evidence progress fixture requires one manifest record.");
+  const evaluationCandidateId = `evaluation:${BUSINESS_ID}`;
+  const sourceRecordId = `source:${BUSINESS_ID}`;
+  const records = baseManifest.records.map((record, index) => index === 0 ? {
+    ...record,
+    businessId: BUSINESS_ID,
+    evaluationCandidateId,
+    sourceRecordId,
+    businessName: "Atomic Decoder Roofing",
+    sourceEvidenceUrl: fixture.request.sourceEvidenceUrl,
+    websiteUrl: fixture.request.websiteUrl,
+  } : record);
+  const {
+    manifestId: _manifestId,
+    manifestDigest: _manifestDigest,
+    ...manifestCore
+  } = baseManifest;
+  void _manifestId;
+  void _manifestDigest;
+  const reboundManifestCore = { ...manifestCore, records };
+  const manifestDigest = privateKwShadowSliceDigest(reboundManifestCore);
+  const manifest = PrivateKwShadowSliceManifestSchema.parse({
+    ...reboundManifestCore,
+    manifestId: `kw-shadow-slice:${manifestDigest}`,
+    manifestDigest,
+  });
+
+  const sourceCompletedAt = new Date(Date.parse(fixture.request.requestedAt) - 1_000).toISOString();
+  const sourceMaterializationDigest = artifactReferenceDigest({
+    businessId: BUSINESS_ID,
+    manifestDigest,
+    phase: "SOURCE_WORKFLOW",
+  });
+  const workflowReceiptDigest = artifactReferenceDigest(fixture.receipt);
+  const sourceInput = PrivateKwShadowSlicePhaseReceiptInputSchema.parse({
+    receiptVersion: PRIVATE_KW_SHADOW_PHASE_RECEIPT_VERSION,
+    manifestId: manifest.manifestId,
+    manifestDigest: manifest.manifestDigest,
+    businessId: BUSINESS_ID,
+    evaluationCandidateId,
+    phase: "SOURCE_WORKFLOW",
+    completedAt: sourceCompletedAt,
+    proof: {
+      proofKind: "SOURCE_WORKFLOW_MATERIALIZATION",
+      primaryReceiptId: `kw-materialization:${sourceMaterializationDigest}`,
+      primaryReceiptDigest: sourceMaterializationDigest,
+      supportingReceipts: [{
+        receiptId: `workflow-receipt:${workflowReceiptDigest}`,
+        receiptDigest: workflowReceiptDigest,
+      }],
+    },
+    previousPhaseReceipt: null,
+    recordedBy: "CODEX_INTEGRATION_OWNER",
+    recordedAt: sourceCompletedAt,
+    authority: privateKwShadowSliceProgressAuthority(),
+  });
+  const initialProgress = buildInitialPrivateKwShadowSliceProgress(manifest);
+  const sourceProgress = appendPrivateKwShadowSliceProgress(manifest, initialProgress, sourceInput);
+  const sourceReceipt = sourceProgress.records.find(
+    (record) => record.businessId === BUSINESS_ID,
+  )?.phaseReceipts[0];
+  if (!sourceReceipt) throw new Error("Website evidence progress fixture lost its source predecessor.");
+
+  const baseEvidence = currentWebsiteEvidenceProof(fixture);
+  const {
+    proofId: _proofId,
+    proofDigest: _proofDigest,
+    ...evidenceCore
+  } = baseEvidence;
+  void _proofId;
+  void _proofDigest;
+  const reboundEvidenceCore = {
+    ...evidenceCore,
+    manifestId: manifest.manifestId,
+    manifestDigest: manifest.manifestDigest,
+    evaluationCandidateId,
+    sourceRecordId,
+    previousPhaseReceipt: {
+      phaseReceiptId: sourceReceipt.phaseReceiptId,
+      phaseReceiptDigest: sourceReceipt.phaseReceiptDigest,
+      completedAt: sourceReceipt.completedAt,
+    },
+  };
+  const proofDigest = artifactReferenceDigest(reboundEvidenceCore);
+  const evidence = PrivateKwCurrentWebsiteEvidenceProofSchema.parse({
+    ...reboundEvidenceCore,
+    proofId: `website-evidence:${proofDigest}`,
+    proofDigest,
+  });
+  return {
+    manifest,
+    initialProgress,
+    sourceInput,
+    sourceProgress,
+    sourceReceipt,
+    evidence,
+  };
+}
+
+async function durableEligibilityProgressFixture() {
+  const timing = currentSnapshotTiming();
+  const { fixture, database } = await persistedDatabaseFixture(timing);
+  const context = progressContextForWebsiteEvidence(fixture);
+  const executions = await trustedWebsiteArtifactExecutions(database, fixture, timing);
+  const receipt = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: context.evidence,
+    trustedExecutionValues: executions,
+    evaluatedAt: new Date().toISOString(),
+  });
+  const boundary = sqliteD1Boundary(database);
+  const committed = await persistPrivateKwWebsiteEvidenceEligibilityD1(boundary, receipt);
+  const reloaded = await loadPrivateKwWebsiteEvidenceEligibilityD1(boundary, {
+    receiptId: receipt.receiptId,
+    receiptDigest: receipt.receiptDigest,
+  });
+  const recordedAt = new Date(Date.parse(reloaded.databaseNow) + 1).toISOString();
+  return {
+    ...context,
+    database,
+    boundary,
+    receipt,
+    committed,
+    reloaded,
+    recordedAt,
+  };
+}
+
 async function trustedWebsiteArtifactExecutions(
   database: Database.Database,
   fixture: Awaited<ReturnType<typeof buildFixture>>,
@@ -1158,6 +1311,163 @@ test("website evidence eligibility detects replay-row collisions without changin
   });
   assert.deepEqual(reloaded.receipt, receipt);
   database.close();
+});
+
+test("current website evidence progress input requires an exact current durable reload and creates no checkpoint", async () => {
+  const fixture = await durableEligibilityProgressFixture();
+  try {
+    const phaseInput = buildPrivateKwCurrentWebsiteEvidenceProgressInput({
+      manifestValue: fixture.manifest,
+      previousProgressValue: fixture.sourceProgress,
+      websiteEvidenceProofValue: fixture.evidence,
+      currentEligibilityResultValue: fixture.reloaded,
+      recordedAt: fixture.recordedAt,
+    });
+
+    assert.equal(phaseInput.phase, "CURRENT_WEBSITE_EVIDENCE");
+    assert.equal(phaseInput.completedAt, fixture.reloaded.receiptRecordedAt);
+    assert.equal(phaseInput.proof.primaryReceiptId, fixture.evidence.proofId);
+    assert.equal(phaseInput.proof.primaryReceiptDigest, fixture.evidence.proofDigest);
+    assert.deepEqual(phaseInput.proof.supportingReceipts, [{
+      receiptId: fixture.receipt.receiptId,
+      receiptDigest: fixture.receipt.receiptDigest,
+    }]);
+    assert.equal(
+      phaseInput.previousPhaseReceipt?.phaseReceiptId,
+      fixture.sourceReceipt.phaseReceiptId,
+    );
+    assert.equal(phaseInput.authority.progressRecordingOnly, true);
+    assert.equal(phaseInput.authority.phaseExecutionAuthorized, false);
+    assert.equal(phaseInput.authority.databaseMutationAuthorized, false);
+    assert.equal(phaseInput.authority.browserCaptureAuthorized, false);
+    assert.equal(phaseInput.authority.providerOperationsAuthorized, 0);
+    assert.equal(phaseInput.authority.costAuthorizedUsd, 0);
+    assert.equal(Object.isFrozen(phaseInput), true);
+    assert.equal(Object.isFrozen(phaseInput.proof), true);
+    assert.equal(requireInProcessPrivateKwCurrentWebsiteEvidenceProgressInput(phaseInput), phaseInput);
+    assert.throws(
+      () => requireInProcessPrivateKwCurrentWebsiteEvidenceProgressInput(structuredClone(phaseInput)),
+      /exact in-process result/i,
+    );
+
+    const unchanged = fixture.sourceProgress.records.find(
+      (record) => record.businessId === phaseInput.businessId,
+    );
+    assert.equal(unchanged?.phaseReceipts.length, 1);
+    assert.equal(unchanged?.currentCheckpoint, "SOURCE_WORKFLOW_PERSISTED");
+    assert.equal(tableCount(fixture.database, "RevenueCurrentWebsiteEvidenceEligibilityReceipt"), 1);
+  } finally {
+    fixture.database.close();
+  }
+});
+
+test("current website evidence progress rejects commit responses, copied trust, stale reloads, and false chronology", async () => {
+  const fixture = await durableEligibilityProgressFixture();
+  const build = (eligibility: unknown, recordedAt = fixture.recordedAt) => (
+    buildPrivateKwCurrentWebsiteEvidenceProgressInput({
+      manifestValue: fixture.manifest,
+      previousProgressValue: fixture.sourceProgress,
+      websiteEvidenceProofValue: fixture.evidence,
+      currentEligibilityResultValue: eligibility,
+      recordedAt,
+    })
+  );
+  try {
+    assert.throws(() => build(fixture.committed), /exact current durable reload/i);
+    assert.throws(() => build(structuredClone(fixture.reloaded)), /exact in-process result/i);
+    assert.throws(
+      () => build(
+        fixture.reloaded,
+        new Date(Date.parse(fixture.reloaded.databaseNow) - 1).toISOString(),
+      ),
+      /chronology.*current evidence window/i,
+    );
+    assert.throws(
+      () => build(fixture.reloaded, fixture.receipt.evidenceFreshThrough),
+      /chronology.*current evidence window/i,
+    );
+
+    const staleBoundary: PrivateKwWebsiteEvidenceEligibilityD1Boundary = {
+      async batch(statements) {
+        const results = structuredClone(await fixture.boundary.batch(statements)) as Array<{
+          success: true;
+          results: Array<Record<string, string | number | null>>;
+          changes: number;
+        }>;
+        const timeIndex = statements.findIndex(
+          (statement) => statement.statementId === "read:eligibility_database_time",
+        );
+        const time = results[timeIndex]?.results[0];
+        if (time) time.databaseNow = fixture.receipt.evidenceFreshThrough;
+        return results;
+      },
+    };
+    const stale = await loadPrivateKwWebsiteEvidenceEligibilityD1(staleBoundary, {
+      receiptId: fixture.receipt.receiptId,
+      receiptDigest: fixture.receipt.receiptDigest,
+    });
+    assert.equal(stale.freshnessState, "STALE");
+    assert.throws(() => build(stale), /not current at the database clock/i);
+  } finally {
+    fixture.database.close();
+  }
+});
+
+test("current website evidence progress rejects predecessor and proof lineage drift", async () => {
+  const fixture = await durableEligibilityProgressFixture();
+  try {
+    const replacementDigest = artifactReferenceDigest({
+      original: fixture.sourceInput.proof.primaryReceiptDigest,
+      replacement: true,
+    });
+    const replacementSourceInput = PrivateKwShadowSlicePhaseReceiptInputSchema.parse({
+      ...fixture.sourceInput,
+      proof: {
+        ...fixture.sourceInput.proof,
+        primaryReceiptId: `kw-materialization:${replacementDigest}`,
+        primaryReceiptDigest: replacementDigest,
+      },
+    });
+    const replacementProgress = appendPrivateKwShadowSliceProgress(
+      fixture.manifest,
+      fixture.initialProgress,
+      replacementSourceInput,
+    );
+    assert.throws(() => buildPrivateKwCurrentWebsiteEvidenceProgressInput({
+      manifestValue: fixture.manifest,
+      previousProgressValue: replacementProgress,
+      websiteEvidenceProofValue: fixture.evidence,
+      currentEligibilityResultValue: fixture.reloaded,
+      recordedAt: fixture.recordedAt,
+    }), /exact completed source\/workflow predecessor/i);
+
+    const {
+      proofId: _proofId,
+      proofDigest: _proofDigest,
+      ...evidenceCore
+    } = fixture.evidence;
+    void _proofId;
+    void _proofDigest;
+    const driftedEvidenceCore = {
+      ...evidenceCore,
+      sourceRecordId: "source:cross-business-drift",
+    };
+    const driftedDigest = artifactReferenceDigest(driftedEvidenceCore);
+    const driftedEvidence = PrivateKwCurrentWebsiteEvidenceProofSchema.parse({
+      ...driftedEvidenceCore,
+      proofId: `website-evidence:${driftedDigest}`,
+      proofDigest: driftedDigest,
+    });
+    assert.throws(() => buildPrivateKwCurrentWebsiteEvidenceProgressInput({
+      manifestValue: fixture.manifest,
+      previousProgressValue: fixture.sourceProgress,
+      websiteEvidenceProofValue: driftedEvidence,
+      currentEligibilityResultValue: fixture.reloaded,
+      recordedAt: fixture.recordedAt,
+    }), /exact website-bearing manifest business/i);
+  } finally {
+    fixture.database.close();
+  }
 });
 
 test("website evidence eligibility rejects copied trust, incomplete coverage, drift, stale windows, and output tampering", async () => {

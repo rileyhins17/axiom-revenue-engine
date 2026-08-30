@@ -111,9 +111,13 @@ commercial coverage, and a hard authority boundary. This option was selected.
     in-process result for a new commit, revalidates canonical storage after a
     process loss, and keeps current versus stale history explicit without
     creating phase input.
-11. [ ] Define a validation-only current-website-evidence phase-input adapter
+11. [x] Define a validation-only current-website-evidence phase-input adapter
     that accepts only the exact current durable reload result and still cannot
     append progress or authorize downstream work.
-12. [ ] Stop on stale evidence, duplicate identity, source-plan drift, imbalance,
+12. [ ] Define a separate guarded progress-append boundary that accepts only the
+    exact module-private current-website-evidence input and its unchanged parent
+    checkpoint. Keep it disconnected from operator commands, live bindings, and
+    real data until those approvals exist.
+13. [ ] Stop on stale evidence, duplicate identity, source-plan drift, imbalance,
     or an unconfirmed/unknown chain status. Never loosen the manifest to make a
     candidate fit.

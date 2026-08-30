@@ -206,10 +206,17 @@ refreshes evidence. Copied result envelopes cannot cross the new private trusted
 reload guard.
 
 Never hand-author, copy, or use an eligibility receipt to advance a real
-business. There is still no phase-input adapter or progress-append path. The
-synthetic tests use local SQLite rows and in-memory artifacts only. Live capture,
-R2 activation/HEAD reads, Cloudflare D1 execution, applying schema 0068 to a real
-database, and progress remain separate future approvals and implementations.
+business. The validation-only phase-input adapter accepts only the exact
+in-process `CURRENT` result returned by a `DURABLE_RELOAD`; a fresh commit,
+exact replay, copied result, stale receipt, wrong manifest, wrong predecessor,
+proof drift, or false chronology fails closed. Its frozen output is still only
+a normalized zero-authority input: the adapter does not call the progress
+appender or create a phase receipt/checkpoint. There is no operator command,
+live binding, or guarded progress-append boundary for this phase. Synthetic
+tests use local SQLite rows and in-memory artifacts only. Live capture, R2
+activation/HEAD reads, Cloudflare D1 execution, applying schema 0068 to a real
+database, and real progress remain separate future approvals and
+implementations.
 
 The `ASSESSMENT` proof contract is also an engineering boundary rather than an
 operator command. It independently rechecks the assessment's content-derived
@@ -221,8 +228,8 @@ progress recorder requires that separate proof reference, but no adapter turns
 the proof into an assessment phase input. The proof authorizes no database read
 or write, qualification execution, contact work, progress append, provider use,
 deployment, send, or spend. Never hand-author an `assessment-proof:*`; the real
-chain remains stopped because no real current eligibility execution, phase-input
-adapter, or progress append exists.
+chain remains stopped because no real current eligibility execution or guarded
+progress append exists.
 
 ## Owner-approved local KW materialization and assessment
 

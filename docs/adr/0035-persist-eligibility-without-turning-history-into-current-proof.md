@@ -69,8 +69,11 @@ creates no phase input or progress receipt.
   exact mirrored-row comparison, and missing writer guards fail before durable
   history can be treated as trusted current proof.
 - The adapter is not imported by the Worker, API routes, queues, or scripts.
-  There is no operator command, live Cloudflare D1 binding, phase-input adapter,
-  Browser/R2 activation, real-business execution, provider operation, or spend.
+  This persistence decision added no operator command, live Cloudflare D1
+  binding, phase-input adapter, Browser/R2 activation, real-business execution,
+  provider operation, or spend. ADR 0036 later permits only a separate
+  validation-only phase-input derivation from an exact current durable reload;
+  it still adds none of those operational capabilities.
 - Canonical ignored-local schema is now migrations 0054–0068. Any older local
   file fails closed until migration 0068 is separately reviewed and applied;
   this checkpoint did not mutate an existing database.
