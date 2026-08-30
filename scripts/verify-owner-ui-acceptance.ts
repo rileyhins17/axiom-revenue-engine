@@ -693,6 +693,31 @@ async function assertMobileNavigationClear(page: Page) {
   assert(geometry.noteBottom <= geometry.navigationTop + 1, `The mobile navigation obscures the dossier safety note: ${JSON.stringify(geometry)}`);
 }
 
+async function openMobileDossier(page: Page) {
+  const link = page.getByRole("link", { name: /Open evidence dossier/i }).first();
+  await link.evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest" }));
+  const geometry = await page.evaluate(() => {
+    const dossierLink = [...document.querySelectorAll("a")].find((element) =>
+      element.textContent?.includes("Open evidence dossier"),
+    )?.getBoundingClientRect();
+    const navigation = document.querySelector("nav[aria-label='Primary']")?.getBoundingClientRect();
+    return dossierLink && navigation ? {
+      linkTop: dossierLink.top,
+      linkBottom: dossierLink.bottom,
+      navigationTop: navigation.top,
+    } : null;
+  });
+  assert(geometry, "The mobile lead must expose its dossier action and primary navigation.");
+  assert(
+    geometry.linkBottom <= geometry.navigationTop + 1,
+    `The mobile navigation obscures the dossier action: ${JSON.stringify(geometry)}`,
+  );
+  assert(geometry.linkTop >= 0, `The mobile dossier action is above the visible viewport: ${JSON.stringify(geometry)}`);
+  assert.equal(await link.getAttribute("href"), `/leads/${FIXTURE_BUSINESS_ID}`);
+  await link.click();
+  await page.waitForURL(new RegExp(`/leads/${FIXTURE_BUSINESS_ID}$`), { waitUntil: "domcontentloaded" });
+}
+
 async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
   let browser: Browser | null = null;
   let page: Page | null = null;
@@ -720,6 +745,21 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
       }
     });
     await authenticate(context, baseUrl);
+
+    // Next dev compiles route chunks on demand. Compile every owner acceptance
+    // route in a disposable page before attaching the measured/error-audited
+    // page so route prefetch cannot replace a chunk during the real run.
+    stage = "owner route warmup";
+    const warmupPage = await context.newPage();
+    await warmupPage.goto("/leads", { waitUntil: "domcontentloaded" });
+    await warmupPage.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
+    await warmupPage.goto(`/leads/${FIXTURE_BUSINESS_ID}`, { waitUntil: "domcontentloaded" });
+    await warmupPage.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
+    await warmupPage.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
+    await warmupPage.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
+    await warmupPage.locator("[data-quality-lab-ready='true']").waitFor();
+    await warmupPage.close();
+
     page = await context.newPage();
     page.on("console", (message) => {
       if (message.type() === "error") browserErrors.push(`${stage} console: ${message.text()}`);
@@ -732,12 +772,6 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     page.on("response", (response) => {
       if (response.url().startsWith(baseUrl) && response.status() >= 500) badResponses.push(`${response.status()} ${response.url()}`);
     });
-
-    stage = "desktop leads warmup";
-    await page.goto("/leads", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
-    await page.getByRole("link", { name: /Open evidence dossier/i }).first().waitFor();
-    await waitForOwnerContent(page);
 
     stage = "desktop leads";
     const listStart = performance.now();
@@ -829,7 +863,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     const mobileWidth = await assertResponsive(page, "mobile leads");
 
     stage = "mobile dossier";
-    await page.getByRole("link", { name: /Open evidence dossier/i }).first().click();
+    await openMobileDossier(page);
     await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Contact review not recorded" }).waitFor();
     await assertWcag(page, "mobile dossier");

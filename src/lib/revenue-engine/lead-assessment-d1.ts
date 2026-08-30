@@ -73,7 +73,7 @@ const SealedReceiptRowSchema = z.object({
 
 const BusinessRowSchema = RevenueLeadAssessmentBusinessSchema;
 
-const ExecutionResultSchema = z.object({
+export const RevenueLeadAssessmentD1ExecutionSchema = z.object({
   executorVersion: z.literal(REVENUE_LEAD_ASSESSMENT_D1_EXECUTOR_VERSION),
   targetSchemaVersion: z.literal(REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION),
   executionPath: z.enum(["FRESH_COMMIT", "EXACT_REPLAY"]),
@@ -93,7 +93,7 @@ const ExecutionResultSchema = z.object({
   costAuthorizedUsd: z.literal(0),
 }).strict();
 
-export type RevenueLeadAssessmentD1Execution = z.infer<typeof ExecutionResultSchema>;
+export type RevenueLeadAssessmentD1Execution = z.infer<typeof RevenueLeadAssessmentD1ExecutionSchema>;
 
 type RecordPlan = {
   entity: "WEBSITE_SNAPSHOT" | "EVIDENCE_CLAIM" | "QUALIFICATION_SNAPSHOT" | "ASSESSMENT_RECEIPT";
@@ -349,7 +349,7 @@ export async function executePrivateRevenueLeadAssessmentD1(
   }
   const missingPlans = plans.filter((_, index) => states[index] === "MISSING");
   if (receiptExists && missingPlans.length === 0) {
-    return ExecutionResultSchema.parse({
+    return RevenueLeadAssessmentD1ExecutionSchema.parse({
       executorVersion: REVENUE_LEAD_ASSESSMENT_D1_EXECUTOR_VERSION,
       targetSchemaVersion: REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION,
       executionPath: "EXACT_REPLAY",
@@ -378,7 +378,7 @@ export async function executePrivateRevenueLeadAssessmentD1(
     }
   });
 
-  return ExecutionResultSchema.parse({
+  return RevenueLeadAssessmentD1ExecutionSchema.parse({
     executorVersion: REVENUE_LEAD_ASSESSMENT_D1_EXECUTOR_VERSION,
     targetSchemaVersion: REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION,
     executionPath: "FRESH_COMMIT",

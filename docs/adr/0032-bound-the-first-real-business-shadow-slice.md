@@ -96,3 +96,12 @@ commercial coverage, and a hard authority boundary. This option was selected.
    existing fixture workflow, deterministic audit, durable persistence, artifact
    manifest, and availability contracts. Keep it synthetic-only and require a
    separate trusted eligibility receipt before any progress append.
+8. [x] Define the content-addressed assessment progress proof against the exact
+   completed website-evidence phase, sealed workflow/audit lineage, immutable
+   assessment identities, and committed-and-reloaded persistence result. Require
+   it as a separate progress reference without creating a phase-input adapter.
+9. [ ] Define the trusted website-evidence eligibility boundary before any real
+   assessment progress. Keep Browser, R2, D1, and owner approvals separate.
+10. Stop on stale evidence, duplicate identity, source-plan drift, imbalance, or
+   an unconfirmed/unknown chain status. Never loosen the manifest to make a
+   candidate fit.

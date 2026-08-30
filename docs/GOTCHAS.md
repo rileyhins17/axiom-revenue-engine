@@ -366,16 +366,19 @@ Retire entries when the architecture makes them impossible.
 - **Root cause:** OpenNext and the Next.js development server share `.next`.
   Concurrent execution can replace a served chunk, while a sequential first
   development run can briefly inherit production assets left by OpenNext before
-  its development chunks finish replacing them.
+  its development chunks finish replacing them. Even after cleanup, Next dev
+  compiles linked routes on demand; automatic route prefetch can therefore
+  replace a development chunk while the measured page is already executing.
 - **Proven fix:** let every Next/OpenNext/Cloudflare build and dry run exit before
   starting `npm run test:owner-ui`, then remove only the repository's generated
-  `.next` directory before starting the isolated development server. Preserve
-  detailed page-error name/message/stack diagnostics; do not suppress syntax
-  errors or blank errors globally.
+  `.next` directory before starting the isolated development server. Compile all
+  measured owner routes in a disposable authenticated page, close it, and use a
+  fresh page for timed/error-audited acceptance. Preserve detailed page-error
+  name/message/stack diagnostics; do not suppress syntax errors or blank errors.
 - **Prevention/test:** `AGENTS.md` forbids concurrent execution, and the owner UI
-  acceptance command now clears its exact generated `.next` directory before
-  server startup. GitHub CI and every local release cycle run the commands
-  sequentially.
+  acceptance command clears its exact generated `.next` directory, warms every
+  measured route, and then proves six fresh-page views. GitHub CI and every local
+  release cycle run the commands sequentially.
 - **Affected area:** owner UI acceptance, Next.js development server, OpenNext,
   Wrangler dry runs, Windows/OneDrive workspaces, and local release evidence.
 - **Verifying commit:** branch HEAD containing the sequential browser-gate rule,
@@ -411,6 +414,24 @@ Retire entries when the architecture makes them impossible.
 - **Affected area:** Today, Leads, System, navigation, and owner read APIs.
 - **Verifying commit:** owner read-model source `bf0c2c4`; first owner Leads
   workspace `5e273fa`.
+
+## UI-002 — A fixed mobile navigation could make an essential action untestable
+
+- **Symptom:** the mobile Leads view visibly rendered the evidence-dossier link,
+  but an automated pointer action stayed on `/leads` until its route assertion
+  timed out.
+- **Root cause:** scrolling a far-down action only “into view” does not prove its
+  actual click target is clear of a fixed bottom navigation layer. Browser
+  actionability and visual presence alone were too weak for this owner task.
+- **Proven fix:** center the dossier action in the mobile viewport, measure its
+  rectangle against the fixed primary navigation, verify its exact destination,
+  then click and require the exact dossier URL before evaluating the page.
+- **Prevention/test:** `npm run test:owner-ui` now proves the unobscured mobile
+  action and exact navigation as part of all six desktop/mobile owner views.
+- **Affected area:** mobile Leads owner task, fixed primary navigation, and
+  Playwright release acceptance.
+- **Verifying commit:** branch HEAD containing the assessment-progress proof
+  checkpoint and hardened owner UI gate.
 
 ## TYPE-001 — Hand-written Cloudflare bindings hid unsafe assumptions
 

@@ -22,7 +22,10 @@ query-only verification of the exact local receipts instead of being typed by
 hand. The next website-evidence proof is also defined and fail-closed: it proves
 the exact desktop/mobile artifact and audit lineage in synthetic tests, but it
 cannot advance a real business without a separate trusted eligibility receipt
-that does not yet exist. That exact console build has a verified, tamper-evident
+that does not yet exist. The following assessment proof is now equally
+fail-closed: it binds the exact website evidence, audit, immutable assessment,
+and database result in synthetic tests, but it cannot create or advance a real
+phase. That exact console build has a verified, tamper-evident
 isolated-staging release packet, but it has not been deployed; exact-head Linux
 CI is green and only the separate owner deployment approval remains required
 before staging can change.
@@ -172,6 +175,9 @@ before staging can change.
 - Synthetic current-website-evidence proof checkpoint: the branch HEAD
   containing this status entry; previous verified checkpoint
   `2bdca9c73562fbf386cba1b4c57f699087c93264`.
+- Synthetic assessment progress-proof checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `5b85075723243c1ccdadb01b6fe242a6451460e3`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1419,6 +1425,42 @@ Completed gates:
   provider call, real business data, progress append, staging/production change,
   mailbox/prospect action, secret change, deployment, migration, or paid runtime
   occurred. Spend impact is C$0 and every autonomous capability remains off.
+- The `ASSESSMENT` progress boundary now requires a separate content-addressed
+  `assessment-proof:*` reference. Its synthetic builder binds one exact manifest
+  business and completed website-evidence phase to the exact website proof and
+  eligibility reference, sealed workflow/audit, immutable assessment IDs and
+  digests, exact deterministic claim set, and committed-and-reloaded D1 result.
+- Cross-business evidence, wrong predecessors, workflow/audit drift, redigested
+  assessment content, invented insert counts, stale evidence, time reversal,
+  missing proof references, content tampering, and altered authority all fail
+  closed. Fresh commits and exact replays have different enforced row-count
+  semantics.
+- The builder cannot create a phase input or progress receipt and authorizes no
+  database read/write, website capture, artifact operation, qualification run,
+  contact work, provider call, outreach, deployment, send, or spend. The real
+  chain remains stopped earlier because no implementation creates the trusted
+  `website-evidence-eligibility:*` receipt.
+- This checkpoint also closed a repeated Next-development acceptance race:
+  after clearing `.next`, the browser gate now compiles all measured owner
+  routes in a disposable authenticated page, closes it, and performs the timed
+  and error-audited run from a fresh page. It still reports every later console,
+  page, HTTP, WCAG, layout, motion, or external-request failure.
+- The mobile acceptance now also centres the dossier action, proves its click
+  target is clear of the fixed primary navigation, verifies the exact href, and
+  requires arrival at the exact dossier route before evaluating the page.
+- Focused assessment/progress verification passes 18/18 tests. The complete
+  release gate passes fail-closed safety, 472/472 tests, standalone typecheck,
+  zero-warning source lint, the secret-sanitized Cloudflare build, and the
+  explicit default-environment no-upload Wrangler dry run. Wrangler retained
+  only the documented generated duplicate-key warnings. The hardened owner UI
+  gate passed all six desktop/mobile WCAG views with zero external requests;
+  its final rebuilt run found the next lead in 414 ms and opened the dossier in
+  854 ms.
+- Only synthetic fixtures were used. No real assessment, current-evidence
+  eligibility receipt, progress record, business data, Browser/R2/D1 operation,
+  provider, mailbox, prospect, staging/production resource, secret, deployment,
+  migration, or paid runtime was touched. Spend impact is C$0 and every
+  autonomous capability remains off.
 
 Still required for Phase 1:
 
@@ -1506,6 +1548,9 @@ before approval.
   proof contract. A real eligibility receipt remains blocked behind the separate
   privacy/budget decisions for Browser Rendering, R2, and exact durable-state
   verification; this checkpoint inferred none of those approvals.
+- No new owner decision is required for the synthetic assessment progress proof.
+  It cannot advance the chain, and its upstream trusted website-evidence
+  eligibility plus any real assessment execution remain separately gated.
 
 ## Next three actions
 
@@ -1517,11 +1562,11 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Define and test the immutable `ASSESSMENT` progress proof normalizer against
-   the existing sealed assessment and current-evidence lineage contracts using
-   synthetic data only. Keep it blocked behind the missing trusted website-
-   evidence eligibility receipt; do not mutate D1, assess a real business, or
-   authorize contact work.
+3. Define the trusted current-website-evidence eligibility contract against an
+   exact persisted workflow, current content-addressed artifacts, and fresh R2
+   availability evidence, but add no Browser/R2/D1 executor or phase adapter.
+   Keep activation, provider operations, real data, progress, and spend blocked
+   behind their separate owner approvals.
 
 ## Resume instructions
 

@@ -152,6 +152,9 @@ function receiptInput(
       }] : phase === "CURRENT_WEBSITE_EVIDENCE" ? [{
         receiptId: `website-evidence-eligibility:${((seed + 9) % 15 + 1).toString(16).repeat(64)}`,
         receiptDigest: ((seed + 9) % 15 + 1).toString(16).repeat(64),
+      }] : phase === "ASSESSMENT" ? [{
+        receiptId: `assessment-proof:${((seed + 10) % 15 + 1).toString(16).repeat(64)}`,
+        receiptDigest: ((seed + 10) % 15 + 1).toString(16).repeat(64),
       }] : [],
     },
     previousPhaseReceipt: previous ? {
@@ -271,6 +274,20 @@ test("phase proof type, receipt shape, manifest lineage, and time fail closed", 
     ...receiptInput(manifest, 0, "CURRENT_WEBSITE_EVIDENCE", sourceReceipt),
     proof: {
       ...receiptInput(manifest, 0, "CURRENT_WEBSITE_EVIDENCE", sourceReceipt).proof,
+      supportingReceipts: [],
+    },
+  }), /Supporting receipts/);
+
+  const website = appendPrivateKwShadowSliceProgress(
+    manifest,
+    source,
+    receiptInput(manifest, 0, "CURRENT_WEBSITE_EVIDENCE", sourceReceipt),
+  );
+  const websiteReceipt = website.records[0].phaseReceipts[1];
+  assert.throws(() => appendPrivateKwShadowSliceProgress(manifest, website, {
+    ...receiptInput(manifest, 0, "ASSESSMENT", websiteReceipt),
+    proof: {
+      ...receiptInput(manifest, 0, "ASSESSMENT", websiteReceipt).proof,
       supportingReceipts: [],
     },
   }), /Supporting receipts/);

@@ -448,6 +448,15 @@ fresh exact availability observation per artifact. The available builder accepts
 fixture evidence only and explicitly cannot create a progress receipt. Real
 progress also requires a separate content-addressed website-evidence eligibility
 receipt; no implementation currently creates that trusted receipt.
+The following assessment boundary is normalized in the same fail-closed style.
+A synthetic-only `assessment-proof:*` binds the exact manifest business,
+completed website-evidence phase, website proof and eligibility reference,
+sealed workflow/audit lineage, immutable assessment, and committed-and-reloaded
+persistence result. The progress recorder requires that proof as a separate
+supporting receipt for `ASSESSMENT`; the builder cannot create a phase receipt,
+read or mutate a database, execute qualification, discover contacts, or advance
+the chain. Because the upstream trusted website-evidence eligibility receipt is
+still missing, no real assessment can use this proof to claim progress.
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

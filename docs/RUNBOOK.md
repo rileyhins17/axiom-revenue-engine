@@ -190,6 +190,19 @@ receipt, so never hand-author one or use the synthetic proof to advance a real
 business. Live capture, R2 activation/HEAD reads, persistence verification, and
 eligibility remain separate future approvals and implementations.
 
+The `ASSESSMENT` proof contract is also an engineering boundary rather than an
+operator command. It independently rechecks the assessment's content-derived
+identity, audit/qualification/basis digests, website and qualification snapshot
+IDs, exact audit-claim set, sealed workflow lineage, freshness, and immutable
+fresh-commit or exact-replay counts. It then binds those facts to the exact
+completed current-website-evidence phase in one `assessment-proof:*`. The
+progress recorder requires that separate proof reference, but no adapter turns
+the proof into an assessment phase input. The proof authorizes no database read
+or write, qualification execution, contact work, progress append, provider use,
+deployment, send, or spend. Never hand-author an `assessment-proof:*`; the real
+chain remains stopped earlier because the trusted `website-evidence-eligibility:*`
+receipt does not exist.
+
 ## Owner-approved local KW materialization and assessment
 
 This procedure is local shadow evaluation only. Source/workflow materialization

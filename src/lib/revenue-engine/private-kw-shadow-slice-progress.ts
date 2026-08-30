@@ -36,7 +36,7 @@ export const PRIVATE_KW_SHADOW_PROGRESS_PHASES = [
     phase: "ASSESSMENT",
     proofKind: "IMMUTABLE_ASSESSMENT",
     primaryReceiptPattern: /^assessment:[a-f0-9]{64}$/,
-    supportingReceiptPatterns: [],
+    supportingReceiptPatterns: [/^assessment-proof:[a-f0-9]{64}$/],
     completedCheckpoint: "ASSESSMENT_PERSISTED",
     nextRequiredGate: "CONTACT_REVIEW_APPROVAL",
   },
