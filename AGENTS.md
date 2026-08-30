@@ -41,6 +41,9 @@ paying-client proof.
 
 ## Safety rules
 
+- On Riley's machine, use the non-synced checkout at
+  `C:\Users\riley\Documents\ChatGPT\APE`. Do not use a OneDrive or Google Drive
+  folder as the working repository. GitHub remains the remote source of truth.
 - All autonomous intake, queue, follow-up, and send switches default to off.
 - Missing, invalid, stale, or contradictory configuration must stop work.
 - Only verified email may eventually be automated. Calls, forms, and social DMs

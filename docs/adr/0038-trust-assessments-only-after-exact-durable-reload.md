@@ -124,5 +124,6 @@ migration, backup, and access procedures.
    progress-proof builder.
 5. [x] Add adversarial tests for copied trust, missing guards, row drift, source
    drift, and stale database time.
-6. [ ] Design a separate zero-authority `ASSESSMENT` phase-input adapter bound
-   to the exact current manifest and parent checkpoint.
+6. [x] Design the separate zero-authority `ASSESSMENT` phase-input adapter in
+   ADR 0039, bound to the exact current manifest and parent checkpoint without
+   appending progress.

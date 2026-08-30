@@ -474,11 +474,18 @@ drift, and row drift cannot become proof.
 A synthetic-only `assessment-proof:*` accepts only that exact `CURRENT` reload
 and binds it to the exact manifest business, completed website-evidence phase,
 website proof, and eligibility reference. The progress recorder requires that
-proof as a separate supporting receipt for `ASSESSMENT`, but there is still no
-assessment phase-input adapter, append path, operator command, live binding, or
-real-business execution. The boundary cannot execute qualification, discover
-contacts, mutate progress, call a provider, deploy, contact a prospect, or
-spend.
+proof as a separate supporting receipt for `ASSESSMENT`. A validation-only
+adapter now regenerates the proof internally and derives one frozen phase input
+only from that exact current durable reload, the exact manifest business and
+website-evidence predecessor, and the complete unchanged parent checkpoint. It
+binds the input to that parent privately, uses D1 time instead of a caller clock,
+and permits another business to have advanced only when the complete new parent
+is canonical and the reload is at least as new. Copied trust, stale history,
+lineage drift, forged checkpoint chronology, and changed parents fail closed.
+There is still no assessment append path, operator command, file/database
+writer, live binding, or real-business execution. The boundary cannot execute
+qualification, discover contacts, mutate progress, call a provider, deploy,
+contact a prospect, or spend.
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

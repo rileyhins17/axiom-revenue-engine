@@ -239,13 +239,24 @@ closed.
 
 The proof builder accepts only that exact current durable reload and uses its D1
 clock as proof time. It binds those facts to the exact completed
-current-website-evidence phase in one `assessment-proof:*`. The progress recorder
-requires the separate proof reference, but no adapter turns it into an
-`ASSESSMENT` phase input and no append occurs. Never hand-author either the
-durable reload or proof. There is no operator command, Worker import, live D1
-binding, or real-business path. The loader authorizes database reads only; it
-does not authorize qualification execution, contact work, progress mutation,
-provider use, deployment, outreach, send, or spend.
+current-website-evidence phase in one `assessment-proof:*`. A separate
+validation-only adapter now regenerates that proof internally and can derive one
+frozen `ASSESSMENT` phase input only after rechecking the exact ten-business
+manifest, selected business, two-receipt predecessor prefix, canonical complete
+parent checkpoint, and chronology. It uses the durable receipt and D1 clock;
+there is no caller-owned progress time. A valid later receipt for another
+business is allowed only when the adapter is re-run against that exact new
+parent and D1 time is not older than the checkpoint.
+
+The phase input is trusted only by exact in-process identity and privately bound
+to its manifest and parent ID/digest. Copied input or reload JSON, an edited and
+re-hashed parent time, a changed parent presented after derivation, stale
+assessment history, or lineage drift fails closed. No assessment progress append
+occurs. Never hand-author the durable reload, proof, or phase input. There is no
+operator command, file writer, Worker import, live D1 binding, or real-business
+path. The loader authorizes database reads only; neither boundary authorizes
+qualification execution, contact work, progress mutation, provider use,
+deployment, outreach, send, or spend.
 
 ## Owner-approved local KW materialization and assessment
 

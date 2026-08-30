@@ -313,11 +313,15 @@ Retire entries when the architecture makes them impossible.
   migration-0061 immutable triggers, rebuild the assessment from the durable
   sealed workflow source and business, exactly reload every derived row, and
   classify freshness from D1 time. Deep-freeze and register the result in a
-  module-private `WeakSet`; only the exact `CURRENT` object can feed proof.
+  module-private `WeakSet`; only the exact `CURRENT` object can feed proof. The
+  assessment phase-input adapter regenerates that proof internally and binds its
+  exact in-process output to the complete manifest and parent checkpoint.
 - **Prevention/test:** adversarial tests reject clones, missing guards, row
   drift, source drift, and stale database time. The safety checker forbids the
-  proof builder from importing the schema-valid writer-execution contract or a
-  caller-owned proof time.
+  proof/input builders from importing the schema-valid writer-execution contract,
+  a caller-owned clock, the generic progress writer, runtime bindings, files, or
+  providers. Parent-clock and unrelated-business tests keep cohort progress
+  strict without requiring the target business to be the last one updated.
 - **Affected area:** shadow assessment persistence, interrupted-task recovery,
   assessment progress proof, and every future `ASSESSMENT` phase-input/append
   boundary.

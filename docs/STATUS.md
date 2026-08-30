@@ -39,9 +39,12 @@ private loader verifies every immutable database guard, reloads the complete
 assessment row set, rebuilds the assessment from the sealed website source, and
 uses the database clock for freshness. Only the exact frozen current reload can
 feed proof; copied JSON, writer responses, stale history, source drift, and row
-drift fail closed. It still cannot create an assessment phase input or advance
-progress, and there is no operator command, live database binding, or real-data
-path. That exact console build has a
+drift fail closed. A separate validation-only boundary now turns that exact
+current reload into one frozen assessment phase input after rechecking the
+selected business, website-evidence predecessor, full ten-business parent, and
+chronology. It internally regenerates proof, binds the input to the exact parent,
+and cannot append progress. There is still no operator command, file/database
+writer, live binding, or real-data path. That exact console build has a
 verified, tamper-evident isolated-staging release packet, but it has not been
 deployed; exact-head Linux CI is green and only the separate owner deployment
 approval remains required before staging can change.
@@ -209,7 +212,13 @@ approval remains required before staging can change.
 - Durable assessment-provenance checkpoint: the branch HEAD containing this
   status entry; previous verified checkpoint
   `67f974ea9b57e8e969228c96bad5256f1f656233`.
+- Assessment phase-input checkpoint: the branch HEAD containing this status
+  entry; previous verified checkpoint
+  `02e0c5a3ef69fe004d8ab7aab1314f0021f07f33`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
+- Canonical Riley-machine checkout: non-synced
+  `C:\Users\riley\Documents\ChatGPT\APE`; OneDrive and Google Drive are not
+  working-repository locations.
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Source migrations: all 68 replay from zero, including the fail-closed
   lockdown, shadow
@@ -1648,6 +1657,28 @@ Completed gates:
   838 ms. No production or staging deployment, migration, provider operation,
   mailbox action, prospect contact, real-business execution, or paid runtime
   work occurred. Spend impact is C$0.
+- The validation-only `ASSESSMENT` adapter now accepts only the exact frozen
+  in-process `CURRENT` durable assessment reload. It regenerates the
+  `assessment-proof:*` internally, rechecks the exact manifest business and
+  two-receipt website-evidence prefix, and returns one deeply frozen normalized
+  phase input using the assessment receipt time and D1 clock.
+- The input is privately bound to the exact manifest and complete parent
+  checkpoint. A canonical parent may include a later receipt for another
+  business, but an edited/re-hashed checkpoint time, a parent newer than the D1
+  reload, a changed parent after derivation, copied input/reload JSON, stale
+  history, or lineage drift fails closed.
+- Static safety checks prevent progress append/receipt creation, caller clocks,
+  operator/Worker imports, files, databases, runtime bindings, providers, or
+  mutations. Focused durable-assessment/proof/input verification passes 15/15.
+- The complete release gate passes fail-closed safety, 489/489 tests,
+  standalone typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, and the explicit default-environment no-upload Wrangler dry run.
+  Wrangler retained only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 358 ms and the dossier in
+  848 ms. No production or staging deployment, migration, provider operation,
+  mailbox action, prospect contact, real-business execution, or paid runtime
+  work occurred. Spend impact is C$0.
 
 Still required for Phase 1:
 
@@ -1758,6 +1789,10 @@ before approval.
   append. It creates no durable record or operational authority. Any operator
   command, ignored-local persistence, real-business use, or live resource
   connection remains separately reviewed and approval-gated.
+- No new owner decision is required for the validation-only assessment
+  phase-input adapter. It creates no receipt or checkpoint and adds no live or
+  real-business path. Assessment progress append and any durable/operator wiring
+  remain separately reviewed and approval-gated.
 
 ## Next three actions
 
@@ -1769,10 +1804,10 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Design the zero-authority `ASSESSMENT` phase-input adapter. Require the exact
-   current durable assessment reload, exact manifest business, website-evidence
-   predecessor, and unchanged parent checkpoint; do not append progress or add
-   an operator/live-data path in the same milestone.
+3. Design the separate guarded in-memory `ASSESSMENT` progress append. Require
+   the exact module-private assessment input and its unchanged parent, prove that
+   exactly one receipt and no unrelated business changed, and keep durable,
+   operator, live-data, and real-business paths out of that milestone.
 
 ## Resume instructions
 

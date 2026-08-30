@@ -125,3 +125,8 @@ commercial coverage, and a hard authority boundary. This option was selected.
 14. [ ] Stop on stale evidence, duplicate identity, source-plan drift, imbalance,
     or an unconfirmed/unknown chain status. Never loosen the manifest to make a
     candidate fit.
+15. [x] Derive a zero-execution-authority `ASSESSMENT` phase input only from the
+    exact current durable assessment reload, internally regenerated proof,
+    selected manifest business, completed website-evidence predecessor, and
+    canonical unchanged parent checkpoint. Keep append and operational wiring
+    separate.
