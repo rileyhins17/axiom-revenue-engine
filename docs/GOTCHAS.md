@@ -428,20 +428,22 @@ Retire entries when the architecture makes them impossible.
 - **Root cause:** scrolling a far-down action only “into view” does not prove its
   actual click target is clear of a fixed bottom navigation layer. Locator click
   actionability can also perform its own last-moment scroll after a geometry
-  check; on the long mobile lead card that intermittently left Next's link on
-  the current `/leads` route even though the earlier rectangle was clear.
-  Browser actionability and visual presence alone were too weak for this owner
-  task.
+  check. A raw coordinate avoids that second scroll, but the long mobile card can
+  still finish a layout frame after the coordinate is measured. In both cases,
+  the pointer can land on the current `/leads` page even though the earlier
+  rectangle was clear. Browser actionability, visual presence, and a one-frame
+  coordinate were all too weak for this owner task.
 - **Proven fix:** center the dossier action in the mobile viewport, measure its
   rectangle against the fixed primary navigation, verify its exact destination,
-  prove `elementFromPoint` at the link centre belongs to that anchor, and click
-  that already-proven coordinate without allowing another locator auto-scroll.
+  require its rectangle to remain unchanged across five animation frames, prove
+  `elementFromPoint` at the link centre belongs to that anchor, and click that
+  stable, already-proven coordinate without allowing another locator auto-scroll.
   Start the exact-URL wait before the pointer click and include the failing stage
   plus current URL in diagnostics.
 - **Prevention/test:** `npm run test:owner-ui` now proves the unobscured mobile
-  pointer target and exact navigation as part of all six desktop/mobile owner
-  views. Two consecutive post-fix runs passed after the intermittent failure was
-  reproduced.
+  stable pointer target and exact navigation as part of all six desktop/mobile
+  owner views. The one-frame coordinate failure was reproduced twice; two
+  consecutive stability-bound post-fix runs passed.
 - **Affected area:** mobile Leads owner task, fixed primary navigation, and
   Playwright release acceptance.
 - **Verifying commit:** branch HEAD containing ADR 0035 and the coordinate-bound

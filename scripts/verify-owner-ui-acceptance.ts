@@ -706,6 +706,30 @@ async function assertMobileNavigationClear(page: Page) {
 async function openMobileDossier(page: Page) {
   const link = page.getByRole("link", { name: /Open evidence dossier/i }).first();
   await link.evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest" }));
+  const stableRectangle = await link.evaluate(async (element) => {
+    let previous: DOMRect | null = null;
+    let stableFrames = 0;
+    for (let frame = 0; frame < 120; frame += 1) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const current = element.getBoundingClientRect();
+      const unchanged = previous
+        && Math.abs(current.left - previous.left) < 0.25
+        && Math.abs(current.top - previous.top) < 0.25
+        && Math.abs(current.width - previous.width) < 0.25
+        && Math.abs(current.height - previous.height) < 0.25;
+      stableFrames = unchanged ? stableFrames + 1 : 0;
+      previous = current;
+      if (stableFrames >= 5) {
+        return {
+          left: current.left,
+          top: current.top,
+          width: current.width,
+          height: current.height,
+        };
+      }
+    }
+    throw new Error("The mobile dossier action did not reach a stable pointer rectangle.");
+  });
   const geometry = await page.evaluate(() => {
     const dossierLink = [...document.querySelectorAll("a")].find((element) =>
       element.textContent?.includes("Open evidence dossier"),
@@ -740,6 +764,22 @@ async function openMobileDossier(page: Page) {
       ownedByLink: hit === element || element.contains(hit) || hit?.closest("a") === element,
     };
   });
+  const clickRectangle = await link.evaluate((element) => {
+    const rectangle = element.getBoundingClientRect();
+    return {
+      left: rectangle.left,
+      top: rectangle.top,
+      width: rectangle.width,
+      height: rectangle.height,
+    };
+  });
+  assert(
+    Math.abs(stableRectangle.left - clickRectangle.left) < 0.25
+      && Math.abs(stableRectangle.top - clickRectangle.top) < 0.25
+      && Math.abs(stableRectangle.width - clickRectangle.width) < 0.25
+      && Math.abs(stableRectangle.height - clickRectangle.height) < 0.25,
+    `The mobile dossier action moved after its stable pointer rectangle was proven: ${JSON.stringify({ stableRectangle, clickRectangle })}`,
+  );
   assert(pointerTarget.ownedByLink, `The mobile dossier link does not own its pointer target: ${JSON.stringify(pointerTarget)}`);
   await Promise.all([
     page.waitForURL(new RegExp(`/leads/${FIXTURE_BUSINESS_ID}$`)),

@@ -89,6 +89,10 @@ import {
   requireInProcessPrivateKwCurrentWebsiteEvidenceProgressInput,
 } from "@/lib/revenue-engine/private-kw-current-website-evidence-progress";
 import {
+  appendPrivateKwCurrentWebsiteEvidenceProgress,
+  requireInProcessPrivateKwCurrentWebsiteEvidenceProgressCheckpoint,
+} from "@/lib/revenue-engine/private-kw-current-website-evidence-progress-append";
+import {
   PRIVATE_KW_CURRENT_WEBSITE_EVIDENCE_VERSION,
   PrivateKwCurrentWebsiteEvidenceProofSchema,
   privateKwCurrentWebsiteEvidenceAuthority,
@@ -100,9 +104,11 @@ import {
 import {
   PRIVATE_KW_SHADOW_PHASE_RECEIPT_VERSION,
   PrivateKwShadowSlicePhaseReceiptInputSchema,
+  PrivateKwShadowSliceProgressCheckpointSchema,
   appendPrivateKwShadowSliceProgress,
   buildInitialPrivateKwShadowSliceProgress,
   privateKwShadowSliceProgressAuthority,
+  privateKwShadowSliceProgressDigest,
 } from "@/lib/revenue-engine/private-kw-shadow-slice-progress";
 import {
   createPrivateKwShadowSourceWorkflowFixture,
@@ -1465,6 +1471,138 @@ test("current website evidence progress rejects predecessor and proof lineage dr
       currentEligibilityResultValue: fixture.reloaded,
       recordedAt: fixture.recordedAt,
     }), /exact website-bearing manifest business/i);
+  } finally {
+    fixture.database.close();
+  }
+});
+
+test("guarded website evidence append advances exactly once and replays the same in-memory checkpoint", async () => {
+  const fixture = await durableEligibilityProgressFixture();
+  try {
+    const phaseInput = buildPrivateKwCurrentWebsiteEvidenceProgressInput({
+      manifestValue: fixture.manifest,
+      previousProgressValue: fixture.sourceProgress,
+      websiteEvidenceProofValue: fixture.evidence,
+      currentEligibilityResultValue: fixture.reloaded,
+      recordedAt: fixture.recordedAt,
+    });
+    const first = appendPrivateKwCurrentWebsiteEvidenceProgress({
+      manifestValue: fixture.manifest,
+      previousProgressValue: structuredClone(fixture.sourceProgress),
+      phaseInputValue: phaseInput,
+    });
+    const replayed = appendPrivateKwCurrentWebsiteEvidenceProgress({
+      manifestValue: fixture.manifest,
+      previousProgressValue: fixture.sourceProgress,
+      phaseInputValue: phaseInput,
+    });
+
+    assert.equal(replayed, first);
+    assert.equal(first.parentCheckpoint?.checkpointId, fixture.sourceProgress.checkpointId);
+    assert.equal(first.parentCheckpoint?.checkpointDigest, fixture.sourceProgress.checkpointDigest);
+    assert.equal(
+      first.summary.completedPhaseReceipts,
+      fixture.sourceProgress.summary.completedPhaseReceipts + 1,
+    );
+    const advanced = first.records.find((record) => record.businessId === phaseInput.businessId);
+    const previous = fixture.sourceProgress.records.find(
+      (record) => record.businessId === phaseInput.businessId,
+    );
+    assert.ok(advanced);
+    assert.ok(previous);
+    assert.equal(advanced.phaseReceipts.length, previous.phaseReceipts.length + 1);
+    assert.equal(advanced.currentCheckpoint, "CURRENT_WEBSITE_EVIDENCE_PERSISTED");
+    assert.equal(advanced.nextRequiredGate, "ASSESSMENT_APPROVAL");
+    assert.equal(advanced.phaseReceipts.at(-1)?.proof.primaryReceiptId, fixture.evidence.proofId);
+    assert.deepEqual(
+      first.records.filter((record) => record.businessId !== phaseInput.businessId),
+      fixture.sourceProgress.records.filter((record) => record.businessId !== phaseInput.businessId),
+    );
+    assert.equal(first.authority.phaseExecutionAuthorized, false);
+    assert.equal(first.authority.databaseMutationAuthorized, false);
+    assert.equal(first.authority.providerOperationsAuthorized, 0);
+    assert.equal(first.authority.costAuthorizedUsd, 0);
+    assert.equal(Object.isFrozen(first), true);
+    assert.equal(Object.isFrozen(advanced.phaseReceipts), true);
+    assert.equal(
+      requireInProcessPrivateKwCurrentWebsiteEvidenceProgressCheckpoint(first),
+      first,
+    );
+    assert.throws(
+      () => requireInProcessPrivateKwCurrentWebsiteEvidenceProgressCheckpoint(
+        structuredClone(first),
+      ),
+      /exact in-process result/i,
+    );
+    assert.equal(
+      fixture.sourceProgress.records.find(
+        (record) => record.businessId === phaseInput.businessId,
+      )?.phaseReceipts.length,
+      1,
+    );
+    assert.equal(
+      tableCount(fixture.database, "RevenueCurrentWebsiteEvidenceEligibilityReceipt"),
+      1,
+    );
+  } finally {
+    fixture.database.close();
+  }
+});
+
+test("guarded website evidence append rejects copied input and any changed parent checkpoint", async () => {
+  const fixture = await durableEligibilityProgressFixture();
+  try {
+    const phaseInput = buildPrivateKwCurrentWebsiteEvidenceProgressInput({
+      manifestValue: fixture.manifest,
+      previousProgressValue: fixture.sourceProgress,
+      websiteEvidenceProofValue: fixture.evidence,
+      currentEligibilityResultValue: fixture.reloaded,
+      recordedAt: fixture.recordedAt,
+    });
+    const append = (previousProgressValue: unknown, phaseInputValue: unknown) => (
+      appendPrivateKwCurrentWebsiteEvidenceProgress({
+        manifestValue: fixture.manifest,
+        previousProgressValue,
+        phaseInputValue,
+      })
+    );
+
+    assert.throws(
+      () => append(fixture.sourceProgress, structuredClone(phaseInput)),
+      /exact in-process result/i,
+    );
+
+    const {
+      checkpointId: _checkpointId,
+      checkpointDigest: _checkpointDigest,
+      ...parentCore
+    } = fixture.sourceProgress;
+    void _checkpointId;
+    void _checkpointDigest;
+    const changedParentCore = {
+      ...parentCore,
+      createdAt: new Date(Date.parse(parentCore.createdAt) + 1).toISOString(),
+    };
+    const changedParentDigest = privateKwShadowSliceProgressDigest(changedParentCore);
+    const changedParent = PrivateKwShadowSliceProgressCheckpointSchema.parse({
+      ...changedParentCore,
+      checkpointId: `kw-shadow-progress:${changedParentDigest}`,
+      checkpointDigest: changedParentDigest,
+    });
+    assert.throws(
+      () => append(changedParent, phaseInput),
+      /exact unchanged manifest and parent checkpoint/i,
+    );
+
+    const completed = append(fixture.sourceProgress, phaseInput);
+    assert.throws(
+      () => append(completed, phaseInput),
+      /exact unchanged manifest and parent checkpoint/i,
+    );
+    assert.equal(
+      tableCount(fixture.database, "RevenueCurrentWebsiteEvidenceEligibilityReceipt"),
+      1,
+    );
   } finally {
     fixture.database.close();
   }

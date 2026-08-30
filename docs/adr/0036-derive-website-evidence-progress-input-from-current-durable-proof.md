@@ -72,8 +72,9 @@ one-call convenience path.
 - Fresh commits, exact replays, copied outputs, stale results, cross-business or
   cross-source lineage, predecessor replacement, and false chronology fail
   closed.
-- The existing progress checkpoint remains unchanged; a separate guarded append
-  decision is still required.
+- This adapter leaves the existing progress checkpoint unchanged. ADR 0037
+  separately defines a guarded in-memory append and still grants no durable or
+  operational progress path.
 - There is still no operator command, Worker import, live D1 binding, Browser/R2
   activation, real-business execution, provider operation, outreach, or spend.
 - Static safety checks prevent accidental wiring to the Worker, runtime/data
@@ -87,5 +88,5 @@ one-call convenience path.
    and zero authority.
 3. [x] Add static safety enforcement for runtime, provider, mutation, and
    progress-writer isolation.
-4. [ ] Add a separate guarded append boundary only after this checkpoint is
-   verified; keep live and real-business wiring separately approval-gated.
+4. [x] Add the separate parent-bound guarded in-memory append boundary in ADR
+   0037; keep durable, live, and real-business wiring separately approval-gated.

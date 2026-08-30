@@ -30,14 +30,17 @@ again. A separate validation-only adapter can now derive the next normalized
 phase input only from the exact in-process current durable reload, after
 rechecking the ten-business scope, business, predecessor, proof lineage, and
 time window. It cannot append progress, create a checkpoint, access a provider,
-or authorize execution, and there is still no operator command, live database
-connection, or guarded append boundary. The following assessment proof is now
-equally fail-closed: it binds the exact website evidence, audit, immutable
-assessment, and database result in synthetic tests, but it cannot create or
-advance a real phase. That exact console build has a verified, tamper-evident
-isolated-staging release packet, but it has not been deployed; exact-head Linux
-CI is green and only the separate owner deployment approval remains required
-before staging can change.
+or authorize execution. A separate guarded boundary now requires that exact
+input and its unchanged parent, verifies a one-receipt-only append, and returns
+the same frozen in-memory checkpoint on an exact retry. There is still no
+operator command, durable output, live database connection, or real-data path.
+The following assessment proof is equally fail-closed: it binds the exact
+website evidence, audit, immutable assessment, and database result in synthetic
+tests, but its assessment execution is not yet durable trusted provenance and
+it cannot create or advance a real phase. That exact console build has a
+verified, tamper-evident isolated-staging release packet, but it has not been
+deployed; exact-head Linux CI is green and only the separate owner deployment
+approval remains required before staging can change.
 
 ## Verified checkpoint
 
@@ -196,6 +199,9 @@ before staging can change.
 - Current-website-evidence phase-input checkpoint: the branch HEAD containing
   this status entry; previous verified checkpoint
   `8116e9b1c365bf4dde6cbf5a25347e7a135ebd6c`.
+- Guarded current-website-evidence progress-append checkpoint: the branch HEAD
+  containing this status entry; previous verified checkpoint
+  `1b29b5fe30d1926b91de90868e55e4f7867fae12`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Source migrations: all 68 replay from zero, including the fail-closed
@@ -1581,6 +1587,32 @@ Completed gates:
   prospect, secret, staging/production resource, deployment, migration, or paid
   runtime operation occurred. Spend impact is C$0 and every autonomous
   capability remains off.
+- The trusted website-evidence phase input now privately retains the exact
+  manifest and full parent checkpoint ID/digest used to derive it. A safely
+  reloaded content-identical parent is accepted; any changed and redigested
+  ten-business state is rejected before append.
+- A separate validation-only in-memory boundary calls the canonical progress
+  appender, then independently proves that exactly one website-evidence receipt
+  was added to the selected business, its prior prefix and every other business
+  stayed unchanged, the summary increased by one, and the result names the
+  exact parent. The result is deeply frozen.
+- An identical retry returns the same cached checkpoint instance. Copied phase
+  inputs, changed parents, and replay against the already-completed child fail
+  closed. The generic operator recorder and inert Worker cannot import this
+  boundary.
+- Focused website-evidence transaction/progress verification passes 26/26
+  tests. The complete release gate passes fail-closed safety, 484/484 tests,
+  standalone typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, and the explicit default-environment no-upload Wrangler dry run.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; two consecutive post-fix runs included a lead list ready
+  in 606 ms and dossier in 917 ms. The mobile pointer check now
+  requires the dossier action to remain geometrically stable before clicking,
+  after two reproduced timeouts proved that a one-frame coordinate could become
+  stale. No file or database progress record, real business,
+  Browser/R2/Cloudflare D1/provider operation, mailbox, prospect, secret,
+  staging/production resource, deployment, migration, or paid runtime operation
+  occurred. Spend impact is C$0 and every autonomous capability remains off.
 
 Still required for Phase 1:
 
@@ -1677,14 +1709,18 @@ before approval.
   recording, and any downstream assessment remain separately approval-gated.
 - No new owner decision is required for the disconnected durable eligibility
   schema and adapter. Applying migration 0068 to any real or remote database,
-  connecting the Cloudflare D1 adapter, creating an operator command, or
-  recording the derived input as progress remains a separate reviewed and
+  connecting the Cloudflare D1 adapter, creating an operator command, or using
+  the receipt with real business data remains a separate reviewed and
   approval-gated change.
 - No new owner decision is required for the validation-only website-evidence
   phase-input adapter. It adds no live operation or progress mutation. Applying
   migration 0068, connecting live D1/Browser/R2, using real businesses, or
-  recording the input through a future guarded append boundary remains
+  persisting the resulting checkpoint through any operator or durable path remains
   separately reviewed and approval-gated.
+- No new owner decision is required for the guarded in-memory website-evidence
+  append. It creates no durable record or operational authority. Any operator
+  command, ignored-local persistence, real-business use, or live resource
+  connection remains separately reviewed and approval-gated.
 
 ## Next three actions
 
@@ -1696,11 +1732,11 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Define a separate validation-only website-evidence progress-append boundary.
-   It must accept only the exact module-private phase input and unchanged parent
-   checkpoint, append at most one idempotent receipt in memory, and grant no
-   execution authority. Keep operator commands, migration apply, Browser/R2,
-   live D1, real data, providers, deployment, and spend separately blocked.
+3. Establish trusted assessment persistence provenance before any `ASSESSMENT`
+   phase-input adapter. Replace acceptance of schema-valid execution JSON with
+   an exact in-process and durable reload boundary that proves the immutable
+   assessment rows and freshness without granting qualification execution,
+   progress append, live D1, providers, deployment, outreach, or spend.
 
 ## Resume instructions
 

@@ -454,8 +454,14 @@ command, runtime import, or live database binding. A separate validation-only
 adapter can derive the normalized `CURRENT_WEBSITE_EVIDENCE` phase input only
 from the exact in-process `CURRENT` durable reload. It rechecks the exact
 ten-business manifest scope, selected business, source/workflow predecessor,
-website proof, receipt lineage, and time window; it cannot append progress,
-create a checkpoint, access a provider, or authorize execution.
+website proof, receipt lineage, and time window; that adapter cannot append
+progress, create a checkpoint, access a provider, or authorize execution. A
+second guarded in-memory boundary requires that exact module-private input and
+the unchanged content-addressed parent checkpoint, calls the canonical progress
+appender, verifies that exactly one receipt and no other business changed, then
+freezes and caches the result. An identical retry returns the same checkpoint
+object. There is still no operator command, file writer, live binding, or
+durable progress path for this phase.
 The following assessment boundary is normalized in the same fail-closed style.
 A synthetic-only `assessment-proof:*` binds the exact manifest business,
 completed website-evidence phase, website proof and eligibility reference,
@@ -463,9 +469,9 @@ sealed workflow/audit lineage, immutable assessment, and committed-and-reloaded
 persistence result. The progress recorder requires that proof as a separate
 supporting receipt for `ASSESSMENT`; the builder cannot create a phase receipt,
 read or mutate a database, execute qualification, discover contacts, or advance
-the chain. Because no real current eligibility execution or guarded
-progress-append boundary exists, no real assessment can use this proof to claim
-progress.
+the chain. Because no real current eligibility execution or trusted durable
+assessment-execution boundary exists, no real assessment can use this proof to
+claim progress.
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

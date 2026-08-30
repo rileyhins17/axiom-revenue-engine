@@ -23,6 +23,12 @@ export const PRIVATE_KW_CURRENT_WEBSITE_EVIDENCE_PROGRESS_INPUT_VERSION =
 
 const TimestampSchema = z.string().datetime({ offset: true });
 const trustedProgressInputs = new WeakSet<object>();
+const trustedProgressInputContexts = new WeakMap<object, {
+  manifestId: string;
+  manifestDigest: string;
+  parentCheckpointId: string;
+  parentCheckpointDigest: string;
+}>();
 
 function deepFreeze<T>(value: T): T {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
@@ -52,6 +58,31 @@ export function requireInProcessPrivateKwCurrentWebsiteEvidenceProgressInput(
     );
   }
   return value as PrivateKwShadowSlicePhaseReceiptInput;
+}
+
+export function requireInProcessPrivateKwCurrentWebsiteEvidenceProgressInputForParent(
+  value: unknown,
+  manifestValue: unknown,
+  previousProgressValue: unknown,
+): PrivateKwShadowSlicePhaseReceiptInput {
+  const trusted = requireInProcessPrivateKwCurrentWebsiteEvidenceProgressInput(value);
+  const manifest = PrivateKwShadowSliceManifestSchema.parse(manifestValue);
+  const previousProgress = PrivateKwShadowSliceProgressCheckpointSchema.parse(
+    previousProgressValue,
+  );
+  const context = trustedProgressInputContexts.get(trusted);
+  if (
+    !context
+    || context.manifestId !== manifest.manifestId
+    || context.manifestDigest !== manifest.manifestDigest
+    || context.parentCheckpointId !== previousProgress.checkpointId
+    || context.parentCheckpointDigest !== previousProgress.checkpointDigest
+  ) {
+    throw new Error(
+      "Current website evidence progress input requires its exact unchanged manifest and parent checkpoint.",
+    );
+  }
+  return trusted;
 }
 
 /**
@@ -196,5 +227,11 @@ export function buildPrivateKwCurrentWebsiteEvidenceProgressInput(input: {
   });
   const trusted = deepFreeze(phaseInput);
   trustedProgressInputs.add(trusted);
+  trustedProgressInputContexts.set(trusted, {
+    manifestId: manifest.manifestId,
+    manifestDigest: manifest.manifestDigest,
+    parentCheckpointId: previousProgress.checkpointId,
+    parentCheckpointDigest: previousProgress.checkpointDigest,
+  });
   return trusted;
 }

@@ -211,12 +211,20 @@ in-process `CURRENT` result returned by a `DURABLE_RELOAD`; a fresh commit,
 exact replay, copied result, stale receipt, wrong manifest, wrong predecessor,
 proof drift, or false chronology fails closed. Its frozen output is still only
 a normalized zero-authority input: the adapter does not call the progress
-appender or create a phase receipt/checkpoint. There is no operator command,
-live binding, or guarded progress-append boundary for this phase. Synthetic
-tests use local SQLite rows and in-memory artifacts only. Live capture, R2
-activation/HEAD reads, Cloudflare D1 execution, applying schema 0068 to a real
-database, and real progress remain separate future approvals and
-implementations.
+appender or create a phase receipt/checkpoint.
+
+The separate guarded append boundary accepts only that exact module-private
+input with the manifest and content-addressed parent checkpoint used to derive
+it. A content-equivalent reloaded parent is valid; any redigested change anywhere
+in the ten-business checkpoint is not. The boundary calls the canonical
+appender, independently verifies that exactly one website-evidence receipt and
+no other business changed, deeply freezes the result, and returns the same
+checkpoint object on an identical in-process retry. It does not write a file or
+database. There is no operator command, live binding, or durable progress path
+for this phase. Synthetic tests use local SQLite rows and in-memory artifacts
+only. Live capture, R2 activation/HEAD reads, Cloudflare D1 execution, applying
+schema 0068 to a real database, and real progress remain separate future
+approvals and implementations.
 
 The `ASSESSMENT` proof contract is also an engineering boundary rather than an
 operator command. It independently rechecks the assessment's content-derived
@@ -228,8 +236,8 @@ progress recorder requires that separate proof reference, but no adapter turns
 the proof into an assessment phase input. The proof authorizes no database read
 or write, qualification execution, contact work, progress append, provider use,
 deployment, send, or spend. Never hand-author an `assessment-proof:*`; the real
-chain remains stopped because no real current eligibility execution or guarded
-progress append exists.
+chain remains stopped because no real current eligibility execution or trusted
+durable assessment-execution boundary exists.
 
 ## Owner-approved local KW materialization and assessment
 
