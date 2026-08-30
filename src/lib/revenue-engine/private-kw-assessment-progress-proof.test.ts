@@ -17,8 +17,7 @@ function buildProof(fixture: Awaited<ReturnType<typeof createPrivateKwAssessment
     manifestValue: fixture.manifest,
     previousPhaseReceiptValue: fixture.currentWebsitePhaseReceipt,
     currentWebsiteEvidenceProofValue: fixture.evidenceProof,
-    assessmentExecutionValue: fixture.assessmentExecution,
-    preparedAt: fixture.proofPreparedAt,
+    assessmentDurableReloadValue: fixture.assessmentDurableReload,
   });
 }
 
@@ -34,7 +33,11 @@ test("builds one deterministic assessment proof bound to current evidence and im
   assert.equal(first.currentWebsiteEvidence.proofId, fixture.evidenceProof.proofId);
   assert.equal(first.assessment.assessmentId, fixture.assessment.assessmentId);
   assert.equal(first.assessment.assessmentDigest, fixture.assessment.assessmentDigest);
-  assert.equal(first.persistence.executionPath, "FRESH_COMMIT");
+  assert.equal(first.persistence.executionPath, "DURABLE_RELOAD");
+  assert.equal(first.persistence.freshnessState, "CURRENT");
+  assert.equal(first.persistence.databaseNow, fixture.assessmentDurableReload.databaseNow);
+  assert.equal(first.persistence.exactSourceRebuilt, true);
+  assert.equal(first.persistence.immutableWriterGuardsVerified, true);
   assert.equal(first.persistence.committedAndReloaded, true);
   assert.equal(first.requiredProgressSupportingReceiptKind, "ASSESSMENT_PROOF");
   assert.equal(first.authority.syntheticContractProofOnly, true);
@@ -57,88 +60,44 @@ test("rejects cross-business, predecessor, and website-workflow lineage drift", 
     manifestValue: other.manifest,
     previousPhaseReceiptValue: fixture.currentWebsitePhaseReceipt,
     currentWebsiteEvidenceProofValue: fixture.evidenceProof,
-    assessmentExecutionValue: fixture.assessmentExecution,
-    preparedAt: fixture.proofPreparedAt,
+    assessmentDurableReloadValue: fixture.assessmentDurableReload,
   }), /exact completed current-website-evidence predecessor/);
 
   assert.throws(() => buildPrivateKwAssessmentProgressProof({
     manifestValue: fixture.manifest,
     previousPhaseReceiptValue: fixture.currentWebsitePhaseReceipt,
     currentWebsiteEvidenceProofValue: other.evidenceProof,
-    assessmentExecutionValue: fixture.assessmentExecution,
-    preparedAt: fixture.proofPreparedAt,
+    assessmentDurableReloadValue: fixture.assessmentDurableReload,
   }), /one exact reviewed manifest business/);
 
-  const assessmentDrift = structuredClone(fixture.assessmentExecution);
-  assessmentDrift.assessment.workflow.receiptDigest = "f".repeat(64);
   assert.throws(() => buildPrivateKwAssessmentProgressProof({
     manifestValue: fixture.manifest,
     previousPhaseReceiptValue: fixture.currentWebsitePhaseReceipt,
     currentWebsiteEvidenceProofValue: fixture.evidenceProof,
-    assessmentExecutionValue: assessmentDrift,
-    preparedAt: fixture.proofPreparedAt,
-  }), /exact current website workflow/);
+    assessmentDurableReloadValue: other.assessmentDurableReload,
+  }), /exact current website workflow|one exact reviewed manifest business/);
 });
 
-test("rejects redigested assessment content, invalid persistence claims, and stale proof preparation", async () => {
+test("rejects copied durable reloads and database-clock expiration", async () => {
   const fixture = await createPrivateKwAssessmentProgressProofFixture({ suffix: "tamper" });
-  const redigested = structuredClone(fixture.assessmentExecution);
-  redigested.assessment.qualification.totalScore += 1;
+  const copied = structuredClone(fixture.assessmentDurableReload);
   assert.throws(() => buildPrivateKwAssessmentProgressProof({
     manifestValue: fixture.manifest,
     previousPhaseReceiptValue: fixture.currentWebsitePhaseReceipt,
     currentWebsiteEvidenceProofValue: fixture.evidenceProof,
-    assessmentExecutionValue: redigested,
-    preparedAt: fixture.proofPreparedAt,
-  }), /Assessment snapshots and digests|Assessment digest/);
+    assessmentDurableReloadValue: copied,
+  }), /exact in-process result/);
 
-  const invalidFreshCommit = structuredClone(fixture.assessmentExecution);
-  invalidFreshCommit.insertedRows.assessmentReceipts = 0;
-  assert.throws(() => buildPrivateKwAssessmentProgressProof({
-    manifestValue: fixture.manifest,
-    previousPhaseReceiptValue: fixture.currentWebsitePhaseReceipt,
-    currentWebsiteEvidenceProofValue: fixture.evidenceProof,
-    assessmentExecutionValue: invalidFreshCommit,
-    preparedAt: fixture.proofPreparedAt,
-  }), /fresh assessment commit/);
-
-  assert.throws(() => buildPrivateKwAssessmentProgressProof({
-    manifestValue: fixture.manifest,
-    previousPhaseReceiptValue: fixture.currentWebsitePhaseReceipt,
-    currentWebsiteEvidenceProofValue: fixture.evidenceProof,
-    assessmentExecutionValue: fixture.assessmentExecution,
-    preparedAt: fixture.evidenceProof.evidenceFreshThrough,
-  }), /ordered and fresh/);
-});
-
-test("accepts an exact replay only when it truthfully reports zero inserted rows", async () => {
-  const fixture = await createPrivateKwAssessmentProgressProofFixture({ suffix: "exact-replay" });
-  const replay = structuredClone(fixture.assessmentExecution);
-  replay.executionPath = "EXACT_REPLAY";
-  replay.insertedRows = {
-    websiteSnapshots: 0,
-    evidenceClaims: 0,
-    qualificationSnapshots: 0,
-    assessmentReceipts: 0,
-  };
-  const proof = buildPrivateKwAssessmentProgressProof({
-    manifestValue: fixture.manifest,
-    previousPhaseReceiptValue: fixture.currentWebsitePhaseReceipt,
-    currentWebsiteEvidenceProofValue: fixture.evidenceProof,
-    assessmentExecutionValue: replay,
-    preparedAt: fixture.proofPreparedAt,
+  const stale = await createPrivateKwAssessmentProgressProofFixture({
+    suffix: "stale",
+    databaseNowOffsetMs: 61 * 24 * 60 * 60 * 1_000,
   });
-  assert.equal(proof.persistence.executionPath, "EXACT_REPLAY");
-  assert.deepEqual(proof.persistence.insertedRows, replay.insertedRows);
-
-  replay.insertedRows.websiteSnapshots = 1;
   assert.throws(() => buildPrivateKwAssessmentProgressProof({
-    manifestValue: fixture.manifest,
-    previousPhaseReceiptValue: fixture.currentWebsitePhaseReceipt,
-    currentWebsiteEvidenceProofValue: fixture.evidenceProof,
-    assessmentExecutionValue: replay,
-    preparedAt: fixture.proofPreparedAt,
-  }), /exact assessment replay/);
+    manifestValue: stale.manifest,
+    previousPhaseReceiptValue: stale.currentWebsitePhaseReceipt,
+    currentWebsiteEvidenceProofValue: stale.evidenceProof,
+    assessmentDurableReloadValue: stale.assessmentDurableReload,
+  }), /not current at the database clock/);
 });
 
 test("proof is required by assessment progress but cannot create or advance that phase", async () => {

@@ -227,17 +227,25 @@ schema 0068 to a real database, and real progress remain separate future
 approvals and implementations.
 
 The `ASSESSMENT` proof contract is also an engineering boundary rather than an
-operator command. It independently rechecks the assessment's content-derived
-identity, audit/qualification/basis digests, website and qualification snapshot
-IDs, exact audit-claim set, sealed workflow lineage, freshness, and immutable
-fresh-commit or exact-replay counts. It then binds those facts to the exact
-completed current-website-evidence phase in one `assessment-proof:*`. The
-progress recorder requires that separate proof reference, but no adapter turns
-the proof into an assessment phase input. The proof authorizes no database read
-or write, qualification execution, contact work, progress append, provider use,
-deployment, send, or spend. Never hand-author an `assessment-proof:*`; the real
-chain remains stopped because no real current eligibility execution or trusted
-durable assessment-execution boundary exists.
+operator command. Its private D1 loader starts from only the assessment ID and
+digest, verifies every migration-0061 immutable trigger, reads the database
+clock, reloads the exact receipt, sealed terminal workflow source, business,
+website snapshot, complete evidence set, and qualification snapshot, then
+rebuilds the assessment deterministically. Every canonical row must match and
+freshness must be `CURRENT`. The result is deeply frozen and trusted only by
+exact in-process identity; copied or hand-authored JSON, immediate commit/replay
+responses, missing guards, source drift, row drift, and stale history fail
+closed.
+
+The proof builder accepts only that exact current durable reload and uses its D1
+clock as proof time. It binds those facts to the exact completed
+current-website-evidence phase in one `assessment-proof:*`. The progress recorder
+requires the separate proof reference, but no adapter turns it into an
+`ASSESSMENT` phase input and no append occurs. Never hand-author either the
+durable reload or proof. There is no operator command, Worker import, live D1
+binding, or real-business path. The loader authorizes database reads only; it
+does not authorize qualification execution, contact work, progress mutation,
+provider use, deployment, outreach, send, or spend.
 
 ## Owner-approved local KW materialization and assessment
 

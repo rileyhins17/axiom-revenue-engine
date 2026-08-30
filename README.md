@@ -462,16 +462,23 @@ appender, verifies that exactly one receipt and no other business changed, then
 freezes and caches the result. An identical retry returns the same checkpoint
 object. There is still no operator command, file writer, live binding, or
 durable progress path for this phase.
-The following assessment boundary is normalized in the same fail-closed style.
-A synthetic-only `assessment-proof:*` binds the exact manifest business,
-completed website-evidence phase, website proof and eligibility reference,
-sealed workflow/audit lineage, immutable assessment, and committed-and-reloaded
-persistence result. The progress recorder requires that proof as a separate
-supporting receipt for `ASSESSMENT`; the builder cannot create a phase receipt,
-read or mutate a database, execute qualification, discover contacts, or advance
-the chain. Because no real current eligibility execution or trusted durable
-assessment-execution boundary exists, no real assessment can use this proof to
-claim progress.
+The assessment boundary now follows the same fail-closed trust pattern. A
+private read-only D1 reload starts from an assessment ID and digest, verifies all
+eight migration-0061 immutable guards, reloads the complete assessment row set,
+and deterministically rebuilds the assessment from its sealed workflow source
+and current business identity. It classifies freshness from the D1 clock and
+returns a deeply frozen result trusted only by exact in-process identity. Copied
+JSON, immediate commit/replay responses, stale history, missing guards, source
+drift, and row drift cannot become proof.
+
+A synthetic-only `assessment-proof:*` accepts only that exact `CURRENT` reload
+and binds it to the exact manifest business, completed website-evidence phase,
+website proof, and eligibility reference. The progress recorder requires that
+proof as a separate supporting receipt for `ASSESSMENT`, but there is still no
+assessment phase-input adapter, append path, operator command, live binding, or
+real-business execution. The boundary cannot execute qualification, discover
+contacts, mutate progress, call a provider, deploy, contact a prospect, or
+spend.
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

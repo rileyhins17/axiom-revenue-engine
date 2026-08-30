@@ -16,6 +16,8 @@ export const REVENUE_LEAD_ASSESSMENT_D1_EXECUTOR_VERSION = "revenue-lead-assessm
 export const REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION = "0061_shadow_lead_assessment_receipts";
 export const REVENUE_LEAD_ASSESSMENT_DATABASE_CLOCK_SKEW_MS = 5 * 60 * 1_000;
 
+const TimestampSchema = z.string().datetime({ offset: true });
+const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 const SqlValueSchema = z.union([z.string(), z.number().finite(), z.null()]);
 const SqlRowSchema = z.record(z.string(), SqlValueSchema);
 type SqlValue = z.infer<typeof SqlValueSchema>;
@@ -36,7 +38,8 @@ const BatchResultSchema = z.object({
   results: z.array(SqlRowSchema).max(250),
   changes: z.number().int().nonnegative(),
 }).strict();
-const DatabaseTimeRowSchema = z.object({ databaseNow: z.string() }).strict();
+const DatabaseTimeRowSchema = z.object({ databaseNow: TimestampSchema }).strict();
+const TriggerRowSchema = z.object({ name: z.string(), sql: z.string().min(1) }).strict();
 
 /**
  * Cloudflare adapter for the private persistence boundary. No Worker, route, or
@@ -94,6 +97,79 @@ export const RevenueLeadAssessmentD1ExecutionSchema = z.object({
 }).strict();
 
 export type RevenueLeadAssessmentD1Execution = z.infer<typeof RevenueLeadAssessmentD1ExecutionSchema>;
+
+export const RevenueLeadAssessmentD1DurableReloadSchema = z.object({
+  executorVersion: z.literal(REVENUE_LEAD_ASSESSMENT_D1_EXECUTOR_VERSION),
+  targetSchemaVersion: z.literal(REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION),
+  executionPath: z.literal("DURABLE_RELOAD"),
+  transactionApi: z.literal("D1Database.batch"),
+  assessment: RevenueLeadAssessmentSchema,
+  assessmentReceiptRecordedAt: TimestampSchema,
+  databaseNow: TimestampSchema,
+  freshnessState: z.enum(["NOT_YET_CURRENT", "CURRENT", "STALE"]),
+  reloadedRows: z.object({
+    websiteSnapshots: z.literal(1),
+    evidenceClaims: z.number().int().min(0).max(100),
+    qualificationSnapshots: z.literal(1),
+    assessmentReceipts: z.literal(1),
+  }).strict(),
+  exactSourceRebuilt: z.literal(true),
+  immutableWriterGuardsVerified: z.literal(true),
+  committedAndReloaded: z.literal(true),
+  databaseReadPerformed: z.literal(true),
+  databaseMutationPerformed: z.literal(false),
+  persistenceScope: z.literal("EXACT_IMMUTABLE_ASSESSMENT_ROW_SET"),
+  runtimeConnected: z.literal(false),
+  phaseInputCreationAuthorized: z.literal(false),
+  progressReceiptCreationAuthorized: z.literal(false),
+  phaseAdvancementAuthorized: z.literal(false),
+  qualificationExecutionAuthorized: z.literal(false),
+  outreachAuthorized: z.literal(false),
+  sendAuthorized: z.literal(false),
+  deploymentAuthorized: z.literal(false),
+  providerOperationsAuthorized: z.literal(0),
+  costAuthorizedUsd: z.literal(0),
+}).strict().superRefine((result, context) => {
+  if (result.reloadedRows.evidenceClaims !== result.assessment.audit.claims.length) {
+    context.addIssue({
+      code: "custom",
+      message: "A durable assessment reload must retain the exact evidence-claim count.",
+      path: ["reloadedRows", "evidenceClaims"],
+    });
+  }
+});
+
+export type RevenueLeadAssessmentD1DurableReload = z.infer<
+  typeof RevenueLeadAssessmentD1DurableReloadSchema
+>;
+
+const trustedAssessmentDurableReloads = new WeakSet<object>();
+
+function deepFreeze<T>(value: T): T {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  return Object.freeze(value);
+}
+
+export function requireTrustedRevenueLeadAssessmentD1DurableReload(
+  value: unknown,
+): RevenueLeadAssessmentD1DurableReload {
+  RevenueLeadAssessmentD1DurableReloadSchema.parse(value);
+  if (!value || typeof value !== "object" || !trustedAssessmentDurableReloads.has(value)) {
+    throw new Error("Assessment persistence must be the exact in-process result of the private durable D1 reload boundary.");
+  }
+  return value as RevenueLeadAssessmentD1DurableReload;
+}
+
+export function requireCurrentRevenueLeadAssessmentD1DurableReload(
+  value: unknown,
+): RevenueLeadAssessmentD1DurableReload & { freshnessState: "CURRENT" } {
+  const result = requireTrustedRevenueLeadAssessmentD1DurableReload(value);
+  if (result.freshnessState !== "CURRENT") {
+    throw new Error("Durable assessment persistence is not current at the database clock.");
+  }
+  return result as RevenueLeadAssessmentD1DurableReload & { freshnessState: "CURRENT" };
+}
 
 type RecordPlan = {
   entity: "WEBSITE_SNAPSHOT" | "EVIDENCE_CLAIM" | "QUALIFICATION_SNAPSHOT" | "ASSESSMENT_RECEIPT";
@@ -248,6 +324,180 @@ function buildRecordPlans(assessment: RevenueLeadAssessment): RecordPlan[] {
   return plans;
 }
 
+const REQUIRED_ASSESSMENT_TRIGGER_MARKERS = {
+  RevenueWebsiteSnapshot_assessment_immutable_update: "REVENUE_LEAD_ASSESSMENT_APPEND_ONLY",
+  RevenueWebsiteSnapshot_assessment_immutable_delete: "REVENUE_LEAD_ASSESSMENT_APPEND_ONLY",
+  RevenueEvidenceClaim_assessment_immutable_update: "REVENUE_LEAD_ASSESSMENT_APPEND_ONLY",
+  RevenueEvidenceClaim_assessment_immutable_delete: "REVENUE_LEAD_ASSESSMENT_APPEND_ONLY",
+  RevenueQualificationSnapshot_assessment_immutable_update: "REVENUE_LEAD_ASSESSMENT_APPEND_ONLY",
+  RevenueQualificationSnapshot_assessment_immutable_delete: "REVENUE_LEAD_ASSESSMENT_APPEND_ONLY",
+  RevenueLeadAssessmentReceipt_immutable_update: "REVENUE_LEAD_ASSESSMENT_APPEND_ONLY",
+  RevenueLeadAssessmentReceipt_immutable_delete: "REVENUE_LEAD_ASSESSMENT_APPEND_ONLY",
+} as const;
+
+const ASSESSMENT_TRIGGER_STATEMENT = statement(
+  "read:assessment_writer_guards",
+  `SELECT "name", "sql" FROM "sqlite_master"
+   WHERE "type" = 'trigger' AND "name" IN (${Object.keys(REQUIRED_ASSESSMENT_TRIGGER_MARKERS).map(() => "?").join(", ")})
+   ORDER BY "name"`,
+  Object.keys(REQUIRED_ASSESSMENT_TRIGGER_MARKERS),
+);
+
+const AssessmentReceiptRowSchema = z.object({
+  id: z.string().regex(/^assessment:[a-f0-9]{64}$/),
+  assessmentVersion: z.literal("revenue-lead-assessment-v1"),
+  assessmentKey: z.string().trim().min(8).max(200),
+  businessId: z.string().trim().min(1).max(128),
+  workflowReceiptId: z.string().trim().min(1).max(200),
+  websiteSnapshotId: z.string().regex(/^website:[a-f0-9]{64}$/),
+  qualificationSnapshotId: z.string().regex(/^qualification:[a-f0-9]{64}$/),
+  auditDigest: Sha256Schema,
+  qualificationDigest: Sha256Schema,
+  basisDigest: Sha256Schema,
+  evidenceClaimCount: z.number().int().min(0).max(100),
+  assessmentDigest: Sha256Schema,
+  assessmentJson: z.string().min(2).max(8_388_608),
+  recordedAt: TimestampSchema,
+  mode: z.literal("SHADOW"),
+  transactionKind: z.literal("D1_BATCH"),
+  outreachAuthorized: z.literal(0),
+  sendAuthorized: z.literal(0),
+  providerOperationsAuthorized: z.literal(0),
+  costAuthorizedUsd: z.literal(0),
+}).strict();
+
+type AssessmentReceiptRow = z.infer<typeof AssessmentReceiptRowSchema>;
+
+const ASSESSMENT_RECEIPT_COLUMNS = Object.keys(
+  AssessmentReceiptRowSchema.shape,
+) as (keyof AssessmentReceiptRow)[];
+
+const EVIDENCE_CLAIM_COLUMNS = [
+  "id",
+  "businessId",
+  "websiteSnapshotId",
+  "category",
+  "observation",
+  "sourceUrl",
+  "artifactRef",
+  "method",
+  "confidence",
+  "conversionCritical",
+  "auditVersion",
+  "capturedAt",
+] as const;
+
+function durableAssessmentReceiptStatement(assessmentId: string, assessmentDigest: string) {
+  return statement(
+    "read:durable_assessment_receipt",
+    `SELECT ${ASSESSMENT_RECEIPT_COLUMNS.map((column) => `"${column}"`).join(", ")}
+     FROM "RevenueLeadAssessmentReceipt"
+     WHERE "id" = ? AND "assessmentDigest" = ?
+     ORDER BY "id"`,
+    [assessmentId, assessmentDigest],
+  );
+}
+
+function completeAssessmentEvidenceStatement(assessment: RevenueLeadAssessment) {
+  return statement(
+    "read:complete_assessment_evidence_claims",
+    `SELECT ${EVIDENCE_CLAIM_COLUMNS.map((column) => `"${column}"`).join(", ")}
+     FROM "RevenueEvidenceClaim"
+     WHERE "businessId" = ? AND "websiteSnapshotId" = ?
+     ORDER BY "id"`,
+    [assessment.business.id, assessment.websiteSnapshotId],
+  );
+}
+
+function assertAssessmentWriterGuards(result: z.infer<typeof BatchResultSchema>) {
+  const rows = result.results.map((row) => TriggerRowSchema.parse(row));
+  const expectedNames = Object.keys(REQUIRED_ASSESSMENT_TRIGGER_MARKERS).sort((left, right) => (
+    left.localeCompare(right, "en-CA")
+  ));
+  if (
+    rows.length !== expectedNames.length
+    || rows.some((row, index) => row.name !== expectedNames[index])
+  ) {
+    throw new Error("Durable assessment persistence requires every exact migration-0061 immutable writer guard.");
+  }
+  for (const row of rows) {
+    const marker = REQUIRED_ASSESSMENT_TRIGGER_MARKERS[
+      row.name as keyof typeof REQUIRED_ASSESSMENT_TRIGGER_MARKERS
+    ];
+    if (!marker || !row.sql.includes(marker)) {
+      throw new Error(`Durable assessment writer guard drifted: ${row.name}.`);
+    }
+  }
+}
+
+function assessmentFreshnessState(assessment: RevenueLeadAssessment, databaseNow: string) {
+  if (Date.parse(databaseNow) < Date.parse(assessment.assessedAt)) return "NOT_YET_CURRENT" as const;
+  if (Date.parse(databaseNow) >= Date.parse(assessment.refreshAfter)) return "STALE" as const;
+  return "CURRENT" as const;
+}
+
+function assessmentFromDurableReceiptRow(raw: SqlRow) {
+  const row = AssessmentReceiptRowSchema.parse(raw);
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(row.assessmentJson) as unknown;
+  } catch {
+    throw new Error("The durable assessment receipt JSON is invalid.");
+  }
+  const assessment = RevenueLeadAssessmentSchema.parse(parsedJson);
+  const receiptPlan = buildRecordPlans(assessment).find((plan) => plan.entity === "ASSESSMENT_RECEIPT");
+  if (
+    !receiptPlan
+    || !rowMatches(row, receiptPlan.expected)
+    || row.assessmentJson !== revenueLeadAssessmentCanonicalJson(assessment)
+  ) {
+    throw new Error("The durable assessment receipt does not exactly mirror its canonical assessment JSON.");
+  }
+  return { row, assessment };
+}
+
+function durableAssessmentResult(input: {
+  assessment: RevenueLeadAssessment;
+  receiptRecordedAt: string;
+  databaseNow: string;
+}) {
+  const parsed = RevenueLeadAssessmentD1DurableReloadSchema.parse({
+    executorVersion: REVENUE_LEAD_ASSESSMENT_D1_EXECUTOR_VERSION,
+    targetSchemaVersion: REVENUE_LEAD_ASSESSMENT_TARGET_SCHEMA_VERSION,
+    executionPath: "DURABLE_RELOAD",
+    transactionApi: "D1Database.batch",
+    assessment: input.assessment,
+    assessmentReceiptRecordedAt: input.receiptRecordedAt,
+    databaseNow: input.databaseNow,
+    freshnessState: assessmentFreshnessState(input.assessment, input.databaseNow),
+    reloadedRows: {
+      websiteSnapshots: 1,
+      evidenceClaims: input.assessment.audit.claims.length,
+      qualificationSnapshots: 1,
+      assessmentReceipts: 1,
+    },
+    exactSourceRebuilt: true,
+    immutableWriterGuardsVerified: true,
+    committedAndReloaded: true,
+    databaseReadPerformed: true,
+    databaseMutationPerformed: false,
+    persistenceScope: "EXACT_IMMUTABLE_ASSESSMENT_ROW_SET",
+    runtimeConnected: false,
+    phaseInputCreationAuthorized: false,
+    progressReceiptCreationAuthorized: false,
+    phaseAdvancementAuthorized: false,
+    qualificationExecutionAuthorized: false,
+    outreachAuthorized: false,
+    sendAuthorized: false,
+    deploymentAuthorized: false,
+    providerOperationsAuthorized: 0,
+    costAuthorizedUsd: 0,
+  });
+  const trusted = deepFreeze(parsed);
+  trustedAssessmentDurableReloads.add(trusted);
+  return trusted;
+}
+
 function parseBatchResults(raw: readonly unknown[], expectedCount: number) {
   if (raw.length !== expectedCount) throw new Error("D1 returned an unexpected assessment batch result count.");
   return raw.map((result) => BatchResultSchema.parse(result));
@@ -396,5 +646,97 @@ export async function executePrivateRevenueLeadAssessmentD1(
     sendAuthorized: false,
     providerOperationsAuthorized: 0,
     costAuthorizedUsd: 0,
+  });
+}
+
+export async function loadPrivateRevenueLeadAssessmentD1(
+  boundary: RevenueLeadAssessmentD1Boundary,
+  identityValue: unknown,
+): Promise<RevenueLeadAssessmentD1DurableReload> {
+  const identity = z.object({
+    assessmentId: z.string().regex(/^assessment:[a-f0-9]{64}$/),
+    assessmentDigest: Sha256Schema,
+  }).strict().parse(identityValue);
+
+  const [guardResult, timeResult, receiptResult] = parseBatchResults(await boundary.batch([
+    ASSESSMENT_TRIGGER_STATEMENT,
+    DATABASE_TIME_STATEMENT,
+    durableAssessmentReceiptStatement(identity.assessmentId, identity.assessmentDigest),
+  ]), 3);
+  assertAssessmentWriterGuards(guardResult);
+  if (timeResult.results.length !== 1) {
+    throw new Error("Durable assessment reload requires one database-time row.");
+  }
+  const { databaseNow } = DatabaseTimeRowSchema.parse(timeResult.results[0]);
+  if (receiptResult.results.length !== 1) {
+    throw new Error("The exact durable assessment receipt is missing or ambiguous.");
+  }
+  const { row, assessment } = assessmentFromDurableReceiptRow(receiptResult.results[0]);
+  if (
+    assessment.assessmentId !== identity.assessmentId
+    || assessment.assessmentDigest !== identity.assessmentDigest
+  ) {
+    throw new Error("The durable assessment identity does not match the requested assessment.");
+  }
+
+  const plans = buildRecordPlans(assessment);
+  const [sealedResult, businessResult, completeEvidenceResult, ...rowResults] = parseBatchResults(await boundary.batch([
+    SEALED_RECEIPT_STATEMENT(assessment.workflow.workflowReceiptId),
+    BUSINESS_STATEMENT(assessment.business.id),
+    completeAssessmentEvidenceStatement(assessment),
+    ...plans.map((plan) => plan.select),
+  ]), plans.length + 3);
+  if (sealedResult.results.length !== 1) {
+    throw new Error("The durable assessment's exact sealed workflow receipt is missing or ambiguous.");
+  }
+  if (businessResult.results.length !== 1) {
+    throw new Error("The durable assessment's exact business is missing or ambiguous.");
+  }
+  const evidencePlans = plans
+    .filter((plan) => plan.entity === "EVIDENCE_CLAIM")
+    .sort((left, right) => left.recordId.localeCompare(right.recordId, "en-CA"));
+  if (
+    completeEvidenceResult.results.length !== evidencePlans.length
+    || completeEvidenceResult.results.some((rowValue, index) => (
+      !rowMatches(rowValue, evidencePlans[index].expected)
+    ))
+  ) {
+    throw new Error("The durable assessment evidence rows are not one exact complete set.");
+  }
+  const sealedReceipt = PersistedSealedWebsiteReceiptSchema.parse(
+    SealedReceiptRowSchema.parse(sealedResult.results[0]),
+  );
+  const business = BusinessRowSchema.parse(businessResult.results[0]);
+  const rebuilt = buildRevenueLeadAssessment({
+    request: RevenueLeadAssessmentRequestSchema.parse({
+      assessmentVersion: assessment.assessmentVersion,
+      idempotencyKey: assessment.assessmentKey,
+      workflowReceiptId: assessment.workflow.workflowReceiptId,
+      assessedAt: assessment.assessedAt,
+      mode: assessment.mode,
+      businessFitScore: assessment.qualification.scores.businessFit,
+      timingScore: assessment.qualification.scores.timing,
+      basisClaims: assessment.basisClaims,
+      policyBlocks: assessment.policyBlocks,
+    }),
+    business,
+    sealedReceipt,
+  });
+  if (
+    rebuilt.assessmentDigest !== assessment.assessmentDigest
+    || revenueLeadAssessmentCanonicalJson(rebuilt) !== revenueLeadAssessmentCanonicalJson(assessment)
+  ) {
+    throw new Error("The durable assessment cannot be rebuilt exactly from its sealed source and business.");
+  }
+  plans.forEach((plan, index) => {
+    if (classifyPreflight(plan, rowResults[index].results) !== "EXACT") {
+      throw new Error(`Durable assessment row failed exact reload: ${plan.entity}:${plan.recordId}.`);
+    }
+  });
+
+  return durableAssessmentResult({
+    assessment: rebuilt,
+    receiptRecordedAt: row.recordedAt,
+    databaseNow,
   });
 }

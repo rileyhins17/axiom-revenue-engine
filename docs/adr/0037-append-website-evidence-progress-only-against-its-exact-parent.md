@@ -97,9 +97,9 @@ introducing a mutable global ID registry or durable write.
 - There is still no operator command, file write, database mutation, Worker or
   API import, live binding, real-business execution, provider call, deployment,
   outreach, send, or spend.
-- The next trust gap is assessment persistence: schema-valid
-  `RevenueLeadAssessmentD1Execution` JSON is still synthetic evidence rather
-  than durable transaction provenance.
+- ADR 0038 closes the next trust gap by requiring an exact current durable
+  assessment reload before progress proof. An assessment phase-input and append
+  path remain separate future work.
 
 ## Action items
 
@@ -111,5 +111,5 @@ introducing a mutable global ID registry or durable write.
    unrelated businesses, and zero authority.
 4. [x] Prevent the generic operator recorder and inert Worker from importing the
    new boundary.
-5. [ ] Establish exact durable assessment execution/reload trust before an
-   `ASSESSMENT` phase-input adapter or append path is allowed.
+5. [x] Establish exact durable assessment reload trust before an `ASSESSMENT`
+   phase-input adapter or append path is allowed.

@@ -6,6 +6,8 @@ import Database from "better-sqlite3";
 
 import {
   executePrivateRevenueLeadAssessmentD1,
+  loadPrivateRevenueLeadAssessmentD1,
+  requireCurrentRevenueLeadAssessmentD1DurableReload,
   type RevenueLeadAssessmentD1Boundary,
   type RevenueLeadAssessmentD1Statement,
 } from "@/lib/revenue-engine/lead-assessment-d1";
@@ -223,6 +225,27 @@ test("atomically commits and exactly replays one owner-readable shadow assessmen
     });
     assert.equal(second.assessment.assessmentDigest, first.assessment.assessmentDigest);
 
+    const durable = await loadPrivateRevenueLeadAssessmentD1(boundary, {
+      assessmentId: first.assessment.assessmentId,
+      assessmentDigest: first.assessment.assessmentDigest,
+    });
+    assert.equal(durable.executionPath, "DURABLE_RELOAD");
+    assert.equal(durable.freshnessState, "CURRENT");
+    assert.equal(durable.exactSourceRebuilt, true);
+    assert.equal(durable.immutableWriterGuardsVerified, true);
+    assert.equal(durable.databaseMutationPerformed, false);
+    assert.deepEqual(durable.reloadedRows, {
+      websiteSnapshots: 1,
+      evidenceClaims: 1,
+      qualificationSnapshots: 1,
+      assessmentReceipts: 1,
+    });
+    assert.equal(requireCurrentRevenueLeadAssessmentD1DurableReload(durable), durable);
+    assert.throws(
+      () => requireCurrentRevenueLeadAssessmentD1DurableReload(structuredClone(durable)),
+      /exact in-process result/i,
+    );
+
     assert.throws(
       () => database.prepare(`UPDATE "RevenueWebsiteSnapshot" SET "classification" = 'REBUILD'`).run(),
       /REVENUE_LEAD_ASSESSMENT_APPEND_ONLY/,
@@ -233,6 +256,72 @@ test("atomically commits and exactly replays one owner-readable shadow assessmen
     );
   } finally {
     database.close();
+  }
+});
+
+test("durable reload fails closed on missing guards, incomplete sets, drift, and database-clock expiry", async () => {
+  const scenarios = ["MISSING_GUARD", "EXTRA_EVIDENCE", "ROW_DRIFT", "SOURCE_DRIFT", "STALE_CLOCK"] as const;
+  for (const scenario of scenarios) {
+    const database = freshDatabase();
+    try {
+      const source = seedSealedSource(database);
+      const boundary = createBoundary(database);
+      const execution = await executePrivateRevenueLeadAssessmentD1(boundary, request(source.receiptId));
+
+      let reloadBoundary: RevenueLeadAssessmentD1Boundary = boundary;
+      if (scenario === "MISSING_GUARD") {
+        database.exec(`DROP TRIGGER "RevenueLeadAssessmentReceipt_immutable_delete"`);
+      } else if (scenario === "EXTRA_EVIDENCE") {
+        database.prepare(`INSERT INTO "RevenueEvidenceClaim"
+          ("id", "businessId", "websiteSnapshotId", "category", "observation", "sourceUrl", "artifactRef", "method", "confidence", "conversionCritical", "auditVersion", "capturedAt")
+          SELECT ?, "businessId", "websiteSnapshotId", "category", "observation", "sourceUrl", "artifactRef", "method", "confidence", "conversionCritical", "auditVersion", "capturedAt"
+          FROM "RevenueEvidenceClaim" LIMIT 1`).run(`evidence:${"f".repeat(64)}`);
+      } else if (scenario === "ROW_DRIFT") {
+        database.exec(`DROP TRIGGER "RevenueQualificationSnapshot_assessment_immutable_update"`);
+        database.prepare(`UPDATE "RevenueQualificationSnapshot" SET "totalScore" = "totalScore" + 1`).run();
+        database.exec(`CREATE TRIGGER "RevenueQualificationSnapshot_assessment_immutable_update"
+          BEFORE UPDATE ON "RevenueQualificationSnapshot"
+          BEGIN SELECT RAISE(ABORT, 'REVENUE_LEAD_ASSESSMENT_APPEND_ONLY'); END;`);
+      } else if (scenario === "SOURCE_DRIFT") {
+        database.prepare(`UPDATE "RevenueBusiness" SET "canonicalName" = 'Drifted Roofing' WHERE "id" = ?`).run(BUSINESS_ID);
+      } else {
+        reloadBoundary = {
+          async batch(statements) {
+            const results = await boundary.batch(statements);
+            return results.map((result, index) => statements[index]?.statementId === "read:assessment_database_time"
+              ? {
+                  success: true,
+                  results: [{ databaseNow: new Date(TEST_NOW_MS + 61 * 24 * 60 * 60 * 1_000).toISOString() }],
+                  changes: 0,
+                }
+              : result);
+          },
+        };
+      }
+
+      const action = () => loadPrivateRevenueLeadAssessmentD1(reloadBoundary, {
+        assessmentId: execution.assessment.assessmentId,
+        assessmentDigest: execution.assessment.assessmentDigest,
+      });
+      if (scenario === "STALE_CLOCK") {
+        const stale = await action();
+        assert.equal(stale.freshnessState, "STALE");
+        assert.throws(() => requireCurrentRevenueLeadAssessmentD1DurableReload(stale), /not current/i);
+      } else {
+        await assert.rejects(
+          action,
+          scenario === "MISSING_GUARD"
+            ? /every exact migration-0061 immutable writer guard/i
+            : scenario === "EXTRA_EVIDENCE"
+              ? /not one exact complete set/i
+            : scenario === "ROW_DRIFT"
+              ? /row failed exact reload/i
+              : /cannot be rebuilt exactly/i,
+        );
+      }
+    } finally {
+      database.close();
+    }
   }
 });
 

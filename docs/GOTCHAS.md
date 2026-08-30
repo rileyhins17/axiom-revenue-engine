@@ -300,6 +300,29 @@ Retire entries when the architecture makes them impossible.
   persistence, and owner lead audit timelines.
 - **Verifying commit:** branch HEAD containing ADR 0024 and migration 0061.
 
+## DATA-009 — Schema-valid execution JSON impersonated durable assessment proof
+
+- **Symptom:** the assessment progress-proof builder accepted a copied or
+  hand-built `RevenueLeadAssessmentD1Execution` object when its fields and
+  digests were schema-valid, even though the object did not prove a current
+  database reload.
+- **Root cause:** data shape and content integrity were treated as transaction
+  provenance. The immediate writer response was allowed to cross a process-loss
+  boundary that should require fresh durable evidence.
+- **Proven fix:** load by exact assessment ID/digest, verify all eight
+  migration-0061 immutable triggers, rebuild the assessment from the durable
+  sealed workflow source and business, exactly reload every derived row, and
+  classify freshness from D1 time. Deep-freeze and register the result in a
+  module-private `WeakSet`; only the exact `CURRENT` object can feed proof.
+- **Prevention/test:** adversarial tests reject clones, missing guards, row
+  drift, source drift, and stale database time. The safety checker forbids the
+  proof builder from importing the schema-valid writer-execution contract or a
+  caller-owned proof time.
+- **Affected area:** shadow assessment persistence, interrupted-task recovery,
+  assessment progress proof, and every future `ASSESSMENT` phase-input/append
+  boundary.
+- **Verifying commit:** branch HEAD containing ADR 0038.
+
 ## AI-001 — Provider/model documentation drift
 
 - **Symptom:** runtime used DeepSeek while setup documentation named Gemini; the

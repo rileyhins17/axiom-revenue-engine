@@ -118,9 +118,10 @@ commercial coverage, and a hard authority boundary. This option was selected.
     exact module-private current-website-evidence input and its unchanged parent
     checkpoint. Keep it disconnected from operator commands, live bindings, and
     real data until those approvals exist.
-13. [ ] Replace the synthetic assessment persistence claim with an exact trusted
-    durable assessment execution/reload boundary before creating an `ASSESSMENT`
-    phase input. Schema-valid copied execution JSON must never become authority.
+13. [x] Replace the synthetic assessment persistence claim with an exact trusted
+    durable assessment reload boundary before creating an `ASSESSMENT` phase
+    input. It now verifies all immutable rows and guards, rebuilds from the
+    sealed source, uses D1 time, and rejects schema-valid copied execution JSON.
 14. [ ] Stop on stale evidence, duplicate identity, source-plan drift, imbalance,
     or an unconfirmed/unknown chain status. Never loosen the manifest to make a
     candidate fit.

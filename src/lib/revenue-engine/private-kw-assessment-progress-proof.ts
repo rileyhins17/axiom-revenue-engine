@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 import {
-  RevenueLeadAssessmentD1ExecutionSchema,
+  RevenueLeadAssessmentD1DurableReloadSchema,
+  requireCurrentRevenueLeadAssessmentD1DurableReload,
 } from "@/lib/revenue-engine/lead-assessment-d1";
 import {
   revenueLeadAssessmentDigest,
@@ -86,14 +87,19 @@ const AssessmentProgressProofCoreSchema = z.object({
   persistence: z.object({
     executorVersion: IdentitySchema,
     targetSchemaVersion: IdentitySchema,
-    executionPath: z.enum(["FRESH_COMMIT", "EXACT_REPLAY"]),
+    executionPath: z.literal("DURABLE_RELOAD"),
     transactionApi: z.literal("D1Database.batch"),
-    insertedRows: z.object({
-      websiteSnapshots: z.number().int().min(0).max(1),
+    reloadedRows: z.object({
+      websiteSnapshots: z.literal(1),
       evidenceClaims: z.number().int().min(0).max(100),
-      qualificationSnapshots: z.number().int().min(0).max(1),
-      assessmentReceipts: z.number().int().min(0).max(1),
+      qualificationSnapshots: z.literal(1),
+      assessmentReceipts: z.literal(1),
     }).strict(),
+    assessmentReceiptRecordedAt: TimestampSchema,
+    databaseNow: TimestampSchema,
+    freshnessState: z.literal("CURRENT"),
+    exactSourceRebuilt: z.literal(true),
+    immutableWriterGuardsVerified: z.literal(true),
     committedAndReloaded: z.literal(true),
   }).strict(),
   preparedAt: TimestampSchema,
@@ -143,7 +149,7 @@ export function privateKwAssessmentProgressAuthority() {
   });
 }
 
-function assertAssessmentIdentity(assessment: z.infer<typeof RevenueLeadAssessmentD1ExecutionSchema>["assessment"]) {
+function assertAssessmentIdentity(assessment: z.infer<typeof RevenueLeadAssessmentD1DurableReloadSchema>["assessment"]) {
   if (assessment.assessmentId !== `assessment:${revenueLeadAssessmentDigest(assessment.assessmentKey)}`) {
     throw new Error("Assessment identity must bind its exact idempotency key.");
   }
@@ -184,35 +190,17 @@ function assertAssessmentIdentity(assessment: z.infer<typeof RevenueLeadAssessme
   }
 }
 
-function assertPersistenceResult(execution: z.infer<typeof RevenueLeadAssessmentD1ExecutionSchema>) {
-  const counts = execution.insertedRows;
-  if (execution.executionPath === "EXACT_REPLAY") {
-    if (Object.values(counts).some((count) => count !== 0)) {
-      throw new Error("An exact assessment replay cannot claim newly inserted rows.");
-    }
-    return;
-  }
-  if (
-    counts.assessmentReceipts !== 1
-    || counts.qualificationSnapshots !== 1
-    || counts.evidenceClaims > execution.assessment.audit.claims.length
-  ) {
-    throw new Error("A fresh assessment commit must report its exact immutable assessment and qualification rows.");
-  }
-}
-
 export function buildPrivateKwAssessmentProgressProof(input: {
   manifestValue: unknown;
   previousPhaseReceiptValue: unknown;
   currentWebsiteEvidenceProofValue: unknown;
-  assessmentExecutionValue: unknown;
-  preparedAt: string;
+  assessmentDurableReloadValue: unknown;
 }): PrivateKwAssessmentProgressProof {
   const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifestValue);
   const previous = PrivateKwShadowSlicePhaseReceiptSchema.parse(input.previousPhaseReceiptValue);
   const evidence = PrivateKwCurrentWebsiteEvidenceProofSchema.parse(input.currentWebsiteEvidenceProofValue);
-  const execution = RevenueLeadAssessmentD1ExecutionSchema.parse(input.assessmentExecutionValue);
-  const preparedAt = TimestampSchema.parse(input.preparedAt);
+  const execution = requireCurrentRevenueLeadAssessmentD1DurableReload(input.assessmentDurableReloadValue);
+  const preparedAt = execution.databaseNow;
   const assessment = execution.assessment;
 
   if (
@@ -276,7 +264,8 @@ export function buildPrivateKwAssessmentProgressProof(input: {
     previous.completedAt !== evidence.workflow.completedAt
     || Date.parse(previous.recordedAt) < Date.parse(evidence.preparedAt)
     || Date.parse(assessment.assessedAt) < Date.parse(previous.recordedAt)
-    || Date.parse(preparedAt) < Date.parse(assessment.assessedAt)
+    || Date.parse(execution.assessmentReceiptRecordedAt) < Date.parse(assessment.assessedAt)
+    || Date.parse(preparedAt) < Date.parse(execution.assessmentReceiptRecordedAt)
     || Date.parse(preparedAt) >= Date.parse(evidence.evidenceFreshThrough)
     || Date.parse(preparedAt) >= Date.parse(assessment.refreshAfter)
   ) {
@@ -284,7 +273,6 @@ export function buildPrivateKwAssessmentProgressProof(input: {
   }
 
   assertAssessmentIdentity(assessment);
-  assertPersistenceResult(execution);
 
   const core = AssessmentProgressProofCoreSchema.parse({
     proofVersion: PRIVATE_KW_ASSESSMENT_PROGRESS_PROOF_VERSION,
@@ -333,7 +321,12 @@ export function buildPrivateKwAssessmentProgressProof(input: {
       targetSchemaVersion: execution.targetSchemaVersion,
       executionPath: execution.executionPath,
       transactionApi: execution.transactionApi,
-      insertedRows: execution.insertedRows,
+      reloadedRows: execution.reloadedRows,
+      assessmentReceiptRecordedAt: execution.assessmentReceiptRecordedAt,
+      databaseNow: execution.databaseNow,
+      freshnessState: execution.freshnessState,
+      exactSourceRebuilt: execution.exactSourceRebuilt,
+      immutableWriterGuardsVerified: execution.immutableWriterGuardsVerified,
       committedAndReloaded: execution.committedAndReloaded,
     },
     preparedAt,

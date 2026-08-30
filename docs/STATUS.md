@@ -34,10 +34,14 @@ or authorize execution. A separate guarded boundary now requires that exact
 input and its unchanged parent, verifies a one-receipt-only append, and returns
 the same frozen in-memory checkpoint on an exact retry. There is still no
 operator command, durable output, live database connection, or real-data path.
-The following assessment proof is equally fail-closed: it binds the exact
-website evidence, audit, immutable assessment, and database result in synthetic
-tests, but its assessment execution is not yet durable trusted provenance and
-it cannot create or advance a real phase. That exact console build has a
+The following assessment proof is now backed by durable trusted provenance. Its
+private loader verifies every immutable database guard, reloads the complete
+assessment row set, rebuilds the assessment from the sealed website source, and
+uses the database clock for freshness. Only the exact frozen current reload can
+feed proof; copied JSON, writer responses, stale history, source drift, and row
+drift fail closed. It still cannot create an assessment phase input or advance
+progress, and there is no operator command, live database binding, or real-data
+path. That exact console build has a
 verified, tamper-evident isolated-staging release packet, but it has not been
 deployed; exact-head Linux CI is green and only the separate owner deployment
 approval remains required before staging can change.
@@ -202,6 +206,9 @@ approval remains required before staging can change.
 - Guarded current-website-evidence progress-append checkpoint: the branch HEAD
   containing this status entry; previous verified checkpoint
   `1b29b5fe30d1926b91de90868e55e4f7867fae12`.
+- Durable assessment-provenance checkpoint: the branch HEAD containing this
+  status entry; previous verified checkpoint
+  `67f974ea9b57e8e969228c96bad5256f1f656233`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Source migrations: all 68 replay from zero, including the fail-closed
@@ -1613,6 +1620,34 @@ Completed gates:
   Browser/R2/Cloudflare D1/provider operation, mailbox, prospect, secret,
   staging/production resource, deployment, migration, or paid runtime operation
   occurred. Spend impact is C$0 and every autonomous capability remains off.
+- Assessment progress no longer accepts a schema-valid D1 writer response. The
+  private durable loader starts from only an assessment ID/digest, verifies all
+  eight migration-0061 immutable triggers and D1 time, and reloads the exact
+  receipt, sealed source, business, website snapshot, evidence set, and
+  qualification snapshot.
+- The loader reconstructs the original request and deterministically rebuilds
+  the assessment from its sealed workflow source. Canonical source drift, stored
+  row drift, missing/ambiguous rows, missing guards, or identity drift fails
+  closed. Current versus not-yet-current versus stale history comes only from
+  the database clock.
+- The result is deeply frozen and registered in a module-private trust set.
+  Only that exact in-process `CURRENT` reload can feed the assessment proof;
+  serialization or cloning removes trust. The proof now records the D1 clock,
+  receipt time, exact row counts, source rebuild, and guard verification.
+- This boundary is read-only and disconnected: it adds no assessment phase
+  input, progress append, operator command, Worker import, live database,
+  provider, real business, deployment, outreach, send, or spend. No owner
+  decision was needed and every autonomous capability remains off.
+- Focused durable-assessment/progress verification passes 10/10 tests. The
+  complete release gate passes fail-closed safety, 484/484 tests, standalone
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build, and the
+  explicit default-environment no-upload Wrangler dry run. Wrangler retained
+  only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 390 ms and the dossier in
+  838 ms. No production or staging deployment, migration, provider operation,
+  mailbox action, prospect contact, real-business execution, or paid runtime
+  work occurred. Spend impact is C$0.
 
 Still required for Phase 1:
 
@@ -1701,8 +1736,10 @@ before approval.
   privacy/budget decisions for Browser Rendering, R2, and exact durable-state
   verification; this checkpoint inferred none of those approvals.
 - No new owner decision is required for the synthetic assessment progress proof.
-  It cannot advance the chain, and its upstream trusted website-evidence
-  eligibility plus any real assessment execution remain separately gated.
+  It now requires an exact current durable assessment reload but still cannot
+  create a phase input or advance the chain. Its upstream trusted
+  website-evidence eligibility and any real assessment execution remain
+  separately gated.
 - No new owner decision is required for the validation-only trusted website
   evidence eligibility contract. Real Browser capture, R2 activation/HEAD
   reads, Cloudflare D1 execution, durable eligibility persistence, phase
@@ -1732,11 +1769,10 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Establish trusted assessment persistence provenance before any `ASSESSMENT`
-   phase-input adapter. Replace acceptance of schema-valid execution JSON with
-   an exact in-process and durable reload boundary that proves the immutable
-   assessment rows and freshness without granting qualification execution,
-   progress append, live D1, providers, deployment, outreach, or spend.
+3. Design the zero-authority `ASSESSMENT` phase-input adapter. Require the exact
+   current durable assessment reload, exact manifest business, website-evidence
+   predecessor, and unchanged parent checkpoint; do not append progress or add
+   an operator/live-data path in the same milestone.
 
 ## Resume instructions
 
