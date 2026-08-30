@@ -19,10 +19,13 @@ also has an immutable progress ledger: each business advances through one exact
 approved phase at a time and can resume from its last proven receipt after an
 interruption. Its first source/workflow proof can now be prepared from a
 query-only verification of the exact local receipts instead of being typed by
-hand. The next website-evidence proof is also defined and fail-closed: it proves
-the exact desktop/mobile artifact and audit lineage in synthetic tests, but it
-cannot advance a real business without a separate trusted eligibility receipt
-that does not yet exist. The following assessment proof is now equally
+hand. The next website-evidence proof and trusted eligibility boundary are now
+defined and fail-closed: the first binds the desktop/mobile artifact and audit
+lineage, while the second requires one fresh transaction-sealed D1/R2 result per
+exact content-addressed artifact. Copied JSON cannot impersonate either trusted
+execution or eligibility provenance. There is still no durable eligibility
+persistence or phase-input adapter, so this cannot advance a real business. The
+following assessment proof is now equally
 fail-closed: it binds the exact website evidence, audit, immutable assessment,
 and database result in synthetic tests, but it cannot create or advance a real
 phase. That exact console build has a verified, tamper-evident
@@ -178,6 +181,9 @@ before staging can change.
 - Synthetic assessment progress-proof checkpoint: the branch HEAD containing
   this status entry; previous verified checkpoint
   `5b85075723243c1ccdadb01b6fe242a6451460e3`.
+- Trusted current-website-evidence eligibility checkpoint: the branch HEAD
+  containing this status entry; previous verified checkpoint
+  `675ed2d4938d44a042640f145cf40d46c63f731a`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
 - Local migrations: all 67 apply, including the fail-closed lockdown, shadow
@@ -1461,6 +1467,37 @@ Completed gates:
   provider, mailbox, prospect, staging/production resource, secret, deployment,
   migration, or paid runtime was touched. Spend impact is C$0 and every
   autonomous capability remains off.
+- The trusted current-website-evidence eligibility builder now accepts only the
+  exact frozen in-process results of the private D1 completeness executor. It
+  requires one fresh `FRESH_COMMIT` per exact website artifact root and binds
+  the complete persisted terminal workflow, business, request, audit, homepage
+  desktop/mobile proof, workflow forest, completeness receipt, availability
+  source-set proof, artifact manifest digest, and current `R2_HEAD` receipt.
+- Every screenshot/measurement manifest must be covered exactly once. Missing,
+  duplicate, cross-business, cross-workflow, stale, future, non-R2, unverified,
+  manifest-drifted, copied-execution, hand-addressed-eligibility, and tampered
+  results fail closed. Execution order cannot change the content-addressed
+  result.
+- The eligibility output is frozen and content-addressed, but schema-valid JSON
+  alone is explicitly not authenticity. A future durable consumer must create
+  its own exact persistence-and-reload trust boundary. This checkpoint adds no
+  phase-input adapter or progress append and authorizes no Browser, R2, D1,
+  provider, qualification, contact, deployment, send, or spend operation.
+- Focused trusted D1/R2 eligibility verification passes 16/16 tests. The full
+  release gate passes fail-closed safety, 474/474 tests, standalone typecheck,
+  zero-warning source lint, the secret-sanitized Cloudflare build, and the
+  explicit default-environment no-upload Wrangler dry run. Wrangler retained
+  only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG browser gate passed with zero external
+  requests; the next lead was ready in 384 ms and its dossier in 851 ms. The
+  gate now waits a bounded five seconds for each exact Next route title after
+  visible readiness, closing a transient asynchronous metadata race without
+  weakening the expected title.
+- Only synthetic SQLite rows and in-memory fixtures were used. No real business,
+  Browser Rendering, R2 bucket/read/write, Cloudflare D1 database, provider,
+  progress record, mailbox, prospect, staging/production resource, secret,
+  deployment, migration, or paid runtime was touched. Spend impact is C$0 and
+  every autonomous capability remains off.
 
 Still required for Phase 1:
 
@@ -1551,6 +1588,10 @@ before approval.
 - No new owner decision is required for the synthetic assessment progress proof.
   It cannot advance the chain, and its upstream trusted website-evidence
   eligibility plus any real assessment execution remain separately gated.
+- No new owner decision is required for the validation-only trusted website
+  evidence eligibility contract. Real Browser capture, R2 activation/HEAD
+  reads, Cloudflare D1 execution, durable eligibility persistence, phase
+  recording, and any downstream assessment remain separately approval-gated.
 
 ## Next three actions
 
@@ -1562,11 +1603,11 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Define the trusted current-website-evidence eligibility contract against an
-   exact persisted workflow, current content-addressed artifacts, and fresh R2
-   availability evidence, but add no Browser/R2/D1 executor or phase adapter.
-   Keep activation, provider operations, real data, progress, and spend blocked
-   behind their separate owner approvals.
+3. Define the durable website-evidence eligibility persistence-and-reload
+   boundary so a future task can verify one exact stored eligibility receipt
+   without trusting copied JSON. Keep Browser/R2 activation, live D1 execution,
+   phase-input creation, real data, progress, providers, and spend separately
+   blocked.
 
 ## Resume instructions
 

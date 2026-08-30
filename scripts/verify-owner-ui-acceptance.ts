@@ -44,6 +44,7 @@ const TEST_AUTH_SECRET = "owner-ui-acceptance-only-secret-00000000000000000000";
 const AXE_PATH = createRequire(import.meta.url).resolve("axe-core/axe.min.js");
 const OWNER_LIST_BUDGET_MS = 10_000;
 const OWNER_DOSSIER_BUDGET_MS = 15_000;
+const OWNER_TITLE_TIMEOUT_MS = 5_000;
 
 type SqliteDatabase = InstanceType<typeof Database>;
 
@@ -72,6 +73,15 @@ export function isAllowedOwnerAcceptanceUrl(rawUrl: string, baseUrl: string) {
   if (value.protocol === "data:" || value.protocol === "about:") return true;
   if (value.protocol === "blob:") return value.origin === new URL(baseUrl).origin;
   return value.origin === new URL(baseUrl).origin;
+}
+
+async function assertOwnerPageTitle(page: Page, expectedTitle: string) {
+  await page.waitForFunction(
+    (title) => document.title === title,
+    expectedTitle,
+    { timeout: OWNER_TITLE_TIMEOUT_MS },
+  );
+  assert.equal(await page.title(), expectedTitle);
 }
 
 export function cssTimeToMilliseconds(value: string) {
@@ -780,7 +790,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await page.getByRole("link", { name: /Open evidence dossier/i }).first().waitFor();
     const desktopListReadyMs = Math.round(performance.now() - listStart);
     assert(desktopListReadyMs <= OWNER_LIST_BUDGET_MS, `The next owner lead was not discoverable within ${OWNER_LIST_BUDGET_MS} ms.`);
-    assert.equal(await page.title(), "Leads | Axiom Revenue Engine");
+    await assertOwnerPageTitle(page, "Leads | Axiom Revenue Engine");
     await assertWcag(page, "desktop leads");
     await assertReadOnlyOwnerSurface(page, "desktop leads");
     const desktopWidth = await assertResponsive(page, "desktop leads");
@@ -799,7 +809,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await page.getByText("hello@roofing.axiomfixtures.ca", { exact: true }).waitFor();
     const desktopDossierReadyMs = Math.round(performance.now() - dossierStart);
     assert(desktopDossierReadyMs <= OWNER_DOSSIER_BUDGET_MS, `The lead rationale was not visible within ${OWNER_DOSSIER_BUDGET_MS} ms.`);
-    assert.equal(await page.title(), "Lead dossier | Axiom Revenue Engine");
+    await assertOwnerPageTitle(page, "Lead dossier | Axiom Revenue Engine");
     assert((await page.getByRole("link", { name: "Inspect proof" }).count()) >= 3, "The dossier must expose at least three inspectable observations.");
     await assertWcag(page, "desktop dossier");
     await assertReadOnlyOwnerSurface(page, "desktop dossier");
@@ -810,7 +820,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
     await page.locator("[data-quality-lab-ready='true']").waitFor();
-    assert.equal(await page.title(), "Quality Lab | Axiom Revenue Engine");
+    await assertOwnerPageTitle(page, "Quality Lab | Axiom Revenue Engine");
     await page.getByLabel("Choose owner-review checkpoint").setInputFiles({
       name: "owner-labeling-checkpoint.json",
       mimeType: "application/json",

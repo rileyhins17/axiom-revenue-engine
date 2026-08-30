@@ -362,7 +362,9 @@ Retire entries when the architecture makes them impossible.
 
 - **Symptom:** the authenticated owner UI rendered normally and local requests
   returned 200, but Playwright intermittently reported an empty error or
-  `SyntaxError: Invalid or unexpected token` during navigation.
+  `SyntaxError: Invalid or unexpected token` during navigation. A client-side
+  route could also render its complete dossier before Next applied the route's
+  document title, producing a transient empty-title assertion.
 - **Root cause:** OpenNext and the Next.js development server share `.next`.
   Concurrent execution can replace a served chunk, while a sequential first
   development run can briefly inherit production assets left by OpenNext before
@@ -375,10 +377,13 @@ Retire entries when the architecture makes them impossible.
   measured owner routes in a disposable authenticated page, close it, and use a
   fresh page for timed/error-audited acceptance. Preserve detailed page-error
   name/message/stack diagnostics; do not suppress syntax errors or blank errors.
+  Wait up to five seconds for each exact route title after visible readiness;
+  this allows asynchronous metadata application without weakening the expected
+  title.
 - **Prevention/test:** `AGENTS.md` forbids concurrent execution, and the owner UI
   acceptance command clears its exact generated `.next` directory, warms every
-  measured route, and then proves six fresh-page views. GitHub CI and every local
-  release cycle run the commands sequentially.
+  measured route, waits for exact titles, and then proves six fresh-page views.
+  GitHub CI and every local release cycle run the commands sequentially.
 - **Affected area:** owner UI acceptance, Next.js development server, OpenNext,
   Wrangler dry runs, Windows/OneDrive workspaces, and local release evidence.
 - **Verifying commit:** branch HEAD containing the sequential browser-gate rule,

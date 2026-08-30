@@ -177,18 +177,31 @@ mutate a database, validate a provider call, execute Browser Rendering, infer
 consent, change qualification, contact a prospect, deploy, send, or spend. A
 checkpoint proves only that exact already-verified receipts were recorded.
 
-The `CURRENT_WEBSITE_EVIDENCE` proof contract is currently a synthetic-only
-engineering boundary, not an operator command. Its builder can validate the
+The `CURRENT_WEBSITE_EVIDENCE` proof contract is a synthetic-only engineering
+boundary, not an operator command. Its builder can validate the
 exact manifest/predecessor lineage, a complete fixture website workflow,
 desktop and mobile homepage evidence, the deterministic audit, the durable
 persistence plan, every screenshot/measurement manifest, and fresh fixture
 availability observations. Its authority block forbids Browser, R2, database,
 progress, provider, contact, deployment, send, and spend operations. The
 progress recorder additionally requires a separate content-addressed
-`website-evidence-eligibility:*` receipt. No code currently creates that trusted
-receipt, so never hand-author one or use the synthetic proof to advance a real
-business. Live capture, R2 activation/HEAD reads, persistence verification, and
-eligibility remain separate future approvals and implementations.
+`website-evidence-eligibility:*` receipt.
+
+The validation-only eligibility builder can now create that receipt only from
+one exact frozen in-process private D1 completeness execution per artifact
+manifest. Every execution must be a fresh commit, match the same persisted
+terminal workflow/business/audit and complete manifest forest, and contain a
+current verified `R2_HEAD` availability receipt for its exact content-addressed
+screenshot/measurement manifest. The builder freezes its output and tags the
+exact in-process instance; a copied or hand-addressed JSON receipt is not trusted
+provenance even when its schema and digest are valid.
+
+There is no operator command, durable eligibility persistence/reload boundary,
+or phase-input adapter yet. Never hand-author, copy, or use an eligibility
+receipt to advance a real business. The synthetic tests use local SQLite rows
+and in-memory artifacts only. Live capture, R2 activation/HEAD reads, Cloudflare
+D1 execution, eligibility persistence, and progress remain separate future
+approvals and implementations.
 
 The `ASSESSMENT` proof contract is also an engineering boundary rather than an
 operator command. It independently rechecks the assessment's content-derived
@@ -200,8 +213,8 @@ progress recorder requires that separate proof reference, but no adapter turns
 the proof into an assessment phase input. The proof authorizes no database read
 or write, qualification execution, contact work, progress append, provider use,
 deployment, send, or spend. Never hand-author an `assessment-proof:*`; the real
-chain remains stopped earlier because the trusted `website-evidence-eligibility:*`
-receipt does not exist.
+chain remains stopped earlier because no durable trusted eligibility receipt or
+phase-input adapter exists.
 
 ## Owner-approved local KW materialization and assessment
 

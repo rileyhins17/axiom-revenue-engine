@@ -11,6 +11,7 @@ import {
   ARTIFACT_MANIFEST_VERSION,
   ArtifactManifestSchema,
   ArtifactPromotionReceiptSchema,
+  artifactManifestDigest,
   createArtifactPromotionPlan,
   type ArtifactEvidenceUse,
   type ArtifactManifest,
@@ -70,6 +71,16 @@ import {
   type FixtureWebsiteEvidenceWorkflowRequest,
   type FixtureWebsiteDocumentCapture,
 } from "@/lib/revenue-engine/fixture-website-evidence-workflow";
+import {
+  PrivateKwCurrentWebsiteEvidenceEligibilityReceiptSchema,
+  buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt,
+  requireInProcessPrivateKwCurrentWebsiteEvidenceEligibilityReceipt,
+} from "@/lib/revenue-engine/private-kw-current-website-evidence-eligibility";
+import {
+  PRIVATE_KW_CURRENT_WEBSITE_EVIDENCE_VERSION,
+  PrivateKwCurrentWebsiteEvidenceProofSchema,
+  privateKwCurrentWebsiteEvidenceAuthority,
+} from "@/lib/revenue-engine/private-kw-current-website-evidence";
 import {
   WEBSITE_CAPTURE_MAX_REDIRECTS,
   WEBSITE_CAPTURE_MAX_RESPONSE_BYTES,
@@ -665,6 +676,138 @@ function currentSnapshotTiming(): SnapshotTiming {
   };
 }
 
+function currentWebsiteEvidenceProof(fixture: Awaited<ReturnType<typeof buildFixture>>) {
+  const audit = fixture.receipt.audit;
+  const pageSelection = fixture.receipt.pageSelection;
+  const auditAssembly = fixture.receipt.auditAssembly;
+  const home = fixture.receipt.pages.find((page) => page.pageKind === "HOME");
+  assert.ok(audit?.finalUrl);
+  assert.ok(pageSelection);
+  assert.ok(auditAssembly);
+  assert.ok(home);
+  const preparedAt = new Date(Date.parse(fixture.receipt.completedAt) + 60_000).toISOString();
+  const availabilityBoundary = new Date(Date.parse(fixture.receipt.completedAt) + 30 * 24 * 60 * 60 * 1_000).toISOString();
+  const artifactEvidence = fixture.receipt.artifactManifests.map((manifest, index) => {
+    const availability = createArtifactManifestAvailabilityReceipt({
+      receiptId: `71000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      manifest,
+      checkedAt: fixture.receipt.completedAt,
+      validThrough: availabilityBoundary,
+      expiresAt: availabilityBoundary,
+      checkerKind: "FIXTURE",
+      objects: availabilityObjects(manifest),
+    });
+    return {
+      manifestId: manifest.manifestId,
+      manifestDigest: artifactManifestDigest(manifest),
+      retentionClass: "SHADOW_30D" as const,
+      availabilityReceiptId: availability.receiptId,
+      availabilityReceiptDigest: availability.receiptDigest,
+      checkerKind: "FIXTURE" as const,
+      validThrough: availability.validThrough,
+      expiresAt: availability.expiresAt!,
+    };
+  }).sort((left, right) => left.manifestId.localeCompare(right.manifestId, "en-CA"));
+  const manifestIdentity = artifactReferenceDigest({
+    businessId: fixture.request.businessId,
+    workflowId: fixture.request.workflowId,
+  });
+  const previousDigest = artifactReferenceDigest({
+    businessId: fixture.request.businessId,
+    checkpoint: "SOURCE_WORKFLOW_PERSISTED",
+  });
+  const core = {
+    proofVersion: PRIVATE_KW_CURRENT_WEBSITE_EVIDENCE_VERSION,
+    proofKind: "CURRENT_WEBSITE_EVIDENCE" as const,
+    manifestId: `kw-shadow-slice:${manifestIdentity}`,
+    manifestDigest: artifactReferenceDigest({ manifestIdentity, records: [fixture.request.businessId] }),
+    businessId: fixture.request.businessId,
+    evaluationCandidateId: `evaluation:${fixture.request.businessId}`,
+    sourceRecordId: `source:${fixture.request.businessId}`,
+    websiteUrl: fixture.request.websiteUrl,
+    sourceEvidenceUrl: fixture.request.sourceEvidenceUrl,
+    previousPhaseReceipt: {
+      phaseReceiptId: `kw-shadow-phase:${previousDigest}`,
+      phaseReceiptDigest: previousDigest,
+      completedAt: fixture.request.requestedAt,
+    },
+    workflow: {
+      workflowId: fixture.request.workflowId,
+      requestedAt: fixture.request.requestedAt,
+      completedAt: fixture.receipt.completedAt,
+      requestDigest: artifactReferenceDigest(fixture.request),
+      receiptId: `workflow-receipt:${artifactReferenceDigest(fixture.receipt)}`,
+      receiptDigest: artifactReferenceDigest(fixture.receipt),
+      durablePlanDigest: artifactReferenceDigest({ request: fixture.request, receipt: fixture.receipt }),
+      pageSelectionDigest: artifactReferenceDigest(pageSelection),
+      auditAssemblyDigest: artifactReferenceDigest(auditAssembly),
+      auditDigest: artifactReferenceDigest(audit),
+      artifactSetDigest: artifactReferenceDigest(artifactEvidence),
+    },
+    audit: {
+      auditVersion: audit.auditVersion,
+      classification: audit.classification,
+      rebuildNeedScore: audit.rebuildNeedScore,
+      evidenceConfidence: audit.evidenceConfidence,
+      finalUrl: audit.finalUrl,
+    },
+    homeEvidence: {
+      pageKind: "HOME" as const,
+      finalUrl: home.finalUrl!,
+      htmlComplete: true as const,
+      capturedProfiles: ["DESKTOP_1440X900", "MOBILE_390X844"] as const,
+      artifactManifestIds: [...home.artifactReceiptIds].sort((left, right) => left.localeCompare(right, "en-CA")),
+    },
+    artifactEvidence,
+    evidenceFreshThrough: availabilityBoundary,
+    preparedAt,
+    requiredEligibilityReceiptKind: "CURRENT_WEBSITE_EVIDENCE_ELIGIBILITY" as const,
+    authority: privateKwCurrentWebsiteEvidenceAuthority(),
+  };
+  const proofDigest = artifactReferenceDigest(core);
+  return PrivateKwCurrentWebsiteEvidenceProofSchema.parse({
+    ...core,
+    proofId: `website-evidence:${proofDigest}`,
+    proofDigest,
+  });
+}
+
+async function trustedWebsiteArtifactExecutions(
+  database: Database.Database,
+  fixture: Awaited<ReturnType<typeof buildFixture>>,
+  timing: SnapshotTiming,
+) {
+  const attemptIds = [
+    "45000000-0000-4000-8000-000000000001",
+    "45000000-0000-4000-8000-000000000002",
+    "45000000-0000-4000-8000-000000000003",
+    "45000000-0000-4000-8000-000000000004",
+    "45000000-0000-4000-8000-000000000005",
+  ];
+  const boundary = sqliteD1Boundary(database);
+  const executions = [];
+  for (const [index, manifest] of fixture.receipt.artifactManifests.entries()) {
+    const attemptId = attemptIds[index];
+    if (!attemptId) throw new Error("Website artifact fixture exceeds its bounded snapshot identities.");
+    const plan = buildArtifactReferenceAtomicPlan({
+      attemptId,
+      workflowRunId: fixture.request.workflowId,
+      businessId: fixture.request.businessId,
+      lineageRootManifestId: manifest.manifestId,
+      attemptNumber: 1,
+      fencingToken: 1,
+      ownerId: `fixture-owner-website-eligibility-${index + 1}`,
+      requestedAt: timing.requestedAt,
+      acquiredAt: timing.acquiredAt,
+      expiresAt: timing.expiresAt,
+      mode: "SHADOW",
+      maxCostUsd: 0,
+    });
+    executions.push(await executeArtifactReferenceD1Snapshot(boundary, plan));
+  }
+  return executions;
+}
+
 function sqliteD1Boundary(database: Database.Database): ArtifactReferenceD1BatchBoundary {
   return {
     async batch(statements) {
@@ -719,6 +862,107 @@ test("private D1 executor commits, post-verifies, reloads, and exactly replays o
   assert.deepEqual(replayed.receipt, committed.receipt);
   assert.equal(tableCount(database, "RevenueArtifactReferenceCompletenessReceipt"), 1);
   assert.equal(tableCount(database, "RevenueArtifactReferenceSourceSetProof"), 15);
+  database.close();
+});
+
+test("current website evidence eligibility binds every exact trusted D1 and R2 manifest receipt with zero authority", async () => {
+  const timing = currentSnapshotTiming();
+  const { fixture, database } = await persistedDatabaseFixture(timing);
+  const evidence = currentWebsiteEvidenceProof(fixture);
+  const executions = await trustedWebsiteArtifactExecutions(database, fixture, timing);
+  const evaluatedAt = new Date().toISOString();
+  const first = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: evidence,
+    trustedExecutionValues: executions,
+    evaluatedAt,
+  });
+  const reordered = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: evidence,
+    trustedExecutionValues: [...executions].reverse(),
+    evaluatedAt,
+  });
+
+  assert.deepEqual(reordered, first);
+  assert.deepEqual(PrivateKwCurrentWebsiteEvidenceEligibilityReceiptSchema.parse(first), first);
+  assert.equal(first.receiptId, `website-evidence-eligibility:${first.receiptDigest}`);
+  assert.equal(Object.isFrozen(first), true);
+  assert.equal(Object.isFrozen(first.artifacts), true);
+  assert.equal(requireInProcessPrivateKwCurrentWebsiteEvidenceEligibilityReceipt(first), first);
+  assert.equal(first.websiteEvidence.proofId, evidence.proofId);
+  assert.equal(first.persistedWorkflow.workflowId, fixture.request.workflowId);
+  assert.equal(first.artifacts.length, fixture.receipt.artifactManifests.length);
+  assert.equal(new Set(first.artifacts.map((artifact) => artifact.completeness.receiptId)).size, first.artifacts.length);
+  assert(first.artifacts.every((artifact) => artifact.availability.checkerKind === "R2_HEAD"));
+  assert(first.artifacts.every((artifact) => artifact.availability.providerReadPerformed));
+  assert(first.artifacts.every((artifact) => artifact.completeness.executionPath === "FRESH_COMMIT"));
+  assert.equal(first.authority.validationOnly, true);
+  assert.equal(first.authority.exactTrustedExecutionInstancesRequired, true);
+  assert.equal(first.authority.phaseInputCreationAuthorized, false);
+  assert.equal(first.authority.progressReceiptCreationAuthorized, false);
+  assert.equal(first.authority.phaseAdvancementAuthorized, false);
+  assert.equal(first.authority.browserCaptureAuthorized, false);
+  assert.equal(first.authority.r2ReadAuthorized, false);
+  assert.equal(first.authority.databaseMutationAuthorized, false);
+  assert.equal(first.authority.providerOperationsAuthorized, 0);
+  assert.equal(first.authority.costAuthorizedUsd, 0);
+  database.close();
+});
+
+test("website evidence eligibility rejects copied trust, incomplete coverage, drift, stale windows, and output tampering", async () => {
+  const timing = currentSnapshotTiming();
+  const { fixture, database } = await persistedDatabaseFixture(timing);
+  const evidence = currentWebsiteEvidenceProof(fixture);
+  const executions = await trustedWebsiteArtifactExecutions(database, fixture, timing);
+  const evaluatedAt = new Date().toISOString();
+  const receipt = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: evidence,
+    trustedExecutionValues: executions,
+    evaluatedAt,
+  });
+
+  assert.throws(() => buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: evidence,
+    trustedExecutionValues: [structuredClone(executions[0]), ...executions.slice(1)],
+    evaluatedAt,
+  }), /exact in-process result/i);
+  assert.throws(() => buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: evidence,
+    trustedExecutionValues: executions.slice(1),
+    evaluatedAt,
+  }), /one exact trusted completeness execution per artifact manifest/i);
+
+  const { proofId: _proofId, proofDigest: _proofDigest, ...evidenceCore } = evidence;
+  void _proofId;
+  void _proofDigest;
+  const driftedCore = { ...evidenceCore, businessId: "business:forged-eligibility" };
+  const driftedDigest = artifactReferenceDigest(driftedCore);
+  const driftedEvidence = PrivateKwCurrentWebsiteEvidenceProofSchema.parse({
+    ...driftedCore,
+    proofId: `website-evidence:${driftedDigest}`,
+    proofDigest: driftedDigest,
+  });
+  assert.throws(() => buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: driftedEvidence,
+    trustedExecutionValues: executions,
+    evaluatedAt,
+  }), /exact persisted terminal workflow|workflow and business/i);
+  assert.throws(() => buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
+    websiteEvidenceProofValue: evidence,
+    trustedExecutionValues: executions,
+    evaluatedAt: receipt.evidenceFreshThrough,
+  }), /outside its current half-open freshness window/i);
+  assert.throws(() => PrivateKwCurrentWebsiteEvidenceEligibilityReceiptSchema.parse({
+    ...receipt,
+    businessId: "business:tampered",
+  }), /identity must bind/i);
+  assert.throws(() => PrivateKwCurrentWebsiteEvidenceEligibilityReceiptSchema.parse({
+    ...receipt,
+    authority: { ...receipt.authority, phaseAdvancementAuthorized: true },
+  }));
+  assert.throws(
+    () => requireInProcessPrivateKwCurrentWebsiteEvidenceEligibilityReceipt(structuredClone(receipt)),
+    /exact in-process result/i,
+  );
   database.close();
 });
 

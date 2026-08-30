@@ -100,8 +100,12 @@ commercial coverage, and a hard authority boundary. This option was selected.
    completed website-evidence phase, sealed workflow/audit lineage, immutable
    assessment identities, and committed-and-reloaded persistence result. Require
    it as a separate progress reference without creating a phase-input adapter.
-9. [ ] Define the trusted website-evidence eligibility boundary before any real
-   assessment progress. Keep Browser, R2, D1, and owner approvals separate.
-10. Stop on stale evidence, duplicate identity, source-plan drift, imbalance, or
+9. [x] Define the trusted website-evidence eligibility boundary before any real
+   assessment progress. It now requires one exact frozen fresh-commit D1
+   completeness execution and current R2 HEAD receipt per content-addressed
+   artifact, rejects copied trust, and creates no phase input. Browser/R2
+   activation, live D1, durable persistence, and owner approvals remain
+   separate.
+10. [ ] Stop on stale evidence, duplicate identity, source-plan drift, imbalance, or
    an unconfirmed/unknown chain status. Never loosen the manifest to make a
    candidate fit.
