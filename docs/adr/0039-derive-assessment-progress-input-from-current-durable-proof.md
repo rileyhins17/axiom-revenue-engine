@@ -104,9 +104,8 @@ rebase semantics.
   assessment remains usable when the complete new parent is canonical and the
   durable reload clock is current enough.
 - The existing progress checkpoint remains unchanged by this adapter.
-- A separate guarded append boundary is still required before any assessment
-  receipt can be added, and durable/operator/live-data wiring remains separately
-  approval-gated.
+- ADR 0040 provides the separate guarded in-memory append; durable,
+  operator, and live-data wiring remains separately approval-gated.
 - No real business, database, Cloudflare resource, provider, mailbox, prospect,
   deployment, migration, or paid runtime is touched by this decision.
 
@@ -120,5 +119,5 @@ rebase semantics.
    forged parent time, valid unrelated-business progress, and zero authority.
 4. [x] Add static safety checks forbidding appender, operator, Worker, database,
    provider, file, runtime, and caller-clock wiring.
-5. [ ] Design a separate exact-parent guarded in-memory assessment append. Do
-   not add durable, operator, live-data, or real-business wiring in that change.
+5. [x] Add the separate exact-parent guarded in-memory assessment append in ADR
+   0040 without durable, operator, live-data, or real-business wiring.

@@ -109,8 +109,9 @@ migration, backup, and access procedures.
   or cost authority.
 - No operator command, Worker route, live binding, real-business run,
   deployment, or migration is introduced.
-- The next trust gap is a separate `ASSESSMENT` phase-input adapter; it must
-  retain the exact manifest and parent checkpoint before any append is designed.
+- ADRs 0039 and 0040 close the assessment input/append gap while keeping the
+  transition in memory. Durable/operator progress and the following contact
+  review proof remain separate future boundaries.
 
 ## Action items
 

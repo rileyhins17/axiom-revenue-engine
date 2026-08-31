@@ -482,10 +482,15 @@ binds the input to that parent privately, uses D1 time instead of a caller clock
 and permits another business to have advanced only when the complete new parent
 is canonical and the reload is at least as new. Copied trust, stale history,
 lineage drift, forged checkpoint chronology, and changed parents fail closed.
-There is still no assessment append path, operator command, file/database
-writer, live binding, or real-business execution. The boundary cannot execute
-qualification, discover contacts, mutate progress, call a provider, deploy,
-contact a prospect, or spend.
+A separate guarded in-memory append now accepts only that exact input and parent,
+uses the canonical appender, and independently proves that exactly one
+assessment receipt was added while all prior receipts and the other nine
+businesses stayed unchanged. An exact retry returns the same frozen checkpoint;
+copied input, a changed parent, or replay against the completed child fails
+closed. There is still no operator command, file/database writer, live binding,
+durable progress record, or real-business execution. These boundaries cannot
+execute qualification, discover contacts, call a provider, deploy, contact a
+prospect, or spend. `CONTACT_REVIEW` requires a separate future trusted proof.
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

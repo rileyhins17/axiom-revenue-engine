@@ -251,12 +251,24 @@ parent and D1 time is not older than the checkpoint.
 The phase input is trusted only by exact in-process identity and privately bound
 to its manifest and parent ID/digest. Copied input or reload JSON, an edited and
 re-hashed parent time, a changed parent presented after derivation, stale
-assessment history, or lineage drift fails closed. No assessment progress append
-occurs. Never hand-author the durable reload, proof, or phase input. There is no
-operator command, file writer, Worker import, live D1 binding, or real-business
-path. The loader authorizes database reads only; neither boundary authorizes
-qualification execution, contact work, progress mutation, provider use,
-deployment, outreach, send, or spend.
+assessment history, or lineage drift fails closed.
+
+A separate guarded in-memory append boundary accepts only that exact input and
+the content-equivalent manifest and parent used during derivation. It calls the
+canonical appender, then independently proves that only the selected business
+gained one exact assessment receipt, its prior prefix and the other nine
+businesses remained unchanged, and the summary moved one business from current
+website evidence to assessment persisted. An exact retry returns the same
+frozen checkpoint instance; copied input, a changed parent, or replay against
+the completed child fails closed.
+
+Never hand-author the durable reload, proof, phase input, or appended checkpoint.
+There is no operator command, file/database writer, Worker import, live D1
+binding, or real-business path. The durable loader authorizes reads only and the
+append boundary changes in-memory validation state only; neither authorizes
+qualification execution, contact work, provider use, deployment, outreach,
+send, or spend. `CONTACT_REVIEW` remains blocked until its own durable proof and
+phase-input boundary are designed.
 
 ## Owner-approved local KW materialization and assessment
 

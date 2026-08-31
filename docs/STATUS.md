@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-30 (America/Toronto)
+Last updated: 2026-08-31 (America/Toronto)
 
 ## Plain-English status
 
@@ -43,8 +43,10 @@ drift fail closed. A separate validation-only boundary now turns that exact
 current reload into one frozen assessment phase input after rechecking the
 selected business, website-evidence predecessor, full ten-business parent, and
 chronology. It internally regenerates proof, binds the input to the exact parent,
-and cannot append progress. There is still no operator command, file/database
-writer, live binding, or real-data path. That exact console build has a
+and a separate guarded boundary now appends it in memory only after proving one
+assessment receipt and no unrelated change. Exact retry returns the same frozen
+checkpoint. There is still no operator command, file/database writer, live
+binding, durable progress output, or real-data path. That exact console build has a
 verified, tamper-evident isolated-staging release packet, but it has not been
 deployed; exact-head Linux CI is green and only the separate owner deployment
 approval remains required before staging can change.
@@ -215,6 +217,9 @@ approval remains required before staging can change.
 - Assessment phase-input checkpoint: the branch HEAD containing this status
   entry; previous verified checkpoint
   `02e0c5a3ef69fe004d8ab7aab1314f0021f07f33`.
+- Guarded assessment progress-append checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `1bd3f3a77296a116c013d0494388ea2f435e3f14`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Canonical Riley-machine checkout: non-synced
   `C:\Users\riley\Documents\ChatGPT\APE`; OneDrive and Google Drive are not
@@ -1679,6 +1684,28 @@ Completed gates:
   848 ms. No production or staging deployment, migration, provider operation,
   mailbox action, prospect contact, real-business execution, or paid runtime
   work occurred. Spend impact is C$0.
+- The exact assessment input can now enter only a separate guarded in-memory
+  append boundary. It requires the manifest and content-addressed parent used at
+  derivation, calls the canonical appender, then independently proves the exact
+  parent, one added assessment receipt, the two-receipt prior prefix, the
+  website-evidence-to-assessment summary transition, and unchanged other nine
+  business records.
+- Exact retry returns the same deeply frozen checkpoint instance. Copied input,
+  changed manifest or parent, and replay against the already-completed child
+  fail closed. The generic operator recorder and inert Worker cannot import the
+  boundary.
+- Static safety checks prevent files, databases, runtime bindings, providers,
+  external operations, or mutation APIs. Focused durable-assessment/proof/input/
+  append verification passes 17/17.
+- The complete release gate passes fail-closed safety, 491/491 tests,
+  standalone typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, and the explicit default-environment no-upload Wrangler dry run.
+  Wrangler retained only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 357 ms and the dossier in
+  854 ms. No production or staging deployment, migration, provider operation,
+  mailbox action, prospect contact, real-business execution, or paid runtime
+  work occurred. Spend impact is C$0.
 
 Still required for Phase 1:
 
@@ -1793,6 +1820,10 @@ before approval.
   phase-input adapter. It creates no receipt or checkpoint and adds no live or
   real-business path. Assessment progress append and any durable/operator wiring
   remain separately reviewed and approval-gated.
+- No new owner decision is required for the guarded in-memory assessment append.
+  It creates no file or database record and grants no contact, provider,
+  deployment, outreach, or send authority. Durable/operator progress and the
+  following contact-review proof remain separate changes.
 
 ## Next three actions
 
@@ -1804,10 +1835,11 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Design the separate guarded in-memory `ASSESSMENT` progress append. Require
-   the exact module-private assessment input and its unchanged parent, prove that
-   exactly one receipt and no unrelated business changed, and keep durable,
-   operator, live-data, and real-business paths out of that milestone.
+3. Design the `CONTACT_REVIEW` progress-proof trust boundary. Bind the exact
+   completed assessment phase to the reviewed contact invocation and its final
+   persistence receipt; do not trust schema-valid invocation JSON, create a
+   phase input, append progress, or add an operator/live-data path in the same
+   milestone.
 
 ## Resume instructions
 

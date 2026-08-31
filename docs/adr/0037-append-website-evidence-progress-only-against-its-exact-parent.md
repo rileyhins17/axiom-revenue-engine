@@ -97,9 +97,9 @@ introducing a mutable global ID registry or durable write.
 - There is still no operator command, file write, database mutation, Worker or
   API import, live binding, real-business execution, provider call, deployment,
   outreach, send, or spend.
-- ADR 0038 closes the next trust gap by requiring an exact current durable
-  assessment reload before progress proof. An assessment phase-input and append
-  path remain separate future work.
+- ADRs 0038–0040 now require exact durable assessment reload, derive its
+  parent-bound phase input, and append it through a separate guarded in-memory
+  boundary. Durable/operator progress and contact-review proof remain separate.
 
 ## Action items
 
