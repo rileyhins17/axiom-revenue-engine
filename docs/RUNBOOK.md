@@ -267,8 +267,31 @@ There is no operator command, file/database writer, Worker import, live D1
 binding, or real-business path. The durable loader authorizes reads only and the
 append boundary changes in-memory validation state only; neither authorizes
 qualification execution, contact work, provider use, deployment, outreach,
-send, or spend. `CONTACT_REVIEW` remains blocked until its own durable proof and
-phase-input boundary are designed.
+send, or spend. `CONTACT_REVIEW` remains blocked until its validation-only
+phase-input boundary is designed.
+
+The durable `CONTACT_REVIEW` proof now exists as another engineering-only
+boundary. Its read-only loader starts from the exact invocation ID/digest and
+verifies the complete migration 0062–0067 source/contact writer-
+guard set, canonical invocation receipt, exact rebuilt assessment, source
+materialization receipt, every re-derived contact-plan row, and the final contact
+materialization receipt. It reads database time last so evidence cannot expire
+while the proof is assembled unnoticed. Freshness ends at the earlier of
+assessment refresh or verification expiry. Only the exact deeply frozen
+`CURRENT` reload is trusted;
+copied JSON, writer responses, missing/ambiguous rows, guard drift, stale history,
+and row drift fail closed.
+
+The proof builder additionally requires the exact in-process assessment
+checkpoint. It verifies that the first phase still names the reloaded source
+materialization and the third phase still names the reloaded assessment and its
+separate proof, then binds the reviewed invocation and final contact receipt in
+one `contact-review-proof:*`. Never hand-author or copy that result. There is no
+operator command, phase input, progress append, file/database writer, live
+binding, provider operation, real-business path, outreach, or spend authority.
+`CONTACT_REVIEW` remains blocked until a later validation-only phase-input
+adapter is built from this exact proof; its eventual append remains a separate
+milestone.
 
 ## Owner-approved local KW materialization and assessment
 

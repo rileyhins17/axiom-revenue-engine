@@ -117,5 +117,6 @@ input must be re-derived against the new complete cohort checkpoint.
    replay.
 4. [x] Add static safety enforcement against operator, Worker, file, database,
    runtime, provider, and mutation wiring.
-5. [ ] Design the `CONTACT_REVIEW` durable/proof boundary before creating its
-   phase input or progress append.
+5. [x] Design the `CONTACT_REVIEW` durable/proof boundary before creating its
+   phase input or progress append; ADR 0041 now requires an exact current
+   durable reload and separate `contact-review-proof:*`.

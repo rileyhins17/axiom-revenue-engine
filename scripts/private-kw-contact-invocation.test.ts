@@ -8,6 +8,9 @@ import test from "node:test";
 import Database from "better-sqlite3";
 
 import {
+  type RevenueLeadAssessmentD1Boundary,
+} from "../src/lib/revenue-engine/lead-assessment-d1";
+import {
   PRIVATE_KW_ASSESSMENT_APPROVAL_CONFIRMATION,
   PRIVATE_KW_ASSESSMENT_INVOCATION_VERSION,
   type PrivateKwAssessmentInvocationInput,
@@ -19,10 +22,14 @@ import { buildRevenueContactPersistencePlan } from "../src/lib/revenue-engine/co
 import {
   PRIVATE_KW_CONTACT_INVOCATION_APPROVAL_VERSION,
   PRIVATE_KW_CONTACT_REVIEW_VERSION,
+  PrivateKwContactInvocationSchema,
   PrivateKwContactReviewSchema,
   type PrivateKwContactInvocationApproval,
   type PrivateKwContactReviewDraft,
 } from "../src/lib/revenue-engine/private-kw-contact-invocation";
+import {
+  loadPrivateKwContactInvocationDurable,
+} from "../src/lib/revenue-engine/private-kw-contact-invocation-durable";
 import {
   PRIVATE_KW_CONTACT_PERSISTENCE_APPROVAL_CONFIRMATION,
   PRIVATE_KW_CONTACT_PERSISTENCE_VERSION,
@@ -531,6 +538,31 @@ test("prepares a read-only assessed contact review, then persists it only with a
       ).get() as { invocationJson: string }).invocationJson;
       const storedInvocation = JSON.parse(invocationJson) as Record<string, unknown>;
       assert.deepEqual(storedInvocation.review, review);
+      const parsedInvocation = PrivateKwContactInvocationSchema.parse(storedInvocation);
+      const durableBoundary: RevenueLeadAssessmentD1Boundary = {
+        async batch(statements) {
+          return statements.map((statement) => ({
+            success: true,
+            results: verificationDatabase.prepare(statement.sql).all(...statement.bindings),
+            changes: 0,
+          }));
+        },
+      };
+      const durableReload = await loadPrivateKwContactInvocationDurable(
+        durableBoundary,
+        {
+          invocationId: parsedInvocation.invocationId,
+          invocationDigest: parsedInvocation.invocationDigest,
+        },
+      );
+      assert.equal(durableReload.executionPath, "DURABLE_RELOAD");
+      assert.equal(durableReload.freshnessState, "CURRENT");
+      assert.equal(durableReload.invocation.invocationId, first.invocationId);
+      assert.equal(durableReload.contactMaterialization.materializationId, first.materializationId);
+      assert.equal(durableReload.exactAssessmentReloaded, true);
+      assert.equal(durableReload.exactContactPlanRebuilt, true);
+      assert.equal(durableReload.immutableWriterGuardsVerified, true);
+      assert.equal(durableReload.databaseMutationPerformed, false);
       const ownerReceiptRow = verificationDatabase
         .prepare(OWNER_LEAD_CONTACT_REVIEW_QUERY)
         .get(selected.business.id) as Record<string, unknown>;

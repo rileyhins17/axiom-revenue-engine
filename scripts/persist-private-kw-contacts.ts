@@ -6,8 +6,8 @@ import {
   PrivateKwContactInvocationApprovalSchema,
   PrivateKwContactReviewSchema,
   buildPrivateKwContactInvocation,
+  buildPrivateKwContactInvocationReceiptRow,
   privateKwContactInvocationCanonicalJson,
-  type PrivateKwContactInvocation,
 } from "../src/lib/revenue-engine/private-kw-contact-invocation";
 import {
   inspectPrivateKwDatabase,
@@ -84,43 +84,6 @@ function parseArgs(args: string[]) {
   };
 }
 
-function invocationReceipt(invocation: PrivateKwContactInvocation): ReceiptRow {
-  return {
-    id: invocation.invocationId,
-    invocationVersion: invocation.invocationVersion,
-    invocationDigest: invocation.invocationDigest,
-    reviewId: invocation.reviewId,
-    reviewDigest: invocation.reviewDigest,
-    sourcePlanDigest: invocation.sourcePlanDigest,
-    businessId: invocation.businessId,
-    assessmentReceiptId: invocation.assessment.assessmentReceiptId,
-    assessmentDigest: invocation.assessment.assessmentDigest,
-    materializationReceiptId: invocation.contactMaterializationId,
-    discoveryReceiptId: invocation.review.discovery.discoveryResultId,
-    invocationJson: privateKwContactInvocationCanonicalJson(invocation),
-    reviewedBy: invocation.approval.persistenceApproval.approval.reviewedBy,
-    recordedAt: invocation.approval.persistenceApproval.approval.reviewedAt,
-    executionKind: invocation.authority.executionKind,
-    localOnly: 1,
-    localContactMutationAuthorized: 1,
-    localVerificationMutationAuthorized: 1,
-    localInvocationReceiptAuthorized: 1,
-    sourceMutationAuthorized: 0,
-    workflowMutationAuthorized: 0,
-    assessmentMutationAuthorized: 0,
-    schemaMutationAuthorized: 0,
-    captureAuthorized: 0,
-    contactDiscoveryExecutionAuthorized: 0,
-    contactVerificationExecutionAuthorized: 0,
-    consentDecisionAuthorized: 0,
-    qualificationAuthorized: 0,
-    outreachAuthorized: 0,
-    sendAuthorized: 0,
-    providerOperationsAuthorized: 0,
-    costAuthorizedUsd: 0,
-  };
-}
-
 function selectInvocationReceipts(
   database: Database.Database,
   expected: ReceiptRow,
@@ -162,7 +125,7 @@ export function executePrivateKwContactInvocationForLocalDatabase(
     const source = assertExactPrivateKwSourceMaterialization(database, input.source);
     const assessment = loadExactPrivateKwLeadAssessment(database, review.draft.assessment);
     const invocation = buildPrivateKwContactInvocation(source, assessment, review, approval);
-    const expectedReceipt = invocationReceipt(invocation);
+    const expectedReceipt = buildPrivateKwContactInvocationReceiptRow(invocation);
     const existing = selectInvocationReceipts(database, expectedReceipt);
     if (existing.length > 1 || (existing.length === 1 && !receiptMatches(existing[0]!, expectedReceipt))) {
       throw new Error("Local contact invocation receipt identity conflicts with existing history.");

@@ -94,6 +94,8 @@
 | PrivateKwAssessmentProgressProof | Synthetic-only content-addressed proof that binds one exact manifest business and completed website-evidence phase to its evidence/eligibility references plus an exact current durable assessment reload. It retains the D1 clock, immutable-guard verification, sealed-source rebuild, and complete reloaded row counts. It is required as a separate `ASSESSMENT` progress reference but cannot create a phase input or receipt, append progress, execute qualification, discover contacts, authorize outreach, or spend. |
 | PrivateKwAssessmentProgressInput | Deeply frozen, module-private normalized input for the `ASSESSMENT` phase. It can be derived only from the exact in-process `CURRENT` durable assessment reload; it internally regenerates the supporting proof and rechecks the exact manifest business, completed website-evidence predecessor, canonical complete cohort checkpoint, and D1 chronology. It is privately bound to one manifest and parent checkpoint and cannot append progress, access files/runtime/providers, mutate data, or authorize execution. |
 | PrivateKwAssessmentProgressAppend | Validation-only in-memory boundary that accepts only the exact module-private assessment phase input and its unchanged content-addressed parent. It uses the canonical appender, independently verifies one assessment receipt, the expected summary transition, unchanged prior prefix and other nine businesses, freezes the result, and returns the same checkpoint instance on exact retry. It has no operator, file, database, runtime, provider, real-data, deployment, outreach, or cost path. |
+| PrivateKwContactInvocationDurableReload | Deeply frozen read-only trust result created only after the exact invocation receipt, source materialization, rebuilt assessment, complete re-derived contact row set, final contact materialization receipt, and every required source/contact writer guard are reloaded. A final database-clock read classifies currentness against assessment refresh and verification expiry and rejects clock regression. Only the exact in-process `CURRENT` result may feed contact-review proof; copied JSON or the writer response is untrusted. |
+| PrivateKwContactReviewProgressProof | Synthetic-only content-addressed proof that binds the exact guarded assessment checkpoint's source and assessment phase receipts to one current durable contact invocation, its reviewed packet, discovery receipt, and final contact materialization receipt. It is the required supporting proof shape for future `CONTACT_REVIEW` progress but cannot create a phase input/receipt, append progress, access a live database/provider, or authorize contact, outreach, send, deployment, or spend. |
 | PrivateKwSourceWorkflowMaterialization | Separately owner-approved ignored-local transaction that re-derives one deterministic audit and may append only the exact source plan plus one sealed six-row workflow lineage. It cannot assess, capture, contact, deploy, migrate, call a provider, or spend. |
 | RevenuePrivateKwMaterializationReceipt | Append-only schema-0064 seal committed last after the exact local source/workflow rows; it binds the source-plan, candidate, audit, workflow, approval, row counts, transaction type, and zero downstream authority. |
 
@@ -132,6 +134,11 @@
   transaction can persist the contact bundle and schema-0067 receipt. The final
   receipt retains the full review, and a missing final receipt rolls the contact
   bundle back rather than leaving detached reachability beside an assessment.
+- Contact-review progress never trusts that invocation JSON by itself. The
+  durable loader rechecks the database guards, exact source and assessment,
+  complete contact plan, final receipt, database clock, and verification
+  freshness; the proof then binds those facts to the exact in-process assessment
+  checkpoint. Serialization deliberately removes trust.
 - Public contact evidence does not imply CASL consent. Discovery and persistence
   retain `UNASSESSED`; a future `ConsentEvidence` decision remains mandatory and
   separate from verification or owner route readiness.

@@ -44,7 +44,7 @@ export const PRIVATE_KW_SHADOW_PROGRESS_PHASES = [
     phase: "CONTACT_REVIEW",
     proofKind: "OWNER_REVIEWED_CONTACT_INVOCATION",
     primaryReceiptPattern: /^kw-contact-invocation:[a-f0-9]{64}$/,
-    supportingReceiptPatterns: [],
+    supportingReceiptPatterns: [/^contact-review-proof:[a-f0-9]{64}$/],
     completedCheckpoint: "CONTACT_REVIEW_PERSISTED",
     nextRequiredGate: "OWNER_DOSSIER_ACCEPTANCE",
   },

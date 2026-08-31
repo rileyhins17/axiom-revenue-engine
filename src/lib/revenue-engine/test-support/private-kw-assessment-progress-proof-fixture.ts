@@ -242,6 +242,7 @@ export async function createPrivateKwAssessmentProgressProofFixture(options: {
     evidenceProof,
     currentWebsitePhaseReceipt,
     assessment,
+    assessmentBoundary: boundary,
     assessmentDurableReload,
     proofPreparedAt,
   };

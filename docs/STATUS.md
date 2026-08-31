@@ -46,8 +46,17 @@ chronology. It internally regenerates proof, binds the input to the exact parent
 and a separate guarded boundary now appends it in memory only after proving one
 assessment receipt and no unrelated change. Exact retry returns the same frozen
 checkpoint. There is still no operator command, file/database writer, live
-binding, durable progress output, or real-data path. That exact console build has a
-verified, tamper-evident isolated-staging release packet, but it has not been
+binding, durable progress output, or real-data path. The contact-review phase now
+has its own verified proof boundary as well. Its read-only loader rebuilds
+the exact durable assessment, source materialization, reviewed contact invocation,
+every contact and verification row, and the final transaction receipt after
+checking all immutable writer guards. It reads database time last and trusts only
+the exact frozen current in-process result, so copied JSON, incomplete or stale
+history, cross-manifest lineage, and clock regression fail closed. The proof is
+bound to the exact guarded assessment checkpoint and grants no phase input,
+progress append, operator command, live resource, contact action, or spend. The
+console build has a verified, tamper-evident isolated-staging release packet, but
+it has not been
 deployed; exact-head Linux CI is green and only the separate owner deployment
 approval remains required before staging can change.
 
@@ -220,6 +229,9 @@ approval remains required before staging can change.
 - Guarded assessment progress-append checkpoint: the branch HEAD containing
   this status entry; previous verified checkpoint
   `1bd3f3a77296a116c013d0494388ea2f435e3f14`.
+- Durable contact-review progress-proof checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `45d23f690d7362b48bb08c8d252604a6a9f399c9`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Canonical Riley-machine checkout: non-synced
   `C:\Users\riley\Documents\ChatGPT\APE`; OneDrive and Google Drive are not
@@ -1706,6 +1718,37 @@ Completed gates:
   854 ms. No production or staging deployment, migration, provider operation,
   mailbox action, prospect contact, real-business execution, or paid runtime
   work occurred. Spend impact is C$0.
+- Contact-review progress no longer trusts the reviewed invocation or its writer
+  response. The read-only loader starts from only the invocation ID/digest,
+  verifies 27 source/contact/invocation immutable guards, rebuilds the exact
+  durable assessment under its eight assessment guards, reloads the matching
+  source materialization, deterministically rebuilds the complete contact plan,
+  and requires every row plus the final materialization receipt.
+- The database clock is read after all rows have been checked. Clock regression
+  fails, and currentness ends at the earlier of assessment refresh or the first
+  verification expiry. Missing or ambiguous receipts, incomplete rows, source,
+  assessment, review, or manifest drift, stale history, copied JSON, and copied
+  in-process trust all fail closed.
+- `contact-review-proof:*` additionally binds the exact guarded assessment
+  checkpoint's source receipt and assessment proof to the exact reviewed
+  invocation, discovery result, and final contact receipt. It cannot create a
+  phase input, receipt, or checkpoint and has no operator, Worker, file, live
+  database, provider, contact, outreach, send, deployment, or spend path.
+- Seven focused proof tests cover the success path and adversarial trust,
+  completeness, freshness, lineage, and clock-regression cases, while
+  the contact writer integration now reloads its actual rows through the new
+  boundary in real in-memory SQLite. The complete release gate passes
+  fail-closed safety, 498/498 tests, standalone typecheck, zero-warning lint,
+  the secret-sanitized Cloudflare build, and the explicit default-environment
+  no-upload Wrangler dry run. Wrangler retained only the documented generated
+  duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 410 ms and the dossier in
+  610 ms.
+- Only synthetic fixtures and in-memory SQLite were used. No real business,
+  progress record, Cloudflare D1/R2/Browser/provider, mailbox, prospect,
+  staging/production resource, deployment, migration, or paid runtime operation
+  occurred. Spend impact is C$0 and every autonomous capability remains off.
 
 Still required for Phase 1:
 
@@ -1822,8 +1865,13 @@ before approval.
   remain separately reviewed and approval-gated.
 - No new owner decision is required for the guarded in-memory assessment append.
   It creates no file or database record and grants no contact, provider,
-  deployment, outreach, or send authority. Durable/operator progress and the
-  following contact-review proof remain separate changes.
+  deployment, outreach, or send authority. Durable/operator progress remains a
+  separate change.
+- No new owner decision is required for the durable contact-review proof. It is
+  read-only, synthetic/in-memory only, and grants no phase or operational
+  authority. A contact-review phase input, progress append, operator/durable
+  progress path, and any real-business or provider use remain separate reviewed
+  and approval-gated changes.
 
 ## Next three actions
 
@@ -1835,11 +1883,9 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Design the `CONTACT_REVIEW` progress-proof trust boundary. Bind the exact
-   completed assessment phase to the reviewed contact invocation and its final
-   persistence receipt; do not trust schema-valid invocation JSON, create a
-   phase input, append progress, or add an operator/live-data path in the same
-   milestone.
+3. Design the validation-only `CONTACT_REVIEW` phase-input adapter from the exact
+   current durable contact reload/proof and unchanged assessment parent. Do not
+   append progress or add an operator/live-data path in the same milestone.
 
 ## Resume instructions
 

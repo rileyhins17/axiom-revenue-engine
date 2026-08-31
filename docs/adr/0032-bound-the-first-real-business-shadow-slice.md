@@ -133,3 +133,8 @@ commercial coverage, and a hard authority boundary. This option was selected.
 16. [x] Append that exact input only through a separate parent-bound in-memory
     boundary that proves one assessment receipt and no unrelated change, caches
     exact retries, and remains disconnected from durable/operator/live paths.
+17. [x] Define the `CONTACT_REVIEW` durable/proof boundary. It now reloads the
+    exact invocation, assessment, source materialization, complete contact row
+    set, final receipt, writer guards, and database-time freshness; only that
+    exact current in-process result can create the separate content-addressed
+    proof. Phase-input creation and progress append remain separate.

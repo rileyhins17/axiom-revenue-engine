@@ -490,7 +490,24 @@ copied input, a changed parent, or replay against the completed child fails
 closed. There is still no operator command, file/database writer, live binding,
 durable progress record, or real-business execution. These boundaries cannot
 execute qualification, discover contacts, call a provider, deploy, contact a
-prospect, or spend. `CONTACT_REVIEW` requires a separate future trusted proof.
+prospect, or spend.
+
+`CONTACT_REVIEW` now has its own durable proof boundary. A read-only injected SQL
+loader starts from only the contact invocation ID/digest, verifies the exact
+source/contact/invocation database guards, reloads the canonical invocation,
+rebuilds the exact assessment and complete contact persistence plan, and requires
+every contact/verification row plus the final materialization receipt. Database
+time classifies freshness against both the assessment refresh deadline and the
+earliest verification expiry. Only the exact frozen in-process `CURRENT` reload
+can produce `contact-review-proof:*`; copied invocation JSON, writer responses,
+missing rows/guards, stale history, and cross-manifest use fail closed. The proof
+also requires the exact guarded assessment checkpoint and binds its original
+source receipt, assessment receipt/proof, invocation receipt, and final contact
+receipt. It cannot create a phase input or checkpoint, and no operator, file,
+live database, provider, or prospect-contact path was added. A future separate
+adapter must derive the `CONTACT_REVIEW` phase input from this proof before any
+progress append is considered.
+
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

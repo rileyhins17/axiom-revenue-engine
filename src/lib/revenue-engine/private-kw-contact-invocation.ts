@@ -225,6 +225,84 @@ export const PrivateKwContactInvocationSchema = z.object({
 });
 export type PrivateKwContactInvocation = z.infer<typeof PrivateKwContactInvocationSchema>;
 
+export const PrivateKwContactInvocationReceiptRowSchema = z.object({
+  id: z.string().regex(/^kw-contact-invocation:[a-f0-9]{64}$/),
+  invocationVersion: z.literal(PRIVATE_KW_CONTACT_INVOCATION_VERSION),
+  invocationDigest: Sha256Schema,
+  reviewId: z.string().regex(/^kw-contact-review:[a-f0-9]{64}$/),
+  reviewDigest: Sha256Schema,
+  sourcePlanDigest: Sha256Schema,
+  businessId: z.string().trim().min(1).max(80),
+  assessmentReceiptId: z.string().regex(/^assessment:[a-f0-9]{64}$/),
+  assessmentDigest: Sha256Schema,
+  materializationReceiptId: z.string().regex(/^kw-contact-persistence:[a-f0-9]{64}$/),
+  discoveryReceiptId: z.string().regex(/^contact-discovery-result:[a-f0-9]{64}$/),
+  invocationJson: z.string().min(2).max(8_388_608),
+  reviewedBy: z.enum(["RILEY", "AIDAN"]),
+  recordedAt: TimestampSchema,
+  executionKind: z.literal("IGNORED_LOCAL_SQLITE"),
+  localOnly: z.literal(1),
+  localContactMutationAuthorized: z.literal(1),
+  localVerificationMutationAuthorized: z.literal(1),
+  localInvocationReceiptAuthorized: z.literal(1),
+  sourceMutationAuthorized: z.literal(0),
+  workflowMutationAuthorized: z.literal(0),
+  assessmentMutationAuthorized: z.literal(0),
+  schemaMutationAuthorized: z.literal(0),
+  captureAuthorized: z.literal(0),
+  contactDiscoveryExecutionAuthorized: z.literal(0),
+  contactVerificationExecutionAuthorized: z.literal(0),
+  consentDecisionAuthorized: z.literal(0),
+  qualificationAuthorized: z.literal(0),
+  outreachAuthorized: z.literal(0),
+  sendAuthorized: z.literal(0),
+  providerOperationsAuthorized: z.literal(0),
+  costAuthorizedUsd: z.literal(0),
+}).strict();
+export type PrivateKwContactInvocationReceiptRow = z.infer<
+  typeof PrivateKwContactInvocationReceiptRowSchema
+>;
+
+export function buildPrivateKwContactInvocationReceiptRow(
+  value: PrivateKwContactInvocation,
+): PrivateKwContactInvocationReceiptRow {
+  const invocation = PrivateKwContactInvocationSchema.parse(value);
+  return PrivateKwContactInvocationReceiptRowSchema.parse({
+    id: invocation.invocationId,
+    invocationVersion: invocation.invocationVersion,
+    invocationDigest: invocation.invocationDigest,
+    reviewId: invocation.reviewId,
+    reviewDigest: invocation.reviewDigest,
+    sourcePlanDigest: invocation.sourcePlanDigest,
+    businessId: invocation.businessId,
+    assessmentReceiptId: invocation.assessment.assessmentReceiptId,
+    assessmentDigest: invocation.assessment.assessmentDigest,
+    materializationReceiptId: invocation.contactMaterializationId,
+    discoveryReceiptId: invocation.review.discovery.discoveryResultId,
+    invocationJson: revenueLeadAssessmentCanonicalJson(invocation),
+    reviewedBy: invocation.approval.persistenceApproval.approval.reviewedBy,
+    recordedAt: invocation.approval.persistenceApproval.approval.reviewedAt,
+    executionKind: invocation.authority.executionKind,
+    localOnly: 1,
+    localContactMutationAuthorized: 1,
+    localVerificationMutationAuthorized: 1,
+    localInvocationReceiptAuthorized: 1,
+    sourceMutationAuthorized: 0,
+    workflowMutationAuthorized: 0,
+    assessmentMutationAuthorized: 0,
+    schemaMutationAuthorized: 0,
+    captureAuthorized: 0,
+    contactDiscoveryExecutionAuthorized: 0,
+    contactVerificationExecutionAuthorized: 0,
+    consentDecisionAuthorized: 0,
+    qualificationAuthorized: 0,
+    outreachAuthorized: 0,
+    sendAuthorized: 0,
+    providerOperationsAuthorized: 0,
+    costAuthorizedUsd: 0,
+  });
+}
+
 function assertAssessmentIntegrity(assessment: RevenueLeadAssessment) {
   const { assessmentDigest, ...core } = assessment;
   if (

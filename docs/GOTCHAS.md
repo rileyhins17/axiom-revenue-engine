@@ -5,6 +5,36 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## DATA-012 — Schema-valid contact invocation JSON impersonated durable contact-review proof
+
+- **Symptom:** a copied or hand-built contact invocation could satisfy the
+  invocation schema and content digests even though it did not prove that the
+  assessment, source materialization, every contact/verification row, and final
+  transaction receipt still existed together and were current in the database.
+- **Root cause:** the reviewed writer input was being treated as durable
+  transaction provenance. As with assessment progress, shape and content
+  integrity alone cannot prove an exact post-commit reload after a process or
+  Codex task is lost.
+- **Proven fix:** a read-only loader now starts from only the invocation ID and
+  digest, verifies all required source/contact/invocation writer guards,
+  rebuilds the exact durable assessment, source materialization, and complete
+  contact persistence plan, reloads every row plus the final receipt, and reads
+  the database clock last. Only the exact deeply frozen in-process `CURRENT`
+  result can feed a contact-review proof bound to the exact guarded assessment
+  checkpoint. Serialization, stale evidence, missing rows, ambiguous receipts,
+  cross-manifest lineage, and clock regression all fail closed.
+- **Prevention/test:** adversarial tests reject schema-valid invocation JSON,
+  copied durable reloads/checkpoints, missing final receipts or immutable
+  guards, contact-row drift, receipt ambiguity, stale verification, and
+  cross-manifest proof reuse. A real in-memory SQLite integration reloads the
+  actual writer-produced row set. The safety scan requires the final clock read,
+  exact row/guard checks, module-private trust set, zero authority, and isolation
+  from the generic progress recorder, Worker, files, providers, and mutations.
+- **Affected area:** reviewed contact persistence, interrupted-task recovery,
+  contact-review progress proof, and every future `CONTACT_REVIEW` phase-input
+  or append boundary.
+- **Verifying commit:** branch HEAD containing ADR 0041 and this entry.
+
 ## DATA-011 — A realistic UI fixture bypassed the writer it claimed to represent
 
 - **Symptom:** the owner dossier browser test rendered plausible contact routes,
