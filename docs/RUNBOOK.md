@@ -267,8 +267,8 @@ There is no operator command, file/database writer, Worker import, live D1
 binding, or real-business path. The durable loader authorizes reads only and the
 append boundary changes in-memory validation state only; neither authorizes
 qualification execution, contact work, provider use, deployment, outreach,
-send, or spend. The validation-only `CONTACT_REVIEW` phase-input boundary is
-described below; its progress append remains a separate blocked milestone.
+send, or spend. The validation-only `CONTACT_REVIEW` phase-input and guarded
+in-memory append boundaries are described below.
 
 The durable `CONTACT_REVIEW` proof now exists as another engineering-only
 boundary. Its read-only loader starts from the exact invocation ID/digest and
@@ -298,12 +298,19 @@ its recording time comes from the final database clock. Copied reload, proof,
 input, or checkpoint JSON cannot recreate trust, and the input remains privately
 bound to its unchanged assessment parent.
 
-There is no operator command, progress append, file/database writer, live
-binding, provider operation, real-business path, outreach, or spend authority.
-Never pass a hand-authored contact-review input to the generic recorder. The
-synthetic chain remains blocked until a separate exact-parent guarded in-memory
-append is implemented and verified; durable/operator progress remains a later
-approval-gated design.
+The separate contact-review append accepts only that exact trusted input and its
+unchanged content-addressed assessment parent. It calls the canonical receipt
+builder/appender, then independently proves one added receipt, the exact
+`ASSESSMENT_PERSISTED` to `CONTACT_REVIEW_PERSISTED` summary transition, the
+unchanged three-receipt prefix, and unchanged other nine businesses. Exact retry
+returns the same frozen checkpoint; copied input, changed manifest/parent, and
+completed-child replay fail closed.
+
+There is no operator command, file/database writer, live binding, provider
+operation, real-business path, outreach, or spend authority. Never pass a
+hand-authored contact-review input to the generic recorder. The next synthetic
+gate is a separate trustworthy owner-dossier acceptance proof/input;
+durable/operator progress remains a later approval-gated design.
 
 ## Owner-approved local KW materialization and assessment
 

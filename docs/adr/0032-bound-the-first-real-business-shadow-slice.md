@@ -143,3 +143,7 @@ commercial coverage, and a hard authority boundary. This option was selected.
     selected manifest business, completed assessment predecessor, and canonical
     unchanged parent checkpoint. Keep progress append and operational wiring
     separate.
+19. [x] Append that exact contact-review input only through a separate
+    parent-bound in-memory boundary that proves one contact-review receipt and no
+    unrelated change, caches exact retries, and remains disconnected from
+    durable/operator/live paths.

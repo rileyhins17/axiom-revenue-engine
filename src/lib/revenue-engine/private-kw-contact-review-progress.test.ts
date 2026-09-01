@@ -7,11 +7,16 @@ import {
   requireInProcessPrivateKwContactReviewProgressInputForParent,
 } from "@/lib/revenue-engine/private-kw-contact-review-progress";
 import {
+  appendPrivateKwContactReviewProgress,
+  requireInProcessPrivateKwContactReviewProgressCheckpoint,
+} from "@/lib/revenue-engine/private-kw-contact-review-progress-append";
+import {
   buildPrivateKwContactReviewProgressProof,
 } from "@/lib/revenue-engine/private-kw-contact-review-progress-proof";
 import {
   PrivateKwShadowSliceProgressCheckpointSchema,
   appendPrivateKwShadowSliceProgress,
+  buildPrivateKwShadowSlicePhaseReceipt,
   privateKwShadowSliceProgressAuthority,
   privateKwShadowSliceProgressDigest,
 } from "@/lib/revenue-engine/private-kw-shadow-slice-progress";
@@ -227,4 +232,151 @@ test("binds trusted contact input to one unchanged assessment parent without app
   assert.equal(record?.currentCheckpoint, "ASSESSMENT_PERSISTED");
   assert.equal(record?.nextRequiredGate, "CONTACT_REVIEW_APPROVAL");
   assert.equal(record?.phaseReceipts.length, 3);
+});
+
+test("guarded contact-review append advances exactly once and preserves every unrelated record", async () => {
+  const fixture = await createPrivateKwContactReviewProgressProofFixture({
+    suffix: "contact-append",
+  });
+  const parentBefore = structuredClone(fixture.assessmentCheckpoint);
+  const phaseInput = buildInput(fixture);
+  const expectedReceipt = buildPrivateKwShadowSlicePhaseReceipt(
+    fixture.manifest,
+    phaseInput,
+  );
+  const nextProgress = appendPrivateKwContactReviewProgress({
+    manifestValue: structuredClone(fixture.manifest),
+    previousProgressValue: structuredClone(fixture.assessmentCheckpoint),
+    phaseInputValue: phaseInput,
+  });
+  const targetBefore = fixture.assessmentCheckpoint.records.find(
+    (record) => record.businessId === phaseInput.businessId,
+  );
+  const targetAfter = nextProgress.records.find(
+    (record) => record.businessId === phaseInput.businessId,
+  );
+  const otherBefore = fixture.assessmentCheckpoint.records.filter(
+    (record) => record.businessId !== phaseInput.businessId,
+  );
+  const otherAfter = nextProgress.records.filter(
+    (record) => record.businessId !== phaseInput.businessId,
+  );
+
+  assert.equal(
+    nextProgress.parentCheckpoint?.checkpointId,
+    fixture.assessmentCheckpoint.checkpointId,
+  );
+  assert.equal(
+    nextProgress.parentCheckpoint?.checkpointDigest,
+    fixture.assessmentCheckpoint.checkpointDigest,
+  );
+  assert.equal(nextProgress.createdAt, phaseInput.recordedAt);
+  assert.equal(
+    nextProgress.summary.completedPhaseReceipts,
+    fixture.assessmentCheckpoint.summary.completedPhaseReceipts + 1,
+  );
+  assert.equal(
+    nextProgress.summary.fullyCompletedBusinesses,
+    fixture.assessmentCheckpoint.summary.fullyCompletedBusinesses,
+  );
+  assert.equal(
+    nextProgress.summary.nextIncompleteBusinessId,
+    fixture.assessmentCheckpoint.summary.nextIncompleteBusinessId,
+  );
+  assert.equal(
+    nextProgress.summary.countsByCheckpoint.ASSESSMENT_PERSISTED,
+    fixture.assessmentCheckpoint.summary.countsByCheckpoint.ASSESSMENT_PERSISTED - 1,
+  );
+  assert.equal(
+    nextProgress.summary.countsByCheckpoint.CONTACT_REVIEW_PERSISTED,
+    fixture.assessmentCheckpoint.summary.countsByCheckpoint.CONTACT_REVIEW_PERSISTED + 1,
+  );
+  assert.equal(
+    targetAfter?.phaseReceipts.length,
+    (targetBefore?.phaseReceipts.length ?? 0) + 1,
+  );
+  assert.equal(targetAfter?.currentCheckpoint, "CONTACT_REVIEW_PERSISTED");
+  assert.equal(targetAfter?.nextRequiredGate, "OWNER_DOSSIER_ACCEPTANCE");
+  assert.deepEqual(targetAfter?.phaseReceipts.at(-1), expectedReceipt);
+  assert.deepEqual(otherAfter, otherBefore);
+  assert.deepEqual(fixture.assessmentCheckpoint, parentBefore);
+  assert.equal(nextProgress.authority.progressRecordingOnly, true);
+  assert.equal(nextProgress.authority.phaseExecutionAuthorized, false);
+  assert.equal(nextProgress.authority.databaseMutationAuthorized, false);
+  assert.equal(nextProgress.authority.contactDiscoveryExecutionAuthorized, false);
+  assert.equal(nextProgress.authority.contactVerificationExecutionAuthorized, false);
+  assert.equal(nextProgress.authority.consentDecisionAuthorized, false);
+  assert.equal(nextProgress.authority.qualificationAuthorized, false);
+  assert.equal(nextProgress.authority.mailboxSyncAuthorized, false);
+  assert.equal(nextProgress.authority.outreachAuthorized, false);
+  assert.equal(nextProgress.authority.sendAuthorized, false);
+  assert.equal(nextProgress.authority.providerOperationsAuthorized, 0);
+  assert.equal(nextProgress.authority.costAuthorizedUsd, 0);
+  assert.equal(Object.isFrozen(nextProgress), true);
+  assert.equal(Object.isFrozen(targetAfter), true);
+  assert.equal(
+    requireInProcessPrivateKwContactReviewProgressCheckpoint(nextProgress),
+    nextProgress,
+  );
+  assert.throws(
+    () => requireInProcessPrivateKwContactReviewProgressCheckpoint(
+      structuredClone(nextProgress),
+    ),
+    /exact in-process result/i,
+  );
+
+  const exactRetry = appendPrivateKwContactReviewProgress({
+    manifestValue: structuredClone(fixture.manifest),
+    previousProgressValue: structuredClone(fixture.assessmentCheckpoint),
+    phaseInputValue: phaseInput,
+  });
+  assert.equal(exactRetry, nextProgress);
+});
+
+test("guarded contact-review append rejects copied input and any changed parent", async () => {
+  const fixture = await createPrivateKwContactReviewProgressProofFixture({
+    suffix: "contact-append-guards",
+  });
+  const other = await createPrivateKwContactReviewProgressProofFixture({
+    suffix: "contact-append-other-manifest",
+  });
+  const phaseInput = buildInput(fixture);
+
+  assert.throws(() => appendPrivateKwContactReviewProgress({
+    manifestValue: fixture.manifest,
+    previousProgressValue: fixture.assessmentCheckpoint,
+    phaseInputValue: structuredClone(phaseInput),
+  }), /exact in-process result/i);
+
+  assert.throws(() => appendPrivateKwContactReviewProgress({
+    manifestValue: other.manifest,
+    previousProgressValue: fixture.assessmentCheckpoint,
+    phaseInputValue: phaseInput,
+  }), /exact unchanged manifest and assessment parent checkpoint/i);
+
+  const changedParent = appendPrivateKwShadowSliceProgress(
+    fixture.manifest,
+    fixture.assessmentCheckpoint,
+    anotherBusinessSourceInput({
+      manifest: fixture.manifest,
+      excludedBusinessId: phaseInput.businessId,
+      recordedAt: fixture.contactDurableReload.databaseNow,
+    }),
+  );
+  assert.throws(() => appendPrivateKwContactReviewProgress({
+    manifestValue: fixture.manifest,
+    previousProgressValue: changedParent,
+    phaseInputValue: phaseInput,
+  }), /exact unchanged manifest and assessment parent checkpoint/i);
+
+  const completedChild = appendPrivateKwContactReviewProgress({
+    manifestValue: fixture.manifest,
+    previousProgressValue: fixture.assessmentCheckpoint,
+    phaseInputValue: phaseInput,
+  });
+  assert.throws(() => appendPrivateKwContactReviewProgress({
+    manifestValue: fixture.manifest,
+    previousProgressValue: completedChild,
+    phaseInputValue: phaseInput,
+  }), /exact unchanged manifest and assessment parent checkpoint/i);
 });

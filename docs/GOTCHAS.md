@@ -23,9 +23,11 @@ Retire entries when the architecture makes them impossible.
   result can feed a contact-review proof bound to the exact guarded assessment
   checkpoint. The phase-input adapter regenerates that proof internally and
   binds its exact in-process output to the complete manifest and assessment
-  parent checkpoint. Serialization, stale evidence, missing rows, ambiguous
-  receipts, changed parents, cross-manifest lineage, and clock regression all
-  fail closed.
+  parent checkpoint. The separate append requires that exact input/parent and
+  independently proves one canonical receipt plus no unrelated-business change
+  before registering a frozen checkpoint. Serialization, stale evidence,
+  missing rows, ambiguous receipts, changed parents, completed-child replay,
+  cross-manifest lineage, and clock regression all fail closed.
 - **Prevention/test:** adversarial tests reject schema-valid invocation JSON,
   copied durable reloads/checkpoints, missing final receipts or immutable
   guards, contact-row drift, receipt ambiguity, stale verification, and
@@ -34,12 +36,13 @@ Retire entries when the architecture makes them impossible.
   durable trust, copied inputs, copied assessment parents, changed/re-digested
   parents, stale evidence, and cross-manifest reuse. The safety scan requires
   the final clock read, exact row/guard checks, module-private trust sets and
-  parent context, zero authority, and isolation from the generic progress
-  recorder, Worker, files, providers, and mutations.
+  parent context, exact retry caching, one-receipt summary transition, zero
+  authority, and isolation from the generic progress recorder, Worker, files,
+  databases, providers, network, and mutations.
 - **Affected area:** reviewed contact persistence, interrupted-task recovery,
   contact-review progress proof, the `CONTACT_REVIEW` phase-input boundary, and
   every future contact-review append boundary.
-- **Verifying commit:** branch HEAD containing ADRs 0041–0042 and this entry.
+- **Verifying commit:** branch HEAD containing ADRs 0041–0043 and this entry.
 
 ## DATA-011 — A realistic UI fixture bypassed the writer it claimed to represent
 
@@ -454,6 +457,28 @@ Retire entries when the architecture makes them impossible.
   Wrangler dry runs, Windows/OneDrive workspaces, and local release evidence.
 - **Verifying commit:** branch HEAD containing the sequential browser-gate rule,
   exact `.next` cleanup, and six-view Quality Lab acceptance.
+
+## BUILD-007 — Independent JavaScript and SQLite clocks made a current fixture flaky
+
+- **Symptom:** the full suite intermittently failed while persisting a synthetic
+  website-evidence eligibility receipt with “outside its database-clock
+  freshness window,” although the same isolated test usually passed.
+- **Root cause:** the fixture used `new Date()` for `evaluatedAt`, then sampled
+  SQLite time independently. On Windows, SQLite was observed one millisecond
+  behind the JavaScript timestamp (`.948Z` versus `.949Z`), so the fail-closed
+  lower freshness bound correctly classified the receipt as not yet current.
+- **Proven fix:** derive the fixture evaluation time from the latest trusted
+  completeness receipt's database-recorded time. This keeps the evaluation at
+  or after every prerequisite and at or before the later persistence clock
+  without weakening production freshness checks.
+- **Prevention/test:** database-clock-sensitive fixtures must derive dependent
+  event times from prior trusted database receipts, not a separately sampled
+  process clock. The formerly flaky rejection test passed repeated isolated
+  runs after the change and remains part of the complete release suite.
+- **Affected area:** website-evidence eligibility tests, Windows SQLite fixtures,
+  and any future test that compares JavaScript and database clocks at a
+  half-open freshness boundary.
+- **Verifying commit:** branch HEAD containing this entry.
 
 ## BUILD-001 — Local success did not equal Linux/Cloudflare success
 

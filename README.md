@@ -509,9 +509,15 @@ reload and exact guarded assessment parent. It rechecks the complete ten-busines
 scope and chronology, uses the durable invocation receipt plus final database
 clock, and privately binds the input to its unchanged parent. Copied input,
 reload, proof, or parent JSON cannot recreate trust. The adapter cannot append
-progress or create a checkpoint, and no operator, file, live database, provider,
-or prospect-contact path was added. A separate exact-parent in-memory append
-must still be designed before this synthetic chain can advance.
+progress or create a checkpoint. A separate guarded in-memory boundary now
+requires that exact input and unchanged assessment parent, uses the canonical
+receipt/appender, and independently proves exactly one contact-review receipt,
+the assessment-to-contact-review summary transition, the prior three-receipt
+prefix, and no change to the other nine businesses. Exact retry returns the same
+frozen checkpoint; copied input, changed manifest/parent, and completed-child
+replay fail closed. There is still no operator, file/database output, live
+resource, provider, real-business, or prospect-contact path. The next synthetic
+gap is the separate owner-dossier acceptance proof and phase input.
 
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command

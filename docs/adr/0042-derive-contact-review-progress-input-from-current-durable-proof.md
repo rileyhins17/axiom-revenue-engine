@@ -120,8 +120,10 @@ or copied JSON becoming authority.
   internally rebuilt `contact-review-proof:*` as its required support.
 - The assessment checkpoint remains unchanged; this milestone creates no phase
   receipt or next checkpoint.
-- A separate exact-parent guarded in-memory append is still required before the
-  synthetic chain can advance to `CONTACT_REVIEWED`.
+- ADR 0043 now provides the separate exact-parent guarded in-memory append. It
+  independently proves one contact-review receipt, the exact summary
+  transition, and no unrelated change before the synthetic chain advances to
+  `CONTACT_REVIEW_PERSISTED`.
 - No operator command, file/database write, live binding, provider, real-business
   execution, contact action, deployment, migration, or spend is introduced.
 
@@ -135,5 +137,7 @@ or copied JSON becoming authority.
    evidence rejection, lineage rejection, and changed-parent rejection.
 4. [x] Add static safety checks forbidding appender, operator, Worker, file,
    database, runtime, provider, mutation, and caller-clock wiring.
-5. [ ] Add a separate exact-parent guarded in-memory contact-review append;
-   do not add durable, operator, live-data, or real-business wiring.
+5. [x] Add a separate exact-parent guarded in-memory contact-review append;
+   ADR 0043 keeps durable, operator, live-data, and real-business wiring out.
+6. [ ] Design the owner-dossier acceptance proof/input separately from its
+   eventual append and from all durable/operator wiring.

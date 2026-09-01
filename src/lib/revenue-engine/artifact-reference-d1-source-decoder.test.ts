@@ -917,10 +917,15 @@ async function durableEligibilityProgressFixture() {
   const { fixture, database } = await persistedDatabaseFixture(timing);
   const context = progressContextForWebsiteEvidence(fixture);
   const executions = await trustedWebsiteArtifactExecutions(database, fixture, timing);
+  const evaluatedAt = executions
+    .map((execution) => execution.receipt.recordedAt)
+    .sort((left, right) => left.localeCompare(right, "en-CA"))
+    .at(-1);
+  if (!evaluatedAt) throw new Error("Website evidence eligibility fixture lost its durable database time.");
   const receipt = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
     websiteEvidenceProofValue: context.evidence,
     trustedExecutionValues: executions,
-    evaluatedAt: new Date().toISOString(),
+    evaluatedAt,
   });
   const boundary = sqliteD1Boundary(database);
   const committed = await persistPrivateKwWebsiteEvidenceEligibilityD1(boundary, receipt);
