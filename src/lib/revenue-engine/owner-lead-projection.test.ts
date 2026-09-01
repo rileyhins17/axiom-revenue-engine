@@ -235,6 +235,19 @@ test("verified named email outranks role email and still grants no send authorit
   assert.equal(result.authority.outreachAuthorized, false);
 });
 
+test("a newly discovered route does not rewrite or stale the separate qualification snapshot", () => {
+  const input = ownerInput({ contacts: [] });
+  assert.equal(input.qualification.recommendedChannel, "RESEARCH");
+  input.contactPoints = [emailContact()];
+
+  const result = projectOwnerLead(input);
+
+  assert.equal(result.route.channel, "EMAIL");
+  assert.equal(result.route.contactPointId, "contact:email:named");
+  assert.equal(result.dataQuality.state, "CURRENT");
+  assert.equal(result.dataQuality.issues.includes("qualification_snapshot_drift"), false);
+});
+
 test("catch-all or stale email cannot displace a current manual route", () => {
   const catchAll = emailContact({
     contactPointId: "contact:email:catch-all",
@@ -326,4 +339,3 @@ test("cross-business audit and contact contamination fail before projection", ()
   contactMismatch.contactPoints[0] = { ...contactMismatch.contactPoints[0]!, businessId: "business:other" };
   assert.throws(() => projectOwnerLead(contactMismatch), /another business/i);
 });
-

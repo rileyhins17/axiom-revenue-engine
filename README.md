@@ -516,8 +516,21 @@ the assessment-to-contact-review summary transition, the prior three-receipt
 prefix, and no change to the other nine businesses. Exact retry returns the same
 frozen checkpoint; copied input, changed manifest/parent, and completed-child
 replay fail closed. There is still no operator, file/database output, live
-resource, provider, real-business, or prospect-contact path. The next synthetic
-gap is the separate owner-dossier acceptance proof and phase input.
+resource, provider, real-business, or prospect-contact path.
+
+`OWNER_DOSSIER` now has its own validation-only proof and phase-input boundary.
+The real SELECT-only dossier reader deep-freezes and privately registers each
+exact response, so copied JSON is not trusted. A content-addressed
+`owner-dossier-acceptance:*` proof binds that exact current dossier, its complete
+digest and snapshot/contact lineage, the exact guarded contact-review parent,
+and an explicit Riley/Aidan declaration made within five minutes. The proof
+truthfully records that session authentication is not proven and the decision is
+not durably stored. A separate adapter regenerates the proof internally and
+returns one frozen, parent-bound, zero-authority final-phase input with no append.
+The owner projection also keeps qualification separate from current routing: a
+new email or manual route can improve reachability without rewriting lead fit.
+There is no owner action, receipt/checkpoint, file/database output, operator,
+Worker, provider, real-business, deployment, outreach, send, or spend path.
 
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command

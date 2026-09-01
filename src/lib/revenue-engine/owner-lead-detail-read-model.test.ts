@@ -11,6 +11,7 @@ import {
   OWNER_LEAD_HISTORY_QUERY,
   OWNER_LEAD_HISTORY_LIMIT,
   readOwnerLeadDetail,
+  requireInProcessOwnerLeadDetailResponse,
 } from "@/lib/revenue-engine/owner-lead-detail-read-model";
 import { qualifyRevenueLead } from "@/lib/revenue-engine/qualification";
 import { auditWebsiteDeterministically } from "@/lib/revenue-engine/website-audit";
@@ -244,6 +245,28 @@ test("detail reader returns exact evidence, all current routes, and honest v2 hi
     "business:one",
     OWNER_LEAD_HISTORY_LIMIT + 1,
   ]);
+});
+
+test("detail reader trusts and freezes only its exact in-process dossier", async () => {
+  const fake = fakeDatabase([[validCandidate()], [validPhone()], [], historyRows()]);
+  const result = await readOwnerLeadDetail(fake.database, "business:one", GENERATED_AT);
+
+  assert(result);
+  assert.equal(requireInProcessOwnerLeadDetailResponse(result), result);
+  assert.equal(Object.isFrozen(result), true);
+  assert.equal(Object.isFrozen(result.lead), true);
+  assert.equal(Object.isFrozen(result.lead.business), true);
+  assert.equal(Object.isFrozen(result.website), true);
+  assert.equal(Object.isFrozen(result.website.evidence), true);
+  assert.equal(Object.isFrozen(result.routes), true);
+  assert.equal(Object.isFrozen(result.contactReview), true);
+  assert.equal(Object.isFrozen(result.history), true);
+  assert.equal(Object.isFrozen(result.authority), true);
+
+  assert.throws(
+    () => requireInProcessOwnerLeadDetailResponse(structuredClone(result)),
+    /exact in-process owner lead detail response/i,
+  );
 });
 
 test("detail reader returns null for an exact business with no current v2 dossier", async () => {

@@ -62,7 +62,15 @@ that exact input/parent, adds one canonical contact-review receipt, and proves
 the other nine businesses did not change. Exact retry returns the same frozen
 checkpoint; copied input, parent drift, and completed-child replay fail closed.
 It has no file/database output, operator/live resource, real-business path,
-contact action, or spend. The console build has a verified, tamper-evident
+contact action, or spend. The final owner-dossier phase now has a separate
+validation boundary as well: the real reader freezes and privately trusts only
+its exact current response, a content-addressed proof binds that full dossier and
+explicit five-minute declaration to the exact contact checkpoint, and a separate
+adapter creates one frozen zero-authority input without appending it. The proof
+explicitly does not authenticate Riley/Aidan or store a durable decision. A
+quality regression found during this work was also fixed: discovering an email
+or manual route no longer rewrites or falsely stales the separate immutable lead
+qualification. The console build has a verified, tamper-evident
 isolated-staging release packet, but it has not been deployed; exact-head Linux
 CI is green and only the separate owner deployment approval remains required
 before staging can change.
@@ -70,6 +78,10 @@ before staging can change.
 ## Verified checkpoint
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
+- Verified predecessor commit before this checkpoint:
+  `a7a9565896a4ccccf0753077200114c3327dc29b`
+- This milestone's verifying commit is the branch HEAD containing ADR 0044;
+  exact local/remote SHA equality must be verified after the atomic push.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
 - Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
 - CI hardening commits: `14d85a0468bef56e2bf7a97f7e53ed521955f1da`
@@ -1822,6 +1834,30 @@ Completed gates:
   operation occurred. Spend impact is C$0 and every autonomous capability
   remains off.
 
+- The owner-dossier reader now deep-freezes and privately registers only its
+  exact response. Schema-valid clones fail provenance checks.
+- `owner-dossier-acceptance:*` binds the complete dossier digest, current data
+  quality, website/qualification/contact-review lineage, exact contact parent,
+  manifest business/source identity, and an explicit acceptance declaration
+  made within five minutes of dossier generation.
+- The proof states that session authentication is not proven and no durable
+  owner decision exists. The separate `OWNER_DOSSIER` adapter regenerates proof
+  internally, returns one frozen parent-bound zero-authority input, and creates
+  no receipt or checkpoint.
+- Qualification now revalidates against its recorded channel context while the
+  current best route is projected independently. This prevents a newly found
+  email or manual route from falsely producing `qualification_snapshot_drift`;
+  it does not raise a business's fit or rebuild-need score.
+- Static safety forbids the new proof/input from operator, Worker, API/page/UI,
+  file, database, network, provider, mutation, append, deployment, outreach,
+  send, and cost paths. Focused verification passes 22/22 tests. The complete
+  release gate passes fail-closed safety, 511/511 tests, standalone typecheck,
+  zero-warning lint, the secret-sanitized Cloudflare build, and the explicit
+  default-environment no-upload Wrangler dry run. Wrangler retained only the
+  documented generated duplicate-key warnings. The final six-view
+  desktop/mobile WCAG owner-browser gate passed with zero external requests;
+  the lead list was ready in 791 ms and the dossier in 848 ms.
+
 Still required for Phase 1:
 
 - The protected production environment and manual workflow are configured, but
@@ -1950,6 +1986,15 @@ before approval.
   append. It creates no durable record and grants no owner-dossier, contact,
   provider, deployment, outreach, send, or spend authority. Owner-dossier proof
   and every durable/operator progress path remain separate reviewed milestones.
+- No new owner decision is required for the validation-only owner-dossier proof
+  and phase input. Synthetic tests do not create Riley's or Aidan's acceptance,
+  session authentication is explicitly unproven, and no decision or checkpoint
+  is stored. Authentication, durable owner-decision recording, guarded append,
+  operator wiring, and real-business use remain separate reviewed milestones.
+- Riley directed that this rebuild branch should eventually become `main`. That
+  is recorded as the intended final cutover, not approval to merge now. The merge
+  remains gated by the completed rebuild, full safety/review/rollback evidence,
+  and an explicit final release decision.
 
 ## Next three actions
 
@@ -1961,10 +2006,10 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Design a trustworthy `OWNER_DOSSIER` acceptance proof and phase input from
-   the exact contact-review checkpoint and owner-readable dossier. Keep its
-   eventual append, durable/operator path, live data, and real-business use out
-   of the same milestone.
+3. Design a separate exact-parent guarded in-memory `OWNER_DOSSIER` append from
+   the trusted input. Keep session authentication, durable owner-decision
+   recording, operator/UI wiring, live data, and real-business use out of that
+   milestone.
 
 ## Resume instructions
 

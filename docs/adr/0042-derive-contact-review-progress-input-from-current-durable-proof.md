@@ -139,5 +139,5 @@ or copied JSON becoming authority.
    database, runtime, provider, mutation, and caller-clock wiring.
 5. [x] Add a separate exact-parent guarded in-memory contact-review append;
    ADR 0043 keeps durable, operator, live-data, and real-business wiring out.
-6. [ ] Design the owner-dossier acceptance proof/input separately from its
-   eventual append and from all durable/operator wiring.
+6. [x] Design the owner-dossier acceptance proof/input separately from its
+   eventual append and from all durable/operator wiring; see ADR 0044.

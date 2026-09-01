@@ -133,5 +133,6 @@ re-derived against the new complete cohort checkpoint.
    replay.
 4. [x] Add static safety enforcement against operator, Worker, file, database,
    runtime, provider, network, and mutation wiring.
-5. [ ] Design a trustworthy `OWNER_DOSSIER` acceptance proof and phase input
-   before any owner-dossier progress append or durable/operator wiring.
+5. [x] Design a trustworthy `OWNER_DOSSIER` acceptance proof and phase input
+   before any owner-dossier progress append or durable/operator wiring; ADR 0044
+   keeps authentication, durable recording, append, and operator wiring separate.

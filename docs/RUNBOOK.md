@@ -308,9 +308,28 @@ completed-child replay fail closed.
 
 There is no operator command, file/database writer, live binding, provider
 operation, real-business path, outreach, or spend authority. Never pass a
-hand-authored contact-review input to the generic recorder. The next synthetic
-gate is a separate trustworthy owner-dossier acceptance proof/input;
-durable/operator progress remains a later approval-gated design.
+hand-authored contact-review input to the generic recorder.
+
+The validation-only `OWNER_DOSSIER` boundary starts by reading the exact owner
+dossier through the SELECT-only reader. Only the exact deeply frozen in-process
+response is trusted; copied JSON is rejected. Qualification and current routing
+must remain separate: discovering a route cannot rewrite or stale the immutable
+lead-quality snapshot.
+
+The proof builder requires that exact current dossier and exact guarded
+contact-review checkpoint. It binds the complete dossier digest, manifest and
+source identity, website/qualification snapshots, current contact invocation,
+four-receipt predecessor, and an explicit Riley/Aidan declaration made no more
+than five minutes after dossier generation. The resulting
+`owner-dossier-acceptance:*` object explicitly says that session authentication
+is not proven and no decision is durably recorded.
+
+The separate phase-input adapter regenerates that proof internally and returns
+one frozen, parent-bound `OWNER_DOSSIER` input. Never hand-author or reload the
+proof/input from JSON. There is no append, operator command, file/database
+writer, API/UI action, Worker import, live resource, real-business path,
+provider operation, outreach, send, or spend. Authenticated durable acceptance,
+guarded append, and operator wiring remain separate approval-gated designs.
 
 ## Owner-approved local KW materialization and assessment
 

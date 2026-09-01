@@ -174,8 +174,12 @@ test("malformed businesses are explicit and malformed contacts cannot authorize 
   assert.equal(result.summary.rejectedBusinesses, 1);
   assert.deepEqual(result.rejections, [{ businessId: "business:one", code: "INVALID_CANDIDATE_ROW" }]);
   assert.equal(result.leads[0]?.route.channel, "RESEARCH");
-  assert.equal(result.leads[0]?.attention, "NEEDS_REFRESH");
-  assert(result.leads[0]?.dataQuality.issues.includes("qualification_snapshot_drift"));
+  assert.equal(result.leads[0]?.attention, "REVIEW");
+  assert.equal(result.leads[0]?.dataQuality.state, "CURRENT");
+  assert.equal(
+    result.leads[0]?.dataQuality.issues.includes("qualification_snapshot_drift"),
+    false,
+  );
 });
 
 test("query builders remain bounded and contain no mutation statements", async () => {
@@ -190,4 +194,3 @@ test("query builders remain bounded and contain no mutation statements", async (
   await assert.rejects(() => readOwnerLeadList(fake.database, GENERATED_AT, 101), /one to 100/i);
   assert.equal(fake.queries.length, 0);
 });
-

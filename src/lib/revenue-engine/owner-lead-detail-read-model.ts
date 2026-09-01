@@ -234,6 +234,24 @@ export const OwnerLeadDetailResponseSchema = z.object({
 
 export type OwnerLeadDetailResponse = z.infer<typeof OwnerLeadDetailResponseSchema>;
 
+const trustedOwnerLeadDetailResponses = new WeakSet<object>();
+
+function deepFreezeOwnerLeadDetail<T>(value: T): T {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const nestedValue of Object.values(value)) {
+    deepFreezeOwnerLeadDetail(nestedValue);
+  }
+  return Object.freeze(value);
+}
+
+export function requireInProcessOwnerLeadDetailResponse(value: unknown): OwnerLeadDetailResponse {
+  OwnerLeadDetailResponseSchema.parse(value);
+  if (!value || typeof value !== "object" || !trustedOwnerLeadDetailResponses.has(value)) {
+    throw new Error("An exact in-process owner lead detail response is required.");
+  }
+  return value as OwnerLeadDetailResponse;
+}
+
 export const OWNER_LEAD_CONTACT_REVIEW_QUERY = `
 SELECT
   receipt."id" AS "invocationId",
@@ -754,7 +772,7 @@ export async function readOwnerLeadDetail(
       || left.channel.localeCompare(right.channel, "en-CA")
       || left.contactPointId.localeCompare(right.contactPointId, "en-CA"));
 
-  return OwnerLeadDetailResponseSchema.parse({
+  const response = deepFreezeOwnerLeadDetail(OwnerLeadDetailResponseSchema.parse({
     readModelVersion: OWNER_LEAD_DETAIL_READ_MODEL_VERSION,
     generatedAt,
     lead,
@@ -806,5 +824,7 @@ export async function readOwnerLeadDetail(
       providerOperationsAuthorized: 0,
       costAuthorizedUsd: 0,
     },
-  });
+  }));
+  trustedOwnerLeadDetailResponses.add(response);
+  return response;
 }

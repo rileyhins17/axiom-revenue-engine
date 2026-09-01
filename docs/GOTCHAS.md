@@ -415,17 +415,26 @@ Retire entries when the architecture makes them impossible.
 - **Affected area:** agent continuity.
 - **Verifying commit:** `7afc212`.
 
-## QUAL-001 — Email availability was confused with lead quality
+## QUAL-001 — Contact availability was confused with lead quality
 
 - **Symptom:** commercially strong businesses were downgraded or discarded when no
-  usable email was found, while generic mailboxes could make weak leads look ready.
-- **Root cause:** one blended score and an email-first pipeline.
+  usable email was found, generic mailboxes could make weak leads look ready, and
+  adding a legitimate post-assessment route made a current qualification appear
+  stale.
+- **Root cause:** one blended score and an email-first pipeline; later, the owner
+  projection revalidated the immutable qualification against the newly selected
+  live route instead of the channel context recorded by the snapshot.
 - **Proven fix:** independent business-fit, rebuild-need, reachability, timing, and
-  evidence-confidence scores plus a separate channel route.
+  evidence-confidence scores plus a separate channel route. Qualification now
+  revalidates against its recorded channel context while routing uses current
+  contact evidence independently.
 - **Prevention/test:** qualification tests show identical account value regardless
-  of email and route strong no-email accounts to a manual channel.
-- **Affected area:** qualification and UI.
-- **Verifying commit:** foundation began at `d5f0e52`; v3 gates pending.
+  of email, route strong no-email accounts to a manual channel, and prove that a
+  newly discovered email changes routing without creating
+  `qualification_snapshot_drift`.
+- **Affected area:** qualification, owner read models, and UI.
+- **Verifying commit:** foundation began at `d5f0e52`; exact route-separation
+  regression is in the branch HEAD containing ADR 0044.
 
 ## BUILD-006 — The browser gate inherited or raced incompatible `.next` assets
 

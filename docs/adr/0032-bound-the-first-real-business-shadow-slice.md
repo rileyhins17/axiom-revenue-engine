@@ -147,3 +147,7 @@ commercial coverage, and a hard authority boundary. This option was selected.
     parent-bound in-memory boundary that proves one contact-review receipt and no
     unrelated change, caches exact retries, and remains disconnected from
     durable/operator/live paths.
+20. [x] Bind one explicit read-only owner-dossier declaration to the exact
+    frozen reader response and exact guarded contact-review checkpoint, then
+    derive a zero-authority `OWNER_DOSSIER` input without authentication,
+    durable recording, append, operator, real-data, or live-resource wiring.

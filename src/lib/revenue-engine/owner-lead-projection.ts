@@ -333,7 +333,10 @@ export function projectOwnerLead(value: unknown): OwnerLeadProjection {
   const currentQualification = qualifyRevenueLead({
     scores: input.qualification.scores,
     evidenceClaims: input.audit.claims,
-    availableChannels: [route.channel] satisfies ReachableChannel[],
+    // Qualification and current route are separate facts. Revalidate the
+    // immutable qualification against the channel context it recorded; a
+    // later contact discovery may improve routing without rewriting lead fit.
+    availableChannels: [input.qualification.recommendedChannel] satisfies ReachableChannel[],
     blocks: Array.from(new Set(derivedBlocks)).sort(),
   });
   const evidence = evidenceView(input);
