@@ -503,10 +503,15 @@ can produce `contact-review-proof:*`; copied invocation JSON, writer responses,
 missing rows/guards, stale history, and cross-manifest use fail closed. The proof
 also requires the exact guarded assessment checkpoint and binds its original
 source receipt, assessment receipt/proof, invocation receipt, and final contact
-receipt. It cannot create a phase input or checkpoint, and no operator, file,
-live database, provider, or prospect-contact path was added. A future separate
-adapter must derive the `CONTACT_REVIEW` phase input from this proof before any
-progress append is considered.
+receipt. A separate validation-only adapter now regenerates that proof internally
+and derives one frozen `CONTACT_REVIEW` input only from the exact current durable
+reload and exact guarded assessment parent. It rechecks the complete ten-business
+scope and chronology, uses the durable invocation receipt plus final database
+clock, and privately binds the input to its unchanged parent. Copied input,
+reload, proof, or parent JSON cannot recreate trust. The adapter cannot append
+progress or create a checkpoint, and no operator, file, live database, provider,
+or prospect-contact path was added. A separate exact-parent in-memory append
+must still be designed before this synthetic chain can advance.
 
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command

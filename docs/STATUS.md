@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-08-31 (America/Toronto)
+Last updated: 2026-09-01 (America/Toronto)
 
 ## Plain-English status
 
@@ -53,10 +53,13 @@ every contact and verification row, and the final transaction receipt after
 checking all immutable writer guards. It reads database time last and trusts only
 the exact frozen current in-process result, so copied JSON, incomplete or stale
 history, cross-manifest lineage, and clock regression fail closed. The proof is
-bound to the exact guarded assessment checkpoint and grants no phase input,
-progress append, operator command, live resource, contact action, or spend. The
-console build has a verified, tamper-evident isolated-staging release packet, but
-it has not been
+bound to the exact guarded assessment checkpoint. A separate validation-only
+adapter now regenerates that proof internally and derives one frozen
+`CONTACT_REVIEW` input from the exact current durable reload and unchanged full
+parent checkpoint. It rejects copied trust, stale evidence, lineage drift, caller
+time, and changed parents, but it cannot append progress, create a checkpoint,
+access an operator/live resource, contact anyone, or spend. The console build has
+a verified, tamper-evident isolated-staging release packet, but it has not been
 deployed; exact-head Linux CI is green and only the separate owner deployment
 approval remains required before staging can change.
 
@@ -232,6 +235,9 @@ approval remains required before staging can change.
 - Durable contact-review progress-proof checkpoint: the branch HEAD containing
   this status entry; previous verified checkpoint
   `45d23f690d7362b48bb08c8d252604a6a9f399c9`.
+- Contact-review phase-input checkpoint: the branch HEAD containing this status
+  entry; previous verified checkpoint
+  `b07bbc4723c3ba3a0a72d98dbdbf6b4de42519d3`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Canonical Riley-machine checkout: non-synced
   `C:\Users\riley\Documents\ChatGPT\APE`; OneDrive and Google Drive are not
@@ -1749,6 +1755,34 @@ Completed gates:
   progress record, Cloudflare D1/R2/Browser/provider, mailbox, prospect,
   staging/production resource, deployment, migration, or paid runtime operation
   occurred. Spend impact is C$0 and every autonomous capability remains off.
+- The validation-only `CONTACT_REVIEW` adapter now accepts only the exact frozen
+  in-process `CURRENT` durable contact reload and exact guarded assessment
+  checkpoint. It regenerates `contact-review-proof:*` internally, rechecks the
+  complete manifest scope, selected business, three-receipt predecessor,
+  reviewed invocation, final materialization, and database chronology, then
+  returns one deeply frozen normalized input.
+- The input uses the durable invocation receipt for completion time and the final
+  database clock for recording time. A module-private trust set rejects copied
+  input JSON, while private parent context rejects a changed or re-digested
+  assessment checkpoint. Copied/stale durable reloads, copied parents,
+  cross-manifest lineage, and out-of-window evidence fail closed.
+- The static safety gate prevents the adapter from importing the generic
+  appender or receipt builder, connecting to the operator recorder or inert
+  Worker, accepting a caller clock, accessing files/databases/runtime/providers,
+  or using mutation APIs. The assessment parent remains unchanged and no
+  contact-review receipt or checkpoint is created.
+- Focused contact durable-proof/input verification passes 11/11 tests. The
+  complete release gate passes fail-closed safety, 502/502 tests, standalone
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build, and the
+  explicit default-environment no-upload Wrangler dry run. Wrangler retained
+  only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 349 ms and the dossier in
+  836 ms. Only synthetic fixtures and in-memory SQLite were used. No real
+  business, durable progress write, Cloudflare D1/R2/Browser/provider, mailbox,
+  prospect, staging/production resource, deployment, migration, or paid runtime
+  operation occurred. Spend impact is C$0 and every autonomous capability
+  remains off.
 
 Still required for Phase 1:
 
@@ -1869,9 +1903,12 @@ before approval.
   separate change.
 - No new owner decision is required for the durable contact-review proof. It is
   read-only, synthetic/in-memory only, and grants no phase or operational
-  authority. A contact-review phase input, progress append, operator/durable
-  progress path, and any real-business or provider use remain separate reviewed
-  and approval-gated changes.
+  authority. Operator/durable progress and any real-business or provider use
+  remain separate reviewed and approval-gated changes.
+- No new owner decision is required for the validation-only contact-review phase
+  input. It creates no receipt or checkpoint and adds no operator, live, or
+  real-business path. The guarded in-memory append and every durable/operator
+  progress path remain separate reviewed milestones.
 
 ## Next three actions
 
@@ -1883,9 +1920,10 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Design the validation-only `CONTACT_REVIEW` phase-input adapter from the exact
-   current durable contact reload/proof and unchanged assessment parent. Do not
-   append progress or add an operator/live-data path in the same milestone.
+3. Design the separate exact-parent guarded in-memory `CONTACT_REVIEW` append.
+   Require the exact trusted input and unchanged assessment parent, prove one
+   receipt and no unrelated change, cache exact retries, and add no durable,
+   operator, live-data, or real-business path.
 
 ## Resume instructions
 

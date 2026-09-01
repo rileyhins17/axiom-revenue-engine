@@ -21,19 +21,25 @@ Retire entries when the architecture makes them impossible.
   contact persistence plan, reloads every row plus the final receipt, and reads
   the database clock last. Only the exact deeply frozen in-process `CURRENT`
   result can feed a contact-review proof bound to the exact guarded assessment
-  checkpoint. Serialization, stale evidence, missing rows, ambiguous receipts,
-  cross-manifest lineage, and clock regression all fail closed.
+  checkpoint. The phase-input adapter regenerates that proof internally and
+  binds its exact in-process output to the complete manifest and assessment
+  parent checkpoint. Serialization, stale evidence, missing rows, ambiguous
+  receipts, changed parents, cross-manifest lineage, and clock regression all
+  fail closed.
 - **Prevention/test:** adversarial tests reject schema-valid invocation JSON,
   copied durable reloads/checkpoints, missing final receipts or immutable
   guards, contact-row drift, receipt ambiguity, stale verification, and
   cross-manifest proof reuse. A real in-memory SQLite integration reloads the
-  actual writer-produced row set. The safety scan requires the final clock read,
-  exact row/guard checks, module-private trust set, zero authority, and isolation
-  from the generic progress recorder, Worker, files, providers, and mutations.
+  actual writer-produced row set. Phase-input tests additionally reject copied
+  durable trust, copied inputs, copied assessment parents, changed/re-digested
+  parents, stale evidence, and cross-manifest reuse. The safety scan requires
+  the final clock read, exact row/guard checks, module-private trust sets and
+  parent context, zero authority, and isolation from the generic progress
+  recorder, Worker, files, providers, and mutations.
 - **Affected area:** reviewed contact persistence, interrupted-task recovery,
-  contact-review progress proof, and every future `CONTACT_REVIEW` phase-input
-  or append boundary.
-- **Verifying commit:** branch HEAD containing ADR 0041 and this entry.
+  contact-review progress proof, the `CONTACT_REVIEW` phase-input boundary, and
+  every future contact-review append boundary.
+- **Verifying commit:** branch HEAD containing ADRs 0041–0042 and this entry.
 
 ## DATA-011 — A realistic UI fixture bypassed the writer it claimed to represent
 

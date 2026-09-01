@@ -267,8 +267,8 @@ There is no operator command, file/database writer, Worker import, live D1
 binding, or real-business path. The durable loader authorizes reads only and the
 append boundary changes in-memory validation state only; neither authorizes
 qualification execution, contact work, provider use, deployment, outreach,
-send, or spend. `CONTACT_REVIEW` remains blocked until its validation-only
-phase-input boundary is designed.
+send, or spend. The validation-only `CONTACT_REVIEW` phase-input boundary is
+described below; its progress append remains a separate blocked milestone.
 
 The durable `CONTACT_REVIEW` proof now exists as another engineering-only
 boundary. Its read-only loader starts from the exact invocation ID/digest and
@@ -286,12 +286,24 @@ The proof builder additionally requires the exact in-process assessment
 checkpoint. It verifies that the first phase still names the reloaded source
 materialization and the third phase still names the reloaded assessment and its
 separate proof, then binds the reviewed invocation and final contact receipt in
-one `contact-review-proof:*`. Never hand-author or copy that result. There is no
-operator command, phase input, progress append, file/database writer, live
+one `contact-review-proof:*`. Never hand-author or copy that result.
+
+The validation-only contact-review phase-input adapter accepts only the exact
+in-process `CURRENT` durable reload and exact guarded assessment checkpoint. It
+regenerates the proof internally, rechecks the complete ten-business scope,
+selected manifest business, exact three-receipt predecessor, reviewed invocation,
+final materialization, and database chronology, then returns one deeply frozen
+zero-authority input. Its completion time comes from the invocation receipt and
+its recording time comes from the final database clock. Copied reload, proof,
+input, or checkpoint JSON cannot recreate trust, and the input remains privately
+bound to its unchanged assessment parent.
+
+There is no operator command, progress append, file/database writer, live
 binding, provider operation, real-business path, outreach, or spend authority.
-`CONTACT_REVIEW` remains blocked until a later validation-only phase-input
-adapter is built from this exact proof; its eventual append remains a separate
-milestone.
+Never pass a hand-authored contact-review input to the generic recorder. The
+synthetic chain remains blocked until a separate exact-parent guarded in-memory
+append is implemented and verified; durable/operator progress remains a later
+approval-gated design.
 
 ## Owner-approved local KW materialization and assessment
 

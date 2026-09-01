@@ -156,5 +156,7 @@ inventing a false one-workflow invariant.
    and source/contact receipts.
 5. [x] Make the proof a required future `CONTACT_REVIEW` supporting receipt and
    enforce isolation in the static safety gate.
-6. [ ] Add the separate validation-only `CONTACT_REVIEW` phase-input adapter;
-   do not append progress or create an operator/live-data path in that change.
+6. [x] Add the separate validation-only `CONTACT_REVIEW` phase-input adapter in
+   ADR 0042 without progress append or operator/live-data wiring.
+7. [ ] Add the separate exact-parent guarded in-memory contact-review append;
+   keep durable progress and every operator/live path separately gated.

@@ -138,3 +138,8 @@ commercial coverage, and a hard authority boundary. This option was selected.
     set, final receipt, writer guards, and database-time freshness; only that
     exact current in-process result can create the separate content-addressed
     proof. Phase-input creation and progress append remain separate.
+18. [x] Derive a zero-execution-authority `CONTACT_REVIEW` phase input only from
+    the exact current durable contact reload, internally regenerated proof,
+    selected manifest business, completed assessment predecessor, and canonical
+    unchanged parent checkpoint. Keep progress append and operational wiring
+    separate.
