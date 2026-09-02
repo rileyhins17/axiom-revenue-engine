@@ -125,7 +125,7 @@ while keeping the repository incapable of recording a real owner decision.
    immutability without a live database or owner action.
 4. [ ] Harden owner authentication with verified email, MFA, and recovery before
    any decision-writing route can pass.
-5. [ ] Design a separate D1 executor/exact-reload boundary with database clock,
+5. [x] Design a separate D1 executor/exact-reload boundary with database clock,
    current-session recheck, writer-guard verification, and no progress authority.
 6. [ ] Add the owner UI mutation and progress bridge only after separate UI,
    CSRF/idempotency, staging, rollback, and release approval.

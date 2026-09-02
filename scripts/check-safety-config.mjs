@@ -1,4 +1,19 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
+
+async function readCodeTree(root, relativeRoot) {
+  const entries = await readdir(root, { withFileTypes: true });
+  const results = [];
+  for (const entry of entries) {
+    const child = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, root);
+    const relative = `${relativeRoot}/${entry.name}`;
+    if (entry.isDirectory()) {
+      results.push(...await readCodeTree(child, relative));
+    } else if (/\.(?:ts|tsx|mjs)$/.test(entry.name)) {
+      results.push([relative, await readFile(child, "utf8")]);
+    }
+  }
+  return results;
+}
 
 const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, ci, bootstrap, gitignore, privateKwCli, privateKwImport, privateKwFiles, privateKwDatabase, privateKwPersistenceCli, privateKwPersistence, privateKwShadowSliceCli, privateKwShadowSlice, privateKwAssessmentInvocation, privateKwAssessmentCli, privateKwMaterialization, privateKwMaterializationCli, privateKwContactPersistence, privateKwContactPersistenceExecutor, privateKwContactInvocation, privateKwContactPrerequisites, privateKwContactReviewCli, privateKwContactInvocationCli, browserMeasurementAdapter, artifactStore, auditAssembly, artifactLifecycle, pageSelection, fixtureEvidenceWorkflow, durableEvidencePersistence, fixtureEvidenceResumePlan, fencedResumePersistence, artifactReferenceProjection, artifactReferencePersistence, artifactReferenceAtomicSnapshot, artifactManifestAvailability, artifactManifestHeadAdapter, artifactDeliveryAuthorization, artifactDeliveryFixture, artifactReferenceSourceRows, artifactReferenceSourceDecoder, artifactReferenceD1Executor, artifactReferenceTrustedProjection, artifactReferenceSourceWriterGuard, leadAssessment, leadAssessmentD1, contactDiscovery, contactVerification, contactPersistencePlan, websiteAudit, ownerLeadProjection, ownerLeadReadModel, ownerLeadRoute, ownerLeadsPage, ownerLeadList, ownerLeadDetailReadModel, ownerLeadDetailRoute, ownerLeadDetailPage, ownerLeadDetail, durableEvidenceMigration, fencedResumeMigration, artifactReferenceMigration, artifactReferenceAtomicMigration, artifactReferenceWriterGuardMigration, leadAssessmentMigration, contactPersistenceMigration, contactLineageMigration, privateKwMaterializationMigration, privateKwContactPersistenceMigration, privateKwContactPersistenceHardeningMigration, privateKwContactInvocationMigration] = await Promise.all([
   readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
@@ -101,6 +116,7 @@ const privateKwOwnerDossierProgressProof = await readFile(new URL("../src/lib/re
 const privateKwOwnerDossierProgress = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-dossier-progress.ts", import.meta.url), "utf8");
 const privateKwOwnerDossierProgressAppend = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-dossier-progress-append.ts", import.meta.url), "utf8");
 const privateKwAuthenticatedOwnerDecision = await readFile(new URL("../src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", import.meta.url), "utf8");
+const privateKwAuthenticatedOwnerDecisionD1 = await readFile(new URL("../src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
 const privateKwAuthenticatedOwnerDecisionMigration = await readFile(new URL("../migrations/0069_authenticated_owner_dossier_decisions.sql", import.meta.url), "utf8");
 const ownerLabelingWorkspace = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-workspace.ts", import.meta.url), "utf8");
@@ -664,11 +680,45 @@ for (const field of ["ownerDecisionPersistenceAuthorized", "phaseInputCreationAu
 requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", privateKwAuthenticatedOwnerDecision, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "authenticated owner decisions must authorize zero provider operations");
 requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", privateKwAuthenticatedOwnerDecision, /costAuthorizedUsd:\s*z\.literal\(0\)/, "authenticated owner decisions must authorize zero cost");
 forbidMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", privateKwAuthenticatedOwnerDecision, /@cloudflare|@\/lib\/(?:auth|session)|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "the owner-decision contract must not connect authentication adapters, files, databases, runtime bindings, providers, network, or mutation");
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /requireInProcessPrivateKwAuthenticatedOwnerDecisionRecord\([\s\S]*?recheckPrivateKwAuthenticatedOwnerDecisionSessionBinding\([\s\S]*?await boundary\.batch\(/, "fresh owner-decision persistence must reject copied candidates and recheck the exact verified session binding before database access");
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /verifyPrivateKwAuthenticatedOwnerDecisionStoredBinding\([\s\S]*?derivePrivateKwAuthenticatedOwnerDecisionStorageRowForValidation\(/, "durable owner-decision reload must verify the versioned HMAC before exact mirrored-row comparison");
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /read:owner_decision_writer_guards/, "every durable owner-decision batch must inspect the migration-0069 writer guards");
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /OWNER_DECISION_WRITER_GUARD_PREDICATE[\s\S]*?instr\("sql", \?\) > 0 AND instr\("sql", \?\) > 0/, "fresh owner-decision insertion must be SQL-gated on each exact trigger operation and RAISE marker");
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /BEFORE \$\{requirement\.operation\} ON \"RevenuePrivateKwOwnerDecision\"[\s\S]*?RAISE\(ABORT, '\$\{requirement\.marker\}'\)/, "writer-guard verification must bind the expected trigger operation, table, and abort marker");
+for (const marker of ["REVENUE_PRIVATE_KW_OWNER_DECISION_LINEAGE_MISMATCH", "REVENUE_PRIVATE_KW_OWNER_DECISION_APPEND_ONLY"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, new RegExp(marker), `durable owner-decision persistence must require ${marker}`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /INSERT OR IGNORE INTO "RevenuePrivateKwOwnerDecision"[\s\S]*?strftime\('%Y-%m-%dT%H:%M:%fZ', 'now'\)[\s\S]*?julianday\('now'\) >= julianday\(\?\)[\s\S]*?julianday\('now'\) < julianday\(\?\)/, "the only durable owner-decision mutation must use database time and the half-open active-session window");
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /insertOwnerDecisionStatement\(record\),[\s\S]*?DATABASE_TIME_STATEMENT,[\s\S]*?selectOwnerDecisionStatement\(record\.recordId\)/, "the verification clock must be sampled after the database-generated decision time and before exact reload");
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /const trustedDurableOwnerDecisionResults = new WeakSet<object>\(\)[\s\S]*?trustedDurableOwnerDecisionResults\.has\(value\)[\s\S]*?trustedDurableOwnerDecisionResults\.add\(trusted\)/, "durable owner-decision consumers must reject copied result JSON");
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /const trusted = deepFreeze\(parsed\)/, "durable owner-decision results must be deeply frozen before trust is granted");
+for (const field of ["ownerDecisionPersistenceAuthorized", "phaseInputCreationAuthorized", "progressReceiptCreationAuthorized", "phaseAdvancementAuthorized", "browserCaptureAuthorized", "contactDiscoveryAuthorized", "contactVerificationAuthorized", "consentDecisionAuthorized", "qualificationAuthorized", "mailboxSyncAuthorized", "outreachAuthorized", "sendAuthorized", "deploymentAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false after durable owner-decision persistence`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "durable owner-decision persistence must authorize zero provider operations");
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /costAuthorizedUsd:\s*z\.literal\(0\)/, "durable owner-decision persistence must authorize zero cost");
+forbidMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /@cloudflare|@\/lib\/(?:auth|session)|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "the durable owner-decision boundary must stay disconnected from auth adapters, files, Cloudflare bindings, providers, network, and direct database methods");
+forbidMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /\b(?:UPDATE\s+"|DELETE\s+FROM|REPLACE\s+(?:OR\s+\w+\s+)?INTO|DROP\s+(?:TABLE|TRIGGER)|ALTER\s+TABLE|CREATE\s+(?:TABLE|TRIGGER))/i, "the durable owner-decision boundary may never emit another mutation class");
+if ((privateKwAuthenticatedOwnerDecisionD1.match(/\bINSERT\s+(?:OR\s+IGNORE\s+)?INTO\b/gi) || []).length !== 1) failures.push("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts: exactly one owner-decision INSERT statement is allowed");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-authenticated-owner-decision/, "the inert engine must not wire authenticated owner decisions to runtime");
 for (const [name, content] of [["owner lead list route", ownerLeadRoute], ["owner lead detail route", ownerLeadDetailRoute], ["owner lead detail page", ownerLeadDetailPage], ["owner lead detail component", ownerLeadDetail]]) {
   forbidMatch(name, content, /private-kw-authenticated-owner-decision/, "owner UI and API surfaces must not activate the decision contract in this checkpoint");
 }
 forbidMatch("scripts/record-private-kw-shadow-progress.ts", privateKwShadowSliceProgressCli, /private-kw-owner-dossier-progress(?:-proof)?/, "the generic operator recorder must not import owner-dossier proof or phase-input derivation");
+forbidMatch("scripts/record-private-kw-shadow-progress.ts", privateKwShadowSliceProgressCli, /private-kw-authenticated-owner-decision-d1/, "the generic operator recorder must not import durable authenticated owner decisions");
+for (const [name, content] of [
+  ...await readCodeTree(new URL("../src/", import.meta.url), "src"),
+  ...await readCodeTree(new URL("./", import.meta.url), "scripts"),
+]) {
+  if (
+    content.includes("private-kw-authenticated-owner-decision-d1")
+    && name !== "src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts"
+    && name !== "src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.test.ts"
+    && name !== "scripts/check-safety-config.mjs"
+  ) {
+    failures.push(`${name}: durable owner-decision persistence must remain unreachable from every runtime, UI, route, and operator script`);
+  }
+}
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-owner-dossier-progress(?:-proof)?/, "the inert engine must not wire owner-dossier proof or phase-input derivation to runtime");
 forbidMatch("src/app/api/v1/leads/[businessId]/route.ts", ownerLeadDetailRoute, /private-kw-owner-dossier-progress(?:-proof)?/, "the read-only owner lead route must not create owner-dossier acceptance proof or progress input");
 forbidMatch("src/app/leads/[businessId]/page.tsx", ownerLeadDetailPage, /private-kw-owner-dossier-progress(?:-proof)?/, "the read-only owner lead page must not create owner-dossier acceptance proof or progress input");
@@ -785,6 +835,9 @@ for (const timestamp of ["dossierGeneratedAt", "decidedAt", "preparedAt", "recor
 }
 requireMatch("migrations/0069_authenticated_owner_dossier_decisions.sql", privateKwAuthenticatedOwnerDecisionMigration, /REVENUE_PRIVATE_KW_OWNER_DECISION_LINEAGE_MISMATCH/, "owner-decision inserts must mirror the exact record and lineage");
 requireMatch("migrations/0069_authenticated_owner_dossier_decisions.sql", privateKwAuthenticatedOwnerDecisionMigration, /REVENUE_PRIVATE_KW_OWNER_DECISION_APPEND_ONLY/, "owner decisions must reject update and delete");
+for (const field of ["contractValidationOnly", "fileReadAuthorized", "fileMutationAuthorized", "browserCaptureAuthorized", "contactDiscoveryExecutionAuthorized", "contactVerificationExecutionAuthorized", "consentDecisionAuthorized", "qualificationAuthorized", "mailboxSyncAuthorized"]) {
+  requireMatch("migrations/0069_authenticated_owner_dossier_decisions.sql", privateKwAuthenticatedOwnerDecisionMigration, new RegExp(`\\$\\.authority\\.${field}'\\) IS NOT [01]`), `${field} must be constrained inside canonical decision JSON`);
+}
 if ((privateKwAuthenticatedOwnerDecisionMigration.match(/CREATE TRIGGER/g) || []).length !== 3) failures.push("migrations/0069_authenticated_owner_dossier_decisions.sql: exactly 3 lineage and append-only triggers are required");
 forbidMatch("migrations/0069_authenticated_owner_dossier_decisions.sql", privateKwAuthenticatedOwnerDecisionMigration, /\b(?:INSERT\s+INTO|UPDATE\s+\"[^\"]+\"\s+SET|DELETE\s+FROM|DROP\s+TRIGGER)\b/i, "the owner-decision schema must not mutate existing rows or remove guards");
 requireMatch("src/lib/revenue-engine/private-kw-current-website-evidence-eligibility-d1.ts", privateKwWebsiteEvidenceEligibilityD1, /requireInProcessPrivateKwCurrentWebsiteEvidenceEligibilityReceipt\(receiptValue\)/, "fresh eligibility persistence must require the exact in-process trust result");

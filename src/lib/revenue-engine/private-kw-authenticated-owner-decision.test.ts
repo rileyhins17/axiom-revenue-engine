@@ -354,6 +354,33 @@ test("migration 0069 stores only exact mirrored records and keeps the owner ledg
   );
   authorityDatabase.close();
 
+  const jsonAuthorityDatabase = migratedDatabase();
+  insertBusiness(jsonAuthorityDatabase, fixture);
+  for (const [field, forbiddenValue] of [
+    ["contractValidationOnly", false],
+    ["fileReadAuthorized", true],
+    ["fileMutationAuthorized", true],
+    ["browserCaptureAuthorized", true],
+    ["contactDiscoveryExecutionAuthorized", true],
+    ["contactVerificationExecutionAuthorized", true],
+    ["consentDecisionAuthorized", true],
+    ["qualificationAuthorized", true],
+    ["mailboxSyncAuthorized", true],
+  ] as const) {
+    const drifted = structuredClone(record) as unknown as {
+      authority: Record<string, unknown>;
+    };
+    drifted.authority[field] = forbiddenValue;
+    assert.throws(
+      () => insertDecision(jsonAuthorityDatabase, record, {
+        decisionJson: JSON.stringify(drifted),
+      }),
+      /REVENUE_PRIVATE_KW_OWNER_DECISION_LINEAGE_MISMATCH/i,
+      `database trigger must reject authority drift in ${field}`,
+    );
+  }
+  jsonAuthorityDatabase.close();
+
   const invalidTimestampDatabase = migratedDatabase();
   insertBusiness(invalidTimestampDatabase, fixture);
   assert.throws(

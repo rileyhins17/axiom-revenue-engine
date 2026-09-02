@@ -80,9 +80,14 @@ shape is now defined without activating it: only a current Better Auth session
 with verified Riley/Aidan email can supply identity, the server supplies time,
 and HMAC bindings retain the exact subject/session/proof relationship without
 storing raw auth identifiers. Source-only migration 0069 defines the append-only
-ledger, but there is no D1 writer/reloader, route, UI action, durable decision,
-or progress bridge. Current auth still has email verification disabled, so
-verified email plus MFA/recovery are explicit activation blockers. The console
+ledger. A disconnected injected D1-shaped boundary can now commit the exact
+private candidate, return a mutation-free exact replay, or integrity-check a
+process-loss reload using database time, every immutable writer guard, and the
+versioned HMAC. Historical reload is explicitly not a current login and grants
+no progress authority. There is still no configured key, applied migration,
+Cloudflare adapter, route, UI action, operator command, or progress bridge.
+Current auth still has email verification disabled, so verified email plus
+MFA/recovery are explicit activation blockers. The console
 build has a verified,
 tamper-evident isolated-staging release packet, but it has not been deployed;
 exact-head Linux CI is green and only the separate owner deployment approval
@@ -92,8 +97,8 @@ remains required before staging can change.
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `5a25ffb7bf3e00de38faa2638201978226a437c2`
-- This milestone's verifying commit is the branch HEAD containing ADR 0046;
+  `e743f4a5f0a5486b2408f82b06edd4e488e923ce`
+- This milestone's verifying commit is the branch HEAD containing ADR 0047;
   exact local/remote SHA equality must be verified after the atomic push.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
 - Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
@@ -1948,6 +1953,43 @@ Completed gates:
   mailbox, prospect, staging/production change, deployment, provider call, or
   paid runtime operation occurred. Spend impact is C$0 and every autonomous
   capability remains off.
+- The authenticated owner-decision candidate now shares one versioned HMAC
+  derivation path for creation, current-session continuity recheck, and stored
+  decision verification. Digest comparison is constant-time. The continuity
+  recheck is not a Better Auth lookup; any future route must obtain its session
+  through a server-only adapter and must reject browser-supplied session fields.
+- A disconnected injected D1-shaped boundary now requires the exact private
+  candidate and same verified session before database access. One atomic batch
+  SQL-gates the only insert on the active-session window and all three exact
+  migration-0069 trigger operations/abort markers, reads database time after
+  the generated write time, reloads every mirror, verifies the stored HMAC, and
+  distinguishes `FRESH_COMMIT`, mutation-free `EXACT_REPLAY`, and historical
+  `DURABLE_RELOAD`. A different row with the same unique proof cannot become a
+  replay.
+- Durable reload survives process loss but explicitly does not prove a current
+  session or authorize progress. Results are deeply frozen/private, and every
+  runtime, phase, provider, outreach, send, deployment, and cost authority stays
+  false or zero. Static safety now scans the complete `src` and `scripts` trees
+  so a new route, Worker, UI file, or operator script cannot silently import the
+  boundary.
+- The first complete-suite run exposed a real database-clock ordering defect:
+  sampling the verification clock before SQLite generated `recordedAt` could
+  make a valid commit appear chronologically impossible under load. The batch
+  now reads the verification clock after the insert, the regression fixes
+  BUILD-007's prevention rule, and repeated focused/full runs pass.
+- Focused authenticated-decision verification passes 11/11 tests. The complete
+  release gate passes fail-closed safety, 525/525 tests, standalone typecheck,
+  zero-warning lint, the secret-sanitized Cloudflare build, and the explicit
+  default-environment no-upload Wrangler dry run. Wrangler retained only the
+  documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 345 ms and the dossier in
+  872 ms. Only synthetic fixtures and in-memory SQLite were used. No binding key
+  was configured, migration 0069 was not applied, and no real owner session,
+  decision, progress, Cloudflare resource operation, mailbox, prospect,
+  staging/production change, deployment, provider call, or paid runtime
+  operation occurred. Spend impact is C$0 and every autonomous capability
+  remains off.
 
 Still required for Phase 1:
 
@@ -2094,9 +2136,12 @@ before approval.
   operator/UI or real-business path exists.
 - No new owner decision is required for the authenticated decision contract and
   source-only schema 0069. No account was used and no decision was stored.
-  Applying migration 0069, configuring binding material, adding a D1
-  writer/reloader, exposing a route/button, or using the result for progress are
-  separate reviewed and approval-gated changes.
+  Applying migration 0069, configuring binding material, connecting the
+  disconnected D1 boundary to any real resource, exposing a route/button, or
+  using the result for progress are separate reviewed and approval-gated changes.
+- No new owner decision is required for the disconnected exact D1
+  writer/reloader. It has no configured key, Cloudflare adapter, route, UI,
+  operator command, progress bridge, or real-data path and incurred C$0.
 - Riley directed that this rebuild branch should eventually become `main`. That
   is recorded as the intended final cutover, not approval to merge now. The merge
   remains gated by the completed rebuild, full safety/review/rollback evidence,
@@ -2112,13 +2157,12 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Design and test the separate migration-0069 D1 writer/exact-reload boundary
-   behind an injected, disconnected database interface. It must require the
-   exact trusted candidate, re-check current verified session context, database
-   clock, and every immutable guard, mutate only the decision ledger, and keep
-   UI/operator wiring and progress advancement absent. Activation remains
-   blocked until owner email verification, MFA/recovery, staging, rollback, and
-   release approval pass.
+3. Design and test a separate validation-only owner-dossier progress
+   authorization adapter. It may accept only the exact trusted durable decision
+   result plus a newly obtained, server-only current verified owner session; it
+   must create no receipt/checkpoint and keep UI/operator/runtime wiring absent.
+   Activation remains blocked until owner email verification, MFA/recovery,
+   CSRF/idempotency, staging, rollback, and release approval pass.
 
 ## Resume instructions
 

@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { z } from "zod";
 
@@ -47,7 +47,7 @@ const PrivateKwAuthenticatedOwnerDecisionDeclarationSchema = z.object({
   mode: z.literal("SHADOW"),
 }).strict();
 
-const BetterAuthOwnerSessionSchema = z.object({
+export const PrivateKwAuthenticatedOwnerSessionSchema = z.object({
   sessionContractVersion: z.literal(PRIVATE_KW_OWNER_SESSION_CONTRACT_VERSION),
   authenticationProvider: z.literal("BETTER_AUTH"),
   authenticatedUserId: PrivateAuthIdentifierSchema,
@@ -57,6 +57,10 @@ const BetterAuthOwnerSessionSchema = z.object({
   sessionCreatedAt: TimestampSchema,
   sessionExpiresAt: TimestampSchema,
 }).strict();
+
+export type PrivateKwAuthenticatedOwnerSession = z.infer<
+  typeof PrivateKwAuthenticatedOwnerSessionSchema
+>;
 
 const AuthenticatedOwnerDecisionAuthoritySchema = z.object({
   contractValidationOnly: z.literal(true),
@@ -104,6 +108,31 @@ const AuthenticationBindingSchema = z.object({
     "RECHECK_CURRENT_SESSION_AND_EXACT_IN_PROCESS_DECISION",
   ),
 }).strict();
+
+const AuthenticatedOwnerSessionBindingRecheckSchema = z.object({
+  sessionContractVersion: z.literal(PRIVATE_KW_OWNER_SESSION_CONTRACT_VERSION),
+  authenticationProvider: z.literal("BETTER_AUTH"),
+  authenticatedOwner: z.enum(["RILEY", "AIDAN"]),
+  emailVerified: z.literal(true),
+  bindingKeyVersion: BindingKeyVersionSchema,
+  subjectBindingDigest: Sha256Schema,
+  sessionBindingDigest: Sha256Schema,
+  decisionBindingDigest: Sha256Schema,
+  sessionCreatedAt: TimestampSchema,
+  sessionExpiresAt: TimestampSchema,
+  bindingIntegrityVerified: z.literal(true),
+  databaseReadAuthorized: z.literal(false),
+  databaseMutationAuthorized: z.literal(false),
+  phaseInputCreationAuthorized: z.literal(false),
+  progressReceiptCreationAuthorized: z.literal(false),
+  phaseAdvancementAuthorized: z.literal(false),
+  providerOperationsAuthorized: z.literal(0),
+  costAuthorizedUsd: z.literal(0),
+}).strict();
+
+export type PrivateKwAuthenticatedOwnerSessionBindingRecheck = z.infer<
+  typeof AuthenticatedOwnerSessionBindingRecheckSchema
+>;
 
 const AuthenticatedOwnerDecisionCoreSchema = z.object({
   recordVersion: z.literal(PRIVATE_KW_AUTHENTICATED_OWNER_DECISION_RECORD_VERSION),
@@ -303,6 +332,12 @@ function hmacDigest(key: Uint8Array, value: unknown) {
     .digest("hex");
 }
 
+function digestMatches(left: string, right: string) {
+  const leftBytes = Buffer.from(Sha256Schema.parse(left), "hex");
+  const rightBytes = Buffer.from(Sha256Schema.parse(right), "hex");
+  return timingSafeEqual(leftBytes, rightBytes);
+}
+
 function authorizedOwner(email: string) {
   const owner = AuthorizedOwnerByEmail[email as keyof typeof AuthorizedOwnerByEmail];
   if (!owner) {
@@ -356,14 +391,9 @@ export function requireInProcessPrivateKwAuthenticatedOwnerDecisionRecord(
   return value as PrivateKwAuthenticatedOwnerDecisionRecord;
 }
 
-/**
- * Mirrors one exact trusted record into migration-0069 column values. It emits
- * no SQL and grants no database read or mutation authority.
- */
-export function projectPrivateKwAuthenticatedOwnerDecisionStorageRow(
-  value: unknown,
+function authenticatedOwnerDecisionStorageRow(
+  record: PrivateKwAuthenticatedOwnerDecisionRecord,
 ): PrivateKwAuthenticatedOwnerDecisionStorageRow {
-  const record = requireInProcessPrivateKwAuthenticatedOwnerDecisionRecord(value);
   return deepFreeze(PrivateKwAuthenticatedOwnerDecisionStorageRowSchema.parse({
     id: record.recordId,
     decisionVersion: record.recordVersion,
@@ -425,6 +455,195 @@ export function projectPrivateKwAuthenticatedOwnerDecisionStorageRow(
 }
 
 /**
+ * Reconstructs migration-0069 column values for durable row verification. The
+ * result proves only schema/canonical mirroring and carries no in-process trust
+ * or database authority.
+ */
+export function derivePrivateKwAuthenticatedOwnerDecisionStorageRowForValidation(
+  value: unknown,
+): PrivateKwAuthenticatedOwnerDecisionStorageRow {
+  return authenticatedOwnerDecisionStorageRow(
+    PrivateKwAuthenticatedOwnerDecisionRecordSchema.parse(value),
+  );
+}
+
+/**
+ * Mirrors one exact trusted record into migration-0069 column values. It emits
+ * no SQL and grants no database read or mutation authority.
+ */
+export function projectPrivateKwAuthenticatedOwnerDecisionStorageRow(
+  value: unknown,
+): PrivateKwAuthenticatedOwnerDecisionStorageRow {
+  return authenticatedOwnerDecisionStorageRow(
+    requireInProcessPrivateKwAuthenticatedOwnerDecisionRecord(value),
+  );
+}
+
+function decisionBindingDigest(input: {
+  key: Uint8Array;
+  keyVersion: string;
+  subjectBindingDigest: string;
+  sessionBindingDigest: string;
+  acceptanceProofId: string;
+  acceptanceProofDigest: string;
+  decision: "ACCEPTED_FOR_READ_ONLY_SHADOW_PROGRESS";
+  decidedBy: "RILEY" | "AIDAN";
+  decidedAt: string;
+}) {
+  return hmacDigest(input.key, {
+    bindingVersion: "kw-owner-decision-proof-binding-v1",
+    bindingKeyVersion: input.keyVersion,
+    subjectBindingDigest: input.subjectBindingDigest,
+    sessionBindingDigest: input.sessionBindingDigest,
+    acceptanceProofId: input.acceptanceProofId,
+    acceptanceProofDigest: input.acceptanceProofDigest,
+    decision: input.decision,
+    decidedBy: input.decidedBy,
+    decidedAt: input.decidedAt,
+  });
+}
+
+function authenticationBindingDigests(input: {
+  session: PrivateKwAuthenticatedOwnerSession;
+  owner: "RILEY" | "AIDAN";
+  proof: z.infer<typeof PrivateKwOwnerDossierAcceptanceProofSchema>;
+  key: Uint8Array;
+  keyVersion: string;
+}) {
+  const subjectBindingDigest = hmacDigest(input.key, {
+    bindingVersion: "kw-owner-decision-subject-binding-v1",
+    authenticationProvider: input.session.authenticationProvider,
+    authenticatedUserId: input.session.authenticatedUserId,
+    authenticatedEmail: input.session.authenticatedEmail,
+    authenticatedEmailVerified: input.session.authenticatedEmailVerified,
+  });
+  const sessionBindingDigest = hmacDigest(input.key, {
+    bindingVersion: "kw-owner-decision-session-binding-v1",
+    subjectBindingDigest,
+    authenticatedSessionId: input.session.authenticatedSessionId,
+    sessionCreatedAt: input.session.sessionCreatedAt,
+    sessionExpiresAt: input.session.sessionExpiresAt,
+  });
+  return {
+    subjectBindingDigest,
+    sessionBindingDigest,
+    decisionBindingDigest: decisionBindingDigest({
+      key: input.key,
+      keyVersion: input.keyVersion,
+      subjectBindingDigest,
+      sessionBindingDigest,
+      acceptanceProofId: input.proof.proofId,
+      acceptanceProofDigest: input.proof.proofDigest,
+      decision: input.proof.acceptance.decision,
+      decidedBy: input.owner,
+      decidedAt: input.proof.acceptance.acceptedAt,
+    }),
+  };
+}
+
+/**
+ * Rechecks that the exact in-process decision is still presented with the same
+ * verified Better Auth owner session and versioned HMAC key. It stores and
+ * returns no raw user, session, or email identifier.
+ */
+export function recheckPrivateKwAuthenticatedOwnerDecisionSessionBinding(
+  recordValue: unknown,
+  sessionValue: unknown,
+  dependencies: { bindingKey: Uint8Array; bindingKeyVersion: string },
+): PrivateKwAuthenticatedOwnerSessionBindingRecheck {
+  const record = requireInProcessPrivateKwAuthenticatedOwnerDecisionRecord(
+    recordValue,
+  );
+  const session = PrivateKwAuthenticatedOwnerSessionSchema.parse(sessionValue);
+  const key = bindingKey(dependencies.bindingKey);
+  const keyVersion = BindingKeyVersionSchema.parse(dependencies.bindingKeyVersion);
+  const owner = authorizedOwner(session.authenticatedEmail);
+  const bindings = authenticationBindingDigests({
+    session,
+    owner,
+    proof: record.acceptanceProof,
+    key,
+    keyVersion,
+  });
+  if (
+    owner !== record.decision.decidedBy
+    || keyVersion !== record.authentication.bindingKeyVersion
+    || session.authenticationProvider !== record.authentication.authenticationProvider
+    || session.sessionExpiresAt !== record.authentication.sessionExpiresAt
+    || !digestMatches(
+      bindings.subjectBindingDigest,
+      record.authentication.subjectBindingDigest,
+    )
+    || !digestMatches(
+      bindings.sessionBindingDigest,
+      record.authentication.sessionBindingDigest,
+    )
+    || !digestMatches(
+      bindings.decisionBindingDigest,
+      record.authentication.decisionBindingDigest,
+    )
+  ) {
+    throw new Error(
+      "Authenticated owner decision session binding integrity could not be rechecked.",
+    );
+  }
+  return deepFreeze(AuthenticatedOwnerSessionBindingRecheckSchema.parse({
+    sessionContractVersion: session.sessionContractVersion,
+    authenticationProvider: session.authenticationProvider,
+    authenticatedOwner: owner,
+    emailVerified: session.authenticatedEmailVerified,
+    bindingKeyVersion: keyVersion,
+    subjectBindingDigest: bindings.subjectBindingDigest,
+    sessionBindingDigest: bindings.sessionBindingDigest,
+    decisionBindingDigest: bindings.decisionBindingDigest,
+    sessionCreatedAt: session.sessionCreatedAt,
+    sessionExpiresAt: session.sessionExpiresAt,
+    bindingIntegrityVerified: true,
+    databaseReadAuthorized: false,
+    databaseMutationAuthorized: false,
+    phaseInputCreationAuthorized: false,
+    progressReceiptCreationAuthorized: false,
+    phaseAdvancementAuthorized: false,
+    providerOperationsAuthorized: 0,
+    costAuthorizedUsd: 0,
+  }));
+}
+
+/**
+ * Verifies that durable JSON still carries a valid decision HMAC for the exact
+ * proof and opaque session bindings. It does not reauthenticate a live session
+ * and does not establish durable trust by itself.
+ */
+export function verifyPrivateKwAuthenticatedOwnerDecisionStoredBinding(
+  recordValue: unknown,
+  dependencies: { bindingKey: Uint8Array; bindingKeyVersion: string },
+): PrivateKwAuthenticatedOwnerDecisionRecord {
+  const record = PrivateKwAuthenticatedOwnerDecisionRecordSchema.parse(
+    recordValue,
+  );
+  const key = bindingKey(dependencies.bindingKey);
+  const keyVersion = BindingKeyVersionSchema.parse(dependencies.bindingKeyVersion);
+  if (keyVersion !== record.authentication.bindingKeyVersion) {
+    throw new Error("Authenticated owner decision binding key version does not match.");
+  }
+  const expected = decisionBindingDigest({
+    key,
+    keyVersion,
+    subjectBindingDigest: record.authentication.subjectBindingDigest,
+    sessionBindingDigest: record.authentication.sessionBindingDigest,
+    acceptanceProofId: record.acceptanceProof.proofId,
+    acceptanceProofDigest: record.acceptanceProof.proofDigest,
+    decision: record.decision.decision,
+    decidedBy: record.decision.decidedBy,
+    decidedAt: record.decision.decidedAt,
+  });
+  if (!digestMatches(expected, record.authentication.decisionBindingDigest)) {
+    throw new Error("Authenticated owner decision HMAC binding integrity failed.");
+  }
+  return record;
+}
+
+/**
  * Builds one authenticated decision record candidate. The caller must supply
  * current Better Auth session context obtained in the same server request. This
  * module does not read Better Auth, persist, append progress, or authorize any
@@ -447,7 +666,7 @@ export function buildPrivateKwAuthenticatedOwnerDecisionRecord(
   const declaration = PrivateKwAuthenticatedOwnerDecisionDeclarationSchema.parse(
     input.declarationValue,
   );
-  const session = BetterAuthOwnerSessionSchema.parse(
+  const session = PrivateKwAuthenticatedOwnerSessionSchema.parse(
     input.authenticatedSessionValue,
   );
   const key = bindingKey(dependencies.bindingKey);
@@ -484,30 +703,12 @@ export function buildPrivateKwAuthenticatedOwnerDecisionRecord(
     },
   });
 
-  const subjectBindingDigest = hmacDigest(key, {
-    bindingVersion: "kw-owner-decision-subject-binding-v1",
-    authenticationProvider: session.authenticationProvider,
-    authenticatedUserId: session.authenticatedUserId,
-    authenticatedEmail: session.authenticatedEmail,
-    authenticatedEmailVerified: session.authenticatedEmailVerified,
-  });
-  const sessionBindingDigest = hmacDigest(key, {
-    bindingVersion: "kw-owner-decision-session-binding-v1",
-    subjectBindingDigest,
-    authenticatedSessionId: session.authenticatedSessionId,
-    sessionCreatedAt: session.sessionCreatedAt,
-    sessionExpiresAt: session.sessionExpiresAt,
-  });
-  const decisionBindingDigest = hmacDigest(key, {
-    bindingVersion: "kw-owner-decision-proof-binding-v1",
-    bindingKeyVersion: keyVersion,
-    subjectBindingDigest,
-    sessionBindingDigest,
-    acceptanceProofId: proof.proofId,
-    acceptanceProofDigest: proof.proofDigest,
-    decision: proof.acceptance.decision,
-    decidedBy: owner,
-    decidedAt,
+  const bindings = authenticationBindingDigests({
+    session,
+    owner,
+    proof,
+    key,
+    keyVersion,
   });
 
   const core = AuthenticatedOwnerDecisionCoreSchema.parse({
@@ -539,9 +740,9 @@ export function buildPrivateKwAuthenticatedOwnerDecisionRecord(
       authorizationSource: "EXPLICIT_AXIOM_OWNER_EMAIL_ALLOWLIST",
       authenticatedOwner: owner,
       emailVerified: session.authenticatedEmailVerified,
-      subjectBindingDigest,
-      sessionBindingDigest,
-      decisionBindingDigest,
+      subjectBindingDigest: bindings.subjectBindingDigest,
+      sessionBindingDigest: bindings.sessionBindingDigest,
+      decisionBindingDigest: bindings.decisionBindingDigest,
       bindingKeyVersion: keyVersion,
       observedAt: decidedAt,
       sessionExpiresAt: session.sessionExpiresAt,

@@ -343,13 +343,14 @@ This progress append remains in-memory contract verification only. It creates no
 real authenticated or durably stored owner decision, operator command,
 file/database writer, API/UI action, Worker import, live resource, real-business
 path, provider operation, outreach, send, or spend. Actual owner-decision
-recording, reload, progress bridging, and operator wiring remain separate
+activation, progress bridging, and operator wiring remain separate
 approval-gated designs.
 
 ### Inactive authenticated owner-decision foundation
 
-ADR 0046 and migration 0069 now define the future owner-decision security and
-storage shape. They are not an operator procedure and must not be treated as one.
+ADRs 0046–0047 and migration 0069 now define the future owner-decision security,
+storage, and exact durable-reload shape. They are not an operator procedure and
+must not be treated as one.
 
 - The browser declaration contains only the exact dossier/business digest,
   acceptance, rationale, and fixed confirmation. It cannot choose the reviewer
@@ -357,21 +358,28 @@ storage shape. They are not an operator procedure and must not be treated as one
 - A future server boundary must obtain the current Better Auth session in the
   same request, require a verified email for exactly Riley or Aidan, derive the
   time from the server, and supply a separate secret binding key from provider
-  secret storage.
+  secret storage. The boundary's HMAC recheck verifies continuity; it does not
+  query Better Auth itself. Never accept any session field from request JSON.
 - The candidate retains only HMAC subject/session/decision bindings and the
   owner enum. Never log or persist raw user ID, session ID, session token, email,
   or binding key.
 - Migration 0069 is source-only. Do not apply it to an existing local, staging,
   or production database under this checkpoint.
-- There is no D1 insert/reload boundary, route, button, CLI, or progress bridge.
-  A schema-valid row or copied JSON is not a durable authenticated decision.
+- A disconnected injected D1-shaped boundary exists for synthetic tests. Fresh
+  persistence requires the exact private candidate and same current verified
+  session, while process-loss reload verifies historical HMAC/mirror integrity.
+  It has no Cloudflare adapter, D1 binding, route, button, CLI, or progress
+  bridge. Never call it against a live resource.
+- A durable reload is not a current authenticated session and grants no progress
+  authority. A schema-valid row or copied JSON remains untrusted.
 - Before any activation, require verified owner email, MFA and recovery setup,
-  a separate D1 writer/reloader threat review, database-clock/session-expiry
+  a separate progress-authorization threat review, database-clock/session-expiry
   enforcement, exact migration-0069 writer-guard verification, CSRF/origin and
   idempotency controls, staging/rollback evidence, and explicit release approval.
 
 Until every gate above is complete, re-run only the synthetic contract tests;
-never hand-insert an owner decision or use one to append real progress.
+never configure binding material, apply migration 0069, hand-insert an owner
+decision, connect the boundary, or use one to append real progress.
 
 ## Owner-approved local KW materialization and assessment
 

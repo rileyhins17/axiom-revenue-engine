@@ -174,6 +174,7 @@ WHEN
   OR json_extract(NEW."decisionJson", '$.authentication.bindingKeyVersion') IS NOT NEW."authBindingKeyVersion"
   OR json_extract(NEW."decisionJson", '$.authentication.sessionExpiresAt') IS NOT NEW."sessionExpiresAt"
   OR json_extract(NEW."decisionJson", '$.preparedAt') IS NOT NEW."preparedAt"
+  OR json_extract(NEW."decisionJson", '$.authority.contractValidationOnly') IS NOT 1
   OR json_extract(NEW."decisionJson", '$.authority.currentOwnerSessionRequiredAtFutureWrite') IS NOT 1
   OR json_extract(NEW."decisionJson", '$.authority.exactTrustedDecisionInstanceRequiredAtFutureWrite') IS NOT 1
   OR json_extract(NEW."decisionJson", '$.authority.durableExactReloadRequiredBeforeProgress') IS NOT 1
@@ -182,8 +183,16 @@ WHEN
   OR json_extract(NEW."decisionJson", '$.authority.phaseInputCreationAuthorized') IS NOT 0
   OR json_extract(NEW."decisionJson", '$.authority.progressReceiptCreationAuthorized') IS NOT 0
   OR json_extract(NEW."decisionJson", '$.authority.phaseAdvancementAuthorized') IS NOT 0
+  OR json_extract(NEW."decisionJson", '$.authority.fileReadAuthorized') IS NOT 0
+  OR json_extract(NEW."decisionJson", '$.authority.fileMutationAuthorized') IS NOT 0
   OR json_extract(NEW."decisionJson", '$.authority.databaseReadAuthorized') IS NOT 0
   OR json_extract(NEW."decisionJson", '$.authority.databaseMutationAuthorized') IS NOT 0
+  OR json_extract(NEW."decisionJson", '$.authority.browserCaptureAuthorized') IS NOT 0
+  OR json_extract(NEW."decisionJson", '$.authority.contactDiscoveryExecutionAuthorized') IS NOT 0
+  OR json_extract(NEW."decisionJson", '$.authority.contactVerificationExecutionAuthorized') IS NOT 0
+  OR json_extract(NEW."decisionJson", '$.authority.consentDecisionAuthorized') IS NOT 0
+  OR json_extract(NEW."decisionJson", '$.authority.qualificationAuthorized') IS NOT 0
+  OR json_extract(NEW."decisionJson", '$.authority.mailboxSyncAuthorized') IS NOT 0
   OR json_extract(NEW."decisionJson", '$.authority.outreachAuthorized') IS NOT 0
   OR json_extract(NEW."decisionJson", '$.authority.sendAuthorized') IS NOT 0
   OR json_extract(NEW."decisionJson", '$.authority.deploymentAuthorized') IS NOT 0

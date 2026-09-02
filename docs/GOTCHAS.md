@@ -504,11 +504,14 @@ Retire entries when the architecture makes them impossible.
   without weakening production freshness checks.
 - **Prevention/test:** database-clock-sensitive fixtures must derive dependent
   event times from prior trusted database receipts, not a separately sampled
-  process clock. The formerly flaky rejection test passed repeated isolated
-  runs after the change and remains part of the complete release suite.
-- **Affected area:** website-evidence eligibility tests, Windows SQLite fixtures,
-  and any future test that compares JavaScript and database clocks at a
-  half-open freshness boundary.
+  process clock. When a multi-statement batch compares a generated write time to
+  a validation clock, sample that validation clock after the write; a pre-write
+  `now` can legitimately be earlier than `recordedAt`. The formerly flaky
+  rejection test and the owner-decision statement-order regression remain part
+  of the complete release suite.
+- **Affected area:** website-evidence eligibility tests, owner-decision durable
+  writes, Windows SQLite fixtures, and any future test that compares process or
+  pre-write clocks to database-generated timestamps at a half-open boundary.
 - **Verifying commit:** branch HEAD containing this entry.
 
 ## BUILD-001 — Local success did not equal Linux/Cloudflare success

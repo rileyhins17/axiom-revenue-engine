@@ -539,11 +539,15 @@ lead fit. The next server-side contract can now derive Riley/Aidan and decision
 time only from a current verified Better Auth session and server clock, HMAC-bind
 the exact proof without storing raw user/session/email identifiers, and produce
 one frozen content-addressed decision candidate. Additive migration 0069 defines
-its append-only ledger. Both are deliberately inactive: there is no D1
-writer/reloader, API or UI action, durable owner decision, progress bridge,
-operator action, live resource, provider, real-business, deployment, outreach,
-send, or spend path. Current owner authentication must gain verified email and
-MFA/recovery controls before activation can be reviewed.
+its append-only ledger, and a separate injected D1-shaped boundary can now
+commit, exactly replay, or integrity-check a process-loss reload using database
+time, every immutable writer guard, and the versioned HMAC. It remains
+deliberately disconnected: there is no Cloudflare adapter, API or UI action,
+progress bridge, operator action, configured key, applied migration, live
+resource, provider, real-business, deployment, outreach, send, or spend path.
+A durable reload proves historical integrity—not a current login or progress
+authority. Current owner authentication must gain verified email and MFA/recovery
+controls before activation can be reviewed.
 
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
