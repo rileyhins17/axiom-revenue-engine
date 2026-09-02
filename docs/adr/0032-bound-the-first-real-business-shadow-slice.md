@@ -156,3 +156,6 @@ commercial coverage, and a hard authority boundary. This option was selected.
     business count, resume pointer, exact retry, and unchanged other nine
     businesses. Keep authenticated decision storage, durable/operator wiring,
     live data, outreach, send, and spend separate.
+22. [x] Define the verified-session, server-timed, HMAC-bound owner-decision
+    candidate and additive append-only schema 0069 without a route, writer,
+    durable reload, progress bridge, operator action, or real-business path.

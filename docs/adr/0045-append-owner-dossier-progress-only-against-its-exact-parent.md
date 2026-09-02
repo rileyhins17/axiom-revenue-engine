@@ -152,5 +152,8 @@ validation later.
    and completed-child replay.
 4. [x] Add static safety isolation from operator, Worker, UI/API, file, database,
    runtime, provider, network, mutation, deployment, outreach, send, and cost.
-5. [ ] Design authenticated append-only owner-decision storage separately before
-   any operator/UI or real-business owner-dossier progress path.
+5. [x] Define the authenticated append-only owner-decision contract and inactive
+   schema separately under ADR 0046.
+6. [ ] Add recording, durable reload, UI/operator action, and real-business
+   owner-dossier progress only after their separate authentication and release
+   gates pass.

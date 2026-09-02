@@ -103,7 +103,7 @@ one record; Riley does not need to hand-author JSON. The command is:
 npm run kw:execute-assessment -- --source-plan data/kw-evaluation/plan.json --invocation data/kw-evaluation/assessment.json --database data/kw-evaluation/shadow.sqlite
 ```
 
-It requires migrations 0054–0068, every exact source row, and the exact terminal
+It requires migrations 0054–0069, every exact source row, and the exact terminal
 sealed website-evidence receipt to already exist in that local file. It rechecks
 all alternate identities and rejects missing, changed, or multiple matches. The
 approval binds one candidate, one receipt, the reviewed scoring evidence, and a

@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-09-01 (America/Toronto)
+Last updated: 2026-09-02 (America/Toronto)
 
 ## Plain-English status
 
@@ -75,7 +75,15 @@ frozen checkpoint. The proof explicitly does not authenticate Riley/Aidan or
 store a durable decision, and the append has no operator, file/database, live,
 or real-business path. A quality regression found during this work was also
 fixed: discovering an email or manual route no longer rewrites or falsely stales
-the separate immutable lead qualification. The console build has a verified,
+the separate immutable lead qualification. The future owner-decision security
+shape is now defined without activating it: only a current Better Auth session
+with verified Riley/Aidan email can supply identity, the server supplies time,
+and HMAC bindings retain the exact subject/session/proof relationship without
+storing raw auth identifiers. Source-only migration 0069 defines the append-only
+ledger, but there is no D1 writer/reloader, route, UI action, durable decision,
+or progress bridge. Current auth still has email verification disabled, so
+verified email plus MFA/recovery are explicit activation blockers. The console
+build has a verified,
 tamper-evident isolated-staging release packet, but it has not been deployed;
 exact-head Linux CI is green and only the separate owner deployment approval
 remains required before staging can change.
@@ -84,8 +92,8 @@ remains required before staging can change.
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `be77afabbabafeb111d74d15642e070a0796bc5c`
-- This milestone's verifying commit is the branch HEAD containing ADR 0045;
+  `5a25ffb7bf3e00de38faa2638201978226a437c2`
+- This milestone's verifying commit is the branch HEAD containing ADR 0046;
   exact local/remote SHA equality must be verified after the atomic push.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
 - Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
@@ -267,18 +275,22 @@ remains required before staging can change.
 - Guarded owner-dossier progress-append checkpoint: the branch HEAD containing
   this status entry; previous verified checkpoint
   `be77afabbabafeb111d74d15642e070a0796bc5c`.
+- Authenticated owner-decision contract/schema checkpoint: the branch HEAD
+  containing ADR 0046 and migration 0069; previous verified checkpoint
+  `5a25ffb7bf3e00de38faa2638201978226a437c2`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Canonical Riley-machine checkout: non-synced
   `C:\Users\riley\Documents\ChatGPT\APE`; OneDrive and Google Drive are not
   working-repository locations.
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Source migrations: all 68 replay from zero, including the fail-closed
+- Source migrations: all 69 replay from zero, including the fail-closed
   lockdown, shadow
   Revenue Engine records, content-bound outreach approval, and durable evidence
-  plus fenced resume, current-reference history, atomic snapshot receipts, and
-  the append-only eligibility receipt. Canonical ignored-local schema is now
-  0054–0068; migration 0068 has not been applied to an existing real-business,
-  staging, or production database
+  plus fenced resume, current-reference history, atomic snapshot receipts, the
+  append-only eligibility receipt, and the inactive authenticated owner-decision
+  ledger. Canonical ignored-local schema is now 0054–0069; migrations 0068 and
+  0069 have not been applied to an existing real-business, staging, or
+  production database
 - Current checkpoint verification rerun 2026-08-21: 160/160 tests, typecheck,
   zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
   build, and Wrangler deploy dry run pass
@@ -1899,6 +1911,43 @@ Completed gates:
   business, Cloudflare resource operation, mailbox, prospect, staging/production
   change, deployment, migration, provider call, or paid runtime operation
   occurred. Spend impact is C$0 and every autonomous capability remains off.
+- The authenticated owner-decision candidate now accepts a declaration with no
+  reviewer or client-selected timestamp, derives Riley/Aidan only from a
+  normalized Better Auth session with `emailVerified: true`, derives decision
+  time from the server clock, and requires the session to be active at that
+  instant. The current app still disables email verification, so no production
+  owner action can satisfy this boundary yet.
+- HMAC-SHA-256 binds the authenticated subject, session, explicit key version,
+  exact `owner-dossier-acceptance:*` proof, decision, owner, and time. The frozen
+  record contains only opaque 64-character bindings and the owner enum; raw user
+  ID, session ID, session token, email, and binding key are absent. Copied JSON,
+  weak keys, unverified/unauthorized sessions, stale dossier windows, changed
+  manifest/parent, and browser-selected reviewer/time fail closed.
+- Source-only migration 0069 defines `RevenuePrivateKwOwnerDecision` with exact
+  JSON/column lineage, one row per acceptance proof, unique decision binding,
+  raw-auth-key rejection, active-session/database chronology, append-only
+  update/delete guards, and every downstream authority fixed to zero. The
+  complete canonical ignored-local schema is now 0054–0069. No migration was
+  applied and no D1 writer/reader exists; direct SQL or schema-valid JSON is not
+  trusted durable proof.
+- ADR 0046 records the threat model for session fixation/replay, identity and
+  parent substitution, stale evidence, copied trust, raw-identifier leakage,
+  weak/rotated keys, duplicate decisions, direct SQL, CSRF, clock drift, and
+  authority creep. AUTH-001 records the proven distinction between a signed-in
+  session, verified email ownership, and Axiom owner authorization.
+- Focused authenticated-decision, owner-dossier, full-migration, local schema,
+  and safety verification passes 22/22 tests. The complete release gate passes
+  fail-closed safety, 519/519 tests, standalone typecheck, zero-warning lint,
+  the secret-sanitized Cloudflare build, and the explicit default-environment
+  no-upload Wrangler dry run. Wrangler retained only the documented generated
+  duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 353 ms and the dossier in
+  401 ms. Only synthetic fixtures and in-memory SQLite were used. No real owner
+  decision, database read/write, migration, Cloudflare resource operation,
+  mailbox, prospect, staging/production change, deployment, provider call, or
+  paid runtime operation occurred. Spend impact is C$0 and every autonomous
+  capability remains off.
 
 Still required for Phase 1:
 
@@ -1927,6 +1976,10 @@ before approval.
 
 - Recreate and secure `riley@getaxiom.ca` and `aidan@getaxiom.ca` in Google
   Workspace; verify send/receive, MFA, SPF, DKIM, DMARC, and recovery ownership.
+- Before any owner-decision writer or UI action can be activated, Better Auth
+  must enforce verified email for both owner accounts and the MFA/recovery setup
+  above must be proven. A signed-in but unverified session is intentionally
+  rejected by the new contract.
 - Confirm who owns replies for each mailbox before the pilot.
 - Later: label the first 50 KW leads strong/weak/wrong with a short reason.
 - R2 activation currently requires the exact owner phrase in
@@ -2039,6 +2092,11 @@ before approval.
   outreach, send, or spend authority. An authenticated append-only decision
   contract and persistence threat model must be reviewed separately before any
   operator/UI or real-business path exists.
+- No new owner decision is required for the authenticated decision contract and
+  source-only schema 0069. No account was used and no decision was stored.
+  Applying migration 0069, configuring binding material, adding a D1
+  writer/reloader, exposing a route/button, or using the result for progress are
+  separate reviewed and approval-gated changes.
 - Riley directed that this rebuild branch should eventually become `main`. That
   is recorded as the intended final cutover, not approval to merge now. The merge
   remains gated by the completed rebuild, full safety/review/rollback evidence,
@@ -2054,10 +2112,13 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Design the content-addressed authenticated owner-decision contract and
-   append-only persistence schema separately from UI/operator wiring and
-   real-business execution; require an explicit threat model and release
-   approval before adding any executor.
+3. Design and test the separate migration-0069 D1 writer/exact-reload boundary
+   behind an injected, disconnected database interface. It must require the
+   exact trusted candidate, re-check current verified session context, database
+   clock, and every immutable guard, mutate only the decision ledger, and keep
+   UI/operator wiring and progress advancement absent. Activation remains
+   blocked until owner email verification, MFA/recovery, staging, rollback, and
+   release approval pass.
 
 ## Resume instructions
 

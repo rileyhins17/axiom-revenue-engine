@@ -158,6 +158,28 @@ Retire entries when the architecture makes them impossible.
   the full propagation window on 2026-08-21; no-cron staging config checkpoint
   `23ee458`.
 
+## AUTH-001 — An authenticated session was mistaken for a verified owner identity
+
+- **Symptom:** a future owner-decision design could have accepted any current
+  Better Auth session whose email string matched Riley or Aidan, even though the
+  current app does not require email verification.
+- **Root cause:** session authentication, email ownership verification, and
+  business authorization are three separate facts. A session proves possession
+  of account credentials; it does not by itself prove the account email belongs
+  to the human owner.
+- **Proven fix:** the owner-decision contract requires `emailVerified: true`,
+  normalizes the server-side session email, maps only the fixed two-owner
+  allowlist, derives reviewer/time server-side, and keeps the route/recorder
+  absent until MFA and recovery are configured.
+- **Prevention/test:**
+  `src/lib/revenue-engine/private-kw-authenticated-owner-decision.test.ts` and
+  `npm run check:safety` reject an unverified email, unauthorized identity,
+  inactive session, browser-selected identity/time, and raw auth identifiers in
+  the ledger JSON.
+- **Affected area:** owner authentication, decision recording, progress
+  authorization, and future operator mutations.
+- **Verifying commit:** branch HEAD containing ADR 0046 and migration 0069.
+
 ## DATA-001 — Raw SQL drifted from the live schema
 
 - **Symptom:** unit behavior passed while production queries referenced columns or

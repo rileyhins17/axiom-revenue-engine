@@ -139,5 +139,7 @@ independently rather than smuggled into a blended qualification result.
 6. [x] Design and implement a separate exact-parent guarded in-memory append;
    do not combine it with authentication, durable owner-decision storage, or
    operator wiring.
-7. [ ] Add authenticated, append-only owner-decision recording only after its
-   own threat model, UI acceptance, and release approval.
+7. [x] Define the authenticated, HMAC-bound owner-decision candidate and
+   append-only schema under ADR 0046 without activating recording.
+8. [ ] Add the separate D1 writer/reloader, UI action, and progress bridge only
+   after authentication hardening, UI acceptance, and release approval.

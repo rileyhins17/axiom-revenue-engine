@@ -273,7 +273,7 @@ and artifact plans are separate from retry receipts. The validation-only planner
 rejects blocked resume histories and checks every primary or alternate identity
 candidate before proposing ordered insert-if-absent SQL. It deliberately has no
 resume executor: all resume, workflow execution, provider, and cost authority
-remains false. All 64 migrations pass from zero in isolated local
+remains false. All 69 migrations pass from zero in isolated local
 D1, but migration 0057 has not been applied to staging or production.
 
 Evidence-use endings and current-reference reasoning are now explicit without
@@ -535,9 +535,15 @@ businesses. Exact retry returns the same frozen checkpoint;
 copied input/result JSON, manifest or parent drift, and completed-child replay
 fail closed. The owner projection also keeps qualification separate from current
 routing: a new email or manual route can improve reachability without rewriting
-lead fit. There is no authenticated or durably stored owner decision, operator
-action, file/database output, live resource, provider, real-business,
-deployment, outreach, send, or spend path.
+lead fit. The next server-side contract can now derive Riley/Aidan and decision
+time only from a current verified Better Auth session and server clock, HMAC-bind
+the exact proof without storing raw user/session/email identifiers, and produce
+one frozen content-addressed decision candidate. Additive migration 0069 defines
+its append-only ledger. Both are deliberately inactive: there is no D1
+writer/reloader, API or UI action, durable owner decision, progress bridge,
+operator action, live resource, provider, real-business, deployment, outreach,
+send, or spend path. Current owner authentication must gain verified email and
+MFA/recovery controls before activation can be reviewed.
 
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
