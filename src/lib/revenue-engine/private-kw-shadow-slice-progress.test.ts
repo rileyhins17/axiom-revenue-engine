@@ -155,6 +155,9 @@ function receiptInput(
       }] : phase === "ASSESSMENT" ? [{
         receiptId: `assessment-proof:${((seed + 10) % 15 + 1).toString(16).repeat(64)}`,
         receiptDigest: ((seed + 10) % 15 + 1).toString(16).repeat(64),
+      }] : phase === "CONTACT_REVIEW" ? [{
+        receiptId: `contact-review-proof:${((seed + 11) % 15 + 1).toString(16).repeat(64)}`,
+        receiptDigest: ((seed + 11) % 15 + 1).toString(16).repeat(64),
       }] : [],
     },
     previousPhaseReceipt: previous ? {
@@ -206,6 +209,36 @@ test("one append advances only the exact business and binds its predecessor chai
   assert.equal(website.summary.completedPhaseReceipts, 2);
   assert.equal(website.summary.countsByCheckpoint.CURRENT_WEBSITE_EVIDENCE_PERSISTED, 1);
   assert.equal(website.summary.countsByCheckpoint.SOURCE_REVIEWED, 9);
+});
+
+test("the final owner-dossier receipt completes the business and advances the cohort pointer", () => {
+  const manifest = manifestFixture();
+  let current = buildInitialPrivateKwShadowSliceProgress(manifest);
+  let previous: PrivateKwShadowSlicePhaseReceipt | null = null;
+  const phases = [
+    "SOURCE_WORKFLOW",
+    "CURRENT_WEBSITE_EVIDENCE",
+    "ASSESSMENT",
+    "CONTACT_REVIEW",
+    "OWNER_DOSSIER",
+  ] as const;
+
+  for (const phase of phases) {
+    current = appendPrivateKwShadowSliceProgress(
+      manifest,
+      current,
+      receiptInput(manifest, 0, phase, previous),
+    );
+    previous = current.records[0].phaseReceipts.at(-1) ?? null;
+  }
+
+  assert.equal(current.records[0].currentCheckpoint, "OWNER_DOSSIER_ACCEPTED");
+  assert.equal(current.records[0].nextRequiredGate, null);
+  assert.equal(current.records[0].phaseReceipts.length, 5);
+  assert.equal(current.summary.completedPhaseReceipts, 5);
+  assert.equal(current.summary.fullyCompletedBusinesses, 1);
+  assert.equal(current.summary.countsByCheckpoint.OWNER_DOSSIER_ACCEPTED, 1);
+  assert.equal(current.summary.nextIncompleteBusinessId, current.records[1].businessId);
 });
 
 test("progress rejects skipped phases, wrong predecessors, cross-business proofs, and reused upstream receipts", () => {

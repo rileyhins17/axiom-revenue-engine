@@ -326,10 +326,24 @@ is not proven and no decision is durably recorded.
 
 The separate phase-input adapter regenerates that proof internally and returns
 one frozen, parent-bound `OWNER_DOSSIER` input. Never hand-author or reload the
-proof/input from JSON. There is no append, operator command, file/database
-writer, API/UI action, Worker import, live resource, real-business path,
-provider operation, outreach, send, or spend. Authenticated durable acceptance,
-guarded append, and operator wiring remain separate approval-gated designs.
+proof/input from JSON.
+
+The separate owner-dossier append accepts only that exact input and unchanged
+content-addressed contact-review parent. It calls the canonical receipt
+builder/appender, then independently proves one final receipt, the exact
+`CONTACT_REVIEW_PERSISTED` to `OWNER_DOSSIER_ACCEPTED` transition, the
+fully-completed count, the first still-incomplete business pointer, the unchanged
+four-receipt prefix, the complete manifest-bound business/evaluation/source
+identity, and unchanged other nine businesses. Exact retry returns the same
+frozen checkpoint. Copied input/result JSON, another manifest, any changed or
+re-digested parent, and completed-child replay fail closed. Never pass a
+hand-authored owner-dossier input to the generic recorder.
+
+This remains in-memory contract verification only. There is no authenticated or
+durably stored owner decision, operator command, file/database writer, API/UI
+action, Worker import, live resource, real-business path, provider operation,
+outreach, send, or spend. Authenticated append-only owner-decision storage and
+operator wiring remain separate approval-gated designs.
 
 ## Owner-approved local KW materialization and assessment
 

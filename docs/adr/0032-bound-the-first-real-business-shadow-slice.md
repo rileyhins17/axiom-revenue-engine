@@ -151,3 +151,8 @@ commercial coverage, and a hard authority boundary. This option was selected.
     frozen reader response and exact guarded contact-review checkpoint, then
     derive a zero-authority `OWNER_DOSSIER` input without authentication,
     durable recording, append, operator, real-data, or live-resource wiring.
+21. [x] Append that exact owner-dossier input only through a separate
+    parent-bound in-memory boundary that proves the final receipt, completed
+    business count, resume pointer, exact retry, and unchanged other nine
+    businesses. Keep authenticated decision storage, durable/operator wiring,
+    live data, outreach, send, and spend separate.

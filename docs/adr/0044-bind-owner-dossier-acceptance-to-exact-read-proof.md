@@ -136,7 +136,8 @@ independently rather than smuggled into a blended qualification result.
    and add regression coverage.
 5. [x] Enforce copied-object rejection and disconnected operation in the static
    safety gate.
-6. [ ] Design a separate exact-parent guarded in-memory append; do not combine it
-   with authentication, durable owner-decision storage, or operator wiring.
+6. [x] Design and implement a separate exact-parent guarded in-memory append;
+   do not combine it with authentication, durable owner-decision storage, or
+   operator wiring.
 7. [ ] Add authenticated, append-only owner-decision recording only after its
    own threat model, UI acceptance, and release approval.

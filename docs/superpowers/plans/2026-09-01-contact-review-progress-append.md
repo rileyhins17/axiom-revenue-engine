@@ -247,7 +247,7 @@ zero failures, zero real prospect/provider requests, and no deployment upload.
 Require a clean `git diff --check`, no secret-like changed file, no unexpected
 generated file, and no unrelated worktree change.
 
-- [ ] **Step 3: Commit and push one atomic checkpoint**
+- [x] **Step 3: Commit and push one atomic checkpoint**
 
 ```powershell
 git commit -m "feat: guard contact review progress append"

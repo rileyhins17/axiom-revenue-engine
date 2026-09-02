@@ -66,21 +66,26 @@ contact action, or spend. The final owner-dossier phase now has a separate
 validation boundary as well: the real reader freezes and privately trusts only
 its exact current response, a content-addressed proof binds that full dossier and
 explicit five-minute declaration to the exact contact checkpoint, and a separate
-adapter creates one frozen zero-authority input without appending it. The proof
-explicitly does not authenticate Riley/Aidan or store a durable decision. A
-quality regression found during this work was also fixed: discovering an email
-or manual route no longer rewrites or falsely stales the separate immutable lead
-qualification. The console build has a verified, tamper-evident
-isolated-staging release packet, but it has not been deployed; exact-head Linux
-CI is green and only the separate owner deployment approval remains required
-before staging can change.
+adapter creates one frozen zero-authority input. A guarded in-memory boundary now
+accepts only that exact input and unchanged parent, adds the final canonical
+receipt, and proves the fully completed count, resume pointer, prior receipt
+chain, and unchanged other nine businesses. Copied input/result JSON, parent
+drift, and completed-child replay fail closed; exact retry returns the same
+frozen checkpoint. The proof explicitly does not authenticate Riley/Aidan or
+store a durable decision, and the append has no operator, file/database, live,
+or real-business path. A quality regression found during this work was also
+fixed: discovering an email or manual route no longer rewrites or falsely stales
+the separate immutable lead qualification. The console build has a verified,
+tamper-evident isolated-staging release packet, but it has not been deployed;
+exact-head Linux CI is green and only the separate owner deployment approval
+remains required before staging can change.
 
 ## Verified checkpoint
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `a7a9565896a4ccccf0753077200114c3327dc29b`
-- This milestone's verifying commit is the branch HEAD containing ADR 0044;
+  `be77afabbabafeb111d74d15642e070a0796bc5c`
+- This milestone's verifying commit is the branch HEAD containing ADR 0045;
   exact local/remote SHA equality must be verified after the atomic push.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
 - Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
@@ -257,6 +262,11 @@ before staging can change.
 - Guarded contact-review progress-append checkpoint: the branch HEAD containing
   this status entry; previous verified checkpoint
   `e4201a104d1bd77a1a3394e85919be0856d4a6c1`.
+- Owner-dossier proof/input checkpoint:
+  `be77afabbabafeb111d74d15642e070a0796bc5c`.
+- Guarded owner-dossier progress-append checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `be77afabbabafeb111d74d15642e070a0796bc5c`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Canonical Riley-machine checkout: non-synced
   `C:\Users\riley\Documents\ChatGPT\APE`; OneDrive and Google Drive are not
@@ -1857,6 +1867,38 @@ Completed gates:
   documented generated duplicate-key warnings. The final six-view
   desktop/mobile WCAG owner-browser gate passed with zero external requests;
   the lead list was ready in 791 ms and the dossier in 848 ms.
+- The exact owner-dossier input can now enter only a separate guarded in-memory
+  append boundary. It requires the unchanged content-addressed contact-review
+  parent, uses the canonical final receipt/appender, and independently proves
+  one completed business, the next-incomplete cohort pointer, the exact prior
+  four-receipt prefix, the complete manifest-bound business/evaluation/source
+  identity, and unchanged other nine businesses.
+- Exact retry returns the same deeply frozen checkpoint instance. Copied
+  input/result JSON, another manifest, a parent changed by another business,
+  any re-digested parent, and completed-child replay fail closed. A dedicated
+  canonical-ledger regression proves that final completion advances the pointer
+  to the next business.
+- Static safety requires exact input/parent trust, the canonical receipt and
+  append kernel, independently derived final summary/pointer checks, deep freeze,
+  and exact retry memory. It forbids authentication, operator/UI/API, file,
+  database, runtime, provider, network, mutation, deployment, outreach, send,
+  and cost paths.
+- A fresh read-only code review caught that the target's source-record identity
+  was only implicitly preserved by the shared appender. The boundary now proves
+  the complete manifest-to-parent-to-child identity tuple independently; the
+  focused re-review found no remaining Critical or Important issue.
+- Focused final-phase and canonical-ledger verification passes 13/13 tests. The
+  complete release gate passes fail-closed safety, 514/514 tests, standalone
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build, and the
+  explicit default-environment no-upload Wrangler dry run. Wrangler retained
+  only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 377 ms and the dossier in
+  464 ms. Only synthetic fixtures and in-memory/local test state were used. No
+  owner was authenticated, no decision or progress was persisted, and no real
+  business, Cloudflare resource operation, mailbox, prospect, staging/production
+  change, deployment, migration, provider call, or paid runtime operation
+  occurred. Spend impact is C$0 and every autonomous capability remains off.
 
 Still required for Phase 1:
 
@@ -1991,6 +2033,12 @@ before approval.
   session authentication is explicitly unproven, and no decision or checkpoint
   is stored. Authentication, durable owner-decision recording, guarded append,
   operator wiring, and real-business use remain separate reviewed milestones.
+- No new owner decision is required for the guarded in-memory owner-dossier
+  append. It creates no authenticated or durable owner decision, file/database
+  output, operator action, live resource, real-business progress, deployment,
+  outreach, send, or spend authority. An authenticated append-only decision
+  contract and persistence threat model must be reviewed separately before any
+  operator/UI or real-business path exists.
 - Riley directed that this rebuild branch should eventually become `main`. That
   is recorded as the intended final cutover, not approval to merge now. The merge
   remains gated by the completed rebuild, full safety/review/rollback evidence,
@@ -2006,10 +2054,10 @@ before approval.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Design a separate exact-parent guarded in-memory `OWNER_DOSSIER` append from
-   the trusted input. Keep session authentication, durable owner-decision
-   recording, operator/UI wiring, live data, and real-business use out of that
-   milestone.
+3. Design the content-addressed authenticated owner-decision contract and
+   append-only persistence schema separately from UI/operator wiring and
+   real-business execution; require an explicit threat model and release
+   approval before adding any executor.
 
 ## Resume instructions
 

@@ -12,7 +12,14 @@ import {
   requireInProcessPrivateKwOwnerDossierProgressInputForParent,
 } from "@/lib/revenue-engine/private-kw-owner-dossier-progress";
 import {
+  appendPrivateKwOwnerDossierProgress,
+  requireInProcessPrivateKwOwnerDossierProgressCheckpoint,
+} from "@/lib/revenue-engine/private-kw-owner-dossier-progress-append";
+import {
   PrivateKwShadowSliceProgressCheckpointSchema,
+  appendPrivateKwShadowSliceProgress,
+  buildPrivateKwShadowSlicePhaseReceipt,
+  privateKwShadowSliceProgressAuthority,
   privateKwShadowSliceProgressDigest,
 } from "@/lib/revenue-engine/private-kw-shadow-slice-progress";
 import {
@@ -37,6 +44,47 @@ function buildInput(fixture: Fixture, acceptanceValue: unknown = fixture.accepta
     ownerDossierValue: fixture.ownerDossier,
     acceptanceValue,
   });
+}
+
+function anotherBusinessSourceInput(input: {
+  manifest: Fixture["manifest"];
+  excludedBusinessId: string;
+  recordedAt: string;
+}) {
+  const record = input.manifest.records.find(
+    (candidate) => candidate.businessId !== input.excludedBusinessId,
+  );
+  assert(record);
+  const primaryDigest = privateKwShadowSliceProgressDigest({
+    businessId: record.businessId,
+    kind: "owner-dossier-parent-materialization",
+  });
+  const supportingDigest = privateKwShadowSliceProgressDigest({
+    businessId: record.businessId,
+    kind: "owner-dossier-parent-workflow",
+  });
+  return {
+    receiptVersion: "kw-shadow-slice-phase-receipt-v1" as const,
+    manifestId: input.manifest.manifestId,
+    manifestDigest: input.manifest.manifestDigest,
+    businessId: record.businessId,
+    evaluationCandidateId: record.evaluationCandidateId,
+    phase: "SOURCE_WORKFLOW" as const,
+    completedAt: input.recordedAt,
+    proof: {
+      proofKind: "SOURCE_WORKFLOW_MATERIALIZATION" as const,
+      primaryReceiptId: `kw-materialization:${primaryDigest}`,
+      primaryReceiptDigest: primaryDigest,
+      supportingReceipts: [{
+        receiptId: `workflow-receipt:${supportingDigest}`,
+        receiptDigest: supportingDigest,
+      }],
+    },
+    previousPhaseReceipt: null,
+    recordedBy: "CODEX_INTEGRATION_OWNER" as const,
+    recordedAt: input.recordedAt,
+    authority: privateKwShadowSliceProgressAuthority(),
+  };
 }
 
 test("binds one explicit acceptance to the exact frozen dossier and contact checkpoint without appending", async () => {
@@ -220,4 +268,185 @@ test("rejects acceptance digest, confirmation, and five-minute chronology drift"
     ...fixture.acceptance,
     acceptedAt: afterWindow,
   }), /within five minutes/i);
+});
+
+test("guarded owner-dossier append completes exactly one business and preserves the cohort", async () => {
+  const fixture = await createPrivateKwOwnerDossierProgressFixture({
+    suffix: "owner-append",
+  });
+  const parentBefore = structuredClone(fixture.contactCheckpoint);
+  const phaseInput = buildInput(fixture);
+  const expectedReceipt = buildPrivateKwShadowSlicePhaseReceipt(
+    fixture.manifest,
+    phaseInput,
+  );
+  const expectedNextIncompleteBusinessId = fixture.contactCheckpoint.records.find(
+    (record) => record.businessId !== phaseInput.businessId && record.phaseReceipts.length < 5,
+  )?.businessId ?? null;
+  const targetIndex = fixture.contactCheckpoint.records.findIndex(
+    (record) => record.businessId === phaseInput.businessId,
+  );
+  const nextProgress = appendPrivateKwOwnerDossierProgress({
+    manifestValue: structuredClone(fixture.manifest),
+    previousProgressValue: structuredClone(fixture.contactCheckpoint),
+    phaseInputValue: phaseInput,
+  });
+  const targetBefore = fixture.contactCheckpoint.records.find(
+    (record) => record.businessId === phaseInput.businessId,
+  );
+  const targetAfter = nextProgress.records.find(
+    (record) => record.businessId === phaseInput.businessId,
+  );
+  const otherBefore = fixture.contactCheckpoint.records.filter(
+    (record) => record.businessId !== phaseInput.businessId,
+  );
+  const otherAfter = nextProgress.records.filter(
+    (record) => record.businessId !== phaseInput.businessId,
+  );
+
+  assert(targetIndex > 0);
+  assert.equal(
+    fixture.contactCheckpoint.summary.nextIncompleteBusinessId,
+    fixture.contactCheckpoint.records[0].businessId,
+  );
+  assert.equal(nextProgress.parentCheckpoint?.checkpointId, fixture.contactCheckpoint.checkpointId);
+  assert.equal(
+    nextProgress.parentCheckpoint?.checkpointDigest,
+    fixture.contactCheckpoint.checkpointDigest,
+  );
+  assert.equal(nextProgress.createdAt, phaseInput.recordedAt);
+  assert.equal(
+    nextProgress.summary.completedPhaseReceipts,
+    fixture.contactCheckpoint.summary.completedPhaseReceipts + 1,
+  );
+  assert.equal(
+    nextProgress.summary.fullyCompletedBusinesses,
+    fixture.contactCheckpoint.summary.fullyCompletedBusinesses + 1,
+  );
+  assert.equal(nextProgress.summary.nextIncompleteBusinessId, expectedNextIncompleteBusinessId);
+  assert.equal(
+    nextProgress.summary.nextIncompleteBusinessId,
+    fixture.contactCheckpoint.summary.nextIncompleteBusinessId,
+  );
+  assert.equal(
+    nextProgress.summary.countsByCheckpoint.CONTACT_REVIEW_PERSISTED,
+    fixture.contactCheckpoint.summary.countsByCheckpoint.CONTACT_REVIEW_PERSISTED - 1,
+  );
+  assert.equal(
+    nextProgress.summary.countsByCheckpoint.OWNER_DOSSIER_ACCEPTED,
+    fixture.contactCheckpoint.summary.countsByCheckpoint.OWNER_DOSSIER_ACCEPTED + 1,
+  );
+  assert.equal(
+    targetAfter?.phaseReceipts.length,
+    (targetBefore?.phaseReceipts.length ?? 0) + 1,
+  );
+  assert.equal(targetAfter?.currentCheckpoint, "OWNER_DOSSIER_ACCEPTED");
+  assert.equal(targetAfter?.nextRequiredGate, null);
+  assert.equal(targetAfter?.businessId, targetBefore?.businessId);
+  assert.equal(targetAfter?.evaluationCandidateId, targetBefore?.evaluationCandidateId);
+  assert.equal(targetAfter?.sourceRecordId, targetBefore?.sourceRecordId);
+  assert.deepEqual(targetAfter?.phaseReceipts.at(-1), expectedReceipt);
+  assert.deepEqual(otherAfter, otherBefore);
+  assert.deepEqual(fixture.contactCheckpoint, parentBefore);
+  assert.equal(nextProgress.authority.progressRecordingOnly, true);
+  assert.equal(nextProgress.authority.phaseExecutionAuthorized, false);
+  assert.equal(nextProgress.authority.databaseMutationAuthorized, false);
+  assert.equal(nextProgress.authority.contactDiscoveryExecutionAuthorized, false);
+  assert.equal(nextProgress.authority.contactVerificationExecutionAuthorized, false);
+  assert.equal(nextProgress.authority.consentDecisionAuthorized, false);
+  assert.equal(nextProgress.authority.qualificationAuthorized, false);
+  assert.equal(nextProgress.authority.mailboxSyncAuthorized, false);
+  assert.equal(nextProgress.authority.outreachAuthorized, false);
+  assert.equal(nextProgress.authority.sendAuthorized, false);
+  assert.equal(nextProgress.authority.deploymentAuthorized, false);
+  assert.equal(nextProgress.authority.providerOperationsAuthorized, 0);
+  assert.equal(nextProgress.authority.costAuthorizedUsd, 0);
+  assert.equal(Object.isFrozen(nextProgress), true);
+  assert.equal(Object.isFrozen(targetAfter), true);
+  assert.equal(
+    requireInProcessPrivateKwOwnerDossierProgressCheckpoint(nextProgress),
+    nextProgress,
+  );
+  assert.throws(
+    () => requireInProcessPrivateKwOwnerDossierProgressCheckpoint(structuredClone(nextProgress)),
+    /exact in-process result/i,
+  );
+
+  const exactRetry = appendPrivateKwOwnerDossierProgress({
+    manifestValue: structuredClone(fixture.manifest),
+    previousProgressValue: structuredClone(fixture.contactCheckpoint),
+    phaseInputValue: phaseInput,
+  });
+  assert.equal(exactRetry, nextProgress);
+});
+
+test("guarded owner-dossier append rejects copied input, manifest drift, and every changed parent", async () => {
+  const fixture = await createPrivateKwOwnerDossierProgressFixture({
+    suffix: "owner-append-guards",
+  });
+  const other = await createPrivateKwOwnerDossierProgressFixture({
+    suffix: "owner-append-other-manifest",
+  });
+  const phaseInput = buildInput(fixture);
+
+  assert.throws(() => appendPrivateKwOwnerDossierProgress({
+    manifestValue: fixture.manifest,
+    previousProgressValue: fixture.contactCheckpoint,
+    phaseInputValue: structuredClone(phaseInput),
+  }), /exact in-process owner-dossier progress input/i);
+
+  assert.throws(() => appendPrivateKwOwnerDossierProgress({
+    manifestValue: other.manifest,
+    previousProgressValue: fixture.contactCheckpoint,
+    phaseInputValue: phaseInput,
+  }), /exact unchanged manifest and contact-review parent checkpoint/i);
+
+  const changedParent = appendPrivateKwShadowSliceProgress(
+    fixture.manifest,
+    fixture.contactCheckpoint,
+    anotherBusinessSourceInput({
+      manifest: fixture.manifest,
+      excludedBusinessId: phaseInput.businessId,
+      recordedAt: fixture.acceptance.acceptedAt,
+    }),
+  );
+  assert.throws(() => appendPrivateKwOwnerDossierProgress({
+    manifestValue: fixture.manifest,
+    previousProgressValue: changedParent,
+    phaseInputValue: phaseInput,
+  }), /exact unchanged manifest and contact-review parent checkpoint/i);
+
+  const {
+    checkpointId: _checkpointId,
+    checkpointDigest: _checkpointDigest,
+    ...parentCore
+  } = structuredClone(fixture.contactCheckpoint);
+  void _checkpointId;
+  void _checkpointDigest;
+  const changedCore = {
+    ...parentCore,
+    createdAt: new Date(Date.parse(parentCore.createdAt) + 1).toISOString(),
+  };
+  const changedDigest = privateKwShadowSliceProgressDigest(changedCore);
+  const redigestedParent = PrivateKwShadowSliceProgressCheckpointSchema.parse({
+    ...changedCore,
+    checkpointId: `kw-shadow-progress:${changedDigest}`,
+    checkpointDigest: changedDigest,
+  });
+  assert.throws(() => appendPrivateKwOwnerDossierProgress({
+    manifestValue: fixture.manifest,
+    previousProgressValue: redigestedParent,
+    phaseInputValue: phaseInput,
+  }), /exact unchanged manifest and contact-review parent checkpoint/i);
+
+  const completedChild = appendPrivateKwOwnerDossierProgress({
+    manifestValue: fixture.manifest,
+    previousProgressValue: fixture.contactCheckpoint,
+    phaseInputValue: phaseInput,
+  });
+  assert.throws(() => appendPrivateKwOwnerDossierProgress({
+    manifestValue: fixture.manifest,
+    previousProgressValue: completedChild,
+    phaseInputValue: phaseInput,
+  }), /exact unchanged manifest and contact-review parent checkpoint/i);
 });

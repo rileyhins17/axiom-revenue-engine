@@ -526,11 +526,18 @@ digest and snapshot/contact lineage, the exact guarded contact-review parent,
 and an explicit Riley/Aidan declaration made within five minutes. The proof
 truthfully records that session authentication is not proven and the decision is
 not durably stored. A separate adapter regenerates the proof internally and
-returns one frozen, parent-bound, zero-authority final-phase input with no append.
-The owner projection also keeps qualification separate from current routing: a
-new email or manual route can improve reachability without rewriting lead fit.
-There is no owner action, receipt/checkpoint, file/database output, operator,
-Worker, provider, real-business, deployment, outreach, send, or spend path.
+returns one frozen, parent-bound, zero-authority final-phase input. A separate
+guarded in-memory append now accepts only that exact input and unchanged contact
+parent, adds the canonical final receipt, and independently proves the completed
+business count, next-incomplete cohort pointer, prior four-receipt prefix, and
+the complete manifest-bound source identity, with unchanged other nine
+businesses. Exact retry returns the same frozen checkpoint;
+copied input/result JSON, manifest or parent drift, and completed-child replay
+fail closed. The owner projection also keeps qualification separate from current
+routing: a new email or manual route can improve reachability without rewriting
+lead fit. There is no authenticated or durably stored owner decision, operator
+action, file/database output, live resource, provider, real-business,
+deployment, outreach, send, or spend path.
 
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
