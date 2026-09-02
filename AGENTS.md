@@ -77,6 +77,38 @@ paying-client proof.
 - Subagents are for independent, bounded audits, research, or non-overlapping
   implementation. One integration owner owns shared files and final verification.
 
+## Codex delegation protocol
+
+- `gpt-5.6-sol` is the sole orchestrator and integration owner. Project-local
+  defaults use high reasoning for that role.
+- Every child agent defaults to `gpt-5.6-luna` with max reasoning and low
+  verbosity. Use children only for useful independent exploration, first-party
+  research, focused tests, security/UI/lead-quality review, or an explicitly
+  non-overlapping implementation patch. Do not delegate trivial work.
+- Sol must not override a child's approved model, reasoning effort, verbosity,
+  sandbox, or permissions. Any exception requires a new ADR plus Riley's explicit
+  decision recorded in `docs/STATUS.md`.
+- A child task packet must state the objective and exit gate, starting branch
+  and commit, allowed files and commands, read/write scope, safety limits, and
+  required result format.
+- Child agents never spawn more agents, use OneDrive or Google Drive, expose
+  secrets, contact prospects, use live providers/resources, deploy, migrate,
+  commit, push, merge, rebase, or change production controls.
+- Children return a concise `Result`, `Evidence`, `Checks`, `Risks`, and `Next
+  action` summary instead of raw logs. Their summary is evidence for Sol to
+  verify; it never replaces repository tests or a clean checkpoint.
+- Sol owns milestone selection, shared files and durable docs, safety review,
+  integration, the complete release gate, atomic commits, branch pushes, and
+  any future proposal to merge into `main`.
+- Run no more than three children concurrently. Read-only work may be parallel.
+  Parallel writers require separate worktrees and non-overlapping file ownership;
+  otherwise serialize them.
+- Before accepting a write-capable child result, Sol must compare the starting
+  commit, declared allowlist, and `git diff --name-only` output and reject any
+  out-of-scope file. A read-only role must never receive broader runtime access.
+- The full operating protocol and role definitions live in
+  `docs/CODEX_AGENT_PROTOCOL.md` and `.codex/agents/`.
+
 ## Required verification
 
 During work, run targeted tests. Before a checkpoint or pull request, run:

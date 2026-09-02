@@ -91,14 +91,21 @@ MFA/recovery are explicit activation blockers. The console
 build has a verified,
 tamper-evident isolated-staging release packet, but it has not been deployed;
 exact-head Linux CI is green and only the separate owner deployment approval
-remains required before staging can change.
+remains required before staging can change. The permanent Codex work model is
+now also fail-closed and resumable: Sol owns orchestration, integration, shared
+documentation, release verification, and commits, while useful independent work
+defaults to Luna at max reasoning through seven narrow roles. Delegation is
+capped at three children, read-only by default, and never grants live authority.
+Google Drive is disabled for this project on Riley's machine, the stale trusted
+OneDrive checkout is removed, and the active heartbeat now resumes only from the
+canonical non-synced repository and its persisted status.
 
 ## Verified checkpoint
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `e743f4a5f0a5486b2408f82b06edd4e488e923ce`
-- This milestone's verifying commit is the branch HEAD containing ADR 0047;
+  `9ae3623b95ce803c584fd3e339a70e21fbfd9dd0`
+- This milestone's verifying commit is the branch HEAD containing ADR 0048;
   exact local/remote SHA equality must be verified after the atomic push.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
 - Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
@@ -283,6 +290,9 @@ remains required before staging can change.
 - Authenticated owner-decision contract/schema checkpoint: the branch HEAD
   containing ADR 0046 and migration 0069; previous verified checkpoint
   `5a25ffb7bf3e00de38faa2638201978226a437c2`.
+- Sol integration / Luna max worker checkpoint: the branch HEAD containing ADR
+  0048; previous verified checkpoint
+  `9ae3623b95ce803c584fd3e339a70e21fbfd9dd0`.
 - Repository: private `rileyhins17/axiom-revenue-engine`
 - Canonical Riley-machine checkout: non-synced
   `C:\Users\riley\Documents\ChatGPT\APE`; OneDrive and Google Drive are not
@@ -719,6 +729,8 @@ Completed gates:
 - Rebuild branch created without rewriting `main`.
 - Owner context, operating contract, master plan, and gotcha/runbook structure
   established.
+- Permanent Sol integration / Luna max worker protocol, seven narrow roles,
+  fail-closed configuration checks, and recurring-heartbeat continuity established.
 - Fail-closed runtime/config/database defaults and guarded production commands.
 - GitHub CI plus an approval-phrase production workflow (not yet exercised).
 - Pinned OpenAI Responses provider with schema validation, retry/cost limits, and
@@ -1990,6 +2002,47 @@ Completed gates:
   staging/production change, deployment, provider call, or paid runtime
   operation occurred. Spend impact is C$0 and every autonomous capability
   remains off.
+- Official OpenAI/Codex guidance was checked before establishing the permanent
+  agent split. Project-local configuration now keeps Sol at high reasoning as
+  the sole integrator and defaults every child to Luna at max reasoning with low
+  verbosity and a three-child ceiling.
+- Seven narrow roles cover repository exploration, first-party research,
+  lead-quality review, security review, test review, owner UI QA, and exclusive
+  non-overlapping implementation. Each role forbids nested delegation, Drive
+  access, secrets, live resources, prospect contact, deployments, migrations,
+  and repository history changes. Only the isolated implementation role may
+  write, and it cannot own shared controls or status.
+- `AGENTS.md`, the README, ADR 0048, `docs/CODEX_AGENT_PROTOCOL.md`, the safety
+  checker, and the active recurring heartbeat now carry the same task-packet,
+  concise-handoff, writer-isolation, and Sol-verification contract. This keeps
+  the rule available after quota exhaustion or a lost conversation.
+- Machine-level policy was verified without printing secrets: the Google Drive
+  plugin is disabled, the canonical non-synced checkout is trusted, and no stale
+  OneDrive APE trust entry remains.
+- Two Luna-max reviews challenged the enforcement rather than trusting the
+  prose. The hardened guard now discovers the complete role directory, permits
+  only the closed approved set, strictly parses the supported TOML subset,
+  rejects duplicate table declarations and duplicate/unknown/conflicting keys,
+  enforces exact model/reasoning/verbosity/sandbox values, rejects authority
+  exceptions, and pins every normalized role instruction body to a reviewed
+  SHA-256 digest. The final independent review reported no remaining Critical
+  or Important blocker.
+- Nine focused mutation tests prove the valid policy and fail on an extra role,
+  duplicate keys, a repeated table, ordinary or creatively worded prohibition
+  exceptions, model/reasoning/verbosity/sandbox drift, missing writer-allowlist
+  evidence, and any unreviewed role-instruction edit. Sol is also required to
+  avoid dispatch overrides and compare a writer's starting commit and allowlist
+  with the final changed-file set before accepting it.
+- All eight project TOML files parse. The complete release gate passes
+  fail-closed safety, 534/534 tests, standalone typecheck, zero-warning lint,
+  the secret-sanitized Cloudflare build, and the explicit default-environment
+  no-upload Wrangler dry run. Wrangler retained only the documented generated
+  duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 1,257 ms and the dossier in
+  857 ms. No application runtime, provider, Cloudflare resource, database,
+  prospect, mailbox, deployment, migration, or production control changed.
+  Spend impact is C$0 and every autonomous capability remains off.
 
 Still required for Phase 1:
 
@@ -2012,10 +2065,15 @@ contract uses Standard storage, whose included allowance is 10 GB-month plus one
 million Class A and ten million Class B operations monthly. HEAD is Class B. R2
 is not activated and the project has incurred zero artifact-storage cost. The
 dashboard price and any activation commitment must be rechecked immediately
-before approval.
+before approval. The Sol/Luna Codex work-model checkpoint changes no application
+runtime subscription or approved C$50 operating budget and incurred C$0.
 
 ## Blockers / owner actions
 
+- No new owner decision is required for the agent-model policy. Riley explicitly
+  selected Sol as orchestrator and Luna max for useful bounded subagent work.
+  This does not authorize wasteful delegation, live operations, or a merge to
+  `main`.
 - Recreate and secure `riley@getaxiom.ca` and `aidan@getaxiom.ca` in Google
   Workspace; verify send/receive, MFA, SPF, DKIM, DMARC, and recovery ownership.
 - Before any owner-decision writer or UI action can be activated, Better Auth

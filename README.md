@@ -373,6 +373,17 @@ ID. DOM artifacts cannot be rendered through this boundary. No route, R2 reader,
 binding, secret, deployment, or live provider operation exists yet, so the owner
 dossier correctly continues to label previews unavailable.
 
+## Codex work model
+
+The repository permanently uses Sol as the orchestration and integration owner,
+with bounded independent work delegated to Luna at max reasoning. Project-local
+defaults live in [`.codex/config.toml`](.codex/config.toml), the narrow worker
+roles live in [`.codex/agents/`](.codex/agents/), and the complete rules are in
+[`docs/CODEX_AGENT_PROTOCOL.md`](docs/CODEX_AGENT_PROTOCOL.md). Sol still owns
+the final safety review, complete release gate, checkpoint commit, branch push,
+and any eventual proposal to merge the rebuild into `main`. Trivial work is not
+delegated merely to satisfy a model policy.
+
 ## Verification
 
 ```powershell
@@ -401,6 +412,8 @@ npm run cf:engine:dry-run
   50-lead quality-label gate and current progress.
 - [`docs/GOTCHAS.md`](docs/GOTCHAS.md) — proven recurring traps and prevention.
 - [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — safe operator and release procedures.
+- [`docs/CODEX_AGENT_PROTOCOL.md`](docs/CODEX_AGENT_PROTOCOL.md) — permanent
+  Sol-orchestrated, Luna-worker execution and handoff contract.
 - [`docs/DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md) — canonical domain language.
 - [`docs/adr/`](docs/adr/) — versioned architecture decisions.
 

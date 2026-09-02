@@ -1,5 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 
+import { validateCodexAgentPolicy } from "./codex-agent-policy.mjs";
+
 async function readCodeTree(root, relativeRoot) {
   const entries = await readdir(root, { withFileTypes: true });
   const results = [];
@@ -127,6 +129,17 @@ const ownerLabelingComponent = await readFile(new URL("../src/components/leads/o
 const stagingConsoleRelease = await readFile(new URL("../src/lib/revenue-engine/staging-console-release.ts", import.meta.url), "utf8");
 const stagingConsoleReleaseVerifier = await readFile(new URL("./verify-staging-console-release.ts", import.meta.url), "utf8");
 const stagingConsoleReleasePacket = await readFile(new URL("../docs/releases/staging/2026-08-28-owner-quality-lab.json", import.meta.url), "utf8");
+const agentOperatingContract = await readFile(new URL("../AGENTS.md", import.meta.url), "utf8");
+const codexProjectConfig = await readFile(new URL("../.codex/config.toml", import.meta.url), "utf8");
+const codexAgentRoot = new URL("../.codex/agents/", import.meta.url);
+const discoveredCodexAgentFiles = (await readdir(codexAgentRoot, { withFileTypes: true }))
+  .filter((entry) => entry.isFile() && entry.name.endsWith(".toml"))
+  .map((entry) => entry.name)
+  .sort();
+const codexAgentConfigs = await Promise.all(discoveredCodexAgentFiles.map(async (fileName) => [
+  fileName,
+  await readFile(new URL(fileName, codexAgentRoot), "utf8"),
+]));
 const stagingMarker = '"staging": {';
 const stagingIndex = wrangler.indexOf(stagingMarker);
 const staging = stagingIndex >= 0 ? wrangler.slice(stagingIndex) : "";
@@ -138,6 +151,17 @@ function requireMatch(name, content, pattern, expectation) {
 function forbidMatch(name, content, pattern, expectation) {
   if (pattern.test(content)) failures.push(`${name}: ${expectation}`);
 }
+
+failures.push(...validateCodexAgentPolicy({
+  projectConfig: codexProjectConfig,
+  agentConfigs: new Map(codexAgentConfigs),
+}));
+requireMatch("AGENTS.md", agentOperatingContract, /gpt-5\.6-sol[\s\S]*sole orchestrator and integration owner/, "Sol must remain the sole integration owner");
+requireMatch("AGENTS.md", agentOperatingContract, /gpt-5\.6-luna[\s\S]*max reasoning/, "the permanent child policy must require Luna max");
+requireMatch("AGENTS.md", agentOperatingContract, /no more than three children concurrently/, "the operating contract must cap concurrency at three");
+requireMatch("AGENTS.md", agentOperatingContract, /must not override a child's approved model, reasoning effort, verbosity,[\s\S]*sandbox, or permissions/, "Sol must not override an approved child configuration");
+requireMatch("AGENTS.md", agentOperatingContract, /git diff --name-only[\s\S]*reject any[\s\S]*out-of-scope file/, "Sol must verify every writer allowlist before accepting a patch");
+requireMatch("AGENTS.md", agentOperatingContract, /docs\/CODEX_AGENT_PROTOCOL\.md/, "the operating contract must link the durable delegation protocol");
 
 for (const key of [
   "AUTONOMOUS_INTAKE_ENABLED",
