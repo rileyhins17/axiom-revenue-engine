@@ -104,8 +104,8 @@ canonical non-synced repository and its persisted status.
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `15c326fc84e71e8074a057050356512413a66b69`
-- This milestone's verifying commit is the branch HEAD containing ADR 0050;
+  `6f12bb207f2dcb9ccc801c3cf80c738f133a789d`
+- This milestone's verifying commit is the branch HEAD containing ADR 0051;
   exact local/remote SHA equality must be verified after the atomic push.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
 - Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
@@ -2053,14 +2053,24 @@ Completed gates:
   route, UI, database, provider, progress, outreach, send, deployment, and cost
   authority false; the four focused tests reject weak defaults, unsafe origins,
   duplicate owners, body-controlled sessions, and copied trust.
+- The server-only owner-auth request boundary is now defined as a separate
+  validation-only contract. It derives the owner only from a current
+  server-supplied verified session, ignores request-body identity fields,
+  requires exact Origin and same-origin Fetch Metadata, and validates an
+  actor/operation/payload-bound idempotency key. Its frozen result contains no
+  raw auth identifiers and grants zero mutation, route, database, provider,
+  outreach, send, deployment, or cost authority. Four focused tests cover body
+  spoofing, stale/unverified sessions, unsafe CSRF metadata, forged keys, and
+  copied-result trust; ADR 0051 records the boundary and remaining activation
+  work.
 - All eight project TOML files parse. The complete release gate passes
-  fail-closed safety, 542/542 tests, standalone typecheck, zero-warning lint,
+  fail-closed safety, 546/546 tests, standalone typecheck, zero-warning lint,
   the secret-sanitized Cloudflare build, and the explicit default-environment
   no-upload Wrangler dry run. Wrangler retained only the documented generated
   duplicate-key warnings.
 - The final six-view desktop/mobile WCAG owner-browser gate passed with zero
-  external requests; the lead list was ready in 361 ms and the dossier in
-  480 ms. No application runtime, provider, Cloudflare resource, database,
+  external requests; the lead list was ready in 1705 ms and the dossier in
+  858 ms. No application runtime, provider, Cloudflare resource, database,
   prospect, mailbox, deployment, migration, or production control changed.
   Spend impact is C$0 and every autonomous capability remains off.
 
@@ -2235,11 +2245,11 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Implement and review the server-only Better Auth session adapter and its
-   CSRF/idempotency boundary. It must consume only live server session lookup,
-   never request-body session fields, and remain disconnected until the real
-   owner controls, staging, rollback, security review, and release approval
-   pass.
+3. Design and review the atomic durable idempotency adapter that will sit
+   behind the validated owner-auth request boundary. It must replay the exact
+   prior result for the same actor/operation/payload key, reject conflicting
+   payloads, and remain disconnected until the real owner controls, staging,
+   rollback, security review, and release approval pass.
 
 ## Resume instructions
 

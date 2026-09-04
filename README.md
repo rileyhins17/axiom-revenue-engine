@@ -582,6 +582,15 @@ database, provider, progress, outreach, send, deployment, or cost authority.
 It is not connected to Better Auth or a route until the real owner accounts,
 staging schema, enrollment, recovery, rollback, and release review are proven.
 
+The future owner mutation boundary is defined separately and remains
+disconnected too. `OWNER_AUTH_SERVER_REQUEST` derives Riley or Aidan only from
+a current server-supplied verified session, ignores every request-body identity
+field, requires an exact `Origin` plus same-origin Fetch Metadata, and binds the
+operation and canonical payload to an idempotency key. Its frozen result carries
+no raw user/session identifiers and grants zero mutation, route, database,
+provider, outreach, send, deployment, or cost authority until the staging and
+release gates are explicitly approved.
+
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

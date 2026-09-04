@@ -121,6 +121,7 @@ const privateKwAuthenticatedOwnerDecision = await readFile(new URL("../src/lib/r
 const privateKwAuthenticatedOwnerDecisionD1 = await readFile(new URL("../src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", import.meta.url), "utf8");
 const privateKwOwnerDossierProgressAuthorization = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", import.meta.url), "utf8");
 const privateKwOwnerAuthReadiness = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", import.meta.url), "utf8");
+const privateKwOwnerAuthServerBoundary = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
 const privateKwAuthenticatedOwnerDecisionMigration = await readFile(new URL("../migrations/0069_authenticated_owner_dossier_decisions.sql", import.meta.url), "utf8");
 const ownerLabelingWorkspace = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-workspace.ts", import.meta.url), "utf8");
@@ -751,6 +752,18 @@ for (const field of ["activationAuthorized", "ownerDecisionPersistenceAuthorized
 }
 requireMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /providerOperationsAuthorized:\s*z\.literal\(0\)[\s\S]*?costAuthorizedUsd:\s*z\.literal\(0\)/, "owner-auth readiness must authorize zero provider operations and cost");
 forbidMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /@cloudflare|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "owner-auth readiness must stay disconnected from auth adapters, runtime, files, databases, providers, network, and mutations");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /PRIVATE_KW_OWNER_AUTH_SERVER_BOUNDARY_VERSION\s*=\s*\n?\s*"kw-owner-auth-server-boundary-v1"/, "owner-auth server boundary must use the reviewed versioned contract");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /requireInProcessPrivateKwOwnerAuthReadiness\(input\.readinessValue\)/, "owner-auth server boundary must require the exact readiness result");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /PrivateKwAuthenticatedOwnerSessionSchema\.parse\(input\.serverSessionValue\)/, "owner-auth server boundary must derive identity from a server-supplied session");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /requestBodySessionFieldsIgnored:\s*z\.literal\(true\)/, "owner-auth server boundary must ignore request-body session fields");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /originHeader !== request\.origin[\s\S]*?fetchSite !== "same-origin"[\s\S]*?fetchMode !== "cors"[\s\S]*?fetchDestination !== "empty"/, "owner-auth server boundary must require exact origin and Fetch Metadata values");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /expectedIdempotencyKey[\s\S]*?owner:[\s\S]*?operation:[\s\S]*?payloadDigest:/, "owner-auth server boundary must bind idempotency to actor, operation, and payload");
+for (const field of ["mutationAuthorized", "ownerDecisionPersistenceAuthorized", "phaseInputCreationAuthorized", "progressReceiptCreationAuthorized", "phaseAdvancementAuthorized", "databaseReadAuthorized", "databaseMutationAuthorized", "routeAuthorized", "uiMutationAuthorized", "outreachAuthorized", "sendAuthorized", "deploymentAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in owner-auth server boundary`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /providerOperationsAuthorized:\s*z\.literal\(0\)[\s\S]*?costAuthorizedUsd:\s*z\.literal\(0\)/, "owner-auth server boundary must authorize zero provider operations and cost");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /const trustedOwnerAuthServerBoundaries = new WeakSet<object>\(\)[\s\S]*?trustedOwnerAuthServerBoundaries\.has\(value\)[\s\S]*?trustedOwnerAuthServerBoundaries\.add\(trusted\)/, "owner-auth server boundary consumers must require the exact frozen in-process result");
+forbidMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /@cloudflare|@\/lib\/auth|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "owner-auth server boundary must stay disconnected from Better Auth adapters, runtime, files, databases, providers, network, and mutations");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-authenticated-owner-decision/, "the inert engine must not wire authenticated owner decisions to runtime");
 for (const [name, content] of [["owner lead list route", ownerLeadRoute], ["owner lead detail route", ownerLeadDetailRoute], ["owner lead detail page", ownerLeadDetailPage], ["owner lead detail component", ownerLeadDetail]]) {
   forbidMatch(name, content, /private-kw-authenticated-owner-decision/, "owner UI and API surfaces must not activate the decision contract in this checkpoint");
@@ -794,9 +807,24 @@ for (const [name, content] of [
     content.includes("private-kw-owner-auth-readiness")
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-readiness.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-readiness.test.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-server-boundary.test.ts"
     && name !== "scripts/check-safety-config.mjs"
   ) {
     failures.push(`${name}: owner-auth readiness must remain unreachable from every runtime, UI, route, and operator script`);
+  }
+}
+for (const [name, content] of [
+  ...await readCodeTree(new URL("../src/", import.meta.url), "src"),
+  ...await readCodeTree(new URL("./", import.meta.url), "scripts"),
+]) {
+  if (
+    content.includes("private-kw-owner-auth-server-boundary")
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-server-boundary.test.ts"
+    && name !== "scripts/check-safety-config.mjs"
+  ) {
+    failures.push(`${name}: owner-auth server boundary must remain unreachable from every runtime, UI, route, and operator script`);
   }
 }
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-owner-dossier-progress(?:-proof)?/, "the inert engine must not wire owner-dossier proof or phase-input derivation to runtime");
