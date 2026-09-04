@@ -104,7 +104,7 @@ canonical non-synced repository and its persisted status.
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `eaccef99ac184a1f50f8e01bbf845b7779c5acf8`
+  `257d1b245fc46c093ec08fb40ceb91f036e83ba3`
 - This milestone's verifying commit is the branch HEAD containing ADR 0052;
   exact local/remote SHA equality must be verified after the atomic push.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
@@ -2078,8 +2078,8 @@ Completed gates:
   no-upload Wrangler dry run. Wrangler retained only the documented generated
   duplicate-key warnings.
 - The final six-view desktop/mobile WCAG owner-browser gate passed with zero
-  external requests; the lead list was ready in 345 ms and the dossier in
-  905 ms. No application runtime, provider, Cloudflare resource, database,
+  external requests; the lead list was ready in 349 ms and the dossier in
+  859 ms. No application runtime, provider, Cloudflare resource, database,
   prospect, mailbox, deployment, migration, or production control changed.
   Spend impact is C$0 and every autonomous capability remains off.
 
