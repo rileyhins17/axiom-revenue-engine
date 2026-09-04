@@ -113,13 +113,22 @@ migration 0070 has not been applied to any persistent local, staging, or
 production resource, and no owner mutation, route,
 provider, deployment, outreach, send, or spend capability was added.
 
+The reservation-recovery review is now also complete as a disconnected
+contract. Any visible `RESERVED` row is blocked rather than reclaimed or
+deleted; only a `COMMITTED` row can replay. The operation-specific future DML
+must embed one exact parameterized owner/boundary/payload claim in the same D1
+batch, and the typed descriptor rejects multi-statements, DDL, interpolated
+identity values, and ledger/outbox targets. An additive abandonment/recovery
+record and affected-row-count proof are still required before any real adapter.
+
 ## Verified checkpoint
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `0071f46b4aa5224f467e948fb10e58b75045589d`
+  `fcc8e05726191fc67bcf200514849ef4cb875b6a`
 - This milestone's verifying commit is the exact branch HEAD containing ADR
-  0053 and migration 0070. Verify its immutable SHA with `git rev-parse HEAD`
+  0054, the recovery/claim contract, and migration 0070. Verify its immutable
+  SHA with `git rev-parse HEAD`
   after the atomic push; local, upstream, and remote equality remains a release
   check.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
@@ -2089,13 +2098,13 @@ Completed gates:
   mutation authority; ADR 0052 records the transaction/outbox work still
   required.
 - All eight project TOML files parse. The complete release gate passes
-  fail-closed safety, 552/552 tests, standalone typecheck, zero-warning lint,
+  fail-closed safety, 555/555 tests, standalone typecheck, zero-warning lint,
   the secret-sanitized Cloudflare build, and the explicit default-environment
   no-upload Wrangler dry run. Wrangler retained only the documented generated
   duplicate-key warnings.
 - The final six-view desktop/mobile WCAG owner-browser gate passed with zero
-  external requests; the lead list was ready in 795 ms and the dossier in
-  843 ms. No application runtime, provider, Cloudflare resource, database,
+  external requests; the lead list was ready in 372 ms and the dossier in
+  449 ms. No application runtime, provider, Cloudflare resource, database,
   prospect, mailbox, deployment, migration, or production control changed.
   Spend impact is C$0 and every autonomous capability remains off.
 
@@ -2275,11 +2284,11 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Review reservation recovery and operation-specific claim predicates for the
-   source-only D1 idempotency/outbox plan. Then prove them in disposable
-   SQLite/staging fixtures before any real migration or owner mutation is
-   considered; owner controls, rollback, security review, and release approval
-   remain required.
+3. Design the additive `ABANDONED`/recovery receipt and affected-row-count
+   proof for the source-only D1 idempotency/outbox plan. Prove both in
+   disposable SQLite/staging fixtures before any real migration or owner
+   mutation is considered; owner controls, rollback, security review, and
+   release approval remain required.
 
 ## Resume instructions
 

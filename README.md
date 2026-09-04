@@ -609,6 +609,15 @@ SQLite only; migration 0070 is not applied to any persistent local, staging,
 or production resource, and all authority remains zero. See
 [`docs/adr/0053-owner-auth-d1-transactional-outbox-shape.md`](docs/adr/0053-owner-auth-d1-transactional-outbox-shape.md).
 
+Reservation recovery is separately fail-closed. A visible `RESERVED` row is
+blocked whether it is young, stale, or outside the owner session; it cannot be
+finalized, deleted, or reused until a future additive recovery record is
+approved. Only `COMMITTED` can replay the exact stored result. Future owner
+mutations must embed one parameterized, content-addressed claim predicate for
+the exact owner, operation, boundary, and payload, in the same D1 batch as the
+mutation and outbox. This recovery and claim contract is still disconnected;
+see [`docs/adr/0054-owner-auth-reservation-recovery-and-claim-predicates.md`](docs/adr/0054-owner-auth-reservation-recovery-and-claim-predicates.md).
+
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

@@ -12,6 +12,10 @@ import {
   requireInProcessPrivateKwOwnerAuthServerBoundary,
   type PrivateKwOwnerAuthServerBoundary,
 } from "@/lib/revenue-engine/private-kw-owner-auth-server-boundary";
+import {
+  PRIVATE_KW_OWNER_AUTH_MUTATION_CLAIM_EXISTS_PREDICATE,
+  PRIVATE_KW_OWNER_AUTH_MUTATION_CLAIM_PREDICATE,
+} from "@/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery";
 
 export const PRIVATE_KW_OWNER_AUTH_IDEMPOTENCY_D1_PLAN_VERSION =
   "kw-owner-auth-idempotency-d1-plan-v1";
@@ -250,7 +254,7 @@ function buildStatements(
     record.operation,
     record.payloadDigest,
   ];
-  const guard = `"id" = ? AND "state" = 'RESERVED' AND "boundaryDigest" = ? AND "owner" = ? AND "operation" = ? AND "payloadDigest" = ?`;
+  const guard = PRIVATE_KW_OWNER_AUTH_MUTATION_CLAIM_PREDICATE;
   const guardBindings = digestBindings(record);
   return [
     statement(
@@ -371,9 +375,7 @@ export function buildPrivateKwOwnerAuthIdempotencyD1Plan(
     sessionExpiresAt: boundary.sessionExpiresAt,
     mutationGate: {
       statementId: "guard:owner_mutation_claim",
-      sqlPredicate: `EXISTS (SELECT 1 FROM "RevenuePrivateKwOwnerAuthIdempotency" WHERE ${
-        `"id" = ? AND "state" = 'RESERVED' AND "boundaryDigest" = ? AND "owner" = ? AND "operation" = ? AND "payloadDigest" = ?`
-      })`,
+      sqlPredicate: PRIVATE_KW_OWNER_AUTH_MUTATION_CLAIM_EXISTS_PREDICATE,
       bindings: [...digestBindings(record)],
       executableByThisPlan: false,
       mustBeEmbeddedInOperationStatement: true,

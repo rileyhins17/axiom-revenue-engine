@@ -124,6 +124,7 @@ const privateKwOwnerAuthReadiness = await readFile(new URL("../src/lib/revenue-e
 const privateKwOwnerAuthServerBoundary = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", import.meta.url), "utf8");
 const privateKwOwnerAuthIdempotency = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", import.meta.url), "utf8");
 const privateKwOwnerAuthIdempotencyD1Plan = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-idempotency-d1-plan.ts", import.meta.url), "utf8");
+const privateKwOwnerAuthIdempotencyRecovery = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
 const privateKwAuthenticatedOwnerDecisionMigration = await readFile(new URL("../migrations/0069_authenticated_owner_dossier_decisions.sql", import.meta.url), "utf8");
 const privateKwOwnerAuthIdempotencyOutboxMigration = await readFile(new URL("../migrations/0070_owner_auth_idempotency_outbox.sql", import.meta.url), "utf8");
@@ -792,6 +793,19 @@ for (const field of ["mutationAuthorized", "ownerDecisionPersistenceAuthorized",
 }
 requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-d1-plan.ts", privateKwOwnerAuthIdempotencyD1Plan, /providerOperationsAuthorized:\s*z\.literal\(0\)[\s\S]*?costAuthorizedUsd:\s*z\.literal\(0\)/, "the owner-auth D1 plan must authorize zero provider operations and cost");
 forbidMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-d1-plan.ts", privateKwOwnerAuthIdempotencyD1Plan, /@cloudflare|@\/lib\/auth|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "the owner-auth D1 plan must stay disconnected from auth adapters, runtime, files, live database methods, providers, and network");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", privateKwOwnerAuthIdempotencyRecovery, /PRIVATE_KW_OWNER_AUTH_IDEMPOTENCY_RECOVERY_VERSION\s*=\s*\n?\s*"kw-owner-auth-idempotency-recovery-v1"/, "owner-auth recovery must use the reviewed versioned contract");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", privateKwOwnerAuthIdempotencyRecovery, /PRIVATE_KW_OWNER_AUTH_RESERVATION_EXPECTED_MAX_AGE_MS\s*=\s*120_000/, "owner-auth recovery must use the bounded reservation age");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", privateKwOwnerAuthIdempotencyRecovery, /PRIVATE_KW_OWNER_AUTH_MUTATION_CLAIM_PREDICATE[\s\S]*?state[^\n]*RESERVED[\s\S]*?payloadDigest/, "owner-auth recovery must define the exact parameterized reservation claim");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", privateKwOwnerAuthIdempotencyRecovery, /visibleReservationAction:\s*z\.literal\("BLOCK_AND_ESCALATE"\)[\s\S]*?reservationMayBeFinalizedByRecovery:\s*z\.literal\(false\)/, "visible and stale reservations must fail closed without recovery mutation");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", privateKwOwnerAuthIdempotencyRecovery, /sameKeyRetryAfterReservation:\s*z\.literal\("FAIL_CLOSED_UNTIL_NEW_KEY"\)/, "a visible reservation must not be reused under the same key");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", privateKwOwnerAuthIdempotencyRecovery, /claimPredicate:\s*z\.literal\(PRIVATE_KW_OWNER_AUTH_MUTATION_CLAIM_EXISTS_PREDICATE\)[\s\S]*?executableByThisContract:\s*z\.literal\(false\)/, "operation claims must embed the exact non-executable reservation predicate");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", privateKwOwnerAuthIdempotencyRecovery, /operationMutationAllowed:\s*z\.literal\(false\)[\s\S]*?reservationRecoveryMutationAllowed:\s*z\.literal\(false\)/, "recovery decisions must authorize neither recovery nor operation mutation");
+for (const field of ["visibleReservationRecoveryAuthorized", "reservationReclaimAuthorized", "operationMutationAuthorized", "ownerDecisionPersistenceAuthorized", "phaseInputCreationAuthorized", "progressReceiptCreationAuthorized", "phaseAdvancementAuthorized", "databaseReadAuthorized", "databaseMutationAuthorized", "routeAuthorized", "uiMutationAuthorized", "outreachAuthorized", "sendAuthorized", "deploymentAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", privateKwOwnerAuthIdempotencyRecovery, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in owner-auth recovery`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", privateKwOwnerAuthIdempotencyRecovery, /providerOperationsAuthorized:\s*z\.literal\(0\)[\s\S]*?costAuthorizedUsd:\s*z\.literal\(0\)/, "owner-auth recovery must authorize zero provider operations and cost");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", privateKwOwnerAuthIdempotencyRecovery, /const trustedObservations = new WeakSet<object>\(\)[\s\S]*?trustedObservations\.has\(value\)[\s\S]*?trustedDecisions\.add\(decision\)/, "owner-auth recovery consumers must require exact in-process observation and decision values");
+forbidMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", privateKwOwnerAuthIdempotencyRecovery, /@cloudflare|@\/lib\/auth|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "owner-auth recovery must stay disconnected from auth adapters, runtime, files, live databases, providers, and network");
 requireMatch("migrations/0070_owner_auth_idempotency_outbox.sql", privateKwOwnerAuthIdempotencyOutboxMigration, /CREATE TABLE "RevenuePrivateKwOwnerAuthIdempotency"[\s\S]*?CREATE TABLE "RevenuePrivateKwOwnerAuthMutationOutbox"/, "migration 0070 must define both the idempotency ledger and transactional outbox");
 requireMatch("migrations/0070_owner_auth_idempotency_outbox.sql", privateKwOwnerAuthIdempotencyOutboxMigration, /CHECK \("state" IN \('RESERVED', 'COMMITTED'\)\)/, "migration 0070 must constrain reservation and commit states");
 requireMatch("migrations/0070_owner_auth_idempotency_outbox.sql", privateKwOwnerAuthIdempotencyOutboxMigration, /CHECK \("outboxRequired" = 1\)[\s\S]*?CHECK \("mutationAuthorized" = 0\)[\s\S]*?CHECK \("databaseMutationAuthorized" = 0\)/, "migration 0070 must keep idempotency authority disabled");
@@ -860,6 +874,8 @@ for (const [name, content] of [
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency.test.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-d1-plan.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.test.ts"
     && name !== "scripts/check-safety-config.mjs"
   ) {
     failures.push(`${name}: owner-auth readiness must remain unreachable from every runtime, UI, route, and operator script`);
@@ -876,6 +892,8 @@ for (const [name, content] of [
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency.test.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-d1-plan.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.test.ts"
     && name !== "scripts/check-safety-config.mjs"
   ) {
     failures.push(`${name}: owner-auth server boundary must remain unreachable from every runtime, UI, route, and operator script`);
