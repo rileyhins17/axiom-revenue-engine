@@ -104,7 +104,7 @@ canonical non-synced repository and its persisted status.
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `9f4ffa2cba8fcf34f95eb5da3aded0f4f73024e0`
+  `eaccef99ac184a1f50f8e01bbf845b7779c5acf8`
 - This milestone's verifying commit is the branch HEAD containing ADR 0052;
   exact local/remote SHA equality must be verified after the atomic push.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
@@ -2067,12 +2067,13 @@ Completed gates:
   seam. It records one bounded secret-free result for each owner/operation/
   payload key, returns `FRESH_COMMIT` once and `EXACT_REPLAY` thereafter, and
   rejects conflicting payloads, results, forged rows, stale sessions, cycles,
-  and copied envelopes. Its three focused tests and static checks keep the
+  and copied envelopes. Its four focused tests include concurrent-attempt
+  convergence, and static checks keep the
   boundary disconnected from D1, Better Auth, routes, providers, and all live
   mutation authority; ADR 0052 records the transaction/outbox work still
   required.
 - All eight project TOML files parse. The complete release gate passes
-  fail-closed safety, 549/549 tests, standalone typecheck, zero-warning lint,
+  fail-closed safety, 550/550 tests, standalone typecheck, zero-warning lint,
   the secret-sanitized Cloudflare build, and the explicit default-environment
   no-upload Wrangler dry run. Wrangler retained only the documented generated
   duplicate-key warnings.

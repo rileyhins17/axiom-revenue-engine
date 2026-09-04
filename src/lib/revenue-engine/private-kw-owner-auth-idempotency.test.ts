@@ -142,6 +142,35 @@ test("commits once and returns the exact same safe result on replay", async () =
   assert.equal(requireInProcessPrivateKwOwnerAuthIdempotencyCommitResult(replay), replay);
 });
 
+test("two concurrent attempts converge on one fresh commit and one replay", async () => {
+  let existing: PrivateKwOwnerAuthIdempotencyRecord | null = null;
+  const atomicStore: PrivateKwOwnerAuthIdempotencyStore = {
+    async insertIfAbsent(candidate) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (existing) return { inserted: false, existing };
+      existing = structuredClone(candidate);
+      return { inserted: true, existing: null };
+    },
+  };
+  const [left, right] = await Promise.all([
+    commitPrivateKwOwnerAuthIdempotency({
+      boundaryValue: boundary(),
+      resultValue: { outcome: "ACCEPTED", receiptId: "receipt-race" },
+    }, atomicStore, { now: () => new Date("2026-09-03T12:31:00.000Z") }),
+    commitPrivateKwOwnerAuthIdempotency({
+      boundaryValue: boundary(),
+      resultValue: { outcome: "ACCEPTED", receiptId: "receipt-race" },
+    }, atomicStore, { now: () => new Date("2026-09-03T12:31:00.000Z") }),
+  ]);
+
+  assert.deepEqual(
+    [left.executionPath, right.executionPath].sort(),
+    ["EXACT_REPLAY", "FRESH_COMMIT"],
+  );
+  assert.equal(left.record.recordId, right.record.recordId);
+  assert.deepEqual(left.result, right.result);
+});
+
 test("rejects a conflicting replay result and a forged store record", async () => {
   const first = await commitPrivateKwOwnerAuthIdempotency({
     boundaryValue: boundary(),

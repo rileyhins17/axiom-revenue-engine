@@ -292,7 +292,9 @@ function trustedCommitResult(
   const trusted = deepFreeze(PrivateKwOwnerAuthIdempotencyCommitResultSchema.parse({
     executionPath,
     record,
-    result: record.result,
+    // Normalize replayed store objects to the same null-prototype JSON shape
+    // as a fresh candidate, so exact replay is representation-stable too.
+    result: safeJsonValue(record.result),
     resultDigest: record.resultDigest,
   }));
   trustedIdempotencyResults.add(trusted);
