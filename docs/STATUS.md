@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-09-03 (America/Toronto)
+Last updated: 2026-09-04 (America/Toronto)
 
 ## Plain-English status
 
@@ -100,13 +100,28 @@ Google Drive is disabled for this project on Riley's machine, the stale trusted
 OneDrive checkout is removed, and the active heartbeat now resumes only from the
 canonical non-synced repository and its persisted status.
 
+The next durable-storage milestone is now designed but still disconnected. A
+source-only migration 0070 defines a `RESERVED` → `COMMITTED` owner-auth
+idempotency ledger and a one-event-per-record transactional outbox. The typed
+D1 plan requires the current owner-session window to be checked by the database
+clock, the future operation-specific mutation to embed an exact reservation
+claim, the result finalization and outbox insertion to share one D1 batch, and a
+retry to skip mutation when the row is already committed. Contract triggers
+reject identity drift, invalid transitions, duplicate events, and non-zero
+authority. The plan compiles and runs only against disposable SQLite in tests;
+migration 0070 has not been applied to any persistent local, staging, or
+production resource, and no owner mutation, route,
+provider, deployment, outreach, send, or spend capability was added.
+
 ## Verified checkpoint
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `257d1b245fc46c093ec08fb40ceb91f036e83ba3`
-- This milestone's verifying commit is the branch HEAD containing ADR 0052;
-  exact local/remote SHA equality must be verified after the atomic push.
+  `0071f46b4aa5224f467e948fb10e58b75045589d`
+- This milestone's verifying commit is the exact branch HEAD containing ADR
+  0053 and migration 0070. Verify its immutable SHA with `git rev-parse HEAD`
+  after the atomic push; local, upstream, and remote equality remains a release
+  check.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
 - Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
 - CI hardening commits: `14d85a0468bef56e2bf7a97f7e53ed521955f1da`
@@ -298,13 +313,14 @@ canonical non-synced repository and its persisted status.
   `C:\Users\riley\Documents\ChatGPT\APE`; OneDrive and Google Drive are not
   working-repository locations.
 - Local OpenAI key: stored in ignored `.env.local`; value never printed
-- Source migrations: all 69 replay from zero, including the fail-closed
+- Source migrations: all 70 replay from zero, including the fail-closed
   lockdown, shadow
   Revenue Engine records, content-bound outreach approval, and durable evidence
   plus fenced resume, current-reference history, atomic snapshot receipts, the
   append-only eligibility receipt, and the inactive authenticated owner-decision
-  ledger. Canonical ignored-local schema is now 0054–0069; migrations 0068 and
-  0069 have not been applied to an existing real-business, staging, or
+  ledger and the source-only owner-auth idempotency/outbox shape. Canonical
+  ignored-local schema remains 0054–0069; migrations 0068, 0069, and 0070 have
+  not been applied to an existing persistent local, real-business, staging, or
   production database
 - Current checkpoint verification rerun 2026-08-21: 160/160 tests, typecheck,
   zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
@@ -2073,13 +2089,13 @@ Completed gates:
   mutation authority; ADR 0052 records the transaction/outbox work still
   required.
 - All eight project TOML files parse. The complete release gate passes
-  fail-closed safety, 550/550 tests, standalone typecheck, zero-warning lint,
+  fail-closed safety, 552/552 tests, standalone typecheck, zero-warning lint,
   the secret-sanitized Cloudflare build, and the explicit default-environment
   no-upload Wrangler dry run. Wrangler retained only the documented generated
   duplicate-key warnings.
 - The final six-view desktop/mobile WCAG owner-browser gate passed with zero
-  external requests; the lead list was ready in 349 ms and the dossier in
-  859 ms. No application runtime, provider, Cloudflare resource, database,
+  external requests; the lead list was ready in 795 ms and the dossier in
+  843 ms. No application runtime, provider, Cloudflare resource, database,
   prospect, mailbox, deployment, migration, or production control changed.
   Spend impact is C$0 and every autonomous capability remains off.
 
@@ -2239,6 +2255,11 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
 - No new owner decision is required for the disconnected exact D1
   writer/reloader. It has no configured key, Cloudflare adapter, route, UI,
   operator command, progress bridge, or real-data path and incurred C$0.
+- No new owner decision is required for the source-only D1 idempotency/outbox
+  schema and plan. Migration 0070 has not been applied, the operation-specific
+  mutation slot is deliberately non-executable, and the plan adds no live
+  database, route, provider, deployment, outreach, send, or spend authority.
+  Reservation recovery and claim predicates remain a later security review.
 - Riley directed that this rebuild branch should eventually become `main`. That
   is recorded as the intended final cutover, not approval to merge now. The merge
   remains gated by the completed rebuild, full safety/review/rollback evidence,
@@ -2254,12 +2275,11 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Choose and review the production D1 idempotency schema and transaction/outbox
-   shape behind the validated owner-auth replay contract. It must atomically
-   record the owner/operation/payload key and exact result, replay it without a
-   second mutation, reject conflicts, and remain disconnected until the real
-   owner controls, staging, rollback, security review, and release approval
-   pass.
+3. Review reservation recovery and operation-specific claim predicates for the
+   source-only D1 idempotency/outbox plan. Then prove them in disposable
+   SQLite/staging fixtures before any real migration or owner mutation is
+   considered; owner controls, rollback, security review, and release approval
+   remain required.
 
 ## Resume instructions
 

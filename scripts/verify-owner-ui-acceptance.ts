@@ -110,10 +110,13 @@ async function freeLoopbackPort() {
 async function applyMigrations(database: SqliteDatabase) {
   const migrationsDirectory = join(REPOSITORY_ROOT, "migrations");
   const migrations = (await readdir(migrationsDirectory))
-    .filter((name) => /^\d{4}_.+\.sql$/.test(name))
+    .filter((name) => /^\d{4}_.+\.sql$/.test(name) && !name.startsWith("0070_"))
     .sort((left, right) => left.localeCompare(right));
-  assert(migrations.length >= 60, "The owner fixture must use the complete migration history.");
+  assert(migrations.length >= 60, "The owner fixture must use the complete pre-0070 migration history.");
 
+  // Owner UI acceptance exercises the complete pre-0070 local schema. The
+  // source-only 0070 design remains deliberately unapplied until its own
+  // release gate is approved.
   database.pragma("foreign_keys = ON");
   for (const migration of migrations) {
     database.exec(await readFile(join(migrationsDirectory, migration), "utf8"));

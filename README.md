@@ -598,6 +598,17 @@ on retry, and reject a conflicting retry. It currently uses only an injected
 store seam for tests; there is no D1 writer, mutation callback, route, or live
 authority.
 
+The production storage shape is now documented without being activated. A
+source-only migration 0070 defines a two-state idempotency ledger (`RESERVED`
+then `COMMITTED`) and a one-event-per-record transactional outbox. The typed
+D1 plan requires database-clock session checks, an operation-specific mutation
+that is claim-gated by the exact reserved key, finalization of the exact result,
+and outbox insertion in one batch. A retry that sees `COMMITTED` skips the
+mutation and replays the stored result. The plan is tested against disposable
+SQLite only; migration 0070 is not applied to any persistent local, staging,
+or production resource, and all authority remains zero. See
+[`docs/adr/0053-owner-auth-d1-transactional-outbox-shape.md`](docs/adr/0053-owner-auth-d1-transactional-outbox-shape.md).
+
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

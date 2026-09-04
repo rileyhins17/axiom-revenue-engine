@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
+
+import Database from "better-sqlite3";
 
 import {
   artifactReferenceDigest,
@@ -16,6 +19,10 @@ import {
   type PrivateKwOwnerAuthIdempotencyRecord,
   type PrivateKwOwnerAuthIdempotencyStore,
 } from "@/lib/revenue-engine/private-kw-owner-auth-idempotency";
+import {
+  buildPrivateKwOwnerAuthIdempotencyD1Plan,
+  requireInProcessPrivateKwOwnerAuthIdempotencyD1Plan,
+} from "@/lib/revenue-engine/private-kw-owner-auth-idempotency-d1-plan";
 
 function readiness() {
   return buildPrivateKwOwnerAuthReadiness({
@@ -67,7 +74,7 @@ function readiness() {
   });
 }
 
-function serverSession() {
+function serverSession(overrides: Record<string, unknown> = {}) {
   return {
     sessionContractVersion: "better-auth-owner-session-v1",
     authenticationProvider: "BETTER_AUTH",
@@ -77,10 +84,14 @@ function serverSession() {
     authenticatedEmailVerified: true,
     sessionCreatedAt: "2026-09-03T11:00:00.000Z",
     sessionExpiresAt: "2026-09-03T19:00:00.000Z",
+    ...overrides,
   };
 }
 
-function boundary() {
+function boundary(options: {
+  session?: Record<string, unknown>;
+  now?: Date;
+} = {}) {
   const payload = { dossierDigest: "d".repeat(64), decision: "ACCEPTED" };
   const payloadDigest = artifactReferenceDigest(payload);
   const idempotencyKey = `kw-owner-mutation-idempotency:${artifactReferenceDigest({
@@ -91,7 +102,7 @@ function boundary() {
   })}`;
   return buildPrivateKwOwnerAuthServerBoundary({
     readinessValue: readiness(),
-    serverSessionValue: serverSession(),
+    serverSessionValue: serverSession(options.session),
     request: {
       method: "POST",
       origin: "https://revenue.getaxiom.ca",
@@ -106,7 +117,7 @@ function boundary() {
     operation: "owner.dossier.accept",
     payload,
     idempotencyKey,
-  }, { now: () => new Date("2026-09-03T12:30:00.000Z") });
+  }, { now: () => options.now ?? new Date("2026-09-03T12:30:00.000Z") });
 }
 
 function store(initial?: PrivateKwOwnerAuthIdempotencyRecord): PrivateKwOwnerAuthIdempotencyStore {
@@ -240,4 +251,103 @@ test("rejects secret-like, oversized, non-JSON, stale-session, and copied result
     () => requireInProcessPrivateKwOwnerAuthIdempotencyCommitResult(structuredClone(first)),
     /exact in-process owner-auth idempotency result/i,
   );
+});
+
+test("builds a source-only D1 transaction shape with a claim-gated mutation and one outbox event", async () => {
+  const commit = await commitPrivateKwOwnerAuthIdempotency({
+    boundaryValue: boundary(),
+    resultValue: { outcome: "ACCEPTED", receiptId: "receipt-plan" },
+  }, store(), { now: () => new Date("2026-09-03T12:31:00.000Z") });
+  const plan = buildPrivateKwOwnerAuthIdempotencyD1Plan({
+    boundaryValue: boundary(),
+    commitResultValue: commit,
+    plannedAt: "2026-09-03T12:32:00.000Z",
+  });
+
+  assert.equal(plan.targetSchemaVersion, "0070_owner_auth_idempotency_outbox");
+  assert.equal(plan.statements.length, 5);
+  assert.deepEqual(plan.statementOrder, [
+    "reserve",
+    "reload-reservation",
+    "finalize",
+    "outbox",
+    "reload-committed",
+  ]);
+  assert.equal(plan.requiresOneD1Batch, true);
+  assert.equal(plan.requiresAtomicMutationAndOutbox, true);
+  assert.equal(plan.mutationGate.executableByThisPlan, false);
+  assert.match(plan.mutationGate.sqlPredicate, /state.*RESERVED/);
+  assert.match(plan.statements[0]?.sql ?? "", /INSERT OR IGNORE INTO "RevenuePrivateKwOwnerAuthIdempotency"/);
+  assert.match(plan.statements[0]?.sql ?? "", /strftime\('%Y-%m-%dT%H:%M:%fZ', 'now'\)/);
+  assert.match(plan.statements[2]?.sql ?? "", /UPDATE "RevenuePrivateKwOwnerAuthIdempotency"/);
+  assert.match(plan.statements[2]?.sql ?? "", /state.*COMMITTED/);
+  assert.match(plan.statements[3]?.sql ?? "", /INSERT OR IGNORE INTO "RevenuePrivateKwOwnerAuthMutationOutbox"/);
+  assert.match(plan.statements[3]?.sql ?? "", /state.*COMMITTED/);
+  assert.equal(plan.runtimeConnected, false);
+  assert.equal(plan.migrationApplied, false);
+  assert.equal(plan.authority.mutationAuthorized, false);
+  assert.equal(plan.authority.databaseMutationAuthorized, false);
+  assert.equal(plan.authority.providerOperationsAuthorized, 0);
+  assert.equal(plan.authority.costAuthorizedUsd, 0);
+  assert.equal(requireInProcessPrivateKwOwnerAuthIdempotencyD1Plan(plan), plan);
+  assert.throws(
+    () => requireInProcessPrivateKwOwnerAuthIdempotencyD1Plan(structuredClone(plan)),
+    /exact in-process owner-auth D1 plan/i,
+  );
+});
+
+test("the planned statements compile against the source-only 0070 schema without applying it anywhere", async () => {
+  const planNow = new Date();
+  const liveBoundary = boundary({
+    now: planNow,
+    session: {
+      sessionCreatedAt: new Date(planNow.getTime() - 60 * 60_000).toISOString(),
+      sessionExpiresAt: new Date(planNow.getTime() + 60 * 60_000).toISOString(),
+    },
+  });
+  const commit = await commitPrivateKwOwnerAuthIdempotency({
+    boundaryValue: liveBoundary,
+    resultValue: { outcome: "ACCEPTED", receiptId: "receipt-sql" },
+  }, store(), { now: () => planNow });
+  const plan = buildPrivateKwOwnerAuthIdempotencyD1Plan({
+    boundaryValue: liveBoundary,
+    commitResultValue: commit,
+    plannedAt: new Date(planNow.getTime() + 60_000).toISOString(),
+  });
+  const database = new Database(":memory:");
+  database.pragma("foreign_keys = ON");
+  const migrationRoot = new URL("../../../migrations/", import.meta.url);
+  for (const migration of readdirSync(migrationRoot)
+    .filter((name) => /^(005[4-9]|006[0-9]|0070)_.*\.sql$/.test(name))
+    .sort()) {
+    database.exec(readFileSync(new URL(migration, migrationRoot), "utf8"));
+  }
+  for (const planned of plan.statements) {
+    // The source-only plan is allowed to be compiled and inspected in a fake
+    // database. It is never connected to a runtime binding or a real resource.
+    try {
+      database.prepare(planned.sql).run(...planned.bindings);
+    } catch (error) {
+      throw new Error(`${planned.statementId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  assert.equal((database.prepare('SELECT COUNT(*) AS "count" FROM "RevenuePrivateKwOwnerAuthIdempotency"').get() as { count: number }).count, 1);
+  assert.equal((database.prepare('SELECT COUNT(*) AS "count" FROM "RevenuePrivateKwOwnerAuthMutationOutbox"').get() as { count: number }).count, 1);
+  const committed = database.prepare('SELECT "state", "recordId", "recordDigest", "resultJson" FROM "RevenuePrivateKwOwnerAuthIdempotency" WHERE "id" = ?').get(plan.idempotencyKey) as { state: string; recordId: string; recordDigest: string; resultJson: string };
+  assert.equal(committed.state, "COMMITTED");
+  assert.equal(committed.recordId, plan.recordId);
+  assert.equal(committed.recordDigest, plan.recordDigest);
+  assert.equal(JSON.parse(committed.resultJson).recordId, plan.recordId);
+  assert.throws(
+    () => database.prepare('UPDATE "RevenuePrivateKwOwnerAuthIdempotency" SET "operation" = ? WHERE "id" = ?').run("owner.dossier.other", plan.idempotencyKey),
+    /INVALID_TRANSITION/i,
+  );
+  assert.throws(
+    () => database.prepare('DELETE FROM "RevenuePrivateKwOwnerAuthMutationOutbox" WHERE "idempotencyKey" = ?').run(plan.idempotencyKey),
+    /APPEND_ONLY/i,
+  );
+  for (const planned of plan.statements) database.prepare(planned.sql).run(...planned.bindings);
+  assert.equal((database.prepare('SELECT COUNT(*) AS "count" FROM "RevenuePrivateKwOwnerAuthIdempotency"').get() as { count: number }).count, 1);
+  assert.equal((database.prepare('SELECT COUNT(*) AS "count" FROM "RevenuePrivateKwOwnerAuthMutationOutbox"').get() as { count: number }).count, 1);
+  database.close();
 });
