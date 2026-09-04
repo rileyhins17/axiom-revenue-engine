@@ -119,6 +119,7 @@ const privateKwOwnerDossierProgress = await readFile(new URL("../src/lib/revenue
 const privateKwOwnerDossierProgressAppend = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-dossier-progress-append.ts", import.meta.url), "utf8");
 const privateKwAuthenticatedOwnerDecision = await readFile(new URL("../src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", import.meta.url), "utf8");
 const privateKwAuthenticatedOwnerDecisionD1 = await readFile(new URL("../src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", import.meta.url), "utf8");
+const privateKwOwnerDossierProgressAuthorization = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
 const privateKwAuthenticatedOwnerDecisionMigration = await readFile(new URL("../migrations/0069_authenticated_owner_dossier_decisions.sql", import.meta.url), "utf8");
 const ownerLabelingWorkspace = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-workspace.ts", import.meta.url), "utf8");
@@ -697,6 +698,7 @@ requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts"
 requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", privateKwAuthenticatedOwnerDecision, /authenticatedEmail:\s*z\.string\(\)\.trim\(\)\.toLowerCase\(\)/, "authenticated owner decisions must normalize the session email before the fixed owner allowlist");
 requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", privateKwAuthenticatedOwnerDecision, /acceptedBy:\s*owner[\s\S]*?acceptedAt:\s*decidedAt/, "reviewer identity and decision time must be derived from current server-side session context");
 requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", privateKwAuthenticatedOwnerDecision, /createHmac\("sha256", key\)[\s\S]*?authenticatedUserId[\s\S]*?authenticatedSessionId[\s\S]*?acceptanceProofId/, "authenticated owner decisions must HMAC-bind subject, session, and exact acceptance proof");
+requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", privateKwAuthenticatedOwnerDecision, /export function recheckPrivateKwAuthenticatedOwnerDecisionStoredSessionBinding\([\s\S]*?verifyPrivateKwAuthenticatedOwnerDecisionStoredBinding\([\s\S]*?recheckAuthenticatedOwnerDecisionSessionBindingForRecord\(/, "validation-only progress authorization must reuse stored HMAC verification and the canonical session-binding derivation");
 requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", privateKwAuthenticatedOwnerDecision, /const trustedAuthenticatedOwnerDecisionRecords = new WeakSet<object>\(\)[\s\S]*?trustedAuthenticatedOwnerDecisionRecords\.has\(value\)[\s\S]*?trustedAuthenticatedOwnerDecisionRecords\.add\(record\)/, "future persistence must reject copied authenticated decision JSON");
 for (const field of ["ownerDecisionPersistenceAuthorized", "phaseInputCreationAuthorized", "progressReceiptCreationAuthorized", "phaseAdvancementAuthorized", "databaseReadAuthorized", "databaseMutationAuthorized", "outreachAuthorized", "sendAuthorized", "deploymentAuthorized"]) {
   requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", privateKwAuthenticatedOwnerDecision, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in the authenticated decision candidate`);
@@ -724,6 +726,17 @@ requireMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.
 forbidMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /@cloudflare|@\/lib\/(?:auth|session)|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "the durable owner-decision boundary must stay disconnected from auth adapters, files, Cloudflare bindings, providers, network, and direct database methods");
 forbidMatch("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", privateKwAuthenticatedOwnerDecisionD1, /\b(?:UPDATE\s+"|DELETE\s+FROM|REPLACE\s+(?:OR\s+\w+\s+)?INTO|DROP\s+(?:TABLE|TRIGGER)|ALTER\s+TABLE|CREATE\s+(?:TABLE|TRIGGER))/i, "the durable owner-decision boundary may never emit another mutation class");
 if ((privateKwAuthenticatedOwnerDecisionD1.match(/\bINSERT\s+(?:OR\s+IGNORE\s+)?INTO\b/gi) || []).length !== 1) failures.push("src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts: exactly one owner-decision INSERT statement is allowed");
+requireMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, /requireTrustedPrivateKwAuthenticatedOwnerDecisionD1Result\([\s\S]*?executionPath !== "DURABLE_RELOAD"/, "owner-dossier authorization must require the exact trusted process-loss durable decision reload");
+requireMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, /recheckPrivateKwAuthenticatedOwnerDecisionStoredSessionBinding\([\s\S]*?currentServerSessionValue/, "owner-dossier authorization must recheck a newly obtained verified server session against stored bindings");
+requireMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, /authorizationNow\([\s\S]*?cannot predate the durable reload[\s\S]*?fresh durable reload is required/, "owner-dossier authorization must use a fresh server timestamp after the durable reload");
+requireMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, /const trustedOwnerDossierProgressAuthorizations = new WeakSet<object>\(\)[\s\S]*?trustedOwnerDossierProgressAuthorizations\.has\(value\)[\s\S]*?trustedOwnerDossierProgressAuthorizations\.add\(trusted\)/, "owner-dossier authorization consumers must require the exact frozen in-process result");
+requireMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, /const authorizationContexts = new WeakMap<object,[\s\S]*?authorizationContexts\.set\(trusted,[\s\S]*?durableDecision:/, "owner-dossier authorization must retain the exact durable decision identity for future consumers");
+for (const field of ["ownerDecisionPersistenceAuthorized", "phaseInputCreationAuthorized", "progressReceiptCreationAuthorized", "phaseAdvancementAuthorized", "databaseReadAuthorized", "databaseMutationAuthorized", "outreachAuthorized", "sendAuthorized", "deploymentAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in owner-dossier authorization`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "owner-dossier authorization must authorize zero provider operations");
+requireMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, /costAuthorizedUsd:\s*z\.literal\(0\)/, "owner-dossier authorization must keep provider cost authority at zero");
+forbidMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, /@cloudflare|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(|private-kw-owner-dossier-progress(?:-proof|-append)?/, "owner-dossier authorization must stay disconnected from auth adapters, runtime, files, databases, providers, network, phase inputs, and appends");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-authenticated-owner-decision/, "the inert engine must not wire authenticated owner decisions to runtime");
 for (const [name, content] of [["owner lead list route", ownerLeadRoute], ["owner lead detail route", ownerLeadDetailRoute], ["owner lead detail page", ownerLeadDetailPage], ["owner lead detail component", ownerLeadDetail]]) {
   forbidMatch(name, content, /private-kw-authenticated-owner-decision/, "owner UI and API surfaces must not activate the decision contract in this checkpoint");
@@ -738,9 +751,25 @@ for (const [name, content] of [
     content.includes("private-kw-authenticated-owner-decision-d1")
     && name !== "src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts"
     && name !== "src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.test.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.test.ts"
+    && name !== "src/lib/revenue-engine/test-support/private-kw-owner-dossier-progress-authorization-fixture.ts"
     && name !== "scripts/check-safety-config.mjs"
   ) {
     failures.push(`${name}: durable owner-decision persistence must remain unreachable from every runtime, UI, route, and operator script`);
+  }
+}
+for (const [name, content] of [
+  ...await readCodeTree(new URL("../src/", import.meta.url), "src"),
+  ...await readCodeTree(new URL("./", import.meta.url), "scripts"),
+]) {
+  if (
+    content.includes("private-kw-owner-dossier-progress-authorization")
+    && name !== "src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.test.ts"
+    && name !== "scripts/check-safety-config.mjs"
+  ) {
+    failures.push(`${name}: owner-dossier authorization must remain unreachable from every runtime, UI, route, and operator script`);
   }
 }
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-owner-dossier-progress(?:-proof)?/, "the inert engine must not wire owner-dossier proof or phase-input derivation to runtime");

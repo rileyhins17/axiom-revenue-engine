@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-09-02 (America/Toronto)
+Last updated: 2026-09-03 (America/Toronto)
 
 ## Plain-English status
 
@@ -104,8 +104,8 @@ canonical non-synced repository and its persisted status.
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `9ae3623b95ce803c584fd3e339a70e21fbfd9dd0`
-- This milestone's verifying commit is the branch HEAD containing ADR 0048;
+  `59c854504b297edf2ec3757acac32794239f2aa2`
+- This milestone's verifying commit is the branch HEAD containing ADR 0049;
   exact local/remote SHA equality must be verified after the atomic push.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
 - Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
@@ -2033,14 +2033,26 @@ Completed gates:
   evidence, and any unreviewed role-instruction edit. Sol is also required to
   avoid dispatch overrides and compare a writer's starting commit and allowlist
   with the final changed-file set before accepting it.
+- The validation-only owner-dossier progress authorization boundary now accepts
+  only the exact process-loss durable owner-decision reload plus a newly
+  obtained, verified owner-session context. It reuses canonical HMAC/session
+  binding checks, requires authorization at or after the reload clock and within
+  one minute, and emits a frozen content-addressed token with exact dossier,
+  manifest, source, parent, and acceptance lineage. It creates no phase input,
+  receipt, checkpoint, database operation, route, UI action, provider call,
+  outreach, send, deployment, or spend; all such authority remains false.
+- Four focused authorization tests cover the positive contract, copied and
+  non-reload provenance, session/key failures, chronology/freshness, zero
+  database calls, and absence of raw auth identifiers. ADR 0049 records the
+  threat model and the remaining server-only Better Auth activation boundary.
 - All eight project TOML files parse. The complete release gate passes
-  fail-closed safety, 534/534 tests, standalone typecheck, zero-warning lint,
+  fail-closed safety, 538/538 tests, standalone typecheck, zero-warning lint,
   the secret-sanitized Cloudflare build, and the explicit default-environment
   no-upload Wrangler dry run. Wrangler retained only the documented generated
   duplicate-key warnings.
 - The final six-view desktop/mobile WCAG owner-browser gate passed with zero
-  external requests; the lead list was ready in 1,257 ms and the dossier in
-  857 ms. No application runtime, provider, Cloudflare resource, database,
+  external requests; the lead list was ready in 361 ms and the dossier in
+  480 ms. No application runtime, provider, Cloudflare resource, database,
   prospect, mailbox, deployment, migration, or production control changed.
   Spend impact is C$0 and every autonomous capability remains off.
 
@@ -2215,12 +2227,10 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Design and test a separate validation-only owner-dossier progress
-   authorization adapter. It may accept only the exact trusted durable decision
-   result plus a newly obtained, server-only current verified owner session; it
-   must create no receipt/checkpoint and keep UI/operator/runtime wiring absent.
-   Activation remains blocked until owner email verification, MFA/recovery,
-   CSRF/idempotency, staging, rollback, and release approval pass.
+3. Harden owner authentication with verified email, MFA, and recovery, then design
+   the server-only Better Auth session adapter and its CSRF/idempotency boundary.
+   The new validation-only authorization token must remain disconnected until
+   those controls, staging, rollback, security review, and release approval pass.
 
 ## Resume instructions
 

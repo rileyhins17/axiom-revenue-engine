@@ -562,6 +562,16 @@ A durable reload proves historical integrity—not a current login or progress
 authority. Current owner authentication must gain verified email and MFA/recovery
 controls before activation can be reviewed.
 
+The next safety boundary is now explicit as well: a validation-only
+`OWNER_DOSSIER_PROGRESS_AUTHORIZATION` accepts only that exact process-loss
+durable reload plus a newly obtained, verified owner-session context. It
+rechecks the HMAC-bound session, requires authorization within one minute of the
+reload, returns a frozen content-addressed token, and keeps phase-input,
+checkpoint, database, provider, outreach, send, and cost authority false. It has
+no Better Auth adapter, route, UI, operator command, or live resource wiring;
+the token is a design/test contract until email verification, MFA, recovery,
+CSRF/idempotency, staging, rollback, and release approval are complete.
+
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

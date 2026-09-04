@@ -554,6 +554,18 @@ export function recheckPrivateKwAuthenticatedOwnerDecisionSessionBinding(
   const record = requireInProcessPrivateKwAuthenticatedOwnerDecisionRecord(
     recordValue,
   );
+  return recheckAuthenticatedOwnerDecisionSessionBindingForRecord(
+    record,
+    sessionValue,
+    dependencies,
+  );
+}
+
+function recheckAuthenticatedOwnerDecisionSessionBindingForRecord(
+  record: PrivateKwAuthenticatedOwnerDecisionRecord,
+  sessionValue: unknown,
+  dependencies: { bindingKey: Uint8Array; bindingKeyVersion: string },
+): PrivateKwAuthenticatedOwnerSessionBindingRecheck {
   const session = PrivateKwAuthenticatedOwnerSessionSchema.parse(sessionValue);
   const key = bindingKey(dependencies.bindingKey);
   const keyVersion = BindingKeyVersionSchema.parse(dependencies.bindingKeyVersion);
@@ -607,6 +619,28 @@ export function recheckPrivateKwAuthenticatedOwnerDecisionSessionBinding(
     providerOperationsAuthorized: 0,
     costAuthorizedUsd: 0,
   }));
+}
+
+/**
+ * Rechecks a stored decision's opaque session bindings against a newly obtained
+ * verified owner session. The caller must first establish durable provenance;
+ * this function returns only a zero-authority validation result and grants no
+ * in-process trust to the stored decision.
+ */
+export function recheckPrivateKwAuthenticatedOwnerDecisionStoredSessionBinding(
+  recordValue: unknown,
+  sessionValue: unknown,
+  dependencies: { bindingKey: Uint8Array; bindingKeyVersion: string },
+): PrivateKwAuthenticatedOwnerSessionBindingRecheck {
+  const record = verifyPrivateKwAuthenticatedOwnerDecisionStoredBinding(
+    recordValue,
+    dependencies,
+  );
+  return recheckAuthenticatedOwnerDecisionSessionBindingForRecord(
+    record,
+    sessionValue,
+    dependencies,
+  );
 }
 
 /**
