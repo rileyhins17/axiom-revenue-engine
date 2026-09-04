@@ -104,8 +104,8 @@ canonical non-synced repository and its persisted status.
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `59c854504b297edf2ec3757acac32794239f2aa2`
-- This milestone's verifying commit is the branch HEAD containing ADR 0049;
+  `15c326fc84e71e8074a057050356512413a66b69`
+- This milestone's verifying commit is the branch HEAD containing ADR 0050;
   exact local/remote SHA equality must be verified after the atomic push.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
 - Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
@@ -2045,8 +2045,16 @@ Completed gates:
   non-reload provenance, session/key failures, chronology/freshness, zero
   database calls, and absence of raw auth identifiers. ADR 0049 records the
   threat model and the remaining server-only Better Auth activation boundary.
+- Owner-authentication readiness is now an executable disconnected policy. It
+  requires exactly Riley and Aidan, verified-email delivery before sessions,
+  TOTP enrollment, encrypted single-use recovery codes, lockout, server-only
+  sessions, exact production origins, Fetch Metadata/origin checks, and atomic
+  idempotency. Its result is frozen and `VALIDATED_NOT_ACTIVATED` with every
+  route, UI, database, provider, progress, outreach, send, deployment, and cost
+  authority false; the four focused tests reject weak defaults, unsafe origins,
+  duplicate owners, body-controlled sessions, and copied trust.
 - All eight project TOML files parse. The complete release gate passes
-  fail-closed safety, 538/538 tests, standalone typecheck, zero-warning lint,
+  fail-closed safety, 542/542 tests, standalone typecheck, zero-warning lint,
   the secret-sanitized Cloudflare build, and the explicit default-environment
   no-upload Wrangler dry run. Wrangler retained only the documented generated
   duplicate-key warnings.
@@ -2227,10 +2235,11 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Harden owner authentication with verified email, MFA, and recovery, then design
-   the server-only Better Auth session adapter and its CSRF/idempotency boundary.
-   The new validation-only authorization token must remain disconnected until
-   those controls, staging, rollback, security review, and release approval pass.
+3. Implement and review the server-only Better Auth session adapter and its
+   CSRF/idempotency boundary. It must consume only live server session lookup,
+   never request-body session fields, and remain disconnected until the real
+   owner controls, staging, rollback, security review, and release approval
+   pass.
 
 ## Resume instructions
 

@@ -120,6 +120,7 @@ const privateKwOwnerDossierProgressAppend = await readFile(new URL("../src/lib/r
 const privateKwAuthenticatedOwnerDecision = await readFile(new URL("../src/lib/revenue-engine/private-kw-authenticated-owner-decision.ts", import.meta.url), "utf8");
 const privateKwAuthenticatedOwnerDecisionD1 = await readFile(new URL("../src/lib/revenue-engine/private-kw-authenticated-owner-decision-d1.ts", import.meta.url), "utf8");
 const privateKwOwnerDossierProgressAuthorization = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", import.meta.url), "utf8");
+const privateKwOwnerAuthReadiness = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
 const privateKwAuthenticatedOwnerDecisionMigration = await readFile(new URL("../migrations/0069_authenticated_owner_dossier_decisions.sql", import.meta.url), "utf8");
 const ownerLabelingWorkspace = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-workspace.ts", import.meta.url), "utf8");
@@ -737,6 +738,19 @@ for (const field of ["ownerDecisionPersistenceAuthorized", "phaseInputCreationAu
 requireMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "owner-dossier authorization must authorize zero provider operations");
 requireMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, /costAuthorizedUsd:\s*z\.literal\(0\)/, "owner-dossier authorization must keep provider cost authority at zero");
 forbidMatch("src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", privateKwOwnerDossierProgressAuthorization, /@cloudflare|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(|private-kw-owner-dossier-progress(?:-proof|-append)?/, "owner-dossier authorization must stay disconnected from auth adapters, runtime, files, databases, providers, network, phase inputs, and appends");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /PRIVATE_KW_OWNER_AUTH_READINESS_VERSION\s*=\s*\n?\s*"kw-owner-auth-readiness-v1"/, "owner-auth readiness must use the reviewed versioned contract");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /requiredBeforeSession:\s*z\.literal\(true\)[\s\S]*?sendVerificationEmailConfigured:\s*z\.literal\(true\)[\s\S]*?sendOnSignUp:\s*z\.literal\(true\)[\s\S]*?sendOnSignIn:\s*z\.literal\(true\)/, "owner-auth readiness must require verified-email delivery before activation");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /provider:\s*z\.literal\("TOTP"\)[\s\S]*?enrollmentRequiredForOwners:\s*z\.literal\(true\)[\s\S]*?backupCodesEncryptedAtRest:\s*z\.literal\(true\)[\s\S]*?accountLockoutEnabled:\s*z\.literal\(true\)/, "owner-auth readiness must require TOTP, recovery, and lockout controls");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /serverOnlyLookup:\s*z\.literal\(true\)[\s\S]*?requestBodyFieldsIgnored:\s*z\.literal\(true\)/, "owner-auth readiness must require server-only session lookup and ignore body session fields");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /originCheckEnabled:\s*z\.literal\(true\)[\s\S]*?fetchMetadataChecksEnabled:\s*z\.literal\(true\)[\s\S]*?wildcardOriginsAllowed:\s*z\.literal\(false\)[\s\S]*?localhostAllowedInProduction:\s*z\.literal\(false\)/, "owner-auth readiness must require exact origin and Fetch Metadata checks");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /atomicStorage:\s*z\.literal\(true\)[\s\S]*?replayReturnsSameResult:\s*z\.literal\(true\)/, "owner-auth readiness must require atomic idempotency replay");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /environment === "PRODUCTION"[\s\S]*?localhost|127\.0\.0\.1|\[::1\]/, "production owner-auth readiness must reject loopback origins");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /const trustedOwnerAuthReadiness = new WeakSet<object>\(\)[\s\S]*?trustedOwnerAuthReadiness\.has\(value\)[\s\S]*?trustedOwnerAuthReadiness\.add\(trusted\)/, "owner-auth readiness consumers must require the exact frozen in-process result");
+for (const field of ["activationAuthorized", "ownerDecisionPersistenceAuthorized", "phaseInputCreationAuthorized", "progressReceiptCreationAuthorized", "phaseAdvancementAuthorized", "databaseReadAuthorized", "databaseMutationAuthorized", "routeAuthorized", "uiMutationAuthorized", "outreachAuthorized", "sendAuthorized", "deploymentAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in owner-auth readiness`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /providerOperationsAuthorized:\s*z\.literal\(0\)[\s\S]*?costAuthorizedUsd:\s*z\.literal\(0\)/, "owner-auth readiness must authorize zero provider operations and cost");
+forbidMatch("src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", privateKwOwnerAuthReadiness, /@cloudflare|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "owner-auth readiness must stay disconnected from auth adapters, runtime, files, databases, providers, network, and mutations");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-authenticated-owner-decision/, "the inert engine must not wire authenticated owner decisions to runtime");
 for (const [name, content] of [["owner lead list route", ownerLeadRoute], ["owner lead detail route", ownerLeadDetailRoute], ["owner lead detail page", ownerLeadDetailPage], ["owner lead detail component", ownerLeadDetail]]) {
   forbidMatch(name, content, /private-kw-authenticated-owner-decision/, "owner UI and API surfaces must not activate the decision contract in this checkpoint");
@@ -770,6 +784,19 @@ for (const [name, content] of [
     && name !== "scripts/check-safety-config.mjs"
   ) {
     failures.push(`${name}: owner-dossier authorization must remain unreachable from every runtime, UI, route, and operator script`);
+  }
+}
+for (const [name, content] of [
+  ...await readCodeTree(new URL("../src/", import.meta.url), "src"),
+  ...await readCodeTree(new URL("./", import.meta.url), "scripts"),
+]) {
+  if (
+    content.includes("private-kw-owner-auth-readiness")
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-readiness.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-readiness.test.ts"
+    && name !== "scripts/check-safety-config.mjs"
+  ) {
+    failures.push(`${name}: owner-auth readiness must remain unreachable from every runtime, UI, route, and operator script`);
   }
 }
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-owner-dossier-progress(?:-proof)?/, "the inert engine must not wire owner-dossier proof or phase-input derivation to runtime");

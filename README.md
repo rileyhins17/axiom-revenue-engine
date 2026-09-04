@@ -572,6 +572,16 @@ no Better Auth adapter, route, UI, operator command, or live resource wiring;
 the token is a design/test contract until email verification, MFA, recovery,
 CSRF/idempotency, staging, rollback, and release approval are complete.
 
+Owner-authentication readiness is now an executable, disconnected policy as
+well. `OWNER_AUTHENTICATION_READINESS` requires exactly the two Axiom owners,
+verified-email delivery before sessions, TOTP enrollment with encrypted
+single-use recovery codes and lockout, server-only session lookup, exact
+production origins, Fetch Metadata/origin checks, and atomic idempotency. Its
+frozen result is marked `VALIDATED_NOT_ACTIVATED` and grants zero route, UI,
+database, provider, progress, outreach, send, deployment, or cost authority.
+It is not connected to Better Auth or a route until the real owner accounts,
+staging schema, enrollment, recovery, rollback, and release review are proven.
+
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.
