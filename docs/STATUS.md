@@ -104,8 +104,8 @@ canonical non-synced repository and its persisted status.
 
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `6f12bb207f2dcb9ccc801c3cf80c738f133a789d`
-- This milestone's verifying commit is the branch HEAD containing ADR 0051;
+  `9f4ffa2cba8fcf34f95eb5da3aded0f4f73024e0`
+- This milestone's verifying commit is the branch HEAD containing ADR 0052;
   exact local/remote SHA equality must be verified after the atomic push.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
 - Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
@@ -2063,14 +2063,22 @@ Completed gates:
   spoofing, stale/unverified sessions, unsafe CSRF metadata, forged keys, and
   copied-result trust; ADR 0051 records the boundary and remaining activation
   work.
+- The atomic owner-auth replay layer is now defined behind an injected store
+  seam. It records one bounded secret-free result for each owner/operation/
+  payload key, returns `FRESH_COMMIT` once and `EXACT_REPLAY` thereafter, and
+  rejects conflicting payloads, results, forged rows, stale sessions, cycles,
+  and copied envelopes. Its three focused tests and static checks keep the
+  boundary disconnected from D1, Better Auth, routes, providers, and all live
+  mutation authority; ADR 0052 records the transaction/outbox work still
+  required.
 - All eight project TOML files parse. The complete release gate passes
-  fail-closed safety, 546/546 tests, standalone typecheck, zero-warning lint,
+  fail-closed safety, 549/549 tests, standalone typecheck, zero-warning lint,
   the secret-sanitized Cloudflare build, and the explicit default-environment
   no-upload Wrangler dry run. Wrangler retained only the documented generated
   duplicate-key warnings.
 - The final six-view desktop/mobile WCAG owner-browser gate passed with zero
-  external requests; the lead list was ready in 1705 ms and the dossier in
-  858 ms. No application runtime, provider, Cloudflare resource, database,
+  external requests; the lead list was ready in 345 ms and the dossier in
+  905 ms. No application runtime, provider, Cloudflare resource, database,
   prospect, mailbox, deployment, migration, or production control changed.
   Spend impact is C$0 and every autonomous capability remains off.
 
@@ -2245,11 +2253,12 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Design and review the atomic durable idempotency adapter that will sit
-   behind the validated owner-auth request boundary. It must replay the exact
-   prior result for the same actor/operation/payload key, reject conflicting
-   payloads, and remain disconnected until the real owner controls, staging,
-   rollback, security review, and release approval pass.
+3. Choose and review the production D1 idempotency schema and transaction/outbox
+   shape behind the validated owner-auth replay contract. It must atomically
+   record the owner/operation/payload key and exact result, replay it without a
+   second mutation, reject conflicts, and remain disconnected until the real
+   owner controls, staging, rollback, security review, and release approval
+   pass.
 
 ## Resume instructions
 

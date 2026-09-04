@@ -122,6 +122,7 @@ const privateKwAuthenticatedOwnerDecisionD1 = await readFile(new URL("../src/lib
 const privateKwOwnerDossierProgressAuthorization = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-dossier-progress-authorization.ts", import.meta.url), "utf8");
 const privateKwOwnerAuthReadiness = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-readiness.ts", import.meta.url), "utf8");
 const privateKwOwnerAuthServerBoundary = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", import.meta.url), "utf8");
+const privateKwOwnerAuthIdempotency = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
 const privateKwAuthenticatedOwnerDecisionMigration = await readFile(new URL("../migrations/0069_authenticated_owner_dossier_decisions.sql", import.meta.url), "utf8");
 const ownerLabelingWorkspace = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-workspace.ts", import.meta.url), "utf8");
@@ -764,6 +765,18 @@ for (const field of ["mutationAuthorized", "ownerDecisionPersistenceAuthorized",
 requireMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /providerOperationsAuthorized:\s*z\.literal\(0\)[\s\S]*?costAuthorizedUsd:\s*z\.literal\(0\)/, "owner-auth server boundary must authorize zero provider operations and cost");
 requireMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /const trustedOwnerAuthServerBoundaries = new WeakSet<object>\(\)[\s\S]*?trustedOwnerAuthServerBoundaries\.has\(value\)[\s\S]*?trustedOwnerAuthServerBoundaries\.add\(trusted\)/, "owner-auth server boundary consumers must require the exact frozen in-process result");
 forbidMatch("src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts", privateKwOwnerAuthServerBoundary, /@cloudflare|@\/lib\/auth|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "owner-auth server boundary must stay disconnected from Better Auth adapters, runtime, files, databases, providers, network, and mutations");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", privateKwOwnerAuthIdempotency, /PRIVATE_KW_OWNER_AUTH_IDEMPOTENCY_VERSION\s*=\s*\n?\s*"kw-owner-auth-idempotency-v1"/, "owner-auth idempotency must use the reviewed versioned contract");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", privateKwOwnerAuthIdempotency, /requireInProcessPrivateKwOwnerAuthServerBoundary\(input\.boundaryValue\)/, "owner-auth idempotency must require the exact server-boundary result");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", privateKwOwnerAuthIdempotency, /insertIfAbsent\(candidate: PrivateKwOwnerAuthIdempotencyRecord\)/, "owner-auth idempotency must expose only an atomic insert-if-absent store seam");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", privateKwOwnerAuthIdempotency, /outcome\.inserted[\s\S]*?FRESH_COMMIT[\s\S]*?EXACT_REPLAY/, "owner-auth idempotency must distinguish one fresh commit from an exact replay");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", privateKwOwnerAuthIdempotency, /conflicting intent or result/, "owner-auth idempotency must reject conflicting replay intent or result");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", privateKwOwnerAuthIdempotency, /SENSITIVE_RESULT_KEY[\s\S]*?MAX_RESULT_BYTES/, "owner-auth idempotency must bound and filter replay results before storage");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", privateKwOwnerAuthIdempotency, /const trustedIdempotencyResults = new WeakSet<object>\(\)[\s\S]*?(?:trustedIdempotencyResults\.has\(value\)[\s\S]*?trustedIdempotencyResults\.add\(trusted\)|trustedIdempotencyResults\.add\(trusted\)[\s\S]*?trustedIdempotencyResults\.has\(value\))/, "owner-auth idempotency consumers must require the exact frozen in-process result");
+for (const field of ["mutationAuthorized", "ownerDecisionPersistenceAuthorized", "phaseInputCreationAuthorized", "progressReceiptCreationAuthorized", "phaseAdvancementAuthorized", "databaseReadAuthorized", "databaseMutationAuthorized", "routeAuthorized", "uiMutationAuthorized", "outreachAuthorized", "sendAuthorized", "deploymentAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", privateKwOwnerAuthIdempotency, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in owner-auth idempotency`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", privateKwOwnerAuthIdempotency, /providerOperationsAuthorized:\s*z\.literal\(0\)[\s\S]*?costAuthorizedUsd:\s*z\.literal\(0\)/, "owner-auth idempotency must authorize zero provider operations and cost");
+forbidMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts", privateKwOwnerAuthIdempotency, /@cloudflare|@\/lib\/auth|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "owner-auth idempotency must stay disconnected from Better Auth adapters, runtime, files, databases, providers, network, and mutations");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-authenticated-owner-decision/, "the inert engine must not wire authenticated owner decisions to runtime");
 for (const [name, content] of [["owner lead list route", ownerLeadRoute], ["owner lead detail route", ownerLeadDetailRoute], ["owner lead detail page", ownerLeadDetailPage], ["owner lead detail component", ownerLeadDetail]]) {
   forbidMatch(name, content, /private-kw-authenticated-owner-decision/, "owner UI and API surfaces must not activate the decision contract in this checkpoint");
@@ -809,6 +822,8 @@ for (const [name, content] of [
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-readiness.test.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-server-boundary.test.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency.test.ts"
     && name !== "scripts/check-safety-config.mjs"
   ) {
     failures.push(`${name}: owner-auth readiness must remain unreachable from every runtime, UI, route, and operator script`);
@@ -822,6 +837,8 @@ for (const [name, content] of [
     content.includes("private-kw-owner-auth-server-boundary")
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-server-boundary.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-server-boundary.test.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency.test.ts"
     && name !== "scripts/check-safety-config.mjs"
   ) {
     failures.push(`${name}: owner-auth server boundary must remain unreachable from every runtime, UI, route, and operator script`);
