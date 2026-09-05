@@ -618,6 +618,22 @@ the exact owner, operation, boundary, and payload, in the same D1 batch as the
 mutation and outbox. This recovery and claim contract is still disconnected;
 see [`docs/adr/0054-owner-auth-reservation-recovery-and-claim-predicates.md`](docs/adr/0054-owner-auth-reservation-recovery-and-claim-predicates.md).
 
+The next recovery checkpoint is defined without activating it. A future
+additive record can mark a blocked reservation `ABANDONED` while preserving the
+original row, forbidding same-key reuse, and requiring a separately approved
+replacement key. Its proposed technical retention window is one to two years;
+deletion still needs its own owner release. A companion affected-row proof
+requires exactly one operation/ledger/outbox change for a fresh commit, zero
+changes for an exact replay, and zero remaining rows after a whole-batch
+rollback. These are content-addressed validation contracts; their in-process
+identity proves only that validation ran. Caller counts and timestamps cannot
+prove a durable transaction. A simplified disposable SQLite harness checks
+commit, replay, and rollback after each write; the exact migration-0070 D1
+adapter and additive recovery schema remain unimplemented. They are source-only: no
+migration, route, owner action, database binding, deployment, provider,
+mailbox, prospect, or spend path exists. See
+[`docs/adr/0055-owner-auth-abandonment-receipts-and-affected-row-proofs.md`](docs/adr/0055-owner-auth-abandonment-receipts-and-affected-row-proofs.md).
+
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

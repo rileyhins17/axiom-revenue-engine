@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-09-04 (America/Toronto)
+Last updated: 2026-09-05 (America/Toronto)
 
 ## Plain-English status
 
@@ -118,16 +118,46 @@ contract. Any visible `RESERVED` row is blocked rather than reclaimed or
 deleted; only a `COMMITTED` row can replay. The operation-specific future DML
 must embed one exact parameterized owner/boundary/payload claim in the same D1
 batch, and the typed descriptor rejects multi-statements, DDL, interpolated
-identity values, and ledger/outbox targets. An additive abandonment/recovery
-record and affected-row-count proof are still required before any real adapter.
+identity values, and ledger/outbox targets. The additive recovery checkpoint is
+now also defined without activation: a future `ABANDONED` receipt preserves the
+original reservation, forbids same-key reuse, and carries a proposed one-to-
+two-year technical retention policy with separate deletion release. A companion
+affected-row proof requires exactly one operation/ledger/outbox change for a
+fresh commit, zero changes for an exact replay, and zero remaining rows after
+a whole-batch rollback. A simplified disposable SQLite harness now exercises
+commit, replay, and failures after each write; it does not prove the future D1
+adapter or recovery schema. Caller-supplied counts and timestamps stay explicitly
+non-durable validation candidates. No recovery migration or adapter exists.
 
 ## Verified checkpoint
 
+- Current change: ADR 0055 adds abandonment candidates and transaction-count
+  validation. Candidates preserve observation/decision lineage; a decision
+  inconsistent with the supplied observation is rejected. They cannot record recovery,
+  fence a worker, issue a new key, or prove durable execution.
+- Verification for this checkpoint: 559/559 tests, safety configuration,
+  standalone typecheck, lint, Cloudflare build with bundle sanitization, and
+  the default-environment Wrangler dry run passed locally. The simplified
+  SQLite harness checks one scoped owner change, mutation-free replay,
+  rollback after each of four writes, and unchanged unrelated records.
+  It does not implement or prove the actual migration-0070 D1 adapter.
+- Owner browser regression check passed after the builds: six pages at desktop
+  1440px and mobile 390px, list ready in 536 ms, dossier in 822 ms, and zero
+  external requests. These are local synthetic-data results.
+- Independent Luna max review identified finite-timestamp validation and
+  per-intent count coverage gaps. Both were corrected: invalid dates/offsets
+  fail validation, count scope names the exact key, and fixture databases
+  retain unrelated ledger/outbox rows through commit, replay, and rollback.
+- No UI feature, real-data evaluation, provider, mailbox, production control,
+  deployment, persistent migration, or cost changed in this checkpoint.
+  Spend impact: C$0. Existing live-state claims below are prior inventory,
+  not a fresh production inspection. Linux CI for this new commit is pending;
+  older green CI references must not be read as evidence for this commit.
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `fcc8e05726191fc67bcf200514849ef4cb875b6a`
+  `393e42ba44796e0af13a16c0e63b84ecd799b31b`
 - This milestone's verifying commit is the exact branch HEAD containing ADR
-  0054, the recovery/claim contract, and migration 0070. Verify its immutable
+  0055, the abandonment/count-proof contract, ADR 0054, and migration 0070. Verify its immutable
   SHA with `git rev-parse HEAD`
   after the atomic push; local, upstream, and remote equality remains a release
   check.
@@ -2268,7 +2298,12 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
   schema and plan. Migration 0070 has not been applied, the operation-specific
   mutation slot is deliberately non-executable, and the plan adds no live
   database, route, provider, deployment, outreach, send, or spend authority.
-  Reservation recovery and claim predicates remain a later security review.
+- No new owner decision is required for the source-only abandonment/count proof.
+  It creates no recovery row, migration, replacement key, database adapter,
+  owner mutation, route, deployment, provider, outreach, send, or spend
+  authority. Retention is a technical proposal, not a legal conclusion or a
+  deletion schedule. Engineering design and disposable tests can continue;
+  activation, deletion, and real owner operations retain their existing gates.
 - Riley directed that this rebuild branch should eventually become `main`. That
   is recorded as the intended final cutover, not approval to merge now. The merge
   remains gated by the completed rebuild, full safety/review/rollback evidence,
@@ -2284,11 +2319,12 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Design the additive `ABANDONED`/recovery receipt and affected-row-count
-   proof for the source-only D1 idempotency/outbox plan. Prove both in
-   disposable SQLite/staging fixtures before any real migration or owner
-   mutation is considered; owner controls, rollback, security review, and
-   release approval remain required.
+3. Exercise one concrete owner action against migration 0070 in disposable
+   SQLite: enforce its target identity and affected-row assertion inside the
+   transaction, verify exact result/outbox replay, and inject failures at each
+   statement. Do not connect a live adapter. Recovery schema, fencing, and key
+   replacement must be reconciled with the current deterministic key before
+   activation; a candidate receipt alone cannot make an old worker safe.
 
 ## Resume instructions
 

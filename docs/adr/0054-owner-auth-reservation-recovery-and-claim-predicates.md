@@ -114,9 +114,10 @@ database, and mutation authority disconnected.
    descriptor.
 2. [x] Test visible, stale, expired, committed, copied, malformed, and
    multi-statement cases.
-3. [ ] Design the additive `ABANDONED`/recovery receipt schema and retention
-   policy without applying it.
-4. [ ] Prove affected-row-count and rollback behavior in a disposable D1/SQLite
-   fixture before any staging migration.
+3. [x] Design the additive `ABANDONED`/recovery receipt schema and retention
+   policy without applying it; see ADR 0055.
+4. [ ] Prove affected-row-count and rollback behavior against the exact migration
+   and future D1 adapter before staging. ADR 0055 adds a simplified SQLite
+   harness only; it does not satisfy the full adapter gate.
 5. [ ] Require explicit owner-auth, MFA/recovery, backup, rollback, and release
    approval before connecting a real owner mutation.
