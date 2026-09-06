@@ -645,9 +645,24 @@ disposable in-memory SQLite for fresh commit, read-only replay, a deterministic
 stale-preflight race, missing guards, SQL-enforced zero-row rollback even when
 the exact decision predates the attempt, unchanged unrelated committed records,
 and rollback after every statement. This is SQL-contract evidence, not proof of
-concurrent Cloudflare D1 execution, and no adapter, binding, route, migration,
-owner action, or live resource exists. See
+concurrent Cloudflare D1 execution, and that SQL-shape checkpoint introduced no
+binding, route, migration, owner action, or live resource. See
 [`docs/adr/0056-owner-dossier-acceptance-atomic-d1-shape.md`](docs/adr/0056-owner-dossier-acceptance-atomic-d1-shape.md).
+
+The concrete plan now has a disconnected D1 result executor as well. It checks
+the complete normalized body, object type, owning table, and exact set of all
+nine database triggers; unexpected target-table triggers fail closed. The
+following write is fenced to the exact database schema version observed by that
+preflight, so a rule change in between cannot inherit stale approval. The
+executor accepts Cloudflare's documented array or null mutation-result form,
+validates the four one-row write counts, verifies the signed owner decision and
+canonical idempotency/outbox records, and enforces their complete timestamp
+order before reporting a fresh commit. An already committed request is
+read-only. A lost response or losing race becomes a replay only after a new
+read proves the exact complete bundle. The adapter is still unreachable from
+the app and has only been run against disposable local database behavior; it
+explicitly does not claim live Cloudflare D1 proof or authorize an owner action. See
+[`docs/adr/0057-owner-dossier-accept-d1-result-executor.md`](docs/adr/0057-owner-dossier-accept-d1-result-executor.md).
 
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command

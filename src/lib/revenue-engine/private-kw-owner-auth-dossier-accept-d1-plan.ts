@@ -27,13 +27,15 @@ import {
 } from "@/lib/revenue-engine/private-kw-owner-auth-server-boundary";
 
 export const PRIVATE_KW_OWNER_DOSSIER_ACCEPT_D1_PLAN_VERSION =
-  "kw-owner-dossier-accept-d1-plan-v1";
+  "kw-owner-dossier-accept-d1-plan-v2";
 export const PRIVATE_KW_OWNER_DOSSIER_ACCEPT_REQUEST_VERSION =
   "kw-owner-dossier-accept-request-v1";
 export const PRIVATE_KW_OWNER_DOSSIER_ACCEPT_RESULT_VERSION =
   "kw-owner-dossier-accept-result-v1";
 export const PRIVATE_KW_OWNER_DOSSIER_ACCEPT_OPERATION =
   "owner.dossier.accept";
+export const PRIVATE_KW_OWNER_DOSSIER_ACCEPT_SCHEMA_VERSION_FENCE =
+  "__OWNER_DOSSIER_SCHEMA_VERSION_FROM_EXACT_PREFLIGHT__";
 
 const TimestampSchema = z.string().datetime({ offset: true }).refine(
   (value) => Number.isFinite(Date.parse(value)),
@@ -105,6 +107,7 @@ const AuthoritySchema = z.object({
   missingCommitMustAbortOutboxInsert: z.literal(true),
   exactReplayMustBeReadOnly: z.literal(true),
   oneD1BatchRequired: z.literal(true),
+  exactSchemaVersionFenceRequired: z.literal(true),
   runtimeConnectionAuthorized: z.literal(false),
   migrationApplicationAuthorized: z.literal(false),
   ownerDecisionPersistenceAuthorized: z.literal(false),
@@ -141,6 +144,8 @@ const PlanCoreSchema = z.object({
   ]),
   operation: z.literal(PRIVATE_KW_OWNER_DOSSIER_ACCEPT_OPERATION),
   plannedAt: TimestampSchema,
+  sessionCreatedAt: TimestampSchema,
+  sessionExpiresAt: TimestampSchema,
   owner: z.enum(["RILEY", "AIDAN"]),
   businessId: z.string().min(1).max(512),
   ownerDecisionRecordId: z.string().regex(/^kw-owner-decision:[a-f0-9]{64}$/),
@@ -154,6 +159,39 @@ const PlanCoreSchema = z.object({
   resultDigest: Sha256Schema,
   outboxEventId: z.string().regex(/^kw-owner-auth-outbox:[a-f0-9]{64}$/),
   outboxEventDigest: Sha256Schema,
+  expectedIdempotencyRecordJson: z.string().min(2).max(32_768),
+  expectedOwnerDecisionRecordJson: z.string().min(2).max(32_768),
+  expectedOutboxEventJson: z.string().min(2).max(32_768),
+  freshSchemaVersionFenceBindings: z.literal(2),
+  requiredTriggerDefinitionDigests: z.object({
+    RevenuePrivateKwOwnerDecision_lineage_insert: z.literal(
+      "e6c41971e7acc7c1c77c60762358f5ea2d4df406b739af59f459f9106c42bbf7",
+    ),
+    RevenuePrivateKwOwnerDecision_immutable_update: z.literal(
+      "053b94949bc831f936d38122b9a5f384f175ca8c728df2f7eee97b755a5bb640",
+    ),
+    RevenuePrivateKwOwnerDecision_immutable_delete: z.literal(
+      "0f1c739689546fe1d819e772e9a0dd1eda3dbf49c2dbaa24b9ca3ea6c40af3fb",
+    ),
+    RevenuePrivateKwOwnerAuthIdempotency_contract_insert: z.literal(
+      "fa734b187967a71da0a620beb616fc55abd968e41174c35890f1806d6526bd1c",
+    ),
+    RevenuePrivateKwOwnerAuthIdempotency_transition_update: z.literal(
+      "bc02841d8e34fbbaa830b2323d9f551f95416b03380e8806d5bd14e4a3d6b2a0",
+    ),
+    RevenuePrivateKwOwnerAuthIdempotency_immutable_delete: z.literal(
+      "c149559cc262a5fabf4666c6cc60dc133038d995444c6ef56543aef31301502d",
+    ),
+    RevenuePrivateKwOwnerAuthMutationOutbox_contract_insert: z.literal(
+      "7452112bf24447e7e24b24fead79be127d7ab730069dc80ca29162b309c30862",
+    ),
+    RevenuePrivateKwOwnerAuthMutationOutbox_delivery_update: z.literal(
+      "c928c8c2a36e5610651b0574b7c06470dbe76d054dcb7062224fdf6d514edd49",
+    ),
+    RevenuePrivateKwOwnerAuthMutationOutbox_immutable_delete: z.literal(
+      "c93d13caa08e8615573bebf47d3b6dfb49847e75e9d2b8e03270846840ab019b",
+    ),
+  }).strict(),
   operationClaim: OperationClaimSchema,
   preflightStatements: z.array(StatementSchema).length(5),
   freshBatchStatements: z.array(StatementSchema).length(8),
@@ -229,6 +267,32 @@ const PlanSchema = PlanCoreSchema.extend({
 
 export type PrivateKwOwnerDossierAcceptD1Plan = z.infer<typeof PlanSchema>;
 
+export const PRIVATE_KW_OWNER_DOSSIER_ACCEPT_TRIGGER_DEFINITION_DIGESTS =
+  deepFreeze(PlanCoreSchema.shape.requiredTriggerDefinitionDigests.parse({
+    RevenuePrivateKwOwnerDecision_lineage_insert:
+      "e6c41971e7acc7c1c77c60762358f5ea2d4df406b739af59f459f9106c42bbf7",
+    RevenuePrivateKwOwnerDecision_immutable_update:
+      "053b94949bc831f936d38122b9a5f384f175ca8c728df2f7eee97b755a5bb640",
+    RevenuePrivateKwOwnerDecision_immutable_delete:
+      "0f1c739689546fe1d819e772e9a0dd1eda3dbf49c2dbaa24b9ca3ea6c40af3fb",
+    RevenuePrivateKwOwnerAuthIdempotency_contract_insert:
+      "fa734b187967a71da0a620beb616fc55abd968e41174c35890f1806d6526bd1c",
+    RevenuePrivateKwOwnerAuthIdempotency_transition_update:
+      "bc02841d8e34fbbaa830b2323d9f551f95416b03380e8806d5bd14e4a3d6b2a0",
+    RevenuePrivateKwOwnerAuthIdempotency_immutable_delete:
+      "c149559cc262a5fabf4666c6cc60dc133038d995444c6ef56543aef31301502d",
+    RevenuePrivateKwOwnerAuthMutationOutbox_contract_insert:
+      "7452112bf24447e7e24b24fead79be127d7ab730069dc80ca29162b309c30862",
+    RevenuePrivateKwOwnerAuthMutationOutbox_delivery_update:
+      "c928c8c2a36e5610651b0574b7c06470dbe76d054dcb7062224fdf6d514edd49",
+    RevenuePrivateKwOwnerAuthMutationOutbox_immutable_delete:
+      "c93d13caa08e8615573bebf47d3b6dfb49847e75e9d2b8e03270846840ab019b",
+  }));
+
+export function normalizePrivateKwOwnerAuthTriggerSql(sql: string) {
+  return sql.replace(/;\s*$/, "").replace(/\s+/g, " ").trim();
+}
+
 const trustedPlans = new WeakSet<object>();
 
 function deepFreeze<T>(value: T): T {
@@ -276,38 +340,47 @@ export function buildPrivateKwOwnerDossierAcceptOperationResult(
 const REQUIRED_TRIGGER_MARKERS = {
   RevenuePrivateKwOwnerDecision_lineage_insert: {
     operation: "INSERT",
+    table: "RevenuePrivateKwOwnerDecision",
     marker: "REVENUE_PRIVATE_KW_OWNER_DECISION_LINEAGE_MISMATCH",
   },
   RevenuePrivateKwOwnerDecision_immutable_update: {
     operation: "UPDATE",
+    table: "RevenuePrivateKwOwnerDecision",
     marker: "REVENUE_PRIVATE_KW_OWNER_DECISION_APPEND_ONLY",
   },
   RevenuePrivateKwOwnerDecision_immutable_delete: {
     operation: "DELETE",
+    table: "RevenuePrivateKwOwnerDecision",
     marker: "REVENUE_PRIVATE_KW_OWNER_DECISION_APPEND_ONLY",
   },
   RevenuePrivateKwOwnerAuthIdempotency_contract_insert: {
     operation: "INSERT",
+    table: "RevenuePrivateKwOwnerAuthIdempotency",
     marker: "REVENUE_PRIVATE_KW_OWNER_AUTH_IDEMPOTENCY_CONTRACT_MISMATCH",
   },
   RevenuePrivateKwOwnerAuthIdempotency_transition_update: {
     operation: "UPDATE",
+    table: "RevenuePrivateKwOwnerAuthIdempotency",
     marker: "REVENUE_PRIVATE_KW_OWNER_AUTH_IDEMPOTENCY_INVALID_TRANSITION",
   },
   RevenuePrivateKwOwnerAuthIdempotency_immutable_delete: {
     operation: "DELETE",
+    table: "RevenuePrivateKwOwnerAuthIdempotency",
     marker: "REVENUE_PRIVATE_KW_OWNER_AUTH_IDEMPOTENCY_APPEND_ONLY",
   },
   RevenuePrivateKwOwnerAuthMutationOutbox_contract_insert: {
     operation: "INSERT",
+    table: "RevenuePrivateKwOwnerAuthMutationOutbox",
     marker: "REVENUE_PRIVATE_KW_OWNER_AUTH_OUTBOX_CONTRACT_MISMATCH",
   },
   RevenuePrivateKwOwnerAuthMutationOutbox_delivery_update: {
     operation: "UPDATE",
+    table: "RevenuePrivateKwOwnerAuthMutationOutbox",
     marker: "REVENUE_PRIVATE_KW_OWNER_AUTH_OUTBOX_INVALID_TRANSITION",
   },
   RevenuePrivateKwOwnerAuthMutationOutbox_immutable_delete: {
     operation: "DELETE",
+    table: "RevenuePrivateKwOwnerAuthMutationOutbox",
     marker: "REVENUE_PRIVATE_KW_OWNER_AUTH_OUTBOX_APPEND_ONLY",
   },
 } as const;
@@ -321,7 +394,7 @@ const TRIGGER_GUARD_PREDICATE = TRIGGER_NAMES.map(() => `EXISTS (
 const TRIGGER_GUARD_BINDINGS = Object.entries(REQUIRED_TRIGGER_MARKERS)
   .flatMap(([name, requirement]) => [
     name,
-    `BEFORE ${requirement.operation} ON "${name.startsWith("RevenuePrivateKwOwnerDecision_") ? "RevenuePrivateKwOwnerDecision" : name.startsWith("RevenuePrivateKwOwnerAuthIdempotency_") ? "RevenuePrivateKwOwnerAuthIdempotency" : "RevenuePrivateKwOwnerAuthMutationOutbox"}"`,
+    `BEFORE ${requirement.operation} ON "${requirement.table}"`,
     `RAISE(ABORT, '${requirement.marker}')`,
   ]);
 
@@ -412,10 +485,16 @@ const readDatabaseTime = () => statement(
 
 const readTriggerGuards = () => statement(
   "read:owner_auth_transaction_guards",
-  `SELECT "name", "sql" FROM "sqlite_master"
-   WHERE "type" = 'trigger' AND "name" IN (${TRIGGER_NAMES.map(() => "?").join(", ")})
+  `SELECT "type", "name", "tbl_name",
+     "sql", (SELECT "schema_version" FROM "pragma_schema_version") AS "schemaVersion"
+   FROM "sqlite_master"
+   WHERE "type" = 'trigger' AND "tbl_name" IN (?, ?, ?)
    ORDER BY "name"`,
-  TRIGGER_NAMES,
+  [
+    "RevenuePrivateKwOwnerDecision",
+    "RevenuePrivateKwOwnerAuthIdempotency",
+    "RevenuePrivateKwOwnerAuthMutationOutbox",
+  ],
 );
 
 function assertExactPair(input: {
@@ -463,6 +542,7 @@ function authority() {
     missingCommitMustAbortOutboxInsert: true,
     exactReplayMustBeReadOnly: true,
     oneD1BatchRequired: true,
+    exactSchemaVersionFenceRequired: true,
     runtimeConnectionAuthorized: false,
     migrationApplicationAuthorized: false,
     ownerDecisionPersistenceAuthorized: false,
@@ -537,7 +617,8 @@ export function buildPrivateKwOwnerDossierAcceptD1Plan(input: {
    WHERE ${claimExistsPredicate}
      AND julianday('now') >= julianday(?)
      AND julianday('now') < julianday(?)
-     AND ${TRIGGER_GUARD_PREDICATE}`;
+     AND ${TRIGGER_GUARD_PREDICATE}
+     AND (SELECT "schema_version" FROM "pragma_schema_version") = ?`;
   const operationClaim = buildPrivateKwOwnerAuthOperationClaim({
     boundaryValue: boundary,
     mutationKind: "INSERT",
@@ -577,12 +658,14 @@ export function buildPrivateKwOwnerDossierAcceptD1Plan(input: {
          'OWNER_AUTH_MUTATION_IDEMPOTENCY_ONLY', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
        WHERE julianday('now') >= julianday(?)
          AND julianday('now') < julianday(?)
-         AND ${TRIGGER_GUARD_PREDICATE}`,
+         AND ${TRIGGER_GUARD_PREDICATE}
+         AND (SELECT "schema_version" FROM "pragma_schema_version") = ?`,
       [
         ...reservationValues,
         boundary.sessionCreatedAt,
         boundary.sessionExpiresAt,
         ...TRIGGER_GUARD_BINDINGS,
+        PRIVATE_KW_OWNER_DOSSIER_ACCEPT_SCHEMA_VERSION_FENCE,
       ],
       1,
     ),
@@ -595,6 +678,7 @@ export function buildPrivateKwOwnerDossierAcceptD1Plan(input: {
         boundary.sessionCreatedAt,
         boundary.sessionExpiresAt,
         ...TRIGGER_GUARD_BINDINGS,
+        PRIVATE_KW_OWNER_DOSSIER_ACCEPT_SCHEMA_VERSION_FENCE,
       ],
       1,
     ),
@@ -681,6 +765,8 @@ export function buildPrivateKwOwnerDossierAcceptD1Plan(input: {
     ],
     operation: PRIVATE_KW_OWNER_DOSSIER_ACCEPT_OPERATION,
     plannedAt,
+    sessionCreatedAt: boundary.sessionCreatedAt,
+    sessionExpiresAt: boundary.sessionExpiresAt,
     owner: boundary.owner,
     businessId: decisionRecord.businessId,
     ownerDecisionRecordId: decisionRecord.recordId,
@@ -694,6 +780,12 @@ export function buildPrivateKwOwnerDossierAcceptD1Plan(input: {
     resultDigest: idempotencyRecord.resultDigest,
     outboxEventId: event.eventId,
     outboxEventDigest: event.eventDigest,
+    expectedIdempotencyRecordJson: idempotencyJson,
+    expectedOwnerDecisionRecordJson: artifactReferenceCanonicalJson(decisionRecord),
+    expectedOutboxEventJson: eventJson,
+    freshSchemaVersionFenceBindings: 2,
+    requiredTriggerDefinitionDigests:
+      PRIVATE_KW_OWNER_DOSSIER_ACCEPT_TRIGGER_DEFINITION_DIGESTS,
     operationClaim,
     preflightStatements,
     freshBatchStatements,
@@ -739,4 +831,30 @@ export function requireInProcessPrivateKwOwnerDossierAcceptD1Plan(
     (value as PrivateKwOwnerDossierAcceptD1Plan).operationClaim,
   );
   return value as PrivateKwOwnerDossierAcceptD1Plan;
+}
+
+export function materializePrivateKwOwnerDossierAcceptFreshStatements(
+  planValue: unknown,
+  schemaVersionValue: unknown,
+): readonly PrivateKwOwnerDossierAcceptD1Statement[] {
+  const plan = requireInProcessPrivateKwOwnerDossierAcceptD1Plan(planValue);
+  const schemaVersion = z.number().int().nonnegative().max(2_147_483_647)
+    .parse(schemaVersionValue);
+  let materializedBindings = 0;
+  const statements = plan.freshBatchStatements.map((item) => StatementSchema.parse({
+    ...item,
+    bindings: item.bindings.map((binding) => {
+      if (binding !== PRIVATE_KW_OWNER_DOSSIER_ACCEPT_SCHEMA_VERSION_FENCE) {
+        return binding;
+      }
+      materializedBindings += 1;
+      return schemaVersion;
+    }),
+  }));
+  if (materializedBindings !== plan.freshSchemaVersionFenceBindings) {
+    throw new Error(
+      `The fresh owner-action transaction requires exactly ${plan.freshSchemaVersionFenceBindings} schema-version fence bindings.`,
+    );
+  }
+  return deepFreeze(statements);
 }

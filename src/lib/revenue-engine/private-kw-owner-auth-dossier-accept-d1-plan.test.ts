@@ -16,9 +16,11 @@ import {
 import {
   PRIVATE_KW_OWNER_DOSSIER_ACCEPT_OPERATION,
   PRIVATE_KW_OWNER_DOSSIER_ACCEPT_D1_PLAN_VERSION,
+  PRIVATE_KW_OWNER_DOSSIER_ACCEPT_SCHEMA_VERSION_FENCE,
   buildPrivateKwOwnerDossierAcceptD1Plan,
   buildPrivateKwOwnerDossierAcceptOperationResult,
   buildPrivateKwOwnerDossierAcceptRequestPayload,
+  materializePrivateKwOwnerDossierAcceptFreshStatements,
   requireInProcessPrivateKwOwnerDossierAcceptD1Plan,
   type PrivateKwOwnerDossierAcceptD1Statement,
 } from "@/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan";
@@ -245,6 +247,19 @@ function migratedDatabase(path = ":memory:") {
   return database;
 }
 
+function materializeFresh(
+  database: Database.Database,
+  plan: ReturnType<typeof planFor>,
+) {
+  const row = database.prepare("PRAGMA schema_version").get() as {
+    schema_version: number;
+  };
+  return materializePrivateKwOwnerDossierAcceptFreshStatements(
+    plan,
+    row.schema_version,
+  );
+}
+
 function insertBusiness(database: Database.Database, fixture: Fixture) {
   database.prepare(`INSERT OR IGNORE INTO "RevenueBusiness"
     ("id", "canonicalName", "normalizedDomain", "independenceStatus", "status")
@@ -360,7 +375,7 @@ function seedCommittedBundle(
   plan: ReturnType<typeof planFor>,
 ) {
   insertBusiness(database, prepared.fixture);
-  executeTransaction(database, plan.freshBatchStatements);
+  executeTransaction(database, materializeFresh(database, plan));
   return exactBundleSnapshot(database, plan);
 }
 
@@ -368,7 +383,7 @@ function seedExactDecisionWithoutIdempotency(
   database: Database.Database,
   plan: ReturnType<typeof planFor>,
 ) {
-  executeTransaction(database, plan.freshBatchStatements.slice(0, 2));
+  executeTransaction(database, materializeFresh(database, plan).slice(0, 2));
   const triggerName = "RevenuePrivateKwOwnerAuthIdempotency_immutable_delete";
   const triggerSql = database.prepare(
     `SELECT "sql" FROM "sqlite_master" WHERE "type" = 'trigger' AND "name" = ?`,
@@ -422,6 +437,28 @@ test("builds one exact source-only owner dossier transaction with aborting fresh
   assert.equal(plan.authority.outreachAuthorized, false);
   assert.equal(plan.authority.sendAuthorized, false);
   assert.equal(plan.authority.costAuthorizedUsd, 0);
+  assert.equal(plan.authority.exactSchemaVersionFenceRequired, true);
+  assert.equal(
+    plan.freshBatchStatements.flatMap((item) => item.bindings)
+      .filter((value) => value === PRIVATE_KW_OWNER_DOSSIER_ACCEPT_SCHEMA_VERSION_FENCE)
+      .length,
+    2,
+  );
+  const materialized = materializePrivateKwOwnerDossierAcceptFreshStatements(plan, 42);
+  assert.equal(Object.isFrozen(materialized), true);
+  assert.equal(
+    materialized.flatMap((item) => item.bindings)
+      .filter((value) => value === PRIVATE_KW_OWNER_DOSSIER_ACCEPT_SCHEMA_VERSION_FENCE)
+      .length,
+    0,
+  );
+  assert.equal(
+    materialized.flatMap((item) => item.bindings).filter((value) => value === 42).length,
+    2,
+  );
+  assert.throws(
+    () => materializePrivateKwOwnerDossierAcceptFreshStatements(plan, -1),
+  );
   assert.equal(Object.isFrozen(plan), true);
   assert.equal(requireInProcessPrivateKwOwnerDossierAcceptD1Plan(plan), plan);
   assert.throws(
@@ -467,7 +504,7 @@ test("exact migration 0069 plus 0070 commits once and replays only by reading th
   assert.equal(preflight[2]?.rows.length, 0);
   assert.equal(preflight[3]?.rows.length, 0);
 
-  const fresh = executeTransaction(database, plan.freshBatchStatements);
+  const fresh = executeTransaction(database, materializeFresh(database, plan));
   assert.deepEqual(fresh.slice(0, 4).map((item) => item.changes), [1, 1, 1, 1]);
   assert.equal(fresh[4]?.rows.length, 1);
   assert.equal(fresh[5]?.rows.length, 1);
@@ -613,9 +650,9 @@ test("two stale preflights deterministically converge on one commit and one exac
   insertBusiness(database, prepared.fixture);
   assert.equal(executeTransaction(database, plan.preflightStatements)[1]?.rows.length, 0);
   assert.equal(executeTransaction(database, plan.preflightStatements)[1]?.rows.length, 0);
-  const fresh = executeTransaction(database, plan.freshBatchStatements);
+  const fresh = executeTransaction(database, materializeFresh(database, plan));
   assert.throws(
-    () => executeTransaction(database, plan.freshBatchStatements),
+    () => executeTransaction(database, materializeFresh(database, plan)),
     /UNIQUE constraint failed.*OwnerAuthIdempotency/i,
   );
   const replay = executeTransaction(database, plan.replayStatements);
@@ -640,7 +677,7 @@ test("failure after every statement and missing guards roll back the complete co
     const unrelatedBefore = seedCommittedBundle(database, unrelated, unrelatedPlan);
     insertBusiness(database, prepared.fixture);
     assert.throws(
-      () => executeTransaction(database, plan.freshBatchStatements, failAfter),
+      () => executeTransaction(database, materializeFresh(database, plan), failAfter),
       /INJECTED_FAILURE_AFTER_/,
     );
     assert.equal(scopedCount(
@@ -662,7 +699,7 @@ test("failure after every statement and missing guards roll back the complete co
     insertBusiness(guardDatabase, prepared.fixture);
     guardDatabase.exec(`DROP TRIGGER "${triggerName}"`);
     assert.throws(
-      () => executeTransaction(guardDatabase, plan.freshBatchStatements),
+      () => executeTransaction(guardDatabase, materializeFresh(guardDatabase, plan)),
       /EXPECTED_CHANGES|CONTRACT_MISMATCH|NOT NULL constraint failed/i,
     );
     assert.equal(scopedCount(
@@ -709,7 +746,7 @@ test("the SQL dependency chain aborts a zero-row operation even without JavaScri
         ? `kw-owner-mutation-idempotency:${"0".repeat(64)}`
         : binding),
   };
-  const driftedStatements = plan.freshBatchStatements.map((statement, index) =>
+  const driftedStatements = materializeFresh(database, plan).map((statement, index) =>
     index === 1 ? driftedOperation : statement);
 
   assert.throws(
@@ -761,7 +798,7 @@ test("read-only replay exposes every partial committed bundle and never looks ex
   for (const partial of cases) {
     const database = migratedDatabase();
     insertBusiness(database, prepared.fixture);
-    executeTransaction(database, plan.freshBatchStatements);
+    executeTransaction(database, materializeFresh(database, plan));
     const triggerSql = database.prepare(
       `SELECT "sql" FROM "sqlite_master" WHERE "type" = 'trigger' AND "name" = ?`,
     ).pluck().get(partial.trigger);

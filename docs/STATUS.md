@@ -1,6 +1,6 @@
 # Current status
 
-Last updated: 2026-09-05 (America/Toronto)
+Last updated: 2026-09-06 (America/Toronto)
 
 ## Plain-English status
 
@@ -129,7 +129,8 @@ commit, replay, and failures after each write; it does not prove the future D1
 adapter or recovery schema. Caller-supplied counts and timestamps stay explicitly
 non-durable validation candidates. No recovery migration or adapter exists.
 
-The first concrete owner operation is now defined without activating it.
+The first concrete owner operation is now defined and locally interpreted
+without activating it.
 `owner.dossier.accept` binds the exact authenticated decision record, current
 owner session, request digest, idempotency result, business, and outbox event.
 Its fresh SQL uses regular inserts so a losing race throws instead of silently
@@ -140,43 +141,57 @@ already `COMMITTED`. The exact source migration 0069/0070 chain is exercised
 only in disposable in-memory SQLite for fresh commit, mutation-free replay, a
 deterministic stale-preflight race, every missing guard, a pre-existing exact
 decision attack, partial replay bundles, and rollback after every statement.
-This proves the SQL dependency shape, not Cloudflare D1 durability. There is no
-injected D1 result parser/executor, runtime import, binding, route, persistent
-migration, real owner action, or live-resource path.
+The new disconnected executor now verifies the full normalized definitions,
+object types, owning tables, and exact set of all nine triggers together with
+the database schema version. The following fresh write is fenced to that exact
+version, so a trigger or schema change after preflight fails instead of inheriting
+stale approval. It also handles Cloudflare's documented null mutation-result
+form, checks the four exact affected-row counts, database time, the signed owner
+decision, canonical idempotency/outbox data, complete timestamp order, and one
+complete durable reload. It returns an already committed request without
+mutation and can recover a losing race or lost response only after a new exact
+read. This proves the SQL and injected-result contract, not Cloudflare D1
+durability or true concurrent D1 behavior. There is still no runtime import,
+named binding, route, persistent migration, real owner action, or live-resource
+path.
 
 ## Verified checkpoint
 
-- Current change: ADR 0056 and a content-addressed source-only plan define one
-  concrete `owner.dossier.accept` transaction across source migrations 0069 and
-  0070. The plan binds the exact authenticated decision, current owner session,
-  business, request/result digests, idempotency record, and outbox event while
-  granting no runtime or owner-action authority.
+- Current change: ADR 0057 adds the disconnected result state machine for the
+  concrete `owner.dossier.accept` transaction. Plan version 2 now also binds the
+  owner-session window, canonical expected records, and exact normalized digest
+  of every migration 0069/0070 trigger body. An independent Luna max audit found
+  and blocked release on an unfenced trigger-preflight race and a documented D1
+  null-result shape; both are now fixed and regression-tested.
 - The fresh path now fails atomically when any required write does not happen.
   Regular inserts make a stale losing attempt throw; finalization requires
   `changes() = 1` from the immediately preceding decision insert; the outbox
   requires the exact committed ledger row. A pre-existing exact decision cannot
   impersonate a decision inserted by the current transaction.
-- Disposable in-memory SQLite proof covers fresh commit, complete read-only
-  replay, deterministic stale-preflight interleaving, all nine writer guards,
-  failure after every statement, a pre-existing-decision/zero-row attack,
-  partial replay bundles, exact canonical event content, and preservation of an
-  unrelated valid decision/ledger/outbox bundle. This is SQL-contract evidence,
-  not Cloudflare D1 concurrency or durability proof.
-- Verification for this checkpoint: 566/566 tests, safety configuration,
-  standalone typecheck, lint, Cloudflare build with bundle sanitization (one
-  local secret value removed; 2,018 files scanned), and the default-environment
-  Wrangler dry run passed locally. The known OpenNext Windows and generated
-  duplicate-key warnings remain non-blocking and unchanged.
+- Disposable local proof now covers fresh commit, mutation-free exact replay,
+  deterministic stale-preflight recovery, response loss after commit, complete
+  trigger-body tamper, unexpected target-table triggers, wrong trigger type or
+  owner table, post-preflight schema drift, nullable mutation results, full
+  durable chronology, visible reservation and partial-state rejection,
+  affected-row metadata drift, malformed result counts, copied-result trust,
+  and wrong HMAC material before database access. The prior SQL rollback and
+  unrelated-bundle coverage remains green.
+- The post-fix Luna max audit found no remaining P0/P1 correctness issue in this
+  disconnected checkpoint. It independently confirmed both prior P1s are closed;
+  real D1/Miniflare concurrency and process-loss behavior remains the explicit
+  next technical proof rather than being overstated here.
+- Verification for this checkpoint: focused transaction/executor proof 20/20;
+  full suite 579/579; safety configuration; standalone typecheck; lint;
+  Cloudflare build with bundle sanitization (one local secret value removed;
+  2,018 files scanned); default-environment Wrangler dry run; generated engine
+  binding check; and inert-engine Wrangler dry run all passed locally. The known
+  OpenNext Windows and generated duplicate-key warnings remain non-blocking and
+  unchanged.
 - Owner browser regression passed after the build: six pages, desktop 1440px,
-  mobile 390px, list ready in 375 ms, dossier ready in 842 ms, and zero external
-  requests. The UI itself did not change; these are local synthetic-data checks.
-- Independent Luna max review ran three passes. It exposed missing
-  transaction-local count enforcement, pre-existing-decision bypass risk,
-  incomplete replay/guard coverage, and a false shared-memory SQLite assumption.
-  The fixes were independently rechecked with no remaining P0 or P1 findings.
-  The zero-byte test artifact created by the unsupported URI was removed and
-  TEST-001 now records the prevention rule.
-- No UI feature, real-data evaluation, D1 adapter, live database, provider,
+  mobile 390px, list ready in 952 ms, dossier ready in 432 ms, and zero external
+  requests. The UI itself did not change in this checkpoint; these are local
+  synthetic-data checks.
+- No UI feature, real-data evaluation, live D1 binding, live database, provider,
   mailbox, production control, deployment, migration application, prospect
   contact, outreach, send, or cost changed in this checkpoint. Spend impact:
   C$0. Existing live-state claims below are prior inventory, not a fresh
@@ -184,10 +199,10 @@ migration, real owner action, or live-resource path.
   CI references must not be read as evidence for this commit.
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `089c50f5c32b9c0baa65692b1529cc03e13745b8`
+  `aa6a388c9d5374984c0125e3194008334ac9ec2a`
 - This milestone's verifying commit is the exact branch HEAD containing ADR
-  0056 and the concrete owner-dossier transaction plan. Verify its immutable SHA
-  with `git rev-parse HEAD`
+  0057 and the disconnected owner-dossier D1 result executor. Verify its
+  immutable SHA with `git rev-parse HEAD`
   after the atomic push; local, upstream, and remote equality remains a release
   check.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
@@ -2337,8 +2352,18 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
   `owner.dossier.accept` transaction plan. It remains unreachable from runtime,
   uses only disposable in-memory SQLite evidence, and grants no database,
   owner-action, route, deployment, provider, outreach, send, or spend authority.
-  A real D1 executor, Miniflare proof, migration application, and owner UI action
+  Live D1 wiring, Miniflare proof, migration application, and owner UI action
   remain separate reviewed gates.
+- No new owner decision is required for the disconnected D1 result executor.
+  Its structural adapter has no named binding or runtime importer, source
+  migrations remain unapplied, and its successful result explicitly says live
+  D1 execution is unproven. An isolated D1/Miniflare rehearsal, migration
+  application, owner UI action, progress bridge, and every live operation remain
+  separate reviewed gates.
+- No new owner decision is required for the next local CEO rebuild monitor.
+  Riley explicitly requested it. It must stay private on this computer, outside
+  OneDrive and Google Drive, open inside Codex desktop, expose no secrets or
+  hidden reasoning, contact no provider, deploy nowhere, and cost C$0.
 - Riley directed that this rebuild branch should eventually become `main`. That
   is recorded as the intended final cutover, not approval to merge now. The merge
   remains gated by the completed rebuild, full safety/review/rollback evidence,
@@ -2346,20 +2371,19 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
 
 ## Next three actions
 
-1. Await Riley's or Aidan's exact staging-only approval phrase for packet digest
+1. Build the requested private local-only CEO rebuild monitor inside Codex
+   desktop. Persist a plain-English stage map, current work state, last meaningful
+   update, verified Git checkpoint versus uncommitted work, blockers/owner action,
+   safety facts, and short timeline; enforce meaningful-transition updates in
+   the agent workflow and document how Riley keeps it open beside this task.
+2. Rehearse the unchanged disconnected `owner.dossier.accept` executor against
+   an isolated disposable D1/Miniflare resource. Prove actual concurrent callers,
+   process-loss/ambiguous-response recovery, exact metadata, and zero persistent
+   residue outside the disposable resource before proposing any staging migration.
+3. Await Riley's or Aidan's exact staging-only approval phrase for packet digest
    `a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9`.
    If supplied, create a separate content-bound approval receipt and reverify
    the packet before any console-only staging deployment.
-2. Populate the ignored ten-business manifest only after Riley or Aidan reviews
-   the exact real records and the separate private-research/source decision is
-   recorded; do not infer approval for Browser, storage, verification, or any
-   downstream phase from the manifest.
-3. Add the disconnected D1-result parser/executor for the concrete
-   `owner.dossier.accept` plan: verify exact trigger definitions, database time,
-   affected-row metadata, durable decision/idempotency/outbox rows, read-only
-   replay, and the post-race reload. Keep it unreachable from runtime and prove
-   it against an isolated disposable D1/Miniflare resource before proposing any
-   staging migration.
 
 ## Resume instructions
 

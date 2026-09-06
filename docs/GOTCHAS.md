@@ -5,6 +5,29 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## DATA-013 — An exact trigger preflight was not the trigger set used by the write
+
+- **Symptom:** the owner-action executor could prove all nine trigger bodies in
+  a read batch, then later submit a fresh transaction whose SQL checked only
+  trigger names and marker fragments. A schema change between those calls could
+  let the write inherit stale preflight evidence.
+- **Root cause:** exact validation and mutation were separate database calls
+  without a compare-and-swap fence. Exact names and hashes at time A do not
+  prove the same schema is active at time B.
+- **Proven fix:** read every trigger on all three guarded tables together with
+  `PRAGMA schema_version`; reject extras and wrong object type/table; then
+  materialize the observed version into both fresh entry statements. Any schema
+  drift before the write causes the transaction to fail, and recovery must pass
+  a new exact read.
+- **Prevention/test:** the safety checker requires the exact-set query,
+  two-binding materializer, and schema predicate. Disposable tests add an extra
+  trigger before preflight and between preflight/write, spoof trigger type/table,
+  and prove the target transaction leaves zero rows.
+- **Affected area:** split preflight/write database boundaries, owner-auth
+  trigger verification, and future D1 transaction adapters.
+- **Verifying commit:** branch HEAD containing ADR 0057; immutable SHA recorded
+  in `docs/STATUS.md` after the atomic push.
+
 ## DATA-012 — Schema-valid contact invocation JSON impersonated durable contact-review proof
 
 - **Symptom:** a copied or hand-built contact invocation could satisfy the

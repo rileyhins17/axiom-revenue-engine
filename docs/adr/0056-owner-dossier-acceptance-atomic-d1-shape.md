@@ -143,9 +143,11 @@ transactional batch.
   rollback case.
 - The generic `OR IGNORE` plan from ADR 0053 remains a non-executable historical
   shape; it is not sufficient for this concrete fresh mutation.
-- The next adapter must parse current D1 result metadata, verify every required
-  trigger rather than merely count rows, and re-read after a caught race before
-  classifying it.
+- The disconnected adapter in ADR 0057 now parses current D1-shaped result
+  metadata, verifies the full normalized definition, type, table, exact set,
+  and observed schema version of every required trigger, fences the following
+  write to that schema version, and re-reads after a caught race before
+  classifying it. Disposable D1/Miniflare execution is still outstanding.
 - This design still does not prove Cloudflare D1 execution, durability, or
   process-loss recovery. A disposable SQLite transaction is evidence about the
   SQL contract only.
@@ -162,7 +164,7 @@ transactional batch.
    pre-existing exact decision, partial-bundle visibility, unrelated-bundle
    preservation, and rollback after every statement. Actual concurrent D1
    execution remains part of action 4.
-3. [ ] Add a disconnected D1-result parser/executor that verifies exact trigger
+3. [x] Add a disconnected D1-result parser/executor that verifies exact trigger
    definitions, database time, affected-row metadata, durable row identity, and
    the post-race reload without importing a live binding.
 4. [ ] Rehearse that adapter against an isolated disposable D1/Miniflare resource
