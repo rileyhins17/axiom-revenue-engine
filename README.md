@@ -634,6 +634,21 @@ migration, route, owner action, database binding, deployment, provider,
 mailbox, prospect, or spend path exists. See
 [`docs/adr/0055-owner-auth-abandonment-receipts-and-affected-row-proofs.md`](docs/adr/0055-owner-auth-abandonment-receipts-and-affected-row-proofs.md).
 
+One concrete owner action now closes the abstract SQL gap without activating
+it. The source-only `owner.dossier.accept` plan binds the exact authenticated
+decision, owner session, request, idempotency result, business, and outbox event.
+Its fresh path uses regular inserts so a concurrent conflict throws; the
+decision insert is reservation-claim gated, finalization requires that exact
+decision row, and the outbox insert cannot succeed unless the idempotency row
+reached `COMMITTED`. The exact migration 0069/0070 chain is exercised in
+disposable in-memory SQLite for fresh commit, read-only replay, a deterministic
+stale-preflight race, missing guards, SQL-enforced zero-row rollback even when
+the exact decision predates the attempt, unchanged unrelated committed records,
+and rollback after every statement. This is SQL-contract evidence, not proof of
+concurrent Cloudflare D1 execution, and no adapter, binding, route, migration,
+owner action, or live resource exists. See
+[`docs/adr/0056-owner-dossier-acceptance-atomic-d1-shape.md`](docs/adr/0056-owner-dossier-acceptance-atomic-d1-shape.md).
+
 After an owner has reviewed the exact source plan and deterministic audit input,
 Codex can use the separate local-only materialization command
 `npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite`.

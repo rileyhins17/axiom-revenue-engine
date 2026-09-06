@@ -690,3 +690,21 @@ Retire entries when the architecture makes them impossible.
   environment remains limited to `main` and credentials remain absent by default.
 - **Affected area:** production release integrity and workflow injection safety.
 - **Verifying commit:** `23ee458`.
+
+## TEST-001 — SQLite URI text was mistaken for a shared in-memory database
+
+- **Symptom:** a two-connection test appeared to use
+  `file:...?...mode=memory&cache=shared`, but `better-sqlite3` created a real
+  zero-byte file named `file` in the repository.
+- **Root cause:** the installed native binding does not open SQLite with
+  `SQLITE_OPEN_URI`, so URI-looking text is treated as an ordinary filename.
+- **Proven fix:** use a single explicit `:memory:` database for the deterministic
+  stale-preflight interleaving, assert `database.memory === true`, and leave real
+  concurrent execution to the later disposable D1/Miniflare proof.
+- **Prevention/test:**
+  `private-kw-owner-auth-dossier-accept-d1-plan.test.ts` asserts the database is
+  in memory; reviewer and release checks verify that no `file` artifact exists.
+- **Affected area:** local SQLite concurrency simulations and source-only D1
+  transaction proofs.
+- **Verifying commit:** branch HEAD containing ADR 0056; immutable SHA recorded
+  in `docs/STATUS.md` after the atomic push.

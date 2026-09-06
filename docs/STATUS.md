@@ -129,36 +129,65 @@ commit, replay, and failures after each write; it does not prove the future D1
 adapter or recovery schema. Caller-supplied counts and timestamps stay explicitly
 non-durable validation candidates. No recovery migration or adapter exists.
 
+The first concrete owner operation is now defined without activating it.
+`owner.dossier.accept` binds the exact authenticated decision record, current
+owner session, request digest, idempotency result, business, and outbox event.
+Its fresh SQL uses regular inserts so a losing race throws instead of silently
+changing zero rows; the decision is gated by the exact reservation, finalization
+requires both that exact decision row and an immediately preceding one-row
+insert, and the outbox insert cannot succeed unless the idempotency row is
+already `COMMITTED`. The exact source migration 0069/0070 chain is exercised
+only in disposable in-memory SQLite for fresh commit, mutation-free replay, a
+deterministic stale-preflight race, every missing guard, a pre-existing exact
+decision attack, partial replay bundles, and rollback after every statement.
+This proves the SQL dependency shape, not Cloudflare D1 durability. There is no
+injected D1 result parser/executor, runtime import, binding, route, persistent
+migration, real owner action, or live-resource path.
+
 ## Verified checkpoint
 
-- Current change: ADR 0055 adds abandonment candidates and transaction-count
-  validation. Candidates preserve observation/decision lineage; a decision
-  inconsistent with the supplied observation is rejected. They cannot record recovery,
-  fence a worker, issue a new key, or prove durable execution.
-- Verification for this checkpoint: 559/559 tests, safety configuration,
-  standalone typecheck, lint, Cloudflare build with bundle sanitization, and
-  the default-environment Wrangler dry run passed locally. The simplified
-  SQLite harness checks one scoped owner change, mutation-free replay,
-  rollback after each of four writes, and unchanged unrelated records.
-  It does not implement or prove the actual migration-0070 D1 adapter.
-- Owner browser regression check passed after the builds: six pages at desktop
-  1440px and mobile 390px, list ready in 536 ms, dossier in 822 ms, and zero
-  external requests. These are local synthetic-data results.
-- Independent Luna max review identified finite-timestamp validation and
-  per-intent count coverage gaps. Both were corrected: invalid dates/offsets
-  fail validation, count scope names the exact key, and fixture databases
-  retain unrelated ledger/outbox rows through commit, replay, and rollback.
-- No UI feature, real-data evaluation, provider, mailbox, production control,
-  deployment, persistent migration, or cost changed in this checkpoint.
-  Spend impact: C$0. Existing live-state claims below are prior inventory,
-  not a fresh production inspection. Linux CI for this new commit is pending;
-  older green CI references must not be read as evidence for this commit.
+- Current change: ADR 0056 and a content-addressed source-only plan define one
+  concrete `owner.dossier.accept` transaction across source migrations 0069 and
+  0070. The plan binds the exact authenticated decision, current owner session,
+  business, request/result digests, idempotency record, and outbox event while
+  granting no runtime or owner-action authority.
+- The fresh path now fails atomically when any required write does not happen.
+  Regular inserts make a stale losing attempt throw; finalization requires
+  `changes() = 1` from the immediately preceding decision insert; the outbox
+  requires the exact committed ledger row. A pre-existing exact decision cannot
+  impersonate a decision inserted by the current transaction.
+- Disposable in-memory SQLite proof covers fresh commit, complete read-only
+  replay, deterministic stale-preflight interleaving, all nine writer guards,
+  failure after every statement, a pre-existing-decision/zero-row attack,
+  partial replay bundles, exact canonical event content, and preservation of an
+  unrelated valid decision/ledger/outbox bundle. This is SQL-contract evidence,
+  not Cloudflare D1 concurrency or durability proof.
+- Verification for this checkpoint: 566/566 tests, safety configuration,
+  standalone typecheck, lint, Cloudflare build with bundle sanitization (one
+  local secret value removed; 2,018 files scanned), and the default-environment
+  Wrangler dry run passed locally. The known OpenNext Windows and generated
+  duplicate-key warnings remain non-blocking and unchanged.
+- Owner browser regression passed after the build: six pages, desktop 1440px,
+  mobile 390px, list ready in 375 ms, dossier ready in 842 ms, and zero external
+  requests. The UI itself did not change; these are local synthetic-data checks.
+- Independent Luna max review ran three passes. It exposed missing
+  transaction-local count enforcement, pre-existing-decision bypass risk,
+  incomplete replay/guard coverage, and a false shared-memory SQLite assumption.
+  The fixes were independently rechecked with no remaining P0 or P1 findings.
+  The zero-byte test artifact created by the unsupported URI was removed and
+  TEST-001 now records the prevention rule.
+- No UI feature, real-data evaluation, D1 adapter, live database, provider,
+  mailbox, production control, deployment, migration application, prospect
+  contact, outreach, send, or cost changed in this checkpoint. Spend impact:
+  C$0. Existing live-state claims below are prior inventory, not a fresh
+  production inspection. Linux CI for this new commit is pending; older green
+  CI references must not be read as evidence for this commit.
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `393e42ba44796e0af13a16c0e63b84ecd799b31b`
+  `089c50f5c32b9c0baa65692b1529cc03e13745b8`
 - This milestone's verifying commit is the exact branch HEAD containing ADR
-  0055, the abandonment/count-proof contract, ADR 0054, and migration 0070. Verify its immutable
-  SHA with `git rev-parse HEAD`
+  0056 and the concrete owner-dossier transaction plan. Verify its immutable SHA
+  with `git rev-parse HEAD`
   after the atomic push; local, upstream, and remote equality remains a release
   check.
 - Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
@@ -2304,6 +2333,12 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
   authority. Retention is a technical proposal, not a legal conclusion or a
   deletion schedule. Engineering design and disposable tests can continue;
   activation, deletion, and real owner operations retain their existing gates.
+- No new owner decision is required for the concrete source-only
+  `owner.dossier.accept` transaction plan. It remains unreachable from runtime,
+  uses only disposable in-memory SQLite evidence, and grants no database,
+  owner-action, route, deployment, provider, outreach, send, or spend authority.
+  A real D1 executor, Miniflare proof, migration application, and owner UI action
+  remain separate reviewed gates.
 - Riley directed that this rebuild branch should eventually become `main`. That
   is recorded as the intended final cutover, not approval to merge now. The merge
   remains gated by the completed rebuild, full safety/review/rollback evidence,
@@ -2319,12 +2354,12 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
    the exact real records and the separate private-research/source decision is
    recorded; do not infer approval for Browser, storage, verification, or any
    downstream phase from the manifest.
-3. Exercise one concrete owner action against migration 0070 in disposable
-   SQLite: enforce its target identity and affected-row assertion inside the
-   transaction, verify exact result/outbox replay, and inject failures at each
-   statement. Do not connect a live adapter. Recovery schema, fencing, and key
-   replacement must be reconciled with the current deterministic key before
-   activation; a candidate receipt alone cannot make an old worker safe.
+3. Add the disconnected D1-result parser/executor for the concrete
+   `owner.dossier.accept` plan: verify exact trigger definitions, database time,
+   affected-row metadata, durable decision/idempotency/outbox rows, read-only
+   replay, and the post-race reload. Keep it unreachable from runtime and prove
+   it against an isolated disposable D1/Miniflare resource before proposing any
+   staging migration.
 
 ## Resume instructions
 

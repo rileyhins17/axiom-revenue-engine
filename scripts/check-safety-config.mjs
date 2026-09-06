@@ -126,6 +126,7 @@ const privateKwOwnerAuthIdempotency = await readFile(new URL("../src/lib/revenue
 const privateKwOwnerAuthIdempotencyD1Plan = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-idempotency-d1-plan.ts", import.meta.url), "utf8");
 const privateKwOwnerAuthIdempotencyRecovery = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.ts", import.meta.url), "utf8");
 const privateKwOwnerAuthIdempotencyRecoveryProof = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery-proof.ts", import.meta.url), "utf8");
+const privateKwOwnerAuthDossierAcceptD1Plan = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
 const privateKwAuthenticatedOwnerDecisionMigration = await readFile(new URL("../migrations/0069_authenticated_owner_dossier_decisions.sql", import.meta.url), "utf8");
 const privateKwOwnerAuthIdempotencyOutboxMigration = await readFile(new URL("../migrations/0070_owner_auth_idempotency_outbox.sql", import.meta.url), "utf8");
@@ -826,6 +827,22 @@ requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery-
 requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery-proof.ts", privateKwOwnerAuthIdempotencyRecoveryProof, /const trustedRecoveryReceipts = new WeakSet<object>\(\)[\s\S]*?trustedRecoveryReceipts\.add\(receipt\)[\s\S]*?trustedRecoveryReceipts\.has\(value\)/, "recovery proof consumers must require exact in-process receipts");
 requireMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery-proof.ts", privateKwOwnerAuthIdempotencyRecoveryProof, /const trustedMutationProofs = new WeakSet<object>\(\)[\s\S]*?trustedMutationProofs\.add\(proof\)[\s\S]*?trustedMutationProofs\.has\(value\)/, "affected-row proof consumers must require exact in-process proofs");
 forbidMatch("src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery-proof.ts", privateKwOwnerAuthIdempotencyRecoveryProof, /@cloudflare|@\/lib\/auth|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "owner-auth recovery proof must stay disconnected from auth adapters, runtime, files, live databases, providers, and network");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /PRIVATE_KW_OWNER_DOSSIER_ACCEPT_D1_PLAN_VERSION\s*=\s*\n?\s*"kw-owner-dossier-accept-d1-plan-v1"/, "the concrete owner dossier transaction must use the reviewed versioned contract");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /PRIVATE_KW_OWNER_DOSSIER_ACCEPT_OPERATION\s*=\s*\n?\s*"owner\.dossier\.accept"/, "the concrete transaction must target only owner dossier acceptance");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /requireInProcessPrivateKwOwnerAuthServerBoundary[\s\S]*?requireInProcessPrivateKwOwnerAuthIdempotencyCommitResult[\s\S]*?requireInProcessPrivateKwAuthenticatedOwnerDecisionRecord[\s\S]*?recheckPrivateKwAuthenticatedOwnerDecisionSessionBinding/, "the concrete transaction must bind the exact server boundary, replay result, owner decision, and current session");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /const claimExistsPredicate\s*=\s*\n?\s*PRIVATE_KW_OWNER_AUTH_MUTATION_CLAIM_EXISTS_PREDICATE[\s\S]*?INSERT INTO "RevenuePrivateKwOwnerDecision"[\s\S]*?WHERE \$\{claimExistsPredicate\}/, "the owner decision insert must embed the exact reservation claim");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /"reserve:owner_auth_idempotency"[\s\S]*?"mutation:owner_auth_operation"[\s\S]*?"finalize:owner_auth_idempotency"[\s\S]*?"insert:owner_auth_outbox"/, "the fresh transaction must reserve, mutate the exact decision, finalize, and enqueue in order");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /SET "state" = CASE WHEN changes\(\) = 1 THEN 'COMMITTED' ELSE NULL END/, "finalization must fail unless the immediately preceding owner-decision insert changed exactly one row in this transaction");
+forbidMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /INSERT OR IGNORE/i, "fresh transaction conflicts must throw and roll back rather than become silent zero-row writes");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /SELECT "recordId" FROM "RevenuePrivateKwOwnerAuthIdempotency"[\s\S]*?"state" = 'COMMITTED'/, "outbox insertion must fail when the exact idempotency record did not commit");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /reservation:\s*z\.literal\(1\)[\s\S]*?ownerDecision:\s*z\.literal\(1\)[\s\S]*?finalization:\s*z\.literal\(1\)[\s\S]*?outbox:\s*z\.literal\(1\)/, "fresh transaction expectations must require exactly one change at every mutation step");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /replayBehavior:\s*z\.literal\("READ_EXACT_COMMITTED_BUNDLE_WITHOUT_MUTATION"\)/, "exact replay must remain a read-only bundle reload");
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /planId:[\s\S]*?planDigest:[\s\S]*?artifactReferenceDigest\(core\)[\s\S]*?const trustedPlans = new WeakSet<object>/, "the concrete transaction plan must be content-addressed and exact-instance trusted");
+for (const field of ["runtimeConnectionAuthorized", "migrationApplicationAuthorized", "ownerDecisionPersistenceAuthorized", "phaseInputCreationAuthorized", "progressReceiptCreationAuthorized", "phaseAdvancementAuthorized", "routeAuthorized", "uiMutationAuthorized", "outreachAuthorized", "sendAuthorized", "deploymentAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in the concrete owner dossier transaction plan`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /providerOperationsAuthorized:\s*z\.literal\(0\)[\s\S]*?costAuthorizedUsd:\s*z\.literal\(0\)/, "the concrete transaction plan must authorize zero provider operations and cost");
+forbidMatch("src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts", privateKwOwnerAuthDossierAcceptD1Plan, /@cloudflare|@\/lib\/auth|better-auth|env\.[A-Z_]+|D1Database|R2Bucket|node:fs|readFile|writeFile|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "the concrete owner dossier transaction plan must stay disconnected from auth adapters, runtime bindings, files, live databases, providers, and network");
 requireMatch("migrations/0070_owner_auth_idempotency_outbox.sql", privateKwOwnerAuthIdempotencyOutboxMigration, /CREATE TABLE "RevenuePrivateKwOwnerAuthIdempotency"[\s\S]*?CREATE TABLE "RevenuePrivateKwOwnerAuthMutationOutbox"/, "migration 0070 must define both the idempotency ledger and transactional outbox");
 requireMatch("migrations/0070_owner_auth_idempotency_outbox.sql", privateKwOwnerAuthIdempotencyOutboxMigration, /CHECK \("state" IN \('RESERVED', 'COMMITTED'\)\)/, "migration 0070 must constrain reservation and commit states");
 requireMatch("migrations/0070_owner_auth_idempotency_outbox.sql", privateKwOwnerAuthIdempotencyOutboxMigration, /CHECK \("outboxRequired" = 1\)[\s\S]*?CHECK \("mutationAuthorized" = 0\)[\s\S]*?CHECK \("databaseMutationAuthorized" = 0\)/, "migration 0070 must keep idempotency authority disabled");
@@ -860,9 +877,18 @@ for (const [name, content] of [
     && ![
       "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery-proof.ts",
       "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery-proof.test.ts",
+      "src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.test.ts",
       "scripts/check-safety-config.mjs",
     ].includes(name)) {
     failures.push(`${name}: recovery candidates and count validation must remain disconnected from runtime and operator scripts`);
+  }
+  if (content.includes("private-kw-owner-auth-dossier-accept-d1-plan")
+    && ![
+      "src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts",
+      "src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.test.ts",
+      "scripts/check-safety-config.mjs",
+    ].includes(name)) {
+    failures.push(`${name}: the concrete owner dossier transaction plan must remain unreachable from runtime, UI, routes, and operator scripts`);
   }
   if (
     content.includes("private-kw-authenticated-owner-decision-d1")
@@ -906,6 +932,8 @@ for (const [name, content] of [
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.test.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery-proof.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery-proof.test.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.test.ts"
     && name !== "scripts/check-safety-config.mjs"
   ) {
     failures.push(`${name}: owner-auth readiness must remain unreachable from every runtime, UI, route, and operator script`);
@@ -926,6 +954,8 @@ for (const [name, content] of [
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery.test.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery-proof.ts"
     && name !== "src/lib/revenue-engine/private-kw-owner-auth-idempotency-recovery-proof.test.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.ts"
+    && name !== "src/lib/revenue-engine/private-kw-owner-auth-dossier-accept-d1-plan.test.ts"
     && name !== "scripts/check-safety-config.mjs"
   ) {
     failures.push(`${name}: owner-auth server boundary must remain unreachable from every runtime, UI, route, and operator script`);

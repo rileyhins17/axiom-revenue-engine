@@ -116,10 +116,11 @@ behaviour reviewable and testable while keeping all authority disconnected.
    affected-row proof contracts.
 2. [x] Exercise fresh, replay, and rollback after each write in a simplified
    disposable SQLite fixture; reject copied candidates and chronology/count drift.
-3. [ ] Prove the actual migration-0070 transaction with one concrete operation,
-   statement-level count enforcement, and exact stored-result replay. Resolve
-   retention and fencing as engineering design; obtain owner approval before
-   activating deletion or live recovery.
+3. [x] Prove the migration-0069/0070 SQL transaction in disposable SQLite with
+   one concrete operation, statement-level abort dependencies, exact
+   stored-result replay, a deterministic stale-preflight race, and rollback
+   after every statement; see ADR 0056. This does not prove a D1 adapter,
+   concurrent D1 execution, or live durability.
 4. [ ] Design the future replacement-key issuance boundary with owner auth,
    MFA/recovery, backup, and rollback evidence.
 5. [ ] Require the existing release gate before applying a migration to a real
