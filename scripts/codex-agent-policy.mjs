@@ -30,15 +30,16 @@ const ROLE_KEYS = Object.freeze([
 ]);
 
 const CANONICAL_CHILD_PROHIBITION = "Never spawn another agent; never override the configured model, reasoning effort, verbosity, sandbox, or permissions; never commit, push, merge, rebase, deploy, migrate, contact a prospect, use live providers/resources, access OneDrive or Google Drive, or expose secrets.";
+const CANONICAL_CHECKOUT_ATTESTATION = "Before reading any project file, prove that the resolved Git top level equals C:/Users/riley/Documents/ChatGPT/APE and that the branch and HEAD equal the task packet. Stop on any mismatch. Every filesystem or Git command must target that exact checkout with an absolute path or git -C; never trust the inherited working directory. Return the attested root, branch, and HEAD in Checks.";
 
 const APPROVED_INSTRUCTION_DIGESTS = Object.freeze({
-  "docs-researcher.toml": "6590669d013daa18fcc03da203a84435f9f6738d71cd969576ea6e31178649b7",
-  "implementation-worker.toml": "94e66b89754941a311faa90f3095c32062358ec900aa792e1508922e1ab1cd18",
-  "lead-quality-auditor.toml": "8a299338dd02a51e8051409983252d6b2e355e641b7f7129814e96a9aad3156d",
-  "repo-explorer.toml": "64f2953dfdb094e4c1e2798ae917c5f823532704ee77b328f324cc51475d7d1c",
-  "security-reviewer.toml": "6bcbab8cc4c58fe0351110e636fc8ef796c1dbb43e22c757230789bc7a84c215",
-  "test-auditor.toml": "d1d6d303f2b536fe64083a7244acefd382cf9b169739b8e01b3dcd594ccefa4c",
-  "ui-qa.toml": "58aee370bea70c4cf012ea2ad0102586b7cc87d02bc03659ee7850fcdd33b29c",
+  "docs-researcher.toml": "81da7801f0a24f929e7753538d5347a410423b160b919659115da53b949e3617",
+  "implementation-worker.toml": "fe49549c179a35cb228f07003968183648b217f9cc35635cef67fcbbb64a5175",
+  "lead-quality-auditor.toml": "6622d078dc0b06ed0e8e4260266a3ae07b0299c860021b82a6959737faf8dbe3",
+  "repo-explorer.toml": "28c12ab01f6e5e35eac413eac2ab18e04d2c79fc52ae38801471dd919882528b",
+  "security-reviewer.toml": "1e7f5f3032308a694a14627b7526399407791c6ec0106cd28439b1934bba4d64",
+  "test-auditor.toml": "a86cefc1319ddbaf19013e383e74197720d7df7e5a928ff54357e6ed9e5559a9",
+  "ui-qa.toml": "7c1266013e47b5be2b16578e8c9662fc32bea44d5ff0d716a9c1dc9200e42433",
 });
 
 function parseStrictCodexToml(name, content, failures) {
@@ -145,6 +146,7 @@ export function validateCodexAgentPolicy({ projectConfig, agentConfigs }) {
     const instructions = String(values.get("developer_instructions") ?? "").replace(/\s+/g, " ").trim();
     const instructionDigest = createHash("sha256").update(instructions).digest("hex");
     if (instructionDigest !== APPROVED_INSTRUCTION_DIGESTS[fileName]) failures.push(`${path}: approved instruction digest is required`);
+    if (!instructions.includes(CANONICAL_CHECKOUT_ATTESTATION)) failures.push(`${path}: canonical checkout attestation is required before project reads`);
     if (!instructions.includes(CANONICAL_CHILD_PROHIBITION)) failures.push(`${path}: canonical child prohibitions are required without exceptions`);
     if (/\b(?:except|unless|when necessary|if needed|may override)\b/i.test(instructions)) failures.push(`${path}: child prohibitions may not contain exception wording`);
     const instructionsOutsideCanonicalPolicy = instructions.replace(CANONICAL_CHILD_PROHIBITION, "");

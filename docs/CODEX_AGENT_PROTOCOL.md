@@ -57,6 +57,20 @@ Sol rejects or rewrites an ambiguous packet before dispatch.
 A read-only role must receive the narrowest available runtime permissions and
 must never be launched with a broader parent override.
 
+Before reading any project file, the child must run a checkout attestation and
+prove all three task-packet values:
+
+1. Git top level is exactly `C:/Users/riley/Documents/ChatGPT/APE`.
+2. Current branch is exactly the packet branch.
+3. HEAD is exactly the packet starting commit.
+
+Any mismatch ends the child task before inspection or editing. Every later
+filesystem or Git operation must use the exact absolute checkout path or
+`git -C C:\Users\riley\Documents\ChatGPT\APE`; the inherited working directory
+is not trusted. The child includes all three attested values in `Checks`. Sol
+discards any report or patch whose attestation is absent, mismatched, or names a
+Drive-synced checkout, even when the findings otherwise look plausible.
+
 ## Child result contract
 
 Every child returns:

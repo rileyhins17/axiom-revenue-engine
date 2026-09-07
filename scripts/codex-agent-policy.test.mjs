@@ -109,3 +109,13 @@ test("rejects any unreviewed role instruction body change", () => {
 
   assert.ok(failures.some((failure) => failure.includes("approved instruction digest")));
 });
+
+test("rejects a child role that can read before canonical checkout attestation", () => {
+  const agentConfigs = validAgentConfigs();
+  agentConfigs.set("security-reviewer.toml", agentConfigs.get("security-reviewer.toml")
+    .replace(/Before reading any project file,[\s\S]*?HEAD in Checks\.\r?\n\r?\n/, ""));
+
+  const failures = validateCodexAgentPolicy({ projectConfig, agentConfigs });
+
+  assert.ok(failures.some((failure) => failure.includes("canonical checkout attestation")));
+});

@@ -4,6 +4,18 @@ Last updated: 2026-09-06 (America/Toronto)
 
 ## Plain-English status
 
+An extensive source-security audit is now the active rebuild milestone. The
+canonical snapshot identifies one critical pre-release issue: public signup can
+let somebody claim a not-yet-created approved owner address without proving
+mailbox control. Six high-risk legacy or release boundaries and several medium
+hardening gaps are also documented in `docs/SECURITY_AUDIT.md`. No production
+system was probed or changed, and all automation/providers remain off. Two first
+review drafts were rejected because they inspected the obsolete OneDrive copy;
+the project now machine-enforces an exact repository, branch, and commit
+attestation before any child agent may read code. The first remediation is to
+disable public registration and replace test self-registration with a synthetic
+local fixture.
+
 The real repository has been recovered into the local workspace, renamed to
 `rileyhins17/axiom-revenue-engine`, and made private. The foundation gate is green
 locally and on Linux. Production has now been inventoried and backed up: legacy
@@ -168,6 +180,29 @@ through Git. ADR 0058 and `docs/REBUILD_MONITOR.md` define the workflow.
 
 ## Verified checkpoint
 
+- Security audit baseline: the authoritative audit started from canonical commit
+  `f7a555a604f06b19623b727794fc505b3eebaaee`. The audit records scope,
+  limitations, strong controls, one Critical, six High, seven Medium findings,
+  release gates, and Riley's account-security responsibilities. It explicitly
+  does not claim that any system can be impossible to hack.
+- Current safety fix: every Luna role must stop before reading project files
+  unless the exact Git root, task-packet branch, and starting HEAD match. Every
+  later command targets the absolute canonical checkout or uses `git -C`, and
+  Sol rejects any result without the three attested values. The role bodies
+  remain digest-locked and the focused policy suite now includes the failed-
+  attestation case.
+- Audit verification completed: canonical root/branch/HEAD and clean starting
+  tree; current production dependency audit with zero known vulnerabilities;
+  full dependency audit with two Moderate development/build package entries and
+  no High/Critical issue; bounded tracked/history secret-pattern scan with only
+  the intentional fake-secret fixture; policy tests 10/10; full repository
+  suite 590/590; typecheck; lint; Cloudflare build; default Wrangler dry-run;
+  and the six-page owner browser acceptance gate (561 ms list, 894 ms dossier,
+  desktop/mobile, WCAG, and zero external browser requests).
+- No deployment, migration, production database access, mailbox sync, provider
+  call, prospect contact, send, or spend occurred. The last fully release-proven
+  and pushed checkpoint remains `f7a555a604f06b19623b727794fc505b3eebaaee`
+  until this bounded security checkpoint passes the complete gate and is pushed.
 - Current change: ADR 0058 adds the private local-only CEO rebuild monitor and
   makes meaningful monitor transitions part of the permanent Codex work cycle.
   The versioned schema rejects multiline dumps, common credential forms, and
@@ -2409,19 +2444,31 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
   remains gated by the completed rebuild, full safety/review/rollback evidence,
   and an explicit final release decision.
 
+### Security audit owner decision and spend
+
+- No new Riley decision is required to close the source-level Critical and High
+  findings. Public signup, insecure shared authority, SSRF, replay, unsafe direct
+  sends, and unproven release evidence are not acceptable defaults.
+- Before any real deployment or provider activation, Riley must complete the
+  account-security checklist in `docs/SECURITY_AUDIT.md` and explicitly approve
+  the isolated-staging security test scope. That future approval does not grant
+  production deployment, email, provider, or prospect-contact authority.
+- Spend impact remains C$0. This audit used local source/tests and read-only
+  public documentation; it created no subscription, provider call, deployment,
+  migration, mailbox action, or external contact.
+
 ## Next three actions
 
-1. Rehearse the unchanged disconnected `owner.dossier.accept` executor against
-   an isolated disposable D1/Miniflare resource. Prove actual concurrent callers,
-   process-loss/ambiguous-response recovery, exact metadata, and zero persistent
-   residue outside the disposable resource before proposing any staging migration.
-2. Add an automated monitor-start convenience inside Codex only if the local
-   owner workflow shows that manually restarting the loopback server is annoying;
-   do not host it or add a background cloud dependency.
-3. Await Riley's or Aidan's exact staging-only approval phrase for packet digest
-   `a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9`.
-   If supplied, create a separate content-bound approval receipt and reverify
-   the packet before any console-only staging deployment.
+1. Close `SEC-001`: disable public registration at the server, remove public
+   signup navigation, replace owner-UI self-registration with a direct synthetic
+   fixture account, and prove that even an approved email cannot self-register.
+2. Add one tested browser/request security boundary for custom mutation origin
+   checks, private/no-store responses, framing/MIME/referrer/permissions headers,
+   and CSP report-only staging preparation.
+3. Retire or redesign the legacy MCP token, agent replay/job-fencing, browser
+   SSRF, and direct Gmail reply paths before any provider or automation can be
+   activated. The deferred disposable D1 rehearsal resumes only after the open
+   Critical and High security boundaries are closed.
 
 ## Resume instructions
 

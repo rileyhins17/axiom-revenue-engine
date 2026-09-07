@@ -418,6 +418,8 @@ npm run cf:engine:dry-run
 - [`docs/KW_EVALUATION_GUIDE.md`](docs/KW_EVALUATION_GUIDE.md) — Riley's one-time
   50-lead quality-label gate and current progress.
 - [`docs/GOTCHAS.md`](docs/GOTCHAS.md) — proven recurring traps and prevention.
+- [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md) — canonical threat model,
+  current findings, strong controls, and release-blocking remediation order.
 - [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — safe operator and release procedures.
 - [`docs/CODEX_AGENT_PROTOCOL.md`](docs/CODEX_AGENT_PROTOCOL.md) — permanent
   Sol-orchestrated, Luna-worker execution and handoff contract.

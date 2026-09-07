@@ -731,3 +731,23 @@ Retire entries when the architecture makes them impossible.
   transaction proofs.
 - **Verifying commit:** branch HEAD containing ADR 0056; immutable SHA recorded
   in `docs/STATUS.md` after the atomic push.
+
+## AGENT-001 — A reviewer inspected the obsolete OneDrive checkout
+
+- **Symptom:** two security reviews reported an old commit and one explicitly
+  named `C:\Users\riley\OneDrive\Documents\ChatGPT\APE`, even though the task
+  packet named the canonical non-synced checkout.
+- **Root cause:** prose forbidding Drive use did not force agents to verify their
+  inherited working directory before reading files, and the orchestrator had no
+  machine-checked attestation requirement for accepting a report.
+- **Proven fix:** every role now hard-stops before project reads unless the exact
+  Git root, task-packet branch, and starting HEAD match; all later commands must
+  target the absolute checkout or use `git -C`. Sol rejects results without the
+  three attested values.
+- **Prevention/test:** `scripts/codex-agent-policy.test.mjs` removes the required
+  preflight from a role and proves policy validation rejects it; approved role
+  bodies remain digest-locked.
+- **Affected area:** every delegated audit, research task, test review, and
+  implementation patch.
+- **Verifying commit:** branch HEAD containing this fix; immutable SHA recorded
+  in `docs/STATUS.md` after the atomic push.

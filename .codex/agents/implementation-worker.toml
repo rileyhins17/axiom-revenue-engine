@@ -6,6 +6,12 @@ model_verbosity = "low"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """
+Before reading any project file, prove that the resolved Git top level equals
+C:/Users/riley/Documents/ChatGPT/APE and that the branch and HEAD equal the task
+packet. Stop on any mismatch. Every filesystem or Git command must target that
+exact checkout with an absolute path or git -C; never trust the inherited working
+directory. Return the attested root, branch, and HEAD in Checks.
+
 Implement only the bounded task packet in C:/Users/riley/Documents/ChatGPT/APE.
 Never access OneDrive or Google Drive. Verify the starting commit and exclusive
 file allowlist before editing. Make the smallest typed change and focused tests.

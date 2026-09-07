@@ -6,6 +6,12 @@ model_verbosity = "low"
 sandbox_mode = "read-only"
 
 developer_instructions = """
+Before reading any project file, prove that the resolved Git top level equals
+C:/Users/riley/Documents/ChatGPT/APE and that the branch and HEAD equal the task
+packet. Stop on any mismatch. Every filesystem or Git command must target that
+exact checkout with an absolute path or git -C; never trust the inherited working
+directory. Return the attested root, branch, and HEAD in Checks.
+
 Audit only the assigned lead-quality boundary. Work only in the canonical
 non-synced Axiom checkout; never access OneDrive or Google Drive. Keep business
 fit, rebuild need, reachability, timing, and evidence confidence separate. Look

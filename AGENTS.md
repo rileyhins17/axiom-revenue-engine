@@ -91,12 +91,19 @@ paying-client proof.
 - A child task packet must state the objective and exit gate, starting branch
   and commit, allowed files and commands, read/write scope, safety limits, and
   required result format.
+- Before reading any project file, every child must prove that Git resolves to
+  exactly `C:/Users/riley/Documents/ChatGPT/APE` and that the current branch and
+  HEAD equal its task packet. A mismatch is a hard stop, not a warning. Every
+  child filesystem or Git command must target that exact checkout using an
+  absolute path or `git -C`; inherited working-directory state is untrusted.
 - Child agents never spawn more agents, use OneDrive or Google Drive, expose
   secrets, contact prospects, use live providers/resources, deploy, migrate,
   commit, push, merge, rebase, or change production controls.
 - Children return a concise `Result`, `Evidence`, `Checks`, `Risks`, and `Next
   action` summary instead of raw logs. Their summary is evidence for Sol to
-  verify; it never replaces repository tests or a clean checkpoint.
+  verify; it never replaces repository tests or a clean checkpoint. `Checks`
+  must include the attested repository root, branch, and starting HEAD. Sol must
+  reject a report that names another root or commit.
 - Sol owns milestone selection, shared files and durable docs, safety review,
   integration, the complete release gate, atomic commits, branch pushes, and
   any future proposal to merge into `main`.
