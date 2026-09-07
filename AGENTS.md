@@ -109,6 +109,31 @@ paying-client proof.
 - The full operating protocol and role definitions live in
   `docs/CODEX_AGENT_PROTOCOL.md` and `.codex/agents/`.
 
+## Rebuild monitor protocol
+
+- Riley's private status surface is the loopback-only rebuild monitor documented
+  in `docs/REBUILD_MONITOR.md`. It must run only from
+  `C:\Users\riley\Documents\ChatGPT\APE` and must never be hosted or copied to
+  OneDrive or Google Drive.
+- Update it only on a meaningful transition: milestone start, long testing,
+  fixing a review finding, release verification, verified commit/push, a true
+  blocker, or inactivity. Do not turn routine commands into timeline noise.
+- The only work states are Planning, Coding, Testing, Fixing, Verification,
+  Committed, Blocked, and Inactive. A Blocked state must name the exact Riley
+  action. A Committed state requires a release receipt for the exact commit plus
+  local/upstream/GitHub equality; cleanliness alone is not verification.
+- Keep the verified checkpoint separate from unfinished working-copy status.
+  Never show secrets, environment values, file diffs, file names, raw tool logs,
+  private reasoning, or chain-of-thought in the monitor.
+- The monitor has zero operational authority. Its safety facts remain no sends,
+  no production changes, no external prospect contact, no paid provider work,
+  and C$0 unless Riley separately authorizes a future milestone that changes one
+  of those facts.
+- After the bounded milestone is committed locally, run
+  `npm run rebuild-monitor:prove-release`, push that exact proven commit, verify
+  local/upstream/remote equality, and only then record `--checkpoint`. Update
+  both the monitor and `docs/STATUS.md` in the same work cycle.
+
 ## Required verification
 
 During work, run targeted tests. Before a checkpoint or pull request, run:

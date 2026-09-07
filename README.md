@@ -18,6 +18,13 @@ Start with [`docs/STATUS.md`](docs/STATUS.md) for the current verified checkpoin
 the next three actions, blockers, live-system state, and budget. The full approved
 direction lives in [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md).
 
+For the always-visible CEO view, run `npm run rebuild-monitor` from the canonical
+non-OneDrive checkout and open `http://127.0.0.1:4317` in a Codex browser panel.
+It shows the current milestone, verified checkpoint versus unfinished work,
+completed/current/next work, blockers, safety, and the seven-stage rebuild map.
+It is private to this computer, costs C$0, loads no external services, and cannot
+perform any operation. See [`docs/REBUILD_MONITOR.md`](docs/REBUILD_MONITOR.md).
+
 ## Owner view
 
 The final owner experience has five plain-language areas:

@@ -140,6 +140,12 @@ const stagingConsoleRelease = await readFile(new URL("../src/lib/revenue-engine/
 const stagingConsoleReleaseVerifier = await readFile(new URL("./verify-staging-console-release.ts", import.meta.url), "utf8");
 const stagingConsoleReleasePacket = await readFile(new URL("../docs/releases/staging/2026-08-28-owner-quality-lab.json", import.meta.url), "utf8");
 const agentOperatingContract = await readFile(new URL("../AGENTS.md", import.meta.url), "utf8");
+const rebuildMonitorGuide = await readFile(new URL("../docs/REBUILD_MONITOR.md", import.meta.url), "utf8");
+const rebuildMonitorServer = await readFile(new URL("./serve-rebuild-monitor.ts", import.meta.url), "utf8");
+const rebuildMonitorVerifier = await readFile(new URL("./verify-rebuild-monitor.ts", import.meta.url), "utf8");
+const rebuildMonitorRepository = await readFile(new URL("./rebuild-monitor-repository.ts", import.meta.url), "utf8");
+const rebuildMonitorUpdater = await readFile(new URL("./update-rebuild-monitor.ts", import.meta.url), "utf8");
+const rebuildMonitorReleaseProof = await readFile(new URL("./prove-rebuild-monitor-release.ts", import.meta.url), "utf8");
 const codexProjectConfig = await readFile(new URL("../.codex/config.toml", import.meta.url), "utf8");
 const codexAgentRoot = new URL("../.codex/agents/", import.meta.url);
 const discoveredCodexAgentFiles = (await readdir(codexAgentRoot, { withFileTypes: true }))
@@ -172,6 +178,15 @@ requireMatch("AGENTS.md", agentOperatingContract, /no more than three children c
 requireMatch("AGENTS.md", agentOperatingContract, /must not override a child's approved model, reasoning effort, verbosity,[\s\S]*sandbox, or permissions/, "Sol must not override an approved child configuration");
 requireMatch("AGENTS.md", agentOperatingContract, /git diff --name-only[\s\S]*reject any[\s\S]*out-of-scope file/, "Sol must verify every writer allowlist before accepting a patch");
 requireMatch("AGENTS.md", agentOperatingContract, /docs\/CODEX_AGENT_PROTOCOL\.md/, "the operating contract must link the durable delegation protocol");
+requireMatch("AGENTS.md", agentOperatingContract, /docs\/REBUILD_MONITOR\.md/, "the operating contract must link the private rebuild monitor protocol");
+requireMatch("AGENTS.md", agentOperatingContract, /Planning, Coding, Testing, Fixing, Verification,[\s\S]*Committed, Blocked, and Inactive/, "the operating contract must preserve every meaningful monitor state");
+requireMatch("docs/REBUILD_MONITOR.md", rebuildMonitorGuide, /Google Drive is not used/, "the rebuild monitor guide must preserve the Drive boundary");
+requireMatch("scripts/serve-rebuild-monitor.ts", rebuildMonitorServer, /const HOST = "127\.0\.0\.1"/, "the rebuild monitor must be fixed to loopback");
+forbidMatch("scripts/serve-rebuild-monitor.ts", rebuildMonitorServer, /process\.env/, "the rebuild monitor must not read environment secrets");
+requireMatch("scripts/verify-rebuild-monitor.ts", rebuildMonitorVerifier, /external asset or service/, "the rebuild monitor must enforce its no-external-assets boundary");
+requireMatch("scripts/rebuild-monitor-repository.ts", rebuildMonitorRepository, /REBUILD_MONITOR_ROOT = "C:\\\\Users\\\\riley\\\\Documents\\\\ChatGPT\\\\APE"/, "monitor commands must require the exact non-synced checkout");
+requireMatch("scripts/update-rebuild-monitor.ts", rebuildMonitorUpdater, /release-proof\.\$\{sha\}\.json[\s\S]*ls-remote[\s\S]*upstreamSha !== sha \|\| remoteSha !== sha/, "committed monitor state must require the exact proven pushed commit");
+requireMatch("scripts/prove-rebuild-monitor-release.ts", rebuildMonitorReleaseProof, /REBUILD_MONITOR_RELEASE_CHECKS[\s\S]*for \(const check[\s\S]*runCheck/, "the monitor release receipt must execute every declared release check");
 
 for (const key of [
   "AUTONOMOUS_INTAKE_ENABLED",

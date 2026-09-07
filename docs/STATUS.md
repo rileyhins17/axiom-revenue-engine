@@ -155,9 +155,45 @@ durability or true concurrent D1 behavior. There is still no runtime import,
 named binding, route, persistent migration, real owner action, or live-resource
 path.
 
+Riley's private CEO rebuild monitor is now implemented locally outside OneDrive
+and Google Drive. It shows the current milestone and work state, exact last
+verified Git checkpoint, separate unfinished working-copy state, conservative
+seven-stage map, completed/current/next work, blockers with the exact owner
+action, safety facts, and a short meaningful-transition timeline. The monitor is
+fixed to this computer's loopback address, loads no outside assets, reads no
+environment secrets, exposes no file names or diffs, and has no execution
+controls. Its current-machine state survives new Codex tasks in an ignored local
+file; tracked code, the safe seed, and this status document remain recoverable
+through Git. ADR 0058 and `docs/REBUILD_MONITOR.md` define the workflow.
+
 ## Verified checkpoint
 
-- Current change: ADR 0057 adds the disconnected result state machine for the
+- Current change: ADR 0058 adds the private local-only CEO rebuild monitor and
+  makes meaningful monitor transitions part of the permanent Codex work cycle.
+  The versioned schema rejects multiline dumps, common credential forms, and
+  explicit private-reasoning labels; committed status requires an exact clean
+  Git checkpoint and blocked status requires Riley's exact action.
+- The server is fixed to `127.0.0.1`, refuses OneDrive and the wrong branch,
+  reads no environment variables, loads no external assets, and exposes only a
+  bounded Git checkpoint/working-copy summary. The UI has no mutation API and
+  grants no provider, database, deployment, migration, outreach, send, or spend
+  authority.
+- An independent Luna max review found five release-blocking trust gaps: a clean
+  commit could be called verified without the full gate or GitHub push, alternate
+  clones were not all rejected, Git subjects bypassed visible-copy screening, a
+  clean but unverified HEAD looked verified, and the generic update contract
+  accepted a checkpoint without its release receipt. All five are closed. The
+  reviewer also identified narrow-layout overflow and stale values after a read
+  failure; those owner-facing failures are fixed and regression-checked.
+- Monitor verification for this checkpoint: focused contract/privacy suite 10/10;
+  full repository suite 589/589; exact checkout checks; safety configuration;
+  standalone typecheck; zero-warning lint; rendered live API/owner view; mobile
+  no-overflow proof at a 337-pixel content viewport; and a wide two-column owner
+  layout at 1,323 pixels all pass. The final ignored release receipt reruns these
+  checks plus both Cloudflare dry builds and the six-page owner-browser gate
+  against the exact clean commit before that commit can be pushed and displayed
+  as verified.
+- Verified predecessor: ADR 0057 adds the disconnected result state machine for the
   concrete `owner.dossier.accept` transaction. Plan version 2 now also binds the
   owner-session window, canonical expected records, and exact normalized digest
   of every migration 0069/0070 trigger body. An independent Luna max audit found
@@ -180,7 +216,7 @@ path.
   disconnected checkpoint. It independently confirmed both prior P1s are closed;
   real D1/Miniflare concurrency and process-loss behavior remains the explicit
   next technical proof rather than being overstated here.
-- Verification for this checkpoint: focused transaction/executor proof 20/20;
+- Verification for the predecessor checkpoint: focused transaction/executor proof 20/20;
   full suite 579/579; safety configuration; standalone typecheck; lint;
   Cloudflare build with bundle sanitization (one local secret value removed;
   2,018 files scanned); default-environment Wrangler dry run; generated engine
@@ -191,17 +227,18 @@ path.
   mobile 390px, list ready in 952 ms, dossier ready in 432 ms, and zero external
   requests. The UI itself did not change in this checkpoint; these are local
   synthetic-data checks.
-- No UI feature, real-data evaluation, live D1 binding, live database, provider,
-  mailbox, production control, deployment, migration application, prospect
-  contact, outreach, send, or cost changed in this checkpoint. Spend impact:
+- No application UI feature, real-data evaluation, live D1 binding, live
+  database, provider, mailbox, production control, deployment, migration
+  application, prospect contact, outreach, send, or cost changed in this
+  checkpoint. The only UI is the private loopback status monitor. Spend impact:
   C$0. Existing live-state claims below are prior inventory, not a fresh
   production inspection. Linux CI for this new commit is pending; older green
   CI references must not be read as evidence for this commit.
 - Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
 - Verified predecessor commit before this checkpoint:
-  `aa6a388c9d5374984c0125e3194008334ac9ec2a`
+  `f99784e219d4b5e5d6e07ac1b062a62d275d4b20`
 - This milestone's verifying commit is the exact branch HEAD containing ADR
-  0057 and the disconnected owner-dossier D1 result executor. Verify its
+  0058 and the private local CEO rebuild monitor. Verify its
   immutable SHA with `git rev-parse HEAD`
   after the atomic push; local, upstream, and remote equality remains a release
   check.
@@ -830,6 +867,9 @@ Completed gates:
   established.
 - Permanent Sol integration / Luna max worker protocol, seven narrow roles,
   fail-closed configuration checks, and recurring-heartbeat continuity established.
+- Private local CEO rebuild monitor with a conservative stage map, exact
+  checkpoint/working-copy separation, meaningful transition history, strict
+  privacy checks, and an owner guide established outside every Drive folder.
 - Fail-closed runtime/config/database defaults and guarded production commands.
 - GitHub CI plus an approval-phrase production workflow (not yet exercised).
 - Pinned OpenAI Responses provider with schema validation, retry/cost limits, and
@@ -2371,15 +2411,13 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
 
 ## Next three actions
 
-1. Build the requested private local-only CEO rebuild monitor inside Codex
-   desktop. Persist a plain-English stage map, current work state, last meaningful
-   update, verified Git checkpoint versus uncommitted work, blockers/owner action,
-   safety facts, and short timeline; enforce meaningful-transition updates in
-   the agent workflow and document how Riley keeps it open beside this task.
-2. Rehearse the unchanged disconnected `owner.dossier.accept` executor against
+1. Rehearse the unchanged disconnected `owner.dossier.accept` executor against
    an isolated disposable D1/Miniflare resource. Prove actual concurrent callers,
    process-loss/ambiguous-response recovery, exact metadata, and zero persistent
    residue outside the disposable resource before proposing any staging migration.
+2. Add an automated monitor-start convenience inside Codex only if the local
+   owner workflow shows that manually restarting the loopback server is annoying;
+   do not host it or add a background cloud dependency.
 3. Await Riley's or Aidan's exact staging-only approval phrase for packet digest
    `a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9`.
    If supplied, create a separate content-bound approval receipt and reverify

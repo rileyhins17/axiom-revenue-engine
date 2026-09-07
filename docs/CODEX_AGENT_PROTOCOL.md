@@ -98,15 +98,32 @@ rejects the entire result if any changed file falls outside that allowlist.
 
 1. Sol reads the repository context and verifies branch, commit, status, and
    current tests.
-2. Sol chooses one bounded milestone and records its exit gate.
+2. Sol chooses one bounded milestone and records its exit gate in the private
+   local rebuild monitor.
 3. Sol delegates only independent portions through the task-packet contract.
-4. Sol integrates and independently verifies every child result.
-5. Sol runs targeted checks, then the full release gate from `AGENTS.md`.
+4. Sol integrates and independently verifies every child result, moving the
+   monitor only on meaningful testing, fixing, or verification transitions.
+5. Sol runs targeted checks, then commits the bounded candidate and runs
+   `npm run rebuild-monitor:prove-release` so the exact commit receives the full
+   release receipt.
 6. Sol updates durable status, decisions, README/runbooks, and proven gotchas.
-7. Sol creates one atomic checkpoint and pushes only the current rebuild branch.
-8. The next task resumes from the repository commit and `docs/STATUS.md`, never
-   from a model's memory of the conversation.
+7. Sol pushes only that release-proven commit, verifies local/upstream/GitHub
+   equality, then records the exact checkpoint in the local monitor.
+8. The next task resumes from the repository commit, `docs/STATUS.md`, and the
+   versioned monitor contract, never from a model's memory of the conversation.
 
 If quota ends, the latest verified commit plus `docs/STATUS.md` must state the
 exact checkpoint, blockers, spend, and next three actions. No child summary or
 unfinished working tree is treated as completion.
+
+The monitor is an owner-readable projection, not a second source of engineering
+truth or an execution control. It is fixed to loopback, stores current-machine
+state in the ignored local `data/` boundary, and is fully described in
+`docs/REBUILD_MONITOR.md` and ADR 0058.
+
+The active Codex goal keeps the multi-week objective and checkpoint status
+attached to the task, while Git, this protocol, and `docs/STATUS.md` preserve the
+recoverable implementation truth. This follows the official guidance to use
+[goals for long-running checkpointed work](https://learn.chatgpt.com/use-cases/follow-goals);
+the local monitor adds Riley's owner-readable view without pretending that a
+chat or dashboard replaces the repository.

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="Private local status monitor for the Axiom Revenue Engine rebuild." />
+    <title>Axiom Revenue Engine — Rebuild Monitor</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to rebuild status</a>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+    <header class="topbar">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true"><span>A</span></div>
+        <div>
+          <p class="eyebrow">Axiom Revenue Engine</p>
+          <h1>Rebuild monitor</h1>
+        </div>
+      </div>
+      <div class="privacy-lockup">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span>Private · local computer only</span>
+      </div>
+    </header>
+
+    <main id="main" class="shell">
+      <section id="error-banner" class="error-banner" role="alert" hidden>
+        <strong>Live monitor state is unavailable.</strong>
+        <span>Keep the local monitor terminal open or follow the recovery step in the owner guide. Values below have been invalidated.</span>
+      </section>
+      <section class="hero-grid" aria-labelledby="milestone-heading">
+        <article class="panel current-panel">
+          <div class="panel-heading-row">
+            <p class="section-kicker">Current milestone</p>
+            <span id="state-badge" class="state-badge">Loading</span>
+          </div>
+          <h2 id="milestone-heading">Loading the persisted rebuild state…</h2>
+          <p id="last-update" class="lead-copy">The monitor is reading its local checkpoint.</p>
+          <div class="timestamp-row">
+            <span>Last meaningful update</span>
+            <time id="updated-at">—</time>
+          </div>
+        </article>
+
+        <aside class="panel safety-panel" aria-labelledby="safety-heading">
+          <div class="panel-heading-row">
+            <p id="safety-heading" class="section-kicker">Safety right now</p>
+            <span class="safe-seal">Fail-closed</span>
+          </div>
+          <div class="safety-grid">
+            <div><span>Outbound sends</span><strong id="safety-sends">—</strong></div>
+            <div><span>Production changes</span><strong id="safety-production">—</strong></div>
+            <div><span>Prospect contact</span><strong id="safety-contact">—</strong></div>
+            <div><span>Paid provider work</span><strong id="safety-providers">—</strong></div>
+            <div><span>Storage boundary</span><strong id="safety-storage">—</strong></div>
+            <div><span>This milestone’s spend</span><strong id="safety-spend">—</strong></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="checkpoint-grid" aria-label="Verified and working-copy status">
+        <article class="panel checkpoint-panel verified-panel">
+          <p class="section-kicker">Last verified Git checkpoint</p>
+          <div class="checkpoint-title-row">
+            <strong id="verified-sha" class="mono-chip">—</strong>
+            <span class="check-icon" aria-label="Verified">✓</span>
+          </div>
+          <h3 id="verified-title">—</h3>
+          <p id="verified-time" class="muted">—</p>
+        </article>
+
+        <article class="panel checkpoint-panel working-panel">
+          <p class="section-kicker">Working copy right now</p>
+          <div class="checkpoint-title-row">
+            <strong id="working-status" class="mono-chip">—</strong>
+            <span id="working-indicator" class="working-indicator" aria-hidden="true"></span>
+          </div>
+          <h3 id="working-title">—</h3>
+          <p id="working-detail" class="muted">—</p>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel stage-panel" aria-labelledby="stage-heading">
+          <div class="panel-heading-row">
+            <div>
+              <p class="section-kicker">Truthful stage map</p>
+              <h2 id="stage-heading">Where the rebuild actually stands</h2>
+            </div>
+            <p class="stage-note">Verified gates, not an invented percentage.</p>
+          </div>
+          <ol id="stage-list" class="stage-list"></ol>
+        </article>
+
+        <div class="work-column">
+          <article class="panel work-panel">
+            <p class="section-kicker">Completed</p>
+            <ul id="completed-list" class="work-list completed-list"></ul>
+          </article>
+          <article class="panel work-panel emphasis-panel">
+            <p class="section-kicker">In motion</p>
+            <ul id="current-list" class="work-list"></ul>
+          </article>
+          <article class="panel work-panel">
+            <p class="section-kicker">Next</p>
+            <ol id="next-list" class="work-list numbered-list"></ol>
+          </article>
+        </div>
+      </section>
+
+      <section class="lower-grid">
+        <article id="blocker-panel" class="panel blocker-panel" aria-labelledby="blocker-heading">
+          <div class="blocker-symbol" aria-hidden="true">!</div>
+          <div>
+            <p class="section-kicker">Blocker / Riley action</p>
+            <h2 id="blocker-heading">No owner action needed right now</h2>
+            <p id="owner-action" class="muted">The current milestone can continue safely without you.</p>
+          </div>
+        </article>
+
+        <article class="panel timeline-panel" aria-labelledby="timeline-heading">
+          <div class="panel-heading-row">
+            <div>
+              <p class="section-kicker">Recent timeline</p>
+              <h2 id="timeline-heading">Meaningful transitions only</h2>
+            </div>
+            <span id="refreshed-at" class="refresh-time">—</span>
+          </div>
+          <ol id="timeline-list" class="timeline-list"></ol>
+        </article>
+      </section>
+
+      <p id="monitor-status" class="sr-only" aria-live="polite">Loading rebuild monitor.</p>
+    </main>
+
+    <footer>
+      <span>Local status view: persisted monitor state + live Git working copy</span>
+      <span>No secrets, hidden reasoning, provider calls, or external assets</span>
+    </footer>
+  </body>
+</html>
