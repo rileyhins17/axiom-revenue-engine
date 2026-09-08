@@ -116,7 +116,20 @@ inventory test requires review when an unsafe handler is added or removed.
 This is not a production rollout or permission to use mailbox/provider actions.
 The high-assurance owner-decision contract, MFA and release approval still apply.
 
+### Mailbox metadata (source-only)
+
+Mailbox metadata PATCH accepts only a nonempty trimmed label (maximum 80
+characters, or `null` to clear) and a valid IANA timezone. It cannot change
+identity, connection, active/paused state, warmup state, send/check timestamps,
+or capacity/delay policy. Unknown fields reject the whole request. A timezone
+change affects future scheduler calculations, not authorization to send.
+Approved administrators can manage both partners' metadata. Each actual change
+requires a current approved admin session and a durable audit event in the same
+database transaction; a repeated identical request adds no event. Missing batch
+support or audit storage fails closed. This source-only change enables no mail.
+
 ### Bounded milestone checklist
+
 
 1. Read the files listed in `AGENTS.md`.
 2. Run `git status --short --branch` and inspect recent commits.

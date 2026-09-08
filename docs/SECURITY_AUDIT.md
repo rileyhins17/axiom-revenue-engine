@@ -567,7 +567,8 @@ No live Google exchange, deployment or migration has been performed.
 
 ### SEC-011 — Medium — Mailbox PATCH permits broad record mutation
 
-**Status:** Open; automation/mailboxes remain off.
+**Status:** Candidate source fix; exact-commit release gate still pending.
+Automation/mailboxes remain off; no live fix is claimed.
 **Reachability:** Reachable to an administrator when mailbox data exists.
 
 The route passes an unvalidated arbitrary object into a helper typed as
@@ -585,6 +586,16 @@ owner-editable settings intended by the UI.
 **Required fix:** use a strict schema with an explicit allow-list, reject unknown
 keys, keep identifiers/connection/health/counters server-owned, validate state
 transitions, record an audit event, and add adversarial mass-assignment tests.
+
+**Candidate evidence (2026-09-08):** disposable SQLite reproduced protected owner,
+status and last-send mutation through the old helper. The new shared boundary is
+`src/lib/mailbox-settings.ts`: label and validated timezone only, atomic current
+admin/session check, update-plus-audit batch, and write-free identical retry.
+Numeric settings are derived on connection sync and are not misleadingly exposed
+as persistent owner overrides. Lifecycle transitions stay outside this metadata
+endpoint. Targeted SQLite/D1 adversarial and audit-rollback tests and actual
+route/browser proof pass. Independent bounded review found no concrete bypass or
+regression. Complete exact-commit release evidence is required before closure.
 
 ### SEC-012 — Medium — Security audit events fail open
 

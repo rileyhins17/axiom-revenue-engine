@@ -2558,14 +2558,6 @@ export async function updateAutomationSettings(data: Partial<OutreachAutomationS
   });
 }
 
-export async function updateMailbox(mailboxId: string, data: Partial<OutreachMailboxRecord>) {
-  const prisma = getPrisma();
-  return prisma.outreachMailbox.update({
-    where: { id: mailboxId },
-    data,
-  });
-}
-
 async function stopSequenceInternal(
   prisma: PrismaLike,
   sequence: OutreachSequenceRecord,

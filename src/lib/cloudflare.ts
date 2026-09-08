@@ -14,6 +14,7 @@ export interface D1PreparedStatementLike {
 
 export interface D1DatabaseLike {
   prepare(query: string): D1PreparedStatementLike;
+  batch?<T = Record<string, unknown>>(statements: D1PreparedStatementLike[]): Promise<{ results?: T[] }[]>;
 }
 
 export interface AppBindings {

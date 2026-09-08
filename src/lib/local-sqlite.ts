@@ -23,6 +23,7 @@ export function ensureLocalDatabaseDirectory(dbPath: string): void {
 function createBetterSqliteStatement(
   db: import("better-sqlite3").Database,
   query: string,
+  executors: WeakMap<D1PreparedStatementLike, () => { results: unknown[] }>,
 ): D1PreparedStatementLike {
   let boundValues: unknown[] = [];
 
@@ -61,7 +62,31 @@ function createBetterSqliteStatement(
     },
   };
 
+  executors.set(statement, () => {
+    const prepared = db.prepare(query);
+    if (prepared.reader) return { results: prepared.all(...boundValues) };
+    prepared.run(...boundValues);
+    return { results: [] };
+  });
   return statement;
+}
+
+/** Each batch has one synchronous SQLite transaction, including audit failures. */
+export function createLocalDatabaseAdapter(db: import("better-sqlite3").Database): D1DatabaseLike {
+  const executors = new WeakMap<D1PreparedStatementLike, () => { results: unknown[] }>();
+  return {
+    prepare: (query) => createBetterSqliteStatement(db, query, executors),
+    async batch<T>(statements: D1PreparedStatementLike[]) {
+      const execute = statements.map((statement) => {
+        const run = executors.get(statement);
+        if (!run) throw new Error("Batch statement belongs to another database");
+        return run;
+      });
+      // Do not await statement methods inside this synchronous transaction:
+      // an async rejection would otherwise occur after SQLite had committed.
+      return db.transaction(() => execute.map((run) => run()))() as { results: T[] }[];
+    },
+  };
 }
 
 export function getLocalDatabase(): D1DatabaseLike {
@@ -80,11 +105,7 @@ export function getLocalDatabase(): D1DatabaseLike {
   db.pragma("synchronous = NORMAL");
   db.pragma("foreign_keys = ON");
 
-  cachedDb = {
-    prepare(query: string): D1PreparedStatementLike {
-      return createBetterSqliteStatement(db, query);
-    },
-  };
+  cachedDb = createLocalDatabaseAdapter(db);
 
   return cachedDb;
 }

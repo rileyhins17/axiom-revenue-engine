@@ -9,6 +9,11 @@ channel, preparing specific outreach, and learning which work becomes revenue.
 
 ## Current state
 
+Mailbox settings hardening is being verified: only a label and valid timezone
+can be edited through the metadata endpoint. Identity, connection, send limits,
+health and lifecycle state stay system-controlled. Changes and their audit record
+must succeed together. This is source-only work, not an enabled mailbox or release.
+
 Mailbox connection hardening now uses signed, short-lived, one-time server
 transactions instead of exposing session IDs in connection links. Fresh admin
 access and the intended mailbox are checked. This source change requires the

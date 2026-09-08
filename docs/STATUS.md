@@ -1,10 +1,48 @@
 # Current status
 
-Last updated: 2026-09-07 (America/Toronto)
+Last updated: 2026-09-08 (America/Toronto)
 
 ## Plain-English status
 
-### Current checkpoint: one-time mailbox connection (SEC-010)
+### Current candidate: bounded mailbox settings (SEC-011)
+
+Verified predecessor: `96c9b02002a1be1fb6beb94418f9e9bd2c19f2ba`
+(SEC-010; its exact-commit release receipt and pushed checkpoint are persisted).
+A disposable SQLite reproduction confirmed that the old mailbox helper accepted
+owner, status and last-send timestamp changes alongside legitimate label edits.
+The candidate replaces that broad record mutation with a strict label/timezone
+contract, rejects unknown/protected fields, rechecks current approved admin and
+session in the write, and commits changes with their audit record in one batch.
+Repeated identical updates are mutation-free. Capacity/delay values remain
+server-owned: connection sync derives them from policy and would overwrite PATCH
+overrides. Admins retain shared management of both partners' mailbox metadata;
+this does not activate or reconnect either mailbox.
+
+Targeted SQLite and disposable D1 tests pass for mass assignment, malformed input,
+normal metadata updates, repeat requests, actor denial, audit failure and rollback.
+The new local batch adapter also rejects foreign-database statements before any
+write. All 623 tests, type-checking, and the safety check passed. The real-route
+disposable browser gate passed protected-field rejection, legitimate shared-admin
+metadata edits, identical retry and audit rollback; six WCAG pages, 387 ms list,
+100 ms dossier, zero outside requests. Lint passes. Independent bounded review
+found no concrete SEC-011 bypass or production regression. Environment policy is
+sampled immediately before the atomic batch, not transactionally locked across
+external configuration changes; unrelated mailbox workflows remain separately audited.
+Full exact-commit release verification has not run for this candidate;
+do not call SEC-011 fixed or push until every required gate passes.
+
+No production, persistent database, mailbox/provider or prospect was accessed.
+No deployment/migration or sending/syncing was enabled. Spend impact: C$0.
+No owner decision is needed for this source-level repair. Numeric operator
+overrides would need a separate policy/persistence design, not hidden PATCH keys.
+
+Next three actions:
+1. Run the complete exact-commit release gate for SEC-011 and push only this branch.
+2. Record its immutable release receipt/checkpoint and continue the remaining audit.
+3. Continue remaining security findings and owner MFA/enrollment/recovery before
+   any staging/provider activation; do not merge to main or declare production ready.
+
+### Previous checkpoint: one-time mailbox connection (SEC-010)
 
 Verified predecessor: `a37e9a572e8e99a5143ebefefbfbc6b26abc77d0`
 (all ten release checks and branch push passed). The current candidate replaces

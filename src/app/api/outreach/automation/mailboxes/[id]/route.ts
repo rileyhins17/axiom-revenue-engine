@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getErrorMessage } from "@/lib/errors";
-import { updateMailbox } from "@/lib/outreach-automation";
+import { getDatabase } from "@/lib/cloudflare";
+import { InvalidMailboxSettings, updateMailboxSettings } from "@/lib/mailbox-settings";
 import { requireAdminApiSession } from "@/lib/session";
 
 export async function PATCH(
@@ -14,15 +14,20 @@ export async function PATCH(
   }
 
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    const body: unknown = await request.json();
     const { id } = await params;
-    const mailbox = await updateMailbox(id, body);
-    return NextResponse.json({ mailbox });
+    const mailbox = await updateMailboxSettings(getDatabase(), {
+      userId: authResult.session.user.id,
+      sessionId: authResult.session.session.id,
+    }, id, body);
+    return NextResponse.json(mailbox ? { mailbox } : { error: "Mailbox unavailable" }, {
+      status: mailbox ? 200 : 404, headers: { "Cache-Control": "private, no-store" },
+    });
   } catch (error: unknown) {
-    console.error("Mailbox update error:", error);
+    const invalid = error instanceof InvalidMailboxSettings || error instanceof SyntaxError;
     return NextResponse.json(
-      { error: getErrorMessage(error, "Failed to update mailbox") },
-      { status: 500 },
+      { error: invalid ? "Invalid mailbox settings" : "Mailbox settings unavailable" },
+      { status: invalid ? 400 : 503, headers: { "Cache-Control": "private, no-store" } },
     );
   }
 }
