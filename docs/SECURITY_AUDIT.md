@@ -314,7 +314,8 @@ fencing for every non-admin legacy mutation.
 
 ### SEC-003 — High — One MCP token carries broad read and mutation authority
 
-**Status:** Source retirement reviewed; exact-commit release receipt required.
+**Status:** Source retirement verified at `98c3df8eb7e5cf0e3e079565daef0b15e09fa750`;
+all ten release checks and branch push passed. Not deployed.
 No live route, trigger or credential has been changed.
 **Reachability:** Dormant if the token is absent and automation remains off.
 
@@ -380,7 +381,8 @@ controls. Prefer deleting the legacy browser path after characterization tests.
 
 ### SEC-005 — High — Agent requests can be replayed across instances and alter server-owned lead fields
 
-**Status:** Open in the legacy agent surface.
+**Status:** External-agent source retirement reviewed; exact-commit release
+receipt required. No production route or credential changed.
 **Reachability:** Dormant if `AGENT_SHARED_SECRET` is absent and agent work is off.
 
 The HMAC is a good base, but the claimed agent name is not part of the signed
@@ -409,6 +411,25 @@ signature, enforce body limits before parsing, persist nonce/idempotency state i
 a durable atomic store, replace passthrough with strict write DTOs, make IDs and
 lifecycle fields server-owned, and require a unique claim/lease generation on
 every result, heartbeat, failure, and completion write.
+
+**Candidate evidence (2026-09-08):** isolated instances of the original auth
+implementation accepted the same synthetic signed request under a substituted
+agent name; the same instance rejected its second request. No operational route,
+database or provider was called. The candidate replaces all six HTTP handlers
+with the shared pure 410 response and deletes `agent-auth.ts` plus its runtime
+shared-secret declarations. Exact route-shape public matching replaces the
+broad prefix exemption. The complete-module inventory prevents retired handlers
+from regaining request/credential/binding authority. Focused tests exercise every
+method with unreadable request/context objects and forbidden network/bindings.
+All 626 tests, type-check, lint and safety pass. The actual-route browser gate
+passes every retired endpoint/method and six desktop/mobile accessibility pages
+with zero external requests.
+Independent candidate review found no concrete remaining SEC-005 bypass or
+console/internal-worker regression in this scope.
+Internal scrape-job helpers and lead validation remain unchanged; this does not
+claim that the separate legacy browser workflow or its data contract is hardened.
+External clients remain an explicit rollout compatibility check. Historical
+evidence above refers to the pre-retirement source.
 
 ### SEC-006 — High — Manual Gmail replies bypass the engine's send safety contract
 

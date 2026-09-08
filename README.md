@@ -9,6 +9,11 @@ channel, preparing specific outreach, and learning which work becomes revenue.
 
 ## Current state
 
+The external legacy agent interface is being retired in source. Its six job
+endpoints return fixed HTTP 410 responses without accepting credentials, lead
+records or job updates. Internal lead processing and the owner console remain
+separate. This is not a production rollout; live agents must stay off.
+
 Legacy remote control is being retired in source. `/api/mcp` and the old
 internal cron-tick endpoint return HTTP 410, and the console no longer dispatches
 scheduled work. Old MCP tokens cannot reactivate these paths. The normal owner

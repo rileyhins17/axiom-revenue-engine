@@ -703,6 +703,22 @@ and PKCE support then. Keep mailbox operations and sending off throughout.
 
 ## Resume/handoff
 
+### Retired external legacy agents (SEC-005, source only)
+
+The six `/api/agent/jobs` endpoints (claim, results, heartbeat, logs, complete,
+failed) now return empty 410 responses with no operational authority. Do not
+re-enable an old client or create replacement shared credentials to bypass this
+retirement. New execution belongs to the separately gated engine, not these URLs.
+The internal Cloudflare scrape helpers and validator remain unchanged and off.
+
+Before an explicitly approved rollout, inventory and stop any external legacy
+worker, then revoke its obsolete configured `AGENT_SHARED_SECRET`. This change
+does not inspect or revoke real provider secrets. Source searches cannot prove
+whether external clients still exist. The obsolete `worker`/`worker:local`
+package commands and legacy launcher scripts refer to missing files and are not
+a supported way to start the rebuilt engine. No migration, live database write,
+deployment or activation is part of this source checkpoint.
+
 Before stopping, update `docs/STATUS.md` with the verified commit, production and
 automation state, completed exit gate, tests, budget effect, blockers, owner
 decisions, and exactly three next actions. Commit documentation with the code it

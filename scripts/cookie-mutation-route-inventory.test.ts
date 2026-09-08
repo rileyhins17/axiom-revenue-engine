@@ -5,16 +5,12 @@ import { test } from "node:test";
 import ts from "typescript";
 
 // Exact service authorities, never a prefix-based cookie-security exemption.
-const services = new Map([
-  ["agent/jobs/claim/route.ts", "requireAgentAuth"],
-  ["agent/jobs/[id]/complete/route.ts", "requireAgentAuth"],
-  ["agent/jobs/[id]/failed/route.ts", "requireAgentAuth"],
-  ["agent/jobs/[id]/heartbeat/route.ts", "requireAgentAuth"],
-  ["agent/jobs/[id]/logs/route.ts", "requireAgentAuth"],
-  ["agent/jobs/[id]/results/route.ts", "requireAgentAuth"],
-]);
+const services = new Map<string, string>();
 
-const retired = new Set(["mcp/route.ts", "internal/cron-tick/route.ts"]);
+const retired = new Set([
+  "mcp/route.ts", "internal/cron-tick/route.ts", "agent/jobs/claim/route.ts",
+  ...["complete", "failed", "heartbeat", "logs", "results"].map(action => `agent/jobs/[id]/${action}/route.ts`),
+]);
 
 test("every custom unsafe API export starts with the shared cookie or exact service boundary", () => {
   const root = join(process.cwd(), "src/app/api");
@@ -23,10 +19,12 @@ test("every custom unsafe API export starts with the shared cookie or exact serv
       : entry.name === "route.ts" ? [join(directory, entry.name)] : []);
   let guarded = 0;
   const observed = new Set<string>();
+  const observedRetired = new Set<string>();
   for (const path of files(root)) {
     const name = relative(root, path).replaceAll("\\", "/");
     const source = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
     if (retired.has(name)) {
+      observedRetired.add(name);
       // This is not an authentication exemption: prove the entire module is
       // only seven fixed no-authority responses and its single pure import.
       assert.equal(source.statements.length, 8, name);
@@ -80,5 +78,6 @@ test("every custom unsafe API export starts with the shared cookie or exact serv
     }
   }
   assert.deepEqual([...observed].sort(), [...services.keys()].sort());
+  assert.deepEqual([...observedRetired].sort(), [...retired].sort());
   assert.equal(guarded, 21, "Review the inventory when a custom mutation is added or removed.");
 });

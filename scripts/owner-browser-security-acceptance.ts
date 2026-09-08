@@ -4,10 +4,15 @@ import { browserSecurityHeaders } from "../src/lib/browser-security-headers";
 
 export async function verifyOwnerBrowserSecurity(context: BrowserContext, baseUrl: string) {
   assert.equal(new URL(baseUrl).hostname, "127.0.0.1");
-  for (const path of ["/api/mcp", "/api/internal/cron-tick?task=scheduler"]) {
+  const retiredPaths = [
+    "/api/mcp", "/api/internal/cron-tick?task=scheduler", "/api/agent/jobs/claim",
+    ...["complete", "failed", "heartbeat", "logs", "results"].map(action =>
+      `/api/agent/jobs/00000000-0000-4000-8000-000000000001/${action}`),
+  ];
+  for (const path of retiredPaths) {
     for (const method of ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]) {
       const response = await context.request.fetch(`${baseUrl}${path}`, {
-        method, timeout: 10_000, headers: { authorization: "Bearer synthetic-retired-token", origin: "https://foreign.example.invalid" },
+        method, timeout: 10_000, headers: { authorization: "Bearer synthetic-retired-token", origin: "https://foreign.example.invalid", "x-agent-name": "synthetic-worker", "x-agent-nonce": "replayed-fixture", "x-agent-signature": "00", "x-agent-timestamp": "1" },
         ...(["POST", "PUT", "PATCH"].includes(method) ? { data: [{jsonrpc:"2.0",id:1,method:"tools/call",params:{name:"force_unblock"}}] } : {}),
       });
       assert.equal(response.status(),410,`${method} ${path}`);

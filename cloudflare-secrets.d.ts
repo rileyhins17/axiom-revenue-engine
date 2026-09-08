@@ -4,7 +4,6 @@
  * Cloudflare secret store; local values belong in ignored environment files.
  */
 interface CloudflareEnv {
-  AGENT_SHARED_SECRET?: string;
   BETTER_AUTH_SECRET?: string;
   DEEPSEEK_API_KEY?: string;
   GMAIL_CLIENT_ID?: string;
@@ -14,7 +13,6 @@ interface CloudflareEnv {
 
 declare namespace Cloudflare {
   interface Env {
-    AGENT_SHARED_SECRET?: string;
     BETTER_AUTH_SECRET?: string;
     DEEPSEEK_API_KEY?: string;
     GMAIL_CLIENT_ID?: string;

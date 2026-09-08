@@ -4,7 +4,48 @@ Last updated: 2026-09-08 (America/Toronto)
 
 ## Plain-English status
 
-### Current milestone: retire legacy shared-token control (SEC-003)
+### Current milestone: retire external legacy agents (SEC-005)
+
+Verified predecessor: `98c3df8eb7e5cf0e3e079565daef0b15e09fa750`.
+All ten release checks and branch push passed for SEC-003, including 625 tests,
+six desktop/mobile accessibility pages, 388 ms lead-list and 78 ms dossier
+readiness, and zero outside requests. Local/upstream/GitHub equality was proved.
+
+The next bounded repair retires the six external legacy agent endpoints, as
+permitted by security Gate C. A synthetic, isolated authentication reproduction
+accepted the same signed request in another server instance under a different
+agent name; same-instance replay was rejected. No route, database or provider
+was executed during that reproduction. Independent compatibility investigation
+found no current in-repository HTTP caller: the Cloudflare scraper calls internal
+helpers directly and the v2 owner console uses separate authenticated routes.
+
+The candidate returns fixed empty 410 responses for all six endpoints and all
+seven methods, removes the obsolete authentication implementation and runtime
+shared-secret declarations, and narrows the public-path exemption to these exact
+route shapes. Shared job helpers and the internally used lead validator remain.
+Nine focused tests pass, covering zero request/context/binding/network access,
+the route-module inventory, public-path limits, and valid internal lead input.
+All 626 tests, type-check, lint and safety pass. Actual-route browser verification
+passes all eight retired endpoints/seven methods, six WCAG pages, desktop/mobile
+layouts, 225 ms list readiness, 100 ms dossier readiness and zero outside requests.
+Independent candidate review found no concrete surviving SEC-005 bypass or
+console/internal-worker regression. Exact-commit release verification remains
+the final gate; the immutable receipt and verified branch checkpoint are recorded
+by the rebuild monitor only after all checks and the push pass.
+
+External legacy clients are unverified and intentionally unsupported after a
+separately approved rollout. No configured credential was inspected or revoked;
+obsolete provider secrets require that rollout's inventory/revocation step.
+No owner action is needed for this source repair. No production change,
+deployment, migration, mailbox activity, scraping, prospect contact or paid
+provider operation occurred. Spend impact: C$0. All execution controls remain off.
+
+Next three actions:
+1. Run the exact-commit release gate and push only this branch if it passes.
+2. Record its immutable receipt and verify local/upstream/GitHub equality.
+3. Continue legacy browser/send and owner-account security gates before activation.
+
+### Previous checkpoint: retire legacy shared-token control (SEC-003)
 
 Verified predecessor: `084ff3e70328af4c09e43e11bf618963b8bb257e`.
 All ten release checks passed, including 623 tests, six browser/accessibility
