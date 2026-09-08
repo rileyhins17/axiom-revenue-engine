@@ -456,10 +456,35 @@ reviewed full commit SHAs, and prove post-deploy no-send health.
 
 ### SEC-008 — Medium — Custom cookie-authenticated mutations lack one explicit CSRF policy
 
-**Status:** Open.
+**Status:** Source patch and local attack regression complete; not deployed.
+The exact-commit release receipt is required before treating this as a verified
+source checkpoint. Deployment/adapter proof remains an activation gate.
 **Reachability:** Reachable when the console is deployed.
 
-The middleware checks only for the presence of a session cookie before allowing
+**Source remediation (2026-09-07):** At `7d1eef2`, a Chromium
+same-site/cross-origin `text/plain` POST with the genuine disposable owner's
+cookie archived a synthetic lead through `/api/vault/bulk`. This was a loopback
+HTTP bridge to the real handler and disposable D1, not a live-production probe.
+Foreign/missing-origin profile PATCH requests also changed the disposable owner.
+The candidate shared `requireApiSession` boundary requires exact serialized
+Origin equality with fresh explicit configured origins and a matching request
+Host. Host constrains that configured trust and never supplies it; forwarding
+headers are ignored. This supports Next's normalized/proxy-internal URL form.
+Present Fetch Metadata must say `same-origin`; absent metadata is allowed only
+with the exact Origin. Invalid configuration returns uncached 503; untrusted
+requests return uncached 403 before authentication or mutation. No bearer-header
+bypass is added. Current route inventory covers 21 unsafe custom handlers and
+exact separate service/auth authorities. The original browser attack is now
+denied and a legitimate same-origin archive succeeds; full production-mode
+browser gate now also passes: actual forbidden POST/403, unchanged stored lead,
+normal same-origin archive, six WCAG pages, desktop/mobile, zero outside requests.
+The independent bounded review found no concrete remaining bypass/regression.
+Exact-commit release proof remains required before push, and proxy Host formatting
+must be checked during an explicitly approved staging release.
+OAuth's state-bearing GET callback and Better Auth's own CSRF controls remain
+separate review surfaces; this does not close SEC-002 or enable owner decisions.
+
+**Historical vulnerable boundary:** The middleware checks only for the presence of a session cookie before allowing
 private routes to continue. Custom API mutations authenticate the session, but
 there is no shared same-origin `Origin`/`Sec-Fetch-Site`/CSRF assertion. Better
 Auth's protections do not automatically become proof for the application's own

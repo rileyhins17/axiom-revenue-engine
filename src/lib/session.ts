@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 
 import { getAuth } from "@/lib/auth";
+import { cookieMutationOriginStatus } from "@/lib/cookie-mutation-origin";
 
 type SessionResponse = Awaited<ReturnType<ReturnType<typeof getAuth>["api"]["getSession"]>>;
 type SessionWithUser = Exclude<SessionResponse, null | undefined>;
@@ -41,6 +42,12 @@ export async function getApiSession(request: Request) {
 }
 
 export async function requireApiSession(request: Request): Promise<ApiSessionResult> {
+  const denied = cookieMutationOriginStatus(request);
+  if (denied) return {
+    response: NextResponse.json({ error: denied === 403 ? "Untrusted request origin" : "Request security configuration unavailable" }, {
+      status: denied, headers: { "Cache-Control": "private, no-store" },
+    }),
+  };
   const session = await getApiSession(request);
   if (!session?.user) {
     return {

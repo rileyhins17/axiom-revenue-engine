@@ -4,7 +4,25 @@ Last updated: 2026-09-07 (America/Toronto)
 
 ## Plain-English status
 
-Owner admission is the current source-level security milestone. A local attack
+The current bounded milestone is SEC-008: prevent another website from making
+owner changes with a logged-in browser's cookie. At verified predecessor
+`7d1eef221a25ac4ccdb99dbeeb7e6aa52b7e5832`, a disposable Chromium reproduction
+archived a fake lead through the real bulk route from a different same-site
+origin using a plain-text POST. Direct profile requests also accepted foreign
+and missing origins. The candidate now checks exact current configured origins
+and Fetch Metadata before custom API session lookup. The original local browser
+attack is denied and the ordinary same-origin archive still works. All 21 custom
+unsafe-method handlers are inventoried; auth and separately authenticated service
+routes are not blanket cookie-policy exemptions. Independent bounded review
+found no concrete remaining bypass/regression. The production-mode browser gate
+passes, including the unwanted POST/403 and unchanged fake row, preserved normal
+archive, six WCAG pages and zero outside requests. This is not a production fix
+claim: the exact-commit full gate must pass before push.
+No live deployment, database, mailbox, provider, prospect contact or spend occurs.
+
+### Previous owner-admission source checkpoint
+
+Owner admission was the preceding source-level security milestone. A local attack
 test proved that an account outside the approved owner list could still read
 leads. The candidate now checks current approval and verified email across
 login, existing sessions, and account administration. Removing an owner revokes
@@ -199,6 +217,50 @@ file; tracked code, the safe seed, and this status document remain recoverable
 through Git. ADR 0058 and `docs/REBUILD_MONITOR.md` define the workflow.
 
 ## Verified checkpoint
+
+- Latest fully verified and pushed source checkpoint is
+  `7d1eef221a25ac4ccdb99dbeeb7e6aa52b7e5832`. Its ignored exact-commit release
+  receipt was recorded at `2026-09-08T02:37:34.978Z`: all ten gates, 616 tests,
+  six WCAG pages, desktop/mobile, list 236 ms, dossier 101 ms, zero external
+  browser requests. Local/upstream equality and a clean worktree were rechecked
+  at this work-cycle start. No fresh production or Linux CI inspection is claimed.
+- Current SEC-008 candidate changes only the shared request-origin boundary,
+  its tests/browser acceptance and documentation. Missing/foreign/null origins,
+  same-site siblings, malformed config and mismatched metadata fail closed.
+  Missing Fetch Metadata alone is supported only with an exact valid Origin;
+  this is not the stronger future high-assurance owner-decision activation gate.
+  Explicit aliases work only when the request itself targets that alias.
+- Baseline reproduction used disposable D1 and a loopback HTTP bridge invoking
+  the real route. Chromium supplied `Sec-Fetch-Site: same-site`, sent text/plain
+  without CORS preflight, and the fake row changed. After patch the same browser
+  request returned 403 with no change; a legitimate request returned 200 and
+  archived that row. The full Next production-mode suite additionally exercises
+  this boundary before an exact checkpoint can be pushed.
+- Next: finish the browser/reviewer/release proof; then resume verified owner
+  enrollment/MFA/recovery and the remaining security boundaries. No owner choice
+  is required for this source fix. Runtime/provider spend impact C$0. All live
+  work and autonomy remain off.
+- Candidate integration evidence: the first production-mode gate correctly
+  stopped because NextURL normalizes `127.0.0.1` to `localhost`. Matching the
+  internal URL origin would deny normal owners. The guard instead requires an
+  already explicitly trusted Origin and matching request Host, never deriving
+  trust from Host/forwarding headers. Added proxy/Host-poisoning regressions.
+  A browser request-inspector metadata assertion was also removed because
+  intercepted Playwright metadata omitted a browser-added header; the gate
+  instead requires the actual POST/payload, HTTP 403 and unchanged stored row.
+  Metadata acceptance/rejection remains covered directly by unit tests.
+- Final working-copy checks: targeted guard/inventory tests pass; 618 full-suite
+  tests passed before the final proxy compatibility adjustment; typecheck/lint
+  and the complete production-mode owner browser gate pass after it (214 ms
+  list, 100 ms dossier, desktop 1440/mobile 390, six WCAG pages, zero external
+  requests). The exact-commit release command reruns all ten gates, including
+  the complete suite, before push. Its ignored receipt and monitor supply the
+  immutable final SHA without a self-referential document commit.
+- Reviewer attested the exact canonical root/branch/predecessor and found no
+  concrete surviving in-scope bypass/regression. Proxy Host formatting still
+  needs future authorized staging proof; mismatches deny access, not grant it.
+
+### Historical owner-admission development verification
 
 - Last fully release-proven and pushed commit:
   `f8946bf6ce4ccc416232911cd2fc2c188268d1c6` (ban lifecycle). Its exact-commit
@@ -2646,8 +2708,8 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
    session controls with
    synthetic tests. Retain the registration-denial and stale-cache regressions;
    keep real account changes and staging activation separately approval-gated.
-2. Add one tested browser/request security boundary for custom mutation origin
-   checks, private/no-store responses, framing/MIME/referrer/permissions headers,
+2. Retain SEC-008's shared mutation-origin and browser regressions. Finish the
+   remaining browser boundary: private/no-store responses, framing/MIME/referrer/permissions headers,
    and CSP report-only staging preparation.
 3. Retire or redesign the legacy MCP token, agent replay/job-fencing, browser
    SSRF, and direct Gmail reply paths before any provider or automation can be

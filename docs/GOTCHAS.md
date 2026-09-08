@@ -5,6 +5,26 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## AUTH-002 — Same-site cookies and JSON parsing were not a mutation-origin guard
+
+- **Symptom:** Chromium archived a disposable lead from a different same-site
+  origin using a no-CORS plain-text POST with the legitimate owner's cookie.
+- **Root cause:** custom handlers authenticated cookies but never checked the
+  request origin. `request.json()` accepts JSON text regardless of MIME type;
+  SameSite cookie rules do not isolate same-site sibling origins.
+- **Proven fix:** shared unsafe-method guard before session lookup requires an
+  explicitly configured Origin, matching Host, and `same-origin` Fetch Metadata
+  when present. Missing Origin always fails. NextURL rewrites loopback hostnames,
+  so internal URL equality is not a substitute for the configured origin/Host
+  boundary; Host and forwarding headers never create trust.
+- **Prevention/test:** origin/parser/metadata tests, exact 21-handler inventory,
+  and production-mode browser proof of 403 plus unchanged disposable lead and
+  successful normal archive. Separate service/auth authorities remain explicit.
+- **Affected area:** cookie-authenticated custom API mutations and proxy/Next
+  integration. OAuth state and high-assurance owner actions remain separate.
+- **Verifying commit:** SEC-008 checkpoint following `7d1eef2`; exact SHA and
+  all-ten-gate proof recorded in the ignored release receipt and rebuild monitor.
+
 ## DATA-013 — An exact trigger preflight was not the trigger set used by the write
 
 - **Symptom:** the owner-action executor could prove all nine trigger bodies in

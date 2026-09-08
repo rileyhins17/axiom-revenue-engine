@@ -22,6 +22,12 @@ not deployed; verified enrollment, MFA/recovery and the remaining security
 audit gates still block activation. See the account section of
 [`docs/RUNBOOK.md`](docs/RUNBOOK.md) before any future rollout.
 
+Custom owner changes now also require an exact configured browser origin and
+matching request host. A same-site sibling is not trusted; missing/foreign
+origin or conflicting browser metadata is denied. The source-only browser gate
+tests an unwanted archive request against a disposable lead and proves normal
+owner changes still work. No live deployment or outbound capability is enabled.
+
 Start with [`docs/STATUS.md`](docs/STATUS.md) for the current verified checkpoint,
 the next three actions, blockers, live-system state, and budget. The full approved
 direction lives in [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md).

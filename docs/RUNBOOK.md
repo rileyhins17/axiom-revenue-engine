@@ -89,7 +89,34 @@ a backup containing old sessions requires separately invalidating those sessions
 before the console can reopen. MFA, secure recovery/enrollment, deployed
 admission proof, and remaining audit blockers still prevent production activation.
 
-### Start a bounded milestone
+### Custom owner API request origins (source-only)
+
+Unsafe custom owner requests require a browser-serialized `Origin` equal to an
+explicit `APP_BASE_URL` or `AUTH_ALLOWED_ORIGINS`
+entry. Configured root URLs may have a trailing slash; wildcard/path/credential/
+query/fragment origins are invalid and suspend mutations. Configure aliases
+explicitly; a page on one alias cannot mutate a different alias. The request
+Host must equal that already-trusted origin's host (including port); it does not
+create trust. Forwarding headers are ignored. This accommodates NextURL's
+loopback normalization and proxy-internal URLs without trusting another origin.
+Settings are read freshly.
+
+`Sec-Fetch-Site`, when supplied, must be `same-origin`. Clients without Fetch
+Metadata must still supply exact Origin; missing/null Origin is denied. No
+custom CSRF header is needed by the current same-origin UI. Normal GET/HEAD/
+OPTIONS reads are unchanged. This policy does not authenticate a script or
+protect against XSS/stolen credentials; session and role checks still run.
+
+Better Auth routes retain library security. Exact HMAC-agent and bearer-service
+routes retain their separate authentication, not cookie access. OAuth callback
+GET uses its own state check and remains separately audited. Never add a broad
+path-prefix or bearer-presence bypass to an owner cookie route. The route
+inventory test requires review when an unsafe handler is added or removed.
+
+This is not a production rollout or permission to use mailbox/provider actions.
+The high-assurance owner-decision contract, MFA and release approval still apply.
+
+### Bounded milestone checklist
 
 1. Read the files listed in `AGENTS.md`.
 2. Run `git status --short --branch` and inspect recent commits.
