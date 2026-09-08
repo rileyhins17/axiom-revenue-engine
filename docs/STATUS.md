@@ -1,0 +1,3543 @@
+# Current status
+
+Last updated: 2026-09-08 (America/Toronto)
+
+## Active owner brief
+
+This is the authoritative current queue. Older entries below Plain-English status
+are history, not current instructions. The full rebuild objective is unchanged.
+
+### Owner boundaries
+
+- **Do not deploy the unfinished app anywhere**, including hosted previews,
+  staging or production. Finish implementation/local acceptance, disclose live-only
+  checks, then request Riley's explicit exact-release approval. Local builds,
+  loopback tests and no-upload dry runs are allowed.
+- No Google Workspace and no Google/OneDrive working checkout. Use
+  `C:\Users\riley\Documents\ChatGPT\APE`.
+- C$50/month remains the unmodified runtime ceiling. No live sending, inbox sync,
+  prospect contact, paid provider work, production migration or deployment in this
+  cycle. Spend impact: **C$0**.
+
+### Verified checkpoint versus current work
+
+Last fully verified and pushed checkpoint before this preparation:
+`93f498c4d5c399f2402b262c2b07c05e4074a2af`, on
+`RileyHinsperger/axiom-revenue-engine-rebuild`. Its ten-check receipt does not cover
+the newer work. The local series below preserves that work in separate commits.
+The final candidate is the commit containing this checkpoint-preparation brief,
+following `f0f6c4e`; resolve its exact SHA with `git log -1 --format=%H -- docs/STATUS.md`.
+For current verification, require `data/rebuild-monitor/release-proof.<SHA>.json`
+(v2, all twelve checks) and local/upstream/remote equality. Do not infer success
+from this pre-verification committed document. The monitor records those facts
+only after the command finishes and the exact commit is pushed. No main merge,
+deployment, production query or production state change is part of this checkpoint.
+
+### Current result: partial manual-reply integration, not a finished email feature
+
+Active work card: turn the accumulated locally verified work into recoverable,
+dependency-complete Git checkpoints, separating security, owner restrictions and
+visual changes. Owner result: the next task can recover the actual work from Git,
+with an exact verification receipt rather than an uncommitted-work claim.
+Proof: dependency review, explicit commit scopes, complete ordered release checks,
+clean final tree and exact local/upstream/remote equality before a pushed claim.
+The release receipt must include the new saved/legacy email browser gates; the old
+ten-check receipt is insufficient for these changes. Scope is checkpoint integrity
+and existing work, not another feature. No history rewrite, discarded edits,
+provider activation, deployment or approval of the proposed dark design is allowed.
+No owner decision blocks local checkpoint preparation. Summary privacy passed in
+the previous cycle; the evidence below remains working-copy evidence until the
+exact final commit passes its own gate.
+
+Checkpoint preparation (2026-09-08): the prior turn was progress, with terminal
+browser success and inspected synthetic screenshots. Current inventory separates
+four dependency groups: owner corrections/deployment denial; integrated email
+security and its fixtures; existing mobile/sidebar interactions plus the explicitly
+unapproved dark proposal; and exact verification/CI documentation. No source is
+discarded or restored. Two new regressions demonstrated missing email browser gates
+in both the release receipt and Linux workflow. Release proof v2 now requires all
+twelve ordered checks; old ten-check v1 receipts cannot certify this candidate.
+Sixteen monitor/deployment-focused tests, safety, monitor check and diff checks pass.
+The final committed tree still needs the complete proof before any push claim.
+The owner-constraints/deployment-hold group is saved locally as `82a46a0`.
+This is an unpushed intermediate commit, not a newly verified release. The next
+group retains the provider-neutral guarded reply groundwork and complete saved/
+legacy/summary privacy path together; the full live-send policy remains unfinished.
+That integrated security group is now local commit `e9fac9a`. Mobile review and
+sidebar changes are being saved separately with their existing interaction tests
+and synthetic walkthrough. The dark HTML proposal remains a local design artifact,
+not owner approval and not an implemented replacement application.
+The visual group is local commit `f0f6c4e`. The final verification commit adds the
+twelve-check receipt, matching sequential Linux browser gates and this handoff.
+The reused Luna-max dependency review attested canonical root, branch and starting
+`93f498c`, found no missing traced import, and required hunk staging for package
+commands and the shared owner-browser harness. Those groups were staged separately.
+No live policy or provider authority was added. Human decisions required: none for
+checkpointing. Active duration and model usage were not measured; no speed claim.
+
+The actual reply POST no longer calls Gmail, refreshes tokens or selects the first
+user mailbox. It requires the shared current administrator/origin fence, accepts
+only a stable approved-intent reference, reloads stored approval content and binds
+owner, URL client, mailbox, mode, Message-ID and digest before invoking the
+guarded manual runtime. The real runtime deliberately returns unavailable, with no
+environment override or Gmail fallback.
+
+The local route now uses a same-statement claim fence for current actor/session,
+reviewer, exact stored approval, unarchived lead, global/emergency pauses and
+active suppression, together with the existing atomic budget reservation. The
+pre-patch revocation-after-lookup test returned 200 and sent fake mail; it now
+denies with no new intent, debit or provider call. A final recheck catches changes
+after reservation and leaves a non-resendable record. The normalized legacy `REPLY`
+marker stops sequences without forbidding owner replies; it is not consent or
+opt-out classification. Explicit opt-out/complaint/bounce/no-MX sources cannot
+expire into permission. Reviewer-found wrapper/encoded/`www.` suppression forms
+now share the existing email/domain interpretation; exact raw mappings are checked
+against every current suppression row in the write. Added/changed rows deny. This
+temporary compatibility read stops above 1,000 rows/128 KiB rather than omitting
+records; canonical suppression storage is still needed before scale.
+
+The local approval writer no longer depends on GmailConnection/OutreachMailbox.
+Source-only migration 0075 records immutable provider-neutral mailbox identities,
+mailbox-scoped client conversations and specific recipient/parent reply targets.
+Manual envelope v2 binds the target ID into the approved digest; v1 remains readable
+for legacy characterization but cannot create or load a new manual approval.
+The same identity predicate runs in approval INSERT/reload, claim and final check.
+Missing/disconnected/paused/retired identities deny. Retirement cannot be undone;
+correcting a conversation requires a new target and approval, not reassigning old
+permission. Changing the lead's general email does not invalidate the exact
+recorded recipient. No alias or case rewrite is performed after approval.
+
+The actual approval writer, handler, reader, claim and dispatcher pass on disposable
+SQLite and Miniflare D1. The fixtures now call the real approval writer instead of
+inserting approval receipts directly. Tests cover stops immediately before the D1
+write, identity retirement after lookup/claim and one fake send across concurrency.
+**Provider identity ingestion and health/consent/capacity policy remain synthetic.
+These tests do not prove the owner approval UI, live provider ownership, full atomic
+policy, inbox/CRM integration, inbound replies or opt-outs.**
+
+The manual runtime factory now owns mandatory guarded claim, final check, outcome
+persistence and historical reads; it accepts no claim/outcome/history override.
+Saved outcomes are read from the actual immutable approval and durable send record,
+not a synthetic Map or second history table. Reading requires the exact current
+admitted owner/session/client, including a second check after digest verification.
+Mailbox retirement, approval revocation/expiry or a lead archive no longer hide
+past acceptance. Current session expiry, impersonation, ban and role removal still
+deny. Recovery performs no writes, claims, debits, credentials or provider calls;
+uncertain/rejected states never become permission to resend. A failed historical
+read returns STATUS_UNAVAILABLE without falling through to dispatch. Accepted
+content can be reconstructed after reopening the reader. Acceptance is not delivery.
+
+The separate client email-history GET now reads saved owner-scoped activity only.
+It no longer imports Gmail, Prisma credential lookup or token refresh. Its actual
+route requires current administrator authentication, parses strict client/cursor
+inputs before opening storage, and emits private/no-store responses. The reader
+returns at most five validated messages, with a stable createdAt/id cursor and
+current admission checks before and after reading. It never returns HTML or an
+attempt token. Missing storage or invalid history is unavailable, not a false empty
+inbox. The current owner can still read their saved history after mailbox retirement.
+
+The old Gmail-shaped thread display/raw-envelope composer is replaced by a
+read-only Saved email activity panel. It shows each record's sender, recipient,
+plain-text content and accepted/uncertain/rejected state; acceptance is not delivery.
+Paging and refresh read local records only. Loading/failure clears stale content,
+and changing clients remounts the view and aborts old requests. No send/generate
+control remains on this incomplete interface. This is useful saved activity, not
+the finished approval/reply or inbound-mail journey. Legacy mail is explicitly not
+automatically imported. Its isolated desktop/mobile browser gate passed; the parent
+visually inspected both screenshots. This does not prove the full app shell/login
+or the unfinished reply approval journey.
+
+**SEC-006 stays open.** Full current-policy SQL, trusted provider ingestion/health,
+legacy CRM/inbound integration,
+durable approval/recovery UI, inbound/opt-out processing and the scheduler's second
+outbound caller remain unfinished. Existing Gmail-specific transport/credential
+helpers are reference work, not the target provider integration. Details:
+[ADR 0059](adr/0059-outbound-send-intent-and-ambiguous-delivery.md),
+[reply runbook](RUNBOOK.md#manual-reply-boundary-local-partial-integration),
+[security audit](SECURITY_AUDIT.md).
+
+### Current verification (dashboard and automation summary privacy)
+
+The two baseline reproductions failed on foreign-owner email before the patch.
+Both now pass through current owner/session fences and explicit metadata projections.
+The actual dashboard/automation page and overview/status API fixtures preserve
+owned mail/queue records, reject ordinary members and recheck expiry, impersonation,
+demotion, verification, ban and configured owner removal after reads. Reassigned
+mailboxes do not expose foreign sender metadata. Shared business/CRM information
+remains shared; this is message ownership, not a new per-owner business silo.
+
+Overview/status reads no longer synchronize Gmail mailboxes, create absent settings,
+recover stale sequences or run automatic ORM schema repair. Missing settings fail
+unavailable. The read-only model rejects writes before storage. Exact disposable
+application/schema snapshots remain unchanged; both readers also passed real local
+Miniflare D1 with an application-query allowlist and no outbound requests.
+
+- Nine new focused tests pass; the nearest overview/operator tests pass (42 before
+  adding the additional D1 test).
+- **736/736 full-suite tests passed.** Safety, typecheck, lint, sanitized Cloudflare
+  build and Wrangler no-upload dry run passed. Known generated duplicate-options
+  warnings remain; nothing was uploaded.
+- Post-build legacy and saved-email desktop/mobile browser gates passed again.
+- The final full-app owner browser gate passed after the Google-prompt and
+  same-day timestamp corrections: authenticated summary-to-detail flows at
+  1440px/390px, six existing WCAG views, and zero external browser requests.
+  Parent inspected the final desktop dashboard and mobile automation captures.
+  The timestamp regression failed at 0 versus 1 before its fix; SQLite, D1 and
+  the final dashboard capture now agree on 1. Local fixture list/dossier readiness
+  was 210/69 ms, not a production performance guarantee. Retained evidence:
+  `output/playwright/owner-walkthrough-32288-1788908892014/acceptance.json`.
+  These are existing-UI privacy proofs, not the finished dark redesign. Legacy
+  operational labels and capacity displays still need the owner-first redesign;
+  they must not be treated as permission or evidence of live sending readiness.
+- The reused Luna-max candidate reviewer attested the exact canonical root,
+  branch and HEAD and found no concrete surviving bypass or GET mutation in the
+  named boundary. This was one reused-context review, not a fresh-context audit.
+
+This remains a local working-copy candidate, not a new commit, pushed checkpoint,
+deployed fix or completion of SEC-006. The full trusted send policy, durable owner
+approval/composer and inbound processing remain unfinished. No owner decision
+blocks the next local step; spend C$0, all execution and deployment holds unchanged.
+
+### Previous verification (legacy client history and message viewers)
+
+- Actual client-page and metadata-GET reproductions both failed before the patch
+  because foreign-sender email crossed the boundary. They now pass. The email
+  list/detail GETs share the same explicit reader; guessing another sender's ID
+  returns 404. Business notes and owner-owned legacy history remain readable.
+- Nine disposable storage tests cover the actual page/API boundaries and real
+  Miniflare D1 reader, current admin/session revocation, malformed input before DB
+  access, strict queue-creator ownership, archive behavior, absent schema, explicit
+  oversized/HTML-only text and unchanged application data. Three viewer/contract
+  tests cover removal of HTML sinks, strict message shapes and UTC timestamps.
+- **727/727 tests passed.** Safety, typecheck, lint, final application Cloudflare build and
+  bundle sanitization passed. Wrangler's no-upload dry run exited successfully;
+  only the known generated duplicate-options warnings remain. No upload occurred.
+- The full ClientProfile and shared viewer browser fixture already passed desktop
+  and mobile privacy, keyboard disclosure, error clearing and no horizontal
+  overflow. It consumes the real server-page props and actual built styles, with
+  synthetic HTTP auth and in-memory storage. No external requests or application
+  writes occurred. Parent inspected desktop/mobile viewer screenshots. Both final
+  post-build/post-dry-run legacy and saved-history browser gates passed. Artifacts
+  are under `output/playwright/legacy-email-history/` and `saved-email-history/`.
+  This is not full app login, accessibility certification, incoming mail or the
+  approved reply composer. Saved-history WCAG AA, pagination, error and client-switch
+  coverage passed again. The broader owner-console regression initially stopped
+  before browser launch: the old exact Revenue schema checker rejected the new
+  mailbox tables from migration 0075. Two focused reproductions confirmed this.
+  The checker now accepts either exact 0054-0069 or that exact schema plus the
+  complete canonical 0075 extension. It still compares every table/index/trigger,
+  rejects partial/altered/unknown extensions, and modifies only an in-memory
+  reference. No actual database is migrated or schema object silently ignored.
+  Six focused compatibility/materialization tests pass. The final owner-console
+  gate now passes all six desktop/mobile WCAG views and existing synthetic
+  authentication/OAuth/mailbox safeguards with zero external requests. Warm list
+  and dossier checks were 217/107 ms, not a human usability or production benchmark.
+  Its mobile position assertion now requires exactly one visible business heading,
+  rather than also matching a hidden retained route copy; the first-business
+  above-navigation threshold is unchanged. No duplicate visible card is ignored.
+- Repairs during verification: removed unnecessary effect state resets (the modal
+  already remounts by message ID); supplied an empty synthetic environment for the
+  standalone Next Link browser fixture; replaced D1 total_changes assertions with
+  SELECT-only application-query checks and exact application-table snapshots;
+  fixed actual mobile grid overflow and UTC timestamp interpretation. No real
+  database, credentials, mailbox or provider was used to investigate them.
+- A reused Luna-max reviewer re-attested the canonical root/branch/HEAD and found
+  the dashboard/automation summary disclosure remained at that checkpoint. The
+  follow-through candidate and its current verification are recorded above.
+  This is locally tested partial remediation, **not closure of legacy email privacy
+  or SEC-006**, and not an exact-commit release receipt. No new commit/push, main
+  merge, deployment, production migration or spend; C$0. No owner decision blocks
+  the next local task. Active duration/usage is not reliably measured.
+
+### Previous verification (saved-history GET and read-only view)
+
+- Pre-patch actual-route reproduction made two simulated provider calls and one
+  credential write just by viewing history; the zero-provider expectation failed.
+  The replacement actual route imports only auth, database and saved-history handler.
+- Seven new route tests passed, plus the extended real Miniflare D1 reader proof.
+  They cover authentication/input rejection before DB access, owner/session/client
+  isolation, stable bounded paging, retirement/revocation/archive, policy/session
+  changes during reads, unavailable storage and no extra writes/sends. HTTP auth
+  and provider identity remain synthetic fixtures; storage/approval/runtime/reader
+  logic is real local code.
+- **715/715 full-suite tests passed.** Typecheck, lint, safety, Cloudflare build and
+  sanitizer, and no-upload Wrangler dry run passed (`--dry-run: exiting now.`).
+  Known generated duplicate-options warnings remain; no upload occurred.
+  The new desktop/mobile browser gate passed keyboard message disclosure, WCAG AA,
+  pagination, errors/malformed responses, loading/client switching and plain-text
+  image safety, with zero external requests or extra writes/sends. It uses the real
+  component, built CSS and reader/handler, but synthetic auth and disposable data;
+  this is not the full app sign-in or reply composer. Screenshots are in ignored
+  `output/playwright/saved-email-history/desktop.png` and `mobile.png`.
+  A fresh investigator could not spawn due the agent thread limit; the parent
+  performed the separate investigation and candidate review locally. The completed
+  Luna-max reviewer completed this additional read-only candidate review, re-attested
+  the canonical root/branch/HEAD, passed all seven focused route tests and found no
+  concrete provider bypass, owner/session/client leak, pagination race or false
+  outcome semantics in the bounded new reader/panel. The parent independently
+  traced the candidate and verified the adjacent concern below. No new candidate
+  code repair was required; final safety/typecheck/lint/diff checks also passed.
+
+- Adjacent unresolved path, now the next priority: `src/app/clients/[id]/page.tsx`
+  still requires only requireSession and serializes legacy OutreachEmail bodies
+  selected by leadId without sender ownership. `ClientProfile` separately renders
+  legacy bodyHtml in a sandboxed srcDoc iframe; a sandbox alone is not proof that
+  remote images cannot load. The sibling `/api/clients/[id]` also returns legacy
+  email metadata without sender scope. Parent source inspection confirmed these
+  paths; no live page/provider was used and no browser exploit is claimed. The new
+  GET/panel gate does NOT prove the whole client profile private or provider-free.
+
+### Preceding verified slice (guarded runtime and read-only recovery)
+
+- Pre-patch recovery regression failed after fake acceptance plus history failure:
+  retiring the mailbox and revoking approval hid the saved SENT outcome. It now
+  returns the saved receipt with no second provider attempt. Earlier identity,
+  revocation, stop and suppression regressions remain covered.
+- **24 focused tests and 708/708 full-suite tests passed.** SQLite tests cover all
+  four recorded states under retirement/revocation/archive/budget pause, unchanged
+  total_changes and debit/send counts, owner/session/client privacy, admission
+  changes during hashing, expiry, durable exact content and raw-claim injection
+  rejection. Real local Miniflare D1 also recovers SENT after retirement/revocation
+  with one fake send and zero external requests. Typecheck, lint, safety and the
+  Cloudflare build/sanitizer and no-upload Wrangler dry run passed (terminal
+  `--dry-run: exiting now.`). Generated duplicate-options warnings remain; no
+  upload occurred. Fresh Luna-max candidate review passed its own 24 focused tests
+  and found no concrete surviving bypass/regression in this bounded v2 candidate.
+- Previous owner-browser gate passed six desktop/mobile WCAG pages with zero
+  external requests. No UI changed this slice, and this does not prove the
+  unfinished reply approval/reload flow. It is not a new browser run.
+- Fresh pre-patch investigator attested the canonical checkout/branch/HEAD and
+  identified separate historical admission and the legacy Gmail-backed sibling GET.
+  Fresh Luna-max candidate review independently attested the same root/branch/HEAD.
+  The generic dispatcher remains a
+  low-level mechanism, not standalone authorization; the manual factory owns its
+  guarded composition. No owner decision or spend is needed for these local steps.
+- This remains uncommitted local partial integration, not an exact-commit release
+  checkpoint. Existing mixed UI/deployment/security changes were preserved, not
+  bundled into an unrelated atomic commit or described as pushed. No active-time
+  estimate, new browser proof or completed security finding is claimed.
+
+### Other retained progress and decisions
+
+- Both npm deploy aliases deny unconditionally; production job is disabled in
+  working source. Four guard tests passed previously and remain in the full suite.
+  This is not a machine-wide Wrangler block or a change to old GitHub workflows.
+- [Non-Google email guide](EMAIL_PROVIDER_DECISION.md): cheap ordinary mail is not
+  outreach permission. No complete permitted stack within C$50 is verified.
+  Mailforge is only a conditional candidate; policy/DNS/security/checkout questions
+  remain. The C$85 scenario is **not approved**. No provider was contacted or bought.
+- Riley rejected the old-pipeline look and chose **dark**.
+  [Dark workspace prototype](design/dark-workspace.html) is a local visual proposal,
+  not approved production UI; all businesses and illustrations are fictional.
+  Desktop/mobile interactions were previously inspected, with no external requests.
+- Existing lead/dossier/contact views render. Quality Lab labels survive reload
+  plus reimport in the same browser, but are browser drafts/export, not permanent
+  database-backed decisions. Captured screenshot previews remain unavailable.
+  See [owner walkthrough](OWNER_WALKTHROUGH.md).
+
+### Active work card and next three actions
+
+**Owner result:** complete one exact-approval/send-once/reply/opt-out journey, with
+useful lead evidence and honest status. **Proof:** actual handlers and owner
+controls against disposable local storage and fake transport, including retries,
+policy changes and interruption. **Scope:** complete existing integration, not
+another disconnected proof layer. **Non-goals:** no live provider, purchase,
+production database, deployment or weakening of the quality/compliance gates.
+No owner choice blocks the next local steps; live provider selection needs its
+separate policy/cost decision. Dark composition remains proposed, not approved.
+
+The sibling GET's legacy Gmail path is now replaced in local source. No live GET
+was called. This does not retire Gmail-specific code in other legacy entry points.
+
+**Completed bounded slice:** mandatory manual-runtime composition and read-only
+recorded-outcome recovery passed local checks and independent review. No finding
+closure or release is claimed.
+
+**Completed bounded slice:** replace the live-Gmail email-history GET
+with bounded, current-owner saved history and a truthful read-only presentation.
+Prove actual GET behavior with synthetic storage, owner/session/client isolation,
+pagination, retired-mailbox history and zero provider/token-refresh effects. Keep
+accepted, uncertain and rejected outcomes distinct; do not present acceptance as
+delivery or a partial saved page as an entire inbox. The old reply composer remains
+unavailable until its separate durable approval journey exists. No live provider,
+new schema, migration, deployment or purchase is authorized. A fresh investigator
+could not start because the agent thread limit was reached; parent performs the
+ same separate boundary/compatibility investigation locally.
+
+**Locally verified partial slice:** close the client-profile
+legacy mail copies in the server page, metadata GET, timeline and HTML display,
+plus the equivalent legacy email list/detail endpoints and shared message viewer.
+Preserve sender-owned legacy mail as explicitly historical plain text; exclude raw
+HTML, provider errors and foreign-owner sequence data before serialization. Keep
+business records and CRM activity intact. Proof must exercise actual page/API with
+disposable storage and the full ClientProfile component, not just its new panel.
+No live provider, database, migration, deployment or spending is authorized.
+
+Both baseline page/API tests reproduced foreign-sender disclosure. The candidate
+now shares a SELECT-only current-owner/admin/session reader across those four
+server boundaries, uses durable sender/sequence-creator IDs, returns explicit
+plain-text metadata, and omits HTML, Gmail IDs, private provider errors and unused
+sequence bodies. No saved records are deleted or promoted into send approval.
+Actual-boundary and viewer contract tests pass; current verification is above.
+Dashboard/automation overview follow-through now has explicit owner/session
+admission, metadata-only projections and no read-time maintenance; see current
+verification above. The overall send-policy/composer/inbound SEC-006 work remains
+open. The reused Luna-max reviewer completed the bounded candidate review;
+fresh-agent creation previously reached its limit.
+
+1. Verify the final candidate's v2 receipt and exact Git equality. If either is
+   absent, finish that checkpoint before new code; the grouped source is already
+   committed and must not be recreated. Then continue the remaining send-policy
+   integration below. Do not redo the tested client/history/viewer paths.
+2. Complete remaining consent, verification, capacity and message-policy facts in
+   the existing claim, keeping replies distinct from cold outreach. Connect exact
+   owner approval and a retained intent to the actual composer;
+   prove retry/reload/cancel and all response states in desktop/mobile browser
+   fixtures. Never restore its old raw-envelope/Gmail bypass.
+3. Complete local inbound deduplication and opt-out suppression, and bring the
+   scheduler's second outbound caller through the same guarded boundary before
+   closing SEC-006. Then resume durable lead review and the approved visual rebuild.
+
+## Plain-English status
+
+### Owner correction: no Google Workspace
+
+Riley reaffirmed on 2026-09-08 that Google Workspace must NOT be part of the
+rebuild. The assistant's repeated Gmail/Workspace launch explanation was wrong for
+this requirement. The prior Workspace budget allocation and setup assumption are
+superseded. AGENTS, owner context, master plan and README now record the exclusion.
+No replacement mail provider is selected, no subscription purchased and no live
+email/domain configuration changed. The C$50 monthly ceiling remains unchanged.
+
+Stop expanding Gmail-specific runtime integration. Retain generic durable intent,
+approval/revocation and exact-message safety work. Existing Gmail schema/transport
+tests remain legacy evidence; new mailbox and approval code currently depends on
+GmailConnection and must be refactored behind a provider-neutral contract before
+it can satisfy the corrected target. No code migration is claimed in this update.
+
+Next three actions under this correction:
+1. Verify suitable non-Google provider policies, custom-domain mailbox/reply API
+   capabilities and complete CAD costs; do not choose on mailbox price alone.
+2. Remove Gmail-specific types/schema assumptions from new outbound interfaces
+   and approval/provenance lookups while preserving current no-send defaults.
+3. Continue complete send-policy integration and verification using the selected
+   provider adapter; retain independent review and owner-approved rollout gates.
+
+### Current milestone: shared outbound reply safety (SEC-006)
+
+Latest working-copy continuation:
+- Added source-only migration 0074 and the database-backed exact-envelope approval
+  store. Approval creation checks a current verified, unbanned, allowlisted admin
+  session inside the INSERT, exact sender/mailbox/connection provenance and a live
+  unarchived lead. Approval captures the complete immutable intent/envelope with
+  explicit expiry; exact replay is read-only. Revocation is administrator-gated,
+  idempotent, and cannot restore or renew an old approval.
+  Loading checks current owner/reviewer admission, expiry and exact content; a
+  second read after hashing catches intervening revocation, role or policy changes.
+  Seven focused tests pass, including composition with database mailbox resolution
+  and the dispatcher (one fake send when approved, none after revocation). The first
+  fixture failed because it used updatedAt instead of the actual legacy Lead
+  lastUpdated column; corrected against the real schema. Type-check, scoped lint
+  and safety checks pass. The complete suite passed all 670 tests for this candidate.
+  No API/owner UI is wired to this store. MFA, full policy/consent/health and atomic
+  approval-to-claim composition remain required; approval alone never grants send
+  authority. Independent review and the complete release gate remain incomplete.
+- Local Cloudflare D1 now independently exercises the exact mailbox resolver,
+  using actual table/index definitions with disposable storage and blocked
+  external requests. The fixture inserts another mailbox for the same owner first
+  and proves that no first-connection fallback occurs. It also proves expiry,
+  post-decryption pause/token-change denial, and connection deletion/nulling.
+  The targeted D1 test, full 663-test suite, type-check and scoped lint pass. This verifies local D1
+  compatibility, not deployed state or complete send authorization. The interrupted
+  independent code review remains incomplete; this test does not replace it.
+- Added the real-schema exact mailbox resolver. Both mailbox/Google connection
+  must match owner, ID and address; paused/disconnected states, missing send scope,
+  malformed expiry and tokens within five minutes of expiry stop before decryption.
+  It selects no refresh token and makes no network or mutation calls. After local
+  decryption a second database read rejects changed identity/state/ciphertext or
+  expired credentials. Errors omit private token/diagnostic values.
+  Six focused tests pass against real 0005/0006 schema in disposable SQLite,
+  including composition with the envelope adapter and durable dispatcher: one fake
+  send across active replay, zero for a paused mailbox. All 662 tests, type-check,
+  scoped lint and safety checks pass. The independent candidate mailbox review
+  did not complete: the child returned a Codex usage-limit error. Do not count
+  that review as passed or this working copy as release-verified. Source work can
+  continue without paid providers; review remains required before the checkpoint.
+  Complete policy/health/consent and stored approval loading,
+  token refresh lifecycle and actual route integration remain unfinished.
+- Implemented exact-envelope transport: the versioned content digest binds both
+  bodies, final subject, recipient, sender, thread references, owner, mailbox,
+  connection, lead and policy. Changed content blocks before credential lookup;
+  a mismatched mailbox blocks sending. Headers cannot be silently sanitized after
+  approval, and stored-object mutation cannot alter the checked snapshot. A wrong
+  provider reply thread remains uncertain, never a safe automatic retry.
+  Tests use the real Gmail formatter with fake delivery and compose the adapter
+  with the durable dispatcher. All 656 tests pass, including 23 focused envelope/
+  ledger/dispatcher tests. Type-check, scoped lint, safety and diff checks pass.
+  Independent candidate review found no scoped envelope defect, but initially
+  looked for the dispatcher at the wrong relative path and explicitly corrected
+  that omission; its report is not end-to-end integration evidence. Parent tests
+  exercise the actual dispatcher composition. Real approval/connection loaders and existing
+  route/scheduler wiring remain absent. No release, live send or spend is implied.
+- Scoped independent dispatcher review found no duplicate-provider path under
+  its trusted-dependency contract, but identified that confirmed rejections had
+  no explicit transport result. The dispatcher now persists an explicit trusted
+  rejection before reporting REJECTED. Exceptions remain uncertain; contradictory
+  acceptance/rejection results fail closed. Lost rejection receipts cannot enable
+  another attempt, and rejected attempts retain their budget reservation.
+  All 16 combined ledger/dispatcher tests, the full 649-test suite, safety check,
+  type-check, scoped lint and diff checks pass. The full release build/browser
+  gate has not run for this uncommitted candidate. Gmail status classification
+  and durable history repair scheduling remain
+  unwired; no provider status is newly treated as definitive by this change.
+  This is unfinished SEC-006 work, not a verified release or production change.
+- Added shared dispatch lifecycle code over mandatory injected authorization,
+  exact-intent transport and history-projection dependencies. Thirteen combined
+  ledger/dispatcher tests pass, covering one provider attempt across concurrent
+  calls, policy rejection, ambiguous delivery with failed outcome storage,
+  history-only retry after acceptance, and lost acceptance acknowledgement.
+  This code has no Gmail/binding import or runtime caller. Fixture authorization
+  is synthetic; passing the ledger's claim method alone is NOT production policy.
+  Real actor/mailbox/contact/approval gates and exact-envelope transport are still
+  required before either old caller can be replaced. SEC-006 remains open.
+- Added an atomic budget reservation to the source-only send ledger. The monthly
+  CAD ceiling cannot exceed 5000 cents; no billing row is seeded by the migration
+  and new rows default paused. Missing/stale/paused/exhausted budget blocks the
+  intent insertion. Replay does not debit again; committed spend cannot reset.
+  Nine focused tests pass, including three separate processes racing different
+  one-cent intents against one cent remaining: one succeeds and two roll back.
+  Full suite: 642/642 pass, type-check, scoped lint and diff checks pass. This
+  proposes UTC billing months and requires a reviewed accounting import and
+  authoritative cost quote before integration. It does not prove the global C$50
+  limit across other providers or existing subscriptions; no real budget was set.
+  Independent budget review found no scoped atomicity/double-charge/last-cent race
+  defect, but flagged overcommitted state and inconsistent outcome errors. The
+  revised schema allows already-incurred excess costs to be recorded only while
+  paused and prevents unpausing above the ceiling; it does not hide real overspend
+  by rejecting its accounting record. Missing/wrong attempt tokens now return a
+  stable outcome-conflict error. All nine focused tests and type-check pass after
+  these revisions; the 642-test full run predates these final review adjustments.
+- Reproduced and tightened invalid/future/incoherent approval-date handling.
+  Explicit null expiry, SQLite UTC timestamps and ISO offsets remain supported.
+- Independent review found latest-approval selection could prefer old approval
+  over new pending records. A real-0055-table fixture reproduces the old mixed-format
+  and same-second selection, and verifies normalized time plus rowid ordering.
+  Malformed/future creation dates block instead of falling back to older approval.
+- Gmail transport can now carry a validated stable RFC Message-ID through both
+  email/reply helpers. This is optional compatibility plumbing until dispatcher
+  integration, not provider idempotency. Malformed successful-response JSON/IDs
+  now produce a bounded uncertain-result error instead of empty successful IDs.
+  Header-injection/trailing-newline and ordinary threading tests pass without mail.
+- Inventory confirms contact/verification records are shadow-only and forbid send
+  authority; cost telemetry has no outbound budget reservation. They cannot be
+  relabelled as consent or spending authorization. Explicit consent, complaint/
+  unsubscribe semantics, health failures and atomic budget enforcement remain.
+- Latest targeted checks pass; type-check passed. The new ordering fixture first
+  failed because referenced fixture identities were missing; it now creates those
+  disposable parent rows and passes with foreign keys intact. Full suite: 640/640
+  tests pass; scoped lint and diff checks pass.
+  These source changes remain uncommitted and not release-verified.
+
+Verified source checkpoint: `93f498c4d5c399f2402b262c2b07c05e4074a2af`.
+Its immutable release receipt proves all ten checks passed at
+2026-09-08T11:38:29.114Z. The preceding cycle verified its branch push and
+local/upstream/GitHub equality. No deployment is implied.
+
+The current real-route synthetic reproduction proves that repeated manual reply
+requests cause repeated provider effects. It also proves that provider acceptance
+followed by a CRM recording failure returns 500 and a retry sends again. Existing
+recipient/thread tests and Gmail formatting controls passed. The reproduction is
+pre-remediation evidence, not a passing security regression or a completed fix.
+
+Parent inspection and a separately attested read-only Luna investigation identify
+the shared Gmail transport boundary as the repair location for both manual replies
+and scheduled outreach. Preserve manual replies; do not retire a core sales feature
+or confuse the autonomous-send switch with all manual authorization. ADR 0059
+records the proposed durable intent, exact mailbox, current policy, budget claim,
+single attempt, uncertain-delivery recovery and UI requirements. Its implementation
+gates remain open. No existing production caller has changed in this investigation.
+
+The working copy now includes source migration 0073 and a typed injected SQL
+intent store. INSERT RETURNING identifies the unique claimant; retries return
+the existing record, changed intent identity conflicts, and interrupted attempts
+cannot be reclaimed. SQL guards preserve identity and permit only forward outcome
+transitions. Exact acceptance is replayable, including after a lost database
+acknowledgement. This is a persistence primitive, not send permission: atomic
+policy/budget composition and route/scheduler/UI integration are still required.
+0073 was executed only in disposable in-memory SQLite; no persistent or live
+database was migrated.
+
+Checks so far: eight targeted checks passed before adding an additional lost-ack
+test; all five current store tests pass. Safety, type-check and scoped lint passed;
+the first type-check found one test-only unknown-result access, which was corrected.
+The full suite passed 633 tests before the additional lost-ack test was added.
+Independent review identified missing claim-winner fencing, SQL/runtime validation
+differences, and a concurrency-test overstatement. The store now issues a random
+attempt token only to the INSERT winner and requires it for outcome writes;
+existing-claim responses and public rows omit the token. Wrong-token writes are
+rejected in the focused tests. Digest and timestamp SQL constraints were tightened.
+The next continuation closes the storage review gaps: SQL now mirrors printable
+ASCII identity/RFC message-ID checks and rejects hidden NULs, BLOBs, invalid
+digests and unsafe timestamps. It also blocks INSERT OR REPLACE against retained
+intent identities. Seven current store tests pass, including three distinct
+processes released from a barrier against independent SQLite connections and a
+fourth process reopening the database after the racers exit. Exactly one row and
+one claim winner were observed; the reopened process could not reclaim it. This
+uses only a task-created temporary database, removed after owned processes exit;
+it is not live D1 proof. Type-check passes after correcting the fixture's narrow
+child-environment type assertion; it intentionally passes no application bindings
+or inherited credentials. Privileged reconciliation and policy/budget/caller/UI
+integration remain unfinished. The fresh full suite passed all 636 tests for
+this revision, including the multi-process case. Scoped lint and diff checks pass.
+Full exact-commit release checks have not run for this unfinished working copy.
+No commit or push is claimed for this milestone.
+No external mailbox, persistent database, migration, provider or prospect was used.
+Execution stays off, spend impact C$0. No owner decision blocks source implementation.
+
+Next three actions:
+1. Add authoritative accounting/quote integration, and
+   compose current actor/mailbox/contact/approval policy with the budget-backed
+   intent claim; keep live resources off and preserve process/reopen regressions.
+2. Integrate both outbound callers, exact mailbox/thread checks, recovery and the
+   reply UI's stable intent; replace vulnerable characterization expectations with
+   regression checks.
+3. Independently review the integrated boundary, run the full release gate, then
+   commit/push only a verified checkpoint on the rebuild branch.
+
+### Previous checkpoint: retire legacy browser execution (SEC-004)
+
+Verified predecessor: `9519cb06cc0fd4ea1de9f24ce9c4bf910ad6130d`.
+All ten release checks and branch push passed for SEC-005, including 626 tests,
+six accessibility pages, 212 ms lead-list and 103 ms dossier readiness, and zero
+outside requests. The monitor proved local/upstream/GitHub equality.
+
+A synthetic pre-removal reproduction confirmed that the legacy discovery
+collector handed loopback, private-network and metadata-service URLs directly to
+navigation; its resource filter allowed private document requests. No real
+browser, DNS or network was used. Existing ordinary legacy extraction and v2
+capture checks also passed before editing. Independent compatibility inspection
+confirmed that owner read/history routes and the v2 evidence workflow do not
+depend on this legacy executor.
+
+The candidate deletes legacy browser/provider launch, local fallback, navigation,
+AI execution and job-runner side effects. Explicit retired shims retain the old
+entrypoint names but cannot inspect input/context, bindings, environment or jobs.
+The cloud runner returns unclaimed before any work. Pure Maps parsing, dedupe
+helpers, historical data readers, and independent v2 capture remain unchanged.
+All 21 focused checks, 628 full tests, type-checking, lint and safety pass. New
+regression checks exercise injected unreadable inputs/bindings and forbid
+operational imports. Owner browser acceptance passed six accessibility pages,
+desktop/mobile layouts, 371 ms list readiness, 82 ms dossier readiness and zero
+outside requests. Independent candidate review found no concrete surviving
+legacy-browser authority or v2/owner-console regression. The exact-commit release
+gate remains; its immutable receipt and verified branch checkpoint are recorded
+by the monitor only after all checks and the push pass.
+
+This removes the legacy browser authority only. V2 URL checks and fixture tests
+do not prove DNS pinning, rebinding resistance or platform egress. Live capture
+still requires separate network isolation, provider budget and release approval.
+No provider resource, credential, database record, deployment, migration, mailbox
+or prospect was touched. Spend impact C$0; all execution remains off. No owner
+decision is required for the approved source retirement. Deleted source remains
+recoverable in Git; no historical business data was deleted.
+
+Next three actions:
+1. Run the exact-commit release gate and push only this branch if it passes.
+2. Record its immutable receipt and verify local/upstream/GitHub equality.
+3. Continue outbound-email and owner-account security; keep live capture gated.
+
+### Previous checkpoint: retire external legacy agents (SEC-005)
+
+Verified predecessor: `98c3df8eb7e5cf0e3e079565daef0b15e09fa750`.
+All ten release checks and branch push passed for SEC-003, including 625 tests,
+six desktop/mobile accessibility pages, 388 ms lead-list and 78 ms dossier
+readiness, and zero outside requests. Local/upstream/GitHub equality was proved.
+
+The next bounded repair retires the six external legacy agent endpoints, as
+permitted by security Gate C. A synthetic, isolated authentication reproduction
+accepted the same signed request in another server instance under a different
+agent name; same-instance replay was rejected. No route, database or provider
+was executed during that reproduction. Independent compatibility investigation
+found no current in-repository HTTP caller: the Cloudflare scraper calls internal
+helpers directly and the v2 owner console uses separate authenticated routes.
+
+The candidate returns fixed empty 410 responses for all six endpoints and all
+seven methods, removes the obsolete authentication implementation and runtime
+shared-secret declarations, and narrows the public-path exemption to these exact
+route shapes. Shared job helpers and the internally used lead validator remain.
+Nine focused tests pass, covering zero request/context/binding/network access,
+the route-module inventory, public-path limits, and valid internal lead input.
+All 626 tests, type-check, lint and safety pass. Actual-route browser verification
+passes all eight retired endpoints/seven methods, six WCAG pages, desktop/mobile
+layouts, 225 ms list readiness, 100 ms dossier readiness and zero outside requests.
+Independent candidate review found no concrete surviving SEC-005 bypass or
+console/internal-worker regression. Exact-commit release verification remains
+the final gate; the immutable receipt and verified branch checkpoint are recorded
+by the rebuild monitor only after all checks and the push pass.
+
+External legacy clients are unverified and intentionally unsupported after a
+separately approved rollout. No configured credential was inspected or revoked;
+obsolete provider secrets require that rollout's inventory/revocation step.
+No owner action is needed for this source repair. No production change,
+deployment, migration, mailbox activity, scraping, prospect contact or paid
+provider operation occurred. Spend impact: C$0. All execution controls remain off.
+
+Next three actions:
+1. Run the exact-commit release gate and push only this branch if it passes.
+2. Record its immutable receipt and verify local/upstream/GitHub equality.
+3. Continue legacy browser/send and owner-account security gates before activation.
+
+### Previous checkpoint: retire legacy shared-token control (SEC-003)
+
+Verified predecessor: `084ff3e70328af4c09e43e11bf618963b8bb257e`.
+All ten release checks passed, including 623 tests, six browser/accessibility
+pages, 241 ms lead-list readiness, 98 ms dossier readiness and zero outside
+requests. The exact commit was pushed and the monitor verified local/upstream/
+GitHub equality. SEC-011 is therefore verified in source, not deployed.
+
+The next bounded repair retires the legacy MCP and internal cron-tick authority,
+as explicitly permitted by SEC-003 and the engine migration plan. A disposable
+characterization test confirmed that one synthetic token exposes read tools,
+scheduler execution, queueing and force-unblock controls, with wildcard CORS.
+No tool was executed; the test rejects database access. The root console's
+scheduled self-dispatch is its only source caller found so far; the owner UI
+uses its separate authenticated routes. Independent compatibility investigation
+found no current owner-UI/nonlegacy caller requiring preservation. The candidate
+now replaces both endpoints with pure fixed-410 responses, removes shared-token
+settings/declarations, and makes the root scheduler inert. Targeted tests prove
+no request/binding inspection and zero dispatch with old flags/credentials, while
+preserving console fetch/cache exports. All 625 tests, type-check, lint and safety
+check pass. The real-route browser gate passed both endpoints/all seven methods,
+six WCAG pages, 214 ms lead-list readiness, 101 ms dossier readiness, and zero
+outside requests. Independent candidate review found no concrete surviving
+shared-token bypass or nonlegacy console regression. The new engine remains
+disconnected and off. Exact-commit release verification remains the final gate;
+its immutable local receipt and pushed checkpoint are recorded by the monitor.
+
+Next three actions:
+1. Complete the exact-commit release gate and push this branch only if it passes.
+2. Record the immutable receipt and verified remote checkpoint in the monitor.
+3. Continue remaining security findings, including legacy browser/agent authority;
+   owner MFA/recovery and production release gates stay open.
+
+No owner action is required for source retirement already in the approved plan.
+No production resource, mailbox, prospect, persistent database or secret was
+accessed. External spend remains C$0; no migration, deployment or activation.
+
+### Previous checkpoint: bounded mailbox settings (SEC-011)
+
+Verified predecessor: `96c9b02002a1be1fb6beb94418f9e9bd2c19f2ba`
+(SEC-010; its exact-commit release receipt and pushed checkpoint are persisted).
+A disposable SQLite reproduction confirmed that the old mailbox helper accepted
+owner, status and last-send timestamp changes alongside legitimate label edits.
+The candidate replaces that broad record mutation with a strict label/timezone
+contract, rejects unknown/protected fields, rechecks current approved admin and
+session in the write, and commits changes with their audit record in one batch.
+Repeated identical updates are mutation-free. Capacity/delay values remain
+server-owned: connection sync derives them from policy and would overwrite PATCH
+overrides. Admins retain shared management of both partners' mailbox metadata;
+this does not activate or reconnect either mailbox.
+
+Targeted SQLite and disposable D1 tests pass for mass assignment, malformed input,
+normal metadata updates, repeat requests, actor denial, audit failure and rollback.
+The new local batch adapter also rejects foreign-database statements before any
+write. All 623 tests, type-checking, and the safety check passed. The real-route
+disposable browser gate passed protected-field rejection, legitimate shared-admin
+metadata edits, identical retry and audit rollback; six WCAG pages, 387 ms list,
+100 ms dossier, zero outside requests. Lint passes. Independent bounded review
+found no concrete SEC-011 bypass or production regression. Environment policy is
+sampled immediately before the atomic batch, not transactionally locked across
+external configuration changes; unrelated mailbox workflows remain separately audited.
+Subsequent exact-commit release verification passed all ten checks at
+`084ff3e70328af4c09e43e11bf618963b8bb257e`, and the branch push was verified.
+This repairs source only; production rollout remains unauthorized.
+
+No production, persistent database, mailbox/provider or prospect was accessed.
+No deployment/migration or sending/syncing was enabled. Spend impact: C$0.
+No owner decision is needed for this source-level repair. Numeric operator
+overrides would need a separate policy/persistence design, not hidden PATCH keys.
+
+Next three actions:
+1. Run the complete exact-commit release gate for SEC-011 and push only this branch.
+2. Record its immutable release receipt/checkpoint and continue the remaining audit.
+3. Continue remaining security findings and owner MFA/enrollment/recovery before
+   any staging/provider activation; do not merge to main or declare production ready.
+
+### Previous checkpoint: one-time mailbox connection (SEC-010)
+
+Verified predecessor: `a37e9a572e8e99a5143ebefefbfbc6b26abc77d0`
+(all ten release checks and branch push passed). The current candidate replaces
+readable/replayable session state with signed random, server-stored transactions.
+Each expires after ten database-clock minutes and can be consumed only once by
+the same current approved administrator/session at the exact callback. The
+intended mailbox remains server-owned. Legacy state and duplicate callback
+parameters fail closed; provider/internal details no longer appear in errors.
+Source-only migration 0072 is required; no live migration is authorized.
+
+Local D1 tests pass for signature/identity/redirect/expiry/replay/concurrency and
+admin revocation gates. The real callback passes disposable browser checks for
+non-admin denial, cancellation, replay, duplicate parameters, fresh consumption,
+generic unavailable-provider errors, six WCAG pages and zero outside requests.
+List/dossier readiness before the initiation follow-up: 219/101 ms. Independent
+review identified cross-site GET initiation as a new state-write risk. Initiation
+now requires same-origin Fetch Metadata plus the shared origin/host fence;
+foreign, missing and direct-navigation metadata are denied. HEAD cannot create
+or consume state. An isolated browser test verifies the actual Settings link;
+test cleanup now waits for the intercepted response navigation and clears the
+page before closing (the earlier immediate close stalled Chromium). The fresh
+full browser run passed at 222/102 ms list/dossier readiness, six WCAG pages and
+zero outside requests, including HEAD rejection and real Settings navigation.
+The exact-commit release gate must finish before push; its receipt is authoritative.
+No inbox/provider/production resource was used;
+C$0 spend impact. No owner decision is needed for this source-only checkpoint.
+
+Next three actions:
+1. Complete review, exact-commit release verification, and branch push.
+2. Restrict SEC-011 mailbox edits to explicit validated owner-editable fields.
+3. Complete remaining owner MFA/enrollment/recovery and authorized release proof;
+   migration 0072 and live OAuth remain approval-gated, not implicitly enabled.
+
+### Previous checkpoint: browser protection (SEC-009)
+
+Verified predecessor: `c569fec3b4385f218590c26e2f95ae8cabf2dc24`
+(SEC-008, exact release receipt and branch push verified). The current candidate
+adds global framing, MIME-sniffing, referrer and browser-permission protections
+to Next responses and matching Cloudflare static-asset rules. Script/style CSP
+is report-only, not a claim of XSS prevention. Targeted policy/parity checks,
+type-check and lint pass. The expanded production-mode browser gate passes:
+framing blocked, sandboxed preview preserved, report-only script event observed,
+expected page/static/error statuses and denied API privacy headers preserved;
+six WCAG pages, 224 ms list, 100 ms dossier, zero outside requests. Independent
+review found no concrete bypass/regression. Exact-commit release verification
+must pass before push; its immutable receipt is the authority for that result.
+SEC-009 remains open for strict CSP evaluation/enforcement and HSTS on a verified
+HTTPS deployment. No production resource, provider, mailbox or prospect is used;
+spend impact is C$0. No owner decision is needed for this source-only patch.
+
+Next three actions:
+1. Complete exact-commit release checks, verify built static-header parity, and push.
+2. Fix SEC-010's OAuth state transaction using disposable tests, without connecting a mailbox.
+3. Complete remaining owner MFA/enrollment/recovery and authorized CSP/HSTS staging
+   verification before any activation; no production approval is assumed.
+
+### Previous checkpoint: request-origin protection
+
+The previous bounded milestone was SEC-008: prevent another website from making
+owner changes with a logged-in browser's cookie. At verified predecessor
+`7d1eef221a25ac4ccdb99dbeeb7e6aa52b7e5832`, a disposable Chromium reproduction
+archived a fake lead through the real bulk route from a different same-site
+origin using a plain-text POST. Direct profile requests also accepted foreign
+and missing origins. The candidate now checks exact current configured origins
+and Fetch Metadata before custom API session lookup. The original local browser
+attack is denied and the ordinary same-origin archive still works. All 21 custom
+unsafe-method handlers are inventoried; auth and separately authenticated service
+routes are not blanket cookie-policy exemptions. Independent bounded review
+found no concrete remaining bypass/regression. The production-mode browser gate
+passes, including the unwanted POST/403 and unchanged fake row, preserved normal
+archive, six WCAG pages and zero outside requests. Its exact-commit full gate and
+branch push passed at `c569fec3b4385f218590c26e2f95ae8cabf2dc24`.
+This is not a production fix claim.
+No live deployment, database, mailbox, provider, prospect contact or spend occurs.
+
+### Previous owner-admission source checkpoint
+
+Owner admission was the preceding source-level security milestone. A local attack
+test proved that an account outside the approved owner list could still read
+leads. The candidate now checks current approval and verified email across
+login, existing sessions, and account administration. Removing an owner revokes
+their sessions when the policy is checked; re-adding them requires a fresh login.
+Admin approval is a separate ceiling and never automatically promotes anyone.
+Missing or invalid configuration stops access without mass-changing accounts.
+These are source changes, not a production rollout. MFA, secure enrollment and
+recovery, session-management UI, other audit findings, and live proof remain open.
+
+The preceding verified source checkpoints closed stale login-cookie authorization
+and ban-lifecycle bypasses. A local attack test proved that a saved admin cookie retained access after a
+database demotion. The app now asks the database for the current session and
+role instead of trusting that cached identity. Regression checks cover old
+signed cookies, demotion, revocation, expiry, and normal sign-in. This does not
+yet complete MFA or recovery, and it has not been deployed. No production
+account, session, mailbox, or provider is used.
+
+The security audit's critical public-registration path is now closed in the
+rebuild source: even an approved admin email cannot create an account through
+the public endpoint. The sign-up form and address-based admin promotion are
+removed; existing accounts retain sign-in. Synthetic browser checks exercise
+denied registration, no new account/session, and successful existing-account
+access. This fix has not been deployed. Six high-risk legacy or release
+boundaries and seven medium findings remain in `docs/SECURITY_AUDIT.md`;
+production activation and the eventual merge to main stay blocked. Secure owner
+enrollment, MFA, recovery, session revocation, and a review of existing accounts
+are still required. No production system was probed or changed, and no provider,
+mailbox, prospect contact, or spend was authorized. Agent role files require exact
+repository/branch/commit attestation; the policy test enforces the instruction's
+presence, not the execution of every child command.
+
+The real repository has been recovered into the local workspace, renamed to
+`rileyhins17/axiom-revenue-engine`, and made private. The foundation gate is green
+locally and on Linux. Production has now been inventoried and backed up: legacy
+email/intake work is stopped, the redundant master database switch is off, and
+the legacy five-minute cron was removed so a paused engine no longer writes an
+empty run every five minutes. The rebuild console is live only in isolated
+staging; no rebuild code or migration has been deployed to production. The new
+Quality Lab is now locally verified: Riley can load one exact 50-business review
+packet, inspect the evidence and five separate scores, label leads Strong, Weak,
+or Wrong, and export a resumable checkpoint without changing qualification,
+contacting anyone, or spending money. The first ten-business shadow slice now
+also has an immutable progress ledger: each business advances through one exact
+approved phase at a time and can resume from its last proven receipt after an
+interruption. Its first source/workflow proof can now be prepared from a
+query-only verification of the exact local receipts instead of being typed by
+hand. The next website-evidence proof and trusted eligibility boundary are now
+defined and fail-closed: the first binds the desktop/mobile artifact and audit
+lineage, while the second requires one fresh transaction-sealed D1/R2 result per
+exact content-addressed artifact. Copied JSON cannot impersonate either trusted
+execution or eligibility provenance. The exact eligibility result can now be
+stored once and reloaded after a lost task through an append-only, database-clock
+checked boundary; expired receipts remain history instead of becoming current
+again. A separate validation-only adapter can now derive the next normalized
+phase input only from the exact in-process current durable reload, after
+rechecking the ten-business scope, business, predecessor, proof lineage, and
+time window. It cannot append progress, create a checkpoint, access a provider,
+or authorize execution. A separate guarded boundary now requires that exact
+input and its unchanged parent, verifies a one-receipt-only append, and returns
+the same frozen in-memory checkpoint on an exact retry. There is still no
+operator command, durable output, live database connection, or real-data path.
+The following assessment proof is now backed by durable trusted provenance. Its
+private loader verifies every immutable database guard, reloads the complete
+assessment row set, rebuilds the assessment from the sealed website source, and
+uses the database clock for freshness. Only the exact frozen current reload can
+feed proof; copied JSON, writer responses, stale history, source drift, and row
+drift fail closed. A separate validation-only boundary now turns that exact
+current reload into one frozen assessment phase input after rechecking the
+selected business, website-evidence predecessor, full ten-business parent, and
+chronology. It internally regenerates proof, binds the input to the exact parent,
+and a separate guarded boundary now appends it in memory only after proving one
+assessment receipt and no unrelated change. Exact retry returns the same frozen
+checkpoint. There is still no operator command, file/database writer, live
+binding, durable progress output, or real-data path. The contact-review phase now
+has its own verified proof boundary as well. Its read-only loader rebuilds
+the exact durable assessment, source materialization, reviewed contact invocation,
+every contact and verification row, and the final transaction receipt after
+checking all immutable writer guards. It reads database time last and trusts only
+the exact frozen current in-process result, so copied JSON, incomplete or stale
+history, cross-manifest lineage, and clock regression fail closed. The proof is
+bound to the exact guarded assessment checkpoint. A separate validation-only
+adapter now regenerates that proof internally and derives one frozen
+`CONTACT_REVIEW` input from the exact current durable reload and unchanged full
+parent checkpoint. It rejects copied trust, stale evidence, lineage drift, caller
+time, and changed parents. A separate guarded in-memory boundary now requires
+that exact input/parent, adds one canonical contact-review receipt, and proves
+the other nine businesses did not change. Exact retry returns the same frozen
+checkpoint; copied input, parent drift, and completed-child replay fail closed.
+It has no file/database output, operator/live resource, real-business path,
+contact action, or spend. The final owner-dossier phase now has a separate
+validation boundary as well: the real reader freezes and privately trusts only
+its exact current response, a content-addressed proof binds that full dossier and
+explicit five-minute declaration to the exact contact checkpoint, and a separate
+adapter creates one frozen zero-authority input. A guarded in-memory boundary now
+accepts only that exact input and unchanged parent, adds the final canonical
+receipt, and proves the fully completed count, resume pointer, prior receipt
+chain, and unchanged other nine businesses. Copied input/result JSON, parent
+drift, and completed-child replay fail closed; exact retry returns the same
+frozen checkpoint. The proof explicitly does not authenticate Riley/Aidan or
+store a durable decision, and the append has no operator, file/database, live,
+or real-business path. A quality regression found during this work was also
+fixed: discovering an email or manual route no longer rewrites or falsely stales
+the separate immutable lead qualification. The future owner-decision security
+shape is now defined without activating it: only a current Better Auth session
+with verified Riley/Aidan email can supply identity, the server supplies time,
+and HMAC bindings retain the exact subject/session/proof relationship without
+storing raw auth identifiers. Source-only migration 0069 defines the append-only
+ledger. A disconnected injected D1-shaped boundary can now commit the exact
+private candidate, return a mutation-free exact replay, or integrity-check a
+process-loss reload using database time, every immutable writer guard, and the
+versioned HMAC. Historical reload is explicitly not a current login and grants
+no progress authority. There is still no configured key, applied migration,
+Cloudflare adapter, route, UI action, operator command, or progress bridge.
+Current auth still has email verification disabled, so verified email plus
+MFA/recovery are explicit activation blockers. The console
+build has a verified,
+tamper-evident isolated-staging release packet, but it has not been deployed;
+exact-head Linux CI is green and only the separate owner deployment approval
+remains required before staging can change. The permanent Codex work model is
+now also fail-closed and resumable: Sol owns orchestration, integration, shared
+documentation, release verification, and commits, while useful independent work
+defaults to Luna at max reasoning through seven narrow roles. Delegation is
+capped at three children, read-only by default, and never grants live authority.
+Google Drive is disabled for this project on Riley's machine, the stale trusted
+OneDrive checkout is removed, and the active heartbeat now resumes only from the
+canonical non-synced repository and its persisted status.
+
+The next durable-storage milestone is now designed but still disconnected. A
+source-only migration 0070 defines a `RESERVED` → `COMMITTED` owner-auth
+idempotency ledger and a one-event-per-record transactional outbox. The typed
+D1 plan requires the current owner-session window to be checked by the database
+clock, the future operation-specific mutation to embed an exact reservation
+claim, the result finalization and outbox insertion to share one D1 batch, and a
+retry to skip mutation when the row is already committed. Contract triggers
+reject identity drift, invalid transitions, duplicate events, and non-zero
+authority. The plan compiles and runs only against disposable SQLite in tests;
+migration 0070 has not been applied to any persistent local, staging, or
+production resource, and no owner mutation, route,
+provider, deployment, outreach, send, or spend capability was added.
+
+The reservation-recovery review is now also complete as a disconnected
+contract. Any visible `RESERVED` row is blocked rather than reclaimed or
+deleted; only a `COMMITTED` row can replay. The operation-specific future DML
+must embed one exact parameterized owner/boundary/payload claim in the same D1
+batch, and the typed descriptor rejects multi-statements, DDL, interpolated
+identity values, and ledger/outbox targets. The additive recovery checkpoint is
+now also defined without activation: a future `ABANDONED` receipt preserves the
+original reservation, forbids same-key reuse, and carries a proposed one-to-
+two-year technical retention policy with separate deletion release. A companion
+affected-row proof requires exactly one operation/ledger/outbox change for a
+fresh commit, zero changes for an exact replay, and zero remaining rows after
+a whole-batch rollback. A simplified disposable SQLite harness now exercises
+commit, replay, and failures after each write; it does not prove the future D1
+adapter or recovery schema. Caller-supplied counts and timestamps stay explicitly
+non-durable validation candidates. No recovery migration or adapter exists.
+
+The first concrete owner operation is now defined and locally interpreted
+without activating it.
+`owner.dossier.accept` binds the exact authenticated decision record, current
+owner session, request digest, idempotency result, business, and outbox event.
+Its fresh SQL uses regular inserts so a losing race throws instead of silently
+changing zero rows; the decision is gated by the exact reservation, finalization
+requires both that exact decision row and an immediately preceding one-row
+insert, and the outbox insert cannot succeed unless the idempotency row is
+already `COMMITTED`. The exact source migration 0069/0070 chain is exercised
+only in disposable in-memory SQLite for fresh commit, mutation-free replay, a
+deterministic stale-preflight race, every missing guard, a pre-existing exact
+decision attack, partial replay bundles, and rollback after every statement.
+The new disconnected executor now verifies the full normalized definitions,
+object types, owning tables, and exact set of all nine triggers together with
+the database schema version. The following fresh write is fenced to that exact
+version, so a trigger or schema change after preflight fails instead of inheriting
+stale approval. It also handles Cloudflare's documented null mutation-result
+form, checks the four exact affected-row counts, database time, the signed owner
+decision, canonical idempotency/outbox data, complete timestamp order, and one
+complete durable reload. It returns an already committed request without
+mutation and can recover a losing race or lost response only after a new exact
+read. This proves the SQL and injected-result contract, not Cloudflare D1
+durability or true concurrent D1 behavior. There is still no runtime import,
+named binding, route, persistent migration, real owner action, or live-resource
+path.
+
+Riley's private CEO rebuild monitor is now implemented locally outside OneDrive
+and Google Drive. It shows the current milestone and work state, exact last
+verified Git checkpoint, separate unfinished working-copy state, conservative
+seven-stage map, completed/current/next work, blockers with the exact owner
+action, safety facts, and a short meaningful-transition timeline. The monitor is
+fixed to this computer's loopback address, loads no outside assets, reads no
+environment secrets, exposes no file names or diffs, and has no execution
+controls. Its current-machine state survives new Codex tasks in an ignored local
+file; tracked code, the safe seed, and this status document remain recoverable
+through Git. ADR 0058 and `docs/REBUILD_MONITOR.md` define the workflow.
+
+## Verified checkpoint
+
+- Latest fully verified and pushed source checkpoint is
+  `7d1eef221a25ac4ccdb99dbeeb7e6aa52b7e5832`. Its ignored exact-commit release
+  receipt was recorded at `2026-09-08T02:37:34.978Z`: all ten gates, 616 tests,
+  six WCAG pages, desktop/mobile, list 236 ms, dossier 101 ms, zero external
+  browser requests. Local/upstream equality and a clean worktree were rechecked
+  at this work-cycle start. No fresh production or Linux CI inspection is claimed.
+- Current SEC-008 candidate changes only the shared request-origin boundary,
+  its tests/browser acceptance and documentation. Missing/foreign/null origins,
+  same-site siblings, malformed config and mismatched metadata fail closed.
+  Missing Fetch Metadata alone is supported only with an exact valid Origin;
+  this is not the stronger future high-assurance owner-decision activation gate.
+  Explicit aliases work only when the request itself targets that alias.
+- Baseline reproduction used disposable D1 and a loopback HTTP bridge invoking
+  the real route. Chromium supplied `Sec-Fetch-Site: same-site`, sent text/plain
+  without CORS preflight, and the fake row changed. After patch the same browser
+  request returned 403 with no change; a legitimate request returned 200 and
+  archived that row. The full Next production-mode suite additionally exercises
+  this boundary before an exact checkpoint can be pushed.
+- Next: finish the browser/reviewer/release proof; then resume verified owner
+  enrollment/MFA/recovery and the remaining security boundaries. No owner choice
+  is required for this source fix. Runtime/provider spend impact C$0. All live
+  work and autonomy remain off.
+- Candidate integration evidence: the first production-mode gate correctly
+  stopped because NextURL normalizes `127.0.0.1` to `localhost`. Matching the
+  internal URL origin would deny normal owners. The guard instead requires an
+  already explicitly trusted Origin and matching request Host, never deriving
+  trust from Host/forwarding headers. Added proxy/Host-poisoning regressions.
+  A browser request-inspector metadata assertion was also removed because
+  intercepted Playwright metadata omitted a browser-added header; the gate
+  instead requires the actual POST/payload, HTTP 403 and unchanged stored row.
+  Metadata acceptance/rejection remains covered directly by unit tests.
+- Final working-copy checks: targeted guard/inventory tests pass; 618 full-suite
+  tests passed before the final proxy compatibility adjustment; typecheck/lint
+  and the complete production-mode owner browser gate pass after it (214 ms
+  list, 100 ms dossier, desktop 1440/mobile 390, six WCAG pages, zero external
+  requests). The exact-commit release command reruns all ten gates, including
+  the complete suite, before push. Its ignored receipt and monitor supply the
+  immutable final SHA without a self-referential document commit.
+- Reviewer attested the exact canonical root/branch/predecessor and found no
+  concrete surviving in-scope bypass/regression. Proxy Host formatting still
+  needs future authorized staging proof; mismatches deny access, not grant it.
+
+### Historical owner-admission development verification
+
+- Last fully release-proven and pushed commit:
+  `f8946bf6ce4ccc416232911cd2fc2c188268d1c6` (ban lifecycle). Its exact-commit
+  receipt passed all ten gates, including 605 tests and the owner browser gate:
+  six WCAG pages, desktop 1440/mobile 390, list 1,939 ms, dossier 586 ms, zero
+  external requests. That is the verified predecessor, not this working copy.
+- Current bounded change: enforce approved-owner admission and the separate
+  administrator ceiling through the shared auth boundary, session-creation
+  hook, and mutation-time actor fence. Verified email is required; neither a
+  request body nor configuration alone grants an admin role. Invalid settings
+  fail closed before cleanup. Only disposable test accounts were changed.
+- Baseline evidence at `f8946bf`: the new browser assertion returned HTTP 200
+  for a stored owner email outside the allowlist (expected 401). Focused tests
+  now cover actual cached Better Auth admission on local D1, configuration
+  removal/re-add without cache resets, raw auth and app lookup, unverified
+  accounts, disabled identity edits, admin ceilings, and normal fresh login.
+  SQLite/D1 tests also cover cleanup failure and mutation-time identity drift.
+- Verification in progress: 23 focused checks, all 613 repository tests, safety,
+  typecheck and lint passed. The
+  first browser baseline stopped earlier on the known Next dev manifest issue;
+  moving the independent admission scenario first established the actual
+  200-versus-401 failure. The expanded scenario then hit the real login-rate
+  limit across independent cases. The fixture now clears only its disposable
+  rate windows between scenarios; production limits are unchanged. The browser
+  identity snapshot also caught an over-broad role cleanup touching the internal
+  `system` service identity; cleanup now only changes roles that actually grant
+  admin permission, with a regression preserving service metadata. The complete
+  browser gate passed: list 663 ms, dossier 836 ms, six WCAG pages, zero outside
+  requests. Independent review then identified approved legacy multi-role
+  admin compatibility and the admission-to-insert timing gap. Both were
+  confirmed and addressed: approved role combinations remain intact; a final
+  creation check removes the new session and rejects login when identity or
+  approval changed during insertion. All 23 focused checks pass after those
+  changes. Final exact-commit proof must rerun every gate, including the browser,
+  before push; the release receipt/monitor records that candidate SHA.
+- The reviewed timing tests now exercise both internal creation and the real
+  HTTP route for email, verification, and configuration changes during login.
+  All reject and delete the new session. Because the library queues after-hooks
+  beyond its router, the route now converts those typed rejections to uncached
+  403/503 responses; it does not turn other errors into success. Typecheck and
+  the real-adapter tests pass with this integration. Approved legacy multi-role
+  admins and the unrelated service identity remain unchanged. No second review
+  cycle or broader authentication redesign was introduced.
+- The first exact-commit gate stopped on a Next development-server JSON parse
+  error (500, not an accepted security denial); no receipt or push occurred.
+  The browser harness now builds and runs a fresh production-mode fixture with
+  the same fake identity settings and disposable database. It selects active
+  controls rather than hidden navigation-history DOM and respects production
+  login throttling with bounded, explicit 429 retry delays. No production
+  protection was disabled, and other errors are never retried. The resulting
+  complete gate passed: list 217 ms, dossier 106 ms, desktop 1440/mobile 390,
+  six WCAG pages, zero outside requests. Three helper regressions cover retry
+  limits, error preservation and loopback-only destinations. The amended
+  working copy passes all 616 tests, typecheck and lint. Its checkpoint must
+  pass the entire exact-commit gate before it is pushed.
+- No owner action or new subscription is needed for this source-only milestone.
+  A future rollout must review approved owner/admin configuration and account
+  provenance; do not manually mark unverified owners verified or reopen signup.
+  Permanent removal uses the explicit ban control. A configuration change that
+  is removed and reverted without any request observing it cannot revoke old
+  sessions; no such guarantee is claimed. Runtime cost impact C$0; no live
+  account, database, mailbox, deployment, provider, or prospect was touched.
+
+### Ban security checkpoint (historical)
+
+- Latest fully release-proven and pushed predecessor:
+  `4a945473645951443e6a0785452f35277103dfe1` (current-database session authority).
+  Its exact release gate passed all 590 tests and the saved-cookie browser
+  regressions, with six owner pages scanned and no external requests.
+- Current bounded change: account-ban containment within SEC-002. Migration
+  0071 deletes existing banned-account sessions, makes future bans revoke
+  sessions in the same statement, and denies session creation/update for banned
+  users. The custom admin mutation rechecks the acting administrator's current
+  session/role in its write; permanent bans clear obsolete expiry metadata.
+  A version-pinned Better Auth patch conditionally clears expired bans instead
+  of overwriting a newer ban read during a concurrent login.
+- Evidence: the pre-fix local browser test at `4a94547` failed with one active
+  session after a successful ban (expected zero). The corrected browser run
+  passed ban/read/write denial, fresh-login denial, repeated ban, unban without
+  session resurrection, and legitimate new login. Six WCAG owner pages passed
+  at desktop 1440/mobile 390; list 970 ms, dossier 1,002 ms, external requests 0.
+- Focused verification: 15 new regressions passed across in-memory SQLite,
+  actual Better Auth hooks/adapters, and local D1/Miniflare. Coverage includes
+  expiry races, late insert/replace/reassignment/refresh, atomic rollback,
+  mutation-time actor demotion/revocation/expiry, self/missing targets, and normal
+  ban/unban/role changes. D1 included trigger deletions in its changed-row count;
+  the implementation now uses the guarded UPDATE's returned target identity.
+  All 603 repository tests, safety checks, typecheck, and lint passed during
+  implementation. Independent candidate review precedes the final release gate.
+  Full exact-commit results are recorded only by the release receipt after the
+  required gate, not inferred from these working-copy results.
+- The extended rendered-page test initially failed on a Next dev JSON manifest
+  error after the API denials passed. The fixture now warms denied/no-op
+  handlers and closes the measured page before switching identities, so it
+  cannot keep refetching sessions during the security test. The rerun passed
+  both banned and post-unban page replays, required sign-in content, and the
+  complete owner gate: list 919 ms, dossier 537 ms, six pages, zero external
+  requests. Cloudflare build and default dry run also passed during work.
+- Independent review identified a same-deadline ban edit, unfenced built-in
+  admin mutation routes, and the missing-migration deployment case. Parent
+  confirmed those boundaries and strengthened the candidate: expiry clearance
+  also compares the reason and update time; unreviewed admin mutation shortcuts
+  are denied while read-only inspection/custom fenced controls remain; every
+  auth request and custom operator write verifies the exact installed ban
+  guards. Missing, changed, or unreadable guards deny access instead of trusting
+  a rollout checklist. The strengthened browser gate passed all eleven shortcut
+  denials and missing-schema auth/read/write denial, alongside normal lifecycle
+  and owner UI checks: list 834 ms, dossier 553 ms, six pages, zero external
+  requests. All 605 tests, typecheck and lint passed after the review changes.
+  The final exact-commit release gate must include these cases.
+- Blockers/owner decisions: no Riley action needed for this source-only patch.
+  Deployment requires a separately approved backup, explicit migration plan
+  that does not accidentally apply unrelated 0070, rollback, and the remaining
+  security gates. Source controls remain off. No production/staging database,
+  account, mailbox, provider, or prospect was touched; runtime spend impact C$0.
+
+### Earlier security checkpoints (historical)
+
+- Latest fully release-proven and pushed predecessor:
+  `f9ffebecb6b5b2ddd0f599466ae4e0100dec5e81` (public-registration lockdown).
+- Current bounded change: close stale-cookie authorization within SEC-002.
+  Disable Better Auth cookie caching and explicitly bypass it in both shared
+  application session lookups. A separate synthetic acceptance helper tests the
+  real local app and auth routes, not a mocked authorization function.
+- Reproduction: before the source fix, the admin API returned 200 after database
+  demotion when sent a still-valid legacy signed cache (expected 403). The first
+  patched test then rejected demotion/revocation correctly but assumed page
+  redirects always use HTTP 307. Next's documented streamed redirect uses 200;
+  the corrected test follows the actual browser to sign-in and checks that no
+  protected owner content is rendered.
+- Verification: targeted helper tests, all 590 repository tests, safety checks,
+  and typecheck/lint passed during work.
+  The corrected full browser gate passed the saved-cookie lifecycle regression
+  and six WCAG-scanned owner pages (desktop 1440/mobile 390, list 1,961 ms,
+  dossier 593 ms, zero external requests).
+  Final exact-commit results must be read from the release receipt after the
+  complete gate; do not infer production readiness from a working-copy pass.
+- Scope and blockers: no owner decision needed for this source fix. MFA,
+  verified enrollment/recovery, ban and allowlist enforcement, the other open
+  findings, and staging/production proof remain release blockers. Current
+  spend impact C$0; no external prospect contact, deployment, migration, provider,
+  mailbox, or production-account action occurred.
+
+- Verified predecessor: `ef535c3e9ba99e110c554076fa8e41d762713680`, the audit and
+  checkout-attestation baseline, has a complete exact-commit release receipt and
+  was pushed to the rebuild branch. It is the latest fully proven checkpoint
+  until this remediation passes `rebuild-monitor:prove-release` and is pushed.
+- Current bounded change: SEC-001 source lockdown. Better Auth disables signup
+  and automatic new-account login; a second server denial covers every address;
+  the signup promotion hook is removed. The old registration URL is informational
+  and sign-in no longer advertises public account creation.
+- Verification during implementation: two focused acceptance-helper tests,
+  all 590 repository tests, safety configuration, typecheck, and lint passed.
+  The first full browser run reached its final
+  database assertion after passing auth and owner UI checks, but the test had
+  omitted migration 0008's system user. The corrected assertion compares exact
+  before/after user roles and credential identities, preserving that fixture.
+  The corrected full browser gate passed: anonymous registration denial and
+  existing-account login, six WCAG-scanned owner pages, desktop 1440/mobile 390,
+  list 1,801 ms, dossier 501 ms, and zero external browser requests.
+  Final full-check results are recorded in the exact committed release receipt,
+  not inferred from this working-copy description.
+- Remaining blockers: SEC-002 through SEC-014 and deployment/account-security
+  evidence. No Riley decision is needed for this source fix. No account was
+  provisioned outside the disposable test database. Spend impact: C$0.
+
+- Security audit baseline: the authoritative audit started from canonical commit
+  `f7a555a604f06b19623b727794fc505b3eebaaee`. The audit records scope,
+  limitations, strong controls, one Critical, six High, seven Medium findings,
+  release gates, and Riley's account-security responsibilities. It explicitly
+  does not claim that any system can be impossible to hack.
+- Current safety fix: every Luna role must stop before reading project files
+  unless the exact Git root, task-packet branch, and starting HEAD match. Every
+  later command targets the absolute canonical checkout or uses `git -C`, and
+  Sol rejects any result without the three attested values. The role bodies
+  remain digest-locked and the focused policy suite now includes the failed-
+  attestation case.
+- Audit verification completed: canonical root/branch/HEAD and clean starting
+  tree; current production dependency audit with zero known vulnerabilities;
+  full dependency audit with two Moderate development/build package entries and
+  no High/Critical issue; bounded tracked/history secret-pattern scan with only
+  the intentional fake-secret fixture; policy tests 10/10; full repository
+  suite 590/590; typecheck; lint; Cloudflare build; default Wrangler dry-run;
+  and the six-page owner browser acceptance gate (561 ms list, 894 ms dossier,
+  desktop/mobile, WCAG, and zero external browser requests).
+- No deployment, migration, production database access, mailbox sync, provider
+  call, prospect contact, send, or spend occurred during the audit checkpoint.
+- Current change: ADR 0058 adds the private local-only CEO rebuild monitor and
+  makes meaningful monitor transitions part of the permanent Codex work cycle.
+  The versioned schema rejects multiline dumps, common credential forms, and
+  explicit private-reasoning labels; committed status requires an exact clean
+  Git checkpoint and blocked status requires Riley's exact action.
+- The server is fixed to `127.0.0.1`, refuses OneDrive and the wrong branch,
+  reads no environment variables, loads no external assets, and exposes only a
+  bounded Git checkpoint/working-copy summary. The UI has no mutation API and
+  grants no provider, database, deployment, migration, outreach, send, or spend
+  authority.
+- An independent Luna max review found five release-blocking trust gaps: a clean
+  commit could be called verified without the full gate or GitHub push, alternate
+  clones were not all rejected, Git subjects bypassed visible-copy screening, a
+  clean but unverified HEAD looked verified, and the generic update contract
+  accepted a checkpoint without its release receipt. All five are closed. The
+  reviewer also identified narrow-layout overflow and stale values after a read
+  failure; those owner-facing failures are fixed and regression-checked.
+- Monitor verification for this checkpoint: focused contract/privacy suite 10/10;
+  full repository suite 589/589; exact checkout checks; safety configuration;
+  standalone typecheck; zero-warning lint; rendered live API/owner view; mobile
+  no-overflow proof at a 337-pixel content viewport; and a wide two-column owner
+  layout at 1,323 pixels all pass. The final ignored release receipt reruns these
+  checks plus both Cloudflare dry builds and the six-page owner-browser gate
+  against the exact clean commit before that commit can be pushed and displayed
+  as verified.
+- Verified predecessor: ADR 0057 adds the disconnected result state machine for the
+  concrete `owner.dossier.accept` transaction. Plan version 2 now also binds the
+  owner-session window, canonical expected records, and exact normalized digest
+  of every migration 0069/0070 trigger body. An independent Luna max audit found
+  and blocked release on an unfenced trigger-preflight race and a documented D1
+  null-result shape; both are now fixed and regression-tested.
+- The fresh path now fails atomically when any required write does not happen.
+  Regular inserts make a stale losing attempt throw; finalization requires
+  `changes() = 1` from the immediately preceding decision insert; the outbox
+  requires the exact committed ledger row. A pre-existing exact decision cannot
+  impersonate a decision inserted by the current transaction.
+- Disposable local proof now covers fresh commit, mutation-free exact replay,
+  deterministic stale-preflight recovery, response loss after commit, complete
+  trigger-body tamper, unexpected target-table triggers, wrong trigger type or
+  owner table, post-preflight schema drift, nullable mutation results, full
+  durable chronology, visible reservation and partial-state rejection,
+  affected-row metadata drift, malformed result counts, copied-result trust,
+  and wrong HMAC material before database access. The prior SQL rollback and
+  unrelated-bundle coverage remains green.
+- The post-fix Luna max audit found no remaining P0/P1 correctness issue in this
+  disconnected checkpoint. It independently confirmed both prior P1s are closed;
+  real D1/Miniflare concurrency and process-loss behavior remains the explicit
+  next technical proof rather than being overstated here.
+- Verification for the predecessor checkpoint: focused transaction/executor proof 20/20;
+  full suite 579/579; safety configuration; standalone typecheck; lint;
+  Cloudflare build with bundle sanitization (one local secret value removed;
+  2,018 files scanned); default-environment Wrangler dry run; generated engine
+  binding check; and inert-engine Wrangler dry run all passed locally. The known
+  OpenNext Windows and generated duplicate-key warnings remain non-blocking and
+  unchanged.
+- Owner browser regression passed after the build: six pages, desktop 1440px,
+  mobile 390px, list ready in 952 ms, dossier ready in 432 ms, and zero external
+  requests. The UI itself did not change in this checkpoint; these are local
+  synthetic-data checks.
+- No application UI feature, real-data evaluation, live D1 binding, live
+  database, provider, mailbox, production control, deployment, migration
+  application, prospect contact, outreach, send, or cost changed in this
+  checkpoint. The only UI is the private loopback status monitor. Spend impact:
+  C$0. Existing live-state claims below are prior inventory, not a fresh
+  production inspection. Linux CI for this new commit is pending; older green
+  CI references must not be read as evidence for this commit.
+- Branch: `RileyHinsperger/axiom-revenue-engine-rebuild`
+- Verified predecessor commit before this checkpoint:
+  `f99784e219d4b5e5d6e07ac1b062a62d275d4b20`
+- This milestone's verifying commit is the exact branch HEAD containing ADR
+  0058 and the private local CEO rebuild monitor. Verify its
+  immutable SHA with `git rev-parse HEAD`
+  after the atomic push; local, upstream, and remote equality remains a release
+  check.
+- Baseline commit: `7d23bfa3b0ddad8322051de7d586b787fb1692d3`
+- Verified foundation commit: `7afc21299320019a34b93a387b7d7acda7f74403`
+- CI hardening commits: `14d85a0468bef56e2bf7a97f7e53ed521955f1da`
+  and `6a03de6fe251155d7e5e8fa14b3c7f8e494c5a3b`
+- Production-safety checkpoint:
+  `4408a894319f786fbe416b3e50c68aa8478e5111`
+- Isolated-staging configuration checkpoint:
+  `23ee458a997ddfd4df48f3f1f90581a6f4df3da0`
+- Cloudflare bundle-safety checkpoint:
+  `ab5621cae3d463f935883705bd324ca92ef7e938`
+- Staging binding-refresh checkpoint:
+  `e68ac403b8fbd49005438c33554253962340b545`
+- Inert engine/workflow checkpoint:
+  `5d3ef6a30467db85234b0860b243587dd31084a4`
+- Deterministic website-quality checkpoint:
+  `ea7ff1a35302c927c0c26bf6008d05692d77a2be`
+- Bounded public-website capture checkpoint:
+  `5c372091ace34f68596ebbadb59fe66727f66e8e`
+- Private KW seed-preparation checkpoint:
+  `f0d0378c7dffb34a41637165539424bb98b88ccd`
+- Bounded HTML fact-extraction checkpoint:
+  `fe8fb659c01982a2e82d1c7b8bcbc1d6065eea8e`
+- Validation-only private KW persistence checkpoint:
+  `4d7d9a608b42b09db599cc4f813d8f1fbd062d8b`
+- Browser evidence-contract checkpoint:
+  `99e37fa2c04fd095013f1200acfa99d90922c8c7`
+- Browser evidence documentation/CI checkpoint:
+  `30424528b920ec535641282035428661e057a2d7`
+- Fixture Browser-measurement source checkpoint:
+  `44a65c966841d3a92bf99c14559d2ad85dda87dd`
+- Fixture Browser-measurement documentation/CI checkpoint:
+  `a4d73fa89b1072fdd7803cd6c2276fe8fe830676`
+- Content-addressed artifact-contract source checkpoint:
+  `2621f3c1a790516507a78d89ea3ae06e7e738722`
+- Content-addressed artifact documentation/CI checkpoint:
+  `e77f613d78306c3bc5dd076ed6e46a00527884f2`
+- Multi-page website-audit assembly source checkpoint:
+  `347390aebb15d5e97caa2d5caa0e6ceda1ad5f12`
+- Multi-page website-audit assembly documentation/CI checkpoint:
+  `7a6ac24a905030095de766364bee01d140f3675a`
+- Artifact lifecycle source checkpoint:
+  `7bdabe0316108bb4b24d450ee29e93cac70ed593`
+- Artifact lifecycle documentation/CI checkpoint:
+  `3892c9b3dc8d5f43871ceb73f05f9ce156d287b0`
+- Deterministic website page-selection source checkpoint:
+  `0165a0a6a304b06f7bbc09766c2572d3459054fc`
+- Deterministic website page-selection documentation/CI checkpoint:
+  `f3b3812a93a962658edc259810a202b32f63247f`
+- Fixture website-evidence workflow source checkpoint:
+  `1c9d093351cea3a064ba4b0bc4a4d37d76d880d9`
+- Fixture website-evidence workflow documentation/CI checkpoint:
+  `831bf77d2661287676a7e18ddd203719bc6efbb9`
+- Durable evidence-receipt persistence source checkpoint:
+  `4372305279d627991e8d47ff5b717c4a81ecddc2`
+- Durable evidence-receipt documentation/CI checkpoint:
+  `48c21491268461071540e5bfc0f3275c18a889fa`
+- Fenced evidence-resume source checkpoint:
+  `c3591e9443826271bea9db9cddcc61f6d304ebfa`
+- Fenced evidence-resume documentation checkpoint:
+  `7a3e40a47129403a8feae3983d604ecde743caba`
+- Fenced resume-persistence source/documentation checkpoint:
+  `6d5db2b1536a93571c241f5e2c3fda9be01e075e`
+- Fenced resume-persistence status checkpoint:
+  `32c7ae29b215db32e3af54938ee9efcb9d2f39fb`
+- Artifact current-reference source/documentation checkpoint:
+  `9681e56ad62bf0e7e9b77a57fbd81923338c3378`
+- Artifact reference proof-hardening checkpoint:
+  `fb9f4dd4f94a5793a765c6dc553637bc1bb36158`
+- Atomic artifact-reference snapshot source checkpoint:
+  `98cd88ad918ae09d08d8ddf66e30338f444a0d0a`
+- Atomic artifact-reference documentation checkpoint:
+  `b7168a9b52713eb963fb7132064d1556abbd25a8`
+- Artifact-reference raw-row decoder source/documentation checkpoint:
+  `588926aed3294d5cf6621834ff06d25212b90977`
+- Artifact-reference source-writer guard source/documentation checkpoint:
+  `7d209816ee9bacb11537d37920ef75efede143c5`
+- Private artifact-reference D1 executor source checkpoint:
+  `a9da5ad20e843f528fff7b528dcb8f9d5095fc9b`
+- Trusted artifact-reference projection-v2 source checkpoint:
+  `9e0673be21decd2f70f9f215829a6ab53ba502e3`
+- Bounded manifest HEAD and reconciled retention source checkpoint:
+  `5508e57eb813531f69f42e6b15a5fc6d3419f6f7`
+- Owner-ready lead projection/read-model source checkpoint:
+  `bf0c2c489cd3b315ff04843f2968d77ea61a6fc4`
+- Evidence-first owner Leads workspace source checkpoint:
+  `5e273fa83bc65705e7930fd6c8f33e5c508b6ce0`
+- Evidence-first owner lead dossier source checkpoint:
+  `e44c7bbdb749e7f439e7e5a892226817a2bfc36d`
+- Owner Leads acceptance checkpoint:
+  `0dfaafef6cc5b26ceaaec8bcc7344fc77e2ce89f`
+- Atomic shadow-assessment persistence checkpoint:
+  `27a909a758306d803d3e9f8cb84f63212f0b8dff`
+- Private artifact-delivery authorization checkpoint:
+  `1ea15efe784c73bade3ee4079e8b3da66700364b`
+- Owner-approved local shadow-assessment invocation checkpoint:
+  `427ca67f76580d0cd44ef1337e12656fd2dfaa9d`
+- Evidence-backed contact discovery/verification contract checkpoint:
+  `dcb9c5114ec0bdb61d830e9c2d815190dcba9839`
+- Append-only contact/verification persistence checkpoint: the branch HEAD
+  containing this status entry; previous verified checkpoint
+  `dcb9c5114ec0bdb61d830e9c2d815190dcba9839`
+- Owner-approved local source/workflow materialization checkpoint:
+  `13bbfca89f3c60e0ca561bf023b016a11d3ebe23`
+- Separately approved local contact-persistence executor checkpoint:
+  `6521dcd535bfa613beca939f9438400b5586ffa6`; exact-head Linux CI run
+  `33098011119` passed.
+- Reviewed local contact-invocation checkpoint:
+  `673e949eaca19c738507d7249f18e3281bb67a31`; exact-head Linux CI run
+  `33125382850` passed.
+- Executor-backed owner dossier fixture checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `673e949eaca19c738507d7249f18e3281bb67a31`.
+- Bounded ten-business KW shadow-slice checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `d87c6bbc2b6cc7f50706e6f000cf8165512a851b`.
+- Owner contact-review dossier checkpoint: the branch HEAD containing this
+  status entry; previous verified checkpoint
+  `07a78dd73d8afddefcbdebd113c77dc64e20d85f`.
+- Resumable owner-labelling checkpoint: the branch HEAD containing this status
+  entry; previous verified checkpoint
+  `9b74b4e00f87c0feca3c06a2bd29b5bced92a3e6`.
+- Owner Quality Lab checkpoint: the branch HEAD containing this status entry;
+  previous verified checkpoint
+  `3bcd8eef36b386187c7eb72803515b65269bf71d`.
+- Isolated-staging console release-packet checkpoint: the branch HEAD containing
+  this status entry. The prepared packet targets exact pushed candidate
+  `cfd3cb24945b86de77d2b730d54f92f2b91532fb` with packet digest
+  `a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9`;
+  exact-head Linux CI run `33221735787` passed and deployment approval remains
+  pending.
+- Staging-packet Linux-CI evidence checkpoint: the branch HEAD containing this
+  status entry; previous verified packet commit
+  `c201122446439914517ea0ec4ce06a94b9cdf8fd`.
+- Receipt-bound ten-business progress checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `3ff72df1e7dbf2471906f175b35ffdb94e747282`.
+- Read-only source/workflow progress-proof checkpoint: the branch HEAD
+  containing this status entry; previous verified checkpoint
+  `cbfdfd029c6efc5371e06ea073690e64e4bf7d7b`.
+- Synthetic current-website-evidence proof checkpoint: the branch HEAD
+  containing this status entry; previous verified checkpoint
+  `2bdca9c73562fbf386cba1b4c57f699087c93264`.
+- Synthetic assessment progress-proof checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `5b85075723243c1ccdadb01b6fe242a6451460e3`.
+- Trusted current-website-evidence eligibility checkpoint: the branch HEAD
+  containing this status entry; previous verified checkpoint
+  `675ed2d4938d44a042640f145cf40d46c63f731a`.
+- Durable current-website-evidence eligibility persistence checkpoint: the
+  branch HEAD containing this status entry; previous verified checkpoint
+  `799fb575fd9b9dcdee2b3ea0ba93560db20548a5`.
+- Current-website-evidence phase-input checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `8116e9b1c365bf4dde6cbf5a25347e7a135ebd6c`.
+- Guarded current-website-evidence progress-append checkpoint: the branch HEAD
+  containing this status entry; previous verified checkpoint
+  `1b29b5fe30d1926b91de90868e55e4f7867fae12`.
+- Durable assessment-provenance checkpoint: the branch HEAD containing this
+  status entry; previous verified checkpoint
+  `67f974ea9b57e8e969228c96bad5256f1f656233`.
+- Assessment phase-input checkpoint: the branch HEAD containing this status
+  entry; previous verified checkpoint
+  `02e0c5a3ef69fe004d8ab7aab1314f0021f07f33`.
+- Guarded assessment progress-append checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `1bd3f3a77296a116c013d0494388ea2f435e3f14`.
+- Durable contact-review progress-proof checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `45d23f690d7362b48bb08c8d252604a6a9f399c9`.
+- Contact-review phase-input checkpoint: the branch HEAD containing this status
+  entry; previous verified checkpoint
+  `b07bbc4723c3ba3a0a72d98dbdbf6b4de42519d3`.
+- Guarded contact-review progress-append checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `e4201a104d1bd77a1a3394e85919be0856d4a6c1`.
+- Owner-dossier proof/input checkpoint:
+  `be77afabbabafeb111d74d15642e070a0796bc5c`.
+- Guarded owner-dossier progress-append checkpoint: the branch HEAD containing
+  this status entry; previous verified checkpoint
+  `be77afabbabafeb111d74d15642e070a0796bc5c`.
+- Authenticated owner-decision contract/schema checkpoint: the branch HEAD
+  containing ADR 0046 and migration 0069; previous verified checkpoint
+  `5a25ffb7bf3e00de38faa2638201978226a437c2`.
+- Sol integration / Luna max worker checkpoint: the branch HEAD containing ADR
+  0048; previous verified checkpoint
+  `9ae3623b95ce803c584fd3e339a70e21fbfd9dd0`.
+- Repository: private `rileyhins17/axiom-revenue-engine`
+- Canonical Riley-machine checkout: non-synced
+  `C:\Users\riley\Documents\ChatGPT\APE`; OneDrive and Google Drive are not
+  working-repository locations.
+- Local OpenAI key: stored in ignored `.env.local`; value never printed
+- Source migrations: all 70 replay from zero, including the fail-closed
+  lockdown, shadow
+  Revenue Engine records, content-bound outreach approval, and durable evidence
+  plus fenced resume, current-reference history, atomic snapshot receipts, the
+  append-only eligibility receipt, and the inactive authenticated owner-decision
+  ledger and the source-only owner-auth idempotency/outbox shape. Canonical
+  ignored-local schema remains 0054–0069; migrations 0068, 0069, and 0070 have
+  not been applied to an existing persistent local, real-business, staging, or
+  production database
+- Current checkpoint verification rerun 2026-08-21: 160/160 tests, typecheck,
+  zero-warning lint, safety scan, all 55 local migrations, Cloudflare production
+  build, and Wrangler deploy dry run pass
+- OpenAI project key authentication was verified without a generation request;
+  the key remains ignored and GPT-5.4 nano/mini model families are available.
+- Generated Cloudflare bindings replaced the stale hand-written environment file
+- Draft PR: `#8`.
+- Linux CI run `32547238706` passed on clean Ubuntu: deterministic binding check,
+  OpenNext Cloudflare build, all 55 migrations from scratch, 160/160 tests,
+  typecheck, lint, and Wrangler deploy dry run.
+- The CI fixes also removed duplicate branch/PR runs; PR work now gets one gate.
+- Private D1 export completed at `2026-08-22T02:59:22Z`: ignored path
+  `backups/production/20260821T2300-0400/axiom-ops-omniscient.sql`, 226,228,443
+  bytes, SHA-256
+  `46d60b80e099759c54522858d0ee9174d649dce5627fc8f9894b141666518dc7`.
+- Post-lockdown D1 Time Travel bookmark:
+  `00002ff8-00000002-000050cf-aa041de046860de5cf0527956a845930`.
+- Detailed non-secret inventory: `docs/PRODUCTION_INVENTORY.md`.
+- GitHub `production` environment exists and only accepts deployments originating
+  from `main`. No repository/environment deployment secrets or variables exist,
+  so the production workflow remains incapable of deploying.
+- Isolated staging D1 plus job and dead-letter Queues are provisioned. All 55
+  migrations are applied to staging, every database stop is engaged, and both
+  Queues have zero producers/consumers. See `docs/STAGING_INVENTORY.md`.
+- The staging configuration has no cron, no legacy self-fetch binding, zero
+  autonomous caps, and cannot use Gmail or OpenAI because those secrets are absent.
+- Production release inputs now require an exact 40-character commit, structured
+  D1 checksum reference, exact checkout, and ancestry on `main`; targeted tests
+  reject abbreviated, branch-shaped, and command-shaped inputs.
+- Staging/release checkpoint verification rerun 2026-08-21: safety scan,
+  168/168 tests, typecheck, lint, secret-sanitizing Cloudflare production build,
+  explicit default deploy dry run, and explicit staging deploy dry run pass. The
+  staging dry run exposes only the isolated D1, Browser Rendering, assets, and
+  fail-closed vars.
+- The first staging upload was stopped before network deployment because OpenNext
+  had copied the ignored local OpenAI key into its generated environment module.
+  Every Cloudflare build now empties that local fallback and scans all generated
+  files; the real key was removed and the corrected default/staging dry runs pass.
+- The staging console is live from source commit `7725098`, current version
+  `941b37bc-38e8-4c6c-9111-d475e9871727`, with only a fresh
+  `BETTER_AUTH_SECRET`. Sign-in returns 200, protected automation health returns
+  401 without a session, and staging still has zero runs and zero sends.
+- Linux CI run `32550535144` failed only at generated-binding drift. Commit
+  `e68ac40` regenerated the expected staging URL unions, intake cap zero, removal
+  of the legacy self-binding, and `StagingEnv` interface. Replacement Linux CI
+  run `32551436311` passed every step on commit `3f28acd`.
+- A separate engine Worker and two-step durable Workflow scaffold now exist with
+  stable adapter and receipt contracts. They have no queue, schedule, route,
+  D1/R2/Browser binding, provider credential, or nonzero budget. Local `/health`
+  returns `503 LOCKED`; a POST action returns 404. Nothing was deployed.
+- Wrangler is pinned to `4.125.0`, and both generated binding files use its
+  current workerd runtime. The complete checkpoint gate passes with 171/171
+  tests, deterministic console/engine bindings, typecheck, zero-warning lint,
+  a sanitized console build, and both no-upload deployment dry runs.
+- Expanded Linux CI run `32552447874` passed all 13 console/engine steps on
+  commit `7c11ec0`, including the isolated engine type and dry-run gates.
+- The deterministic website-audit kernel now classifies modern, weak, broken,
+  missing, and mobile-failing sites without AI. Negative findings retain URL,
+  timestamp, method, confidence, artifact reference, and audit version. No live
+  URL was fetched and Browser Rendering/R2 remain unattached.
+- The private KW evaluation contract now enforces 50 unique owner-reviewed leads,
+  at least 10 per city and niche, and at least 85% engine/owner agreement. Real
+  progress remains 0/50; only synthetic test businesses are committed.
+- Audit/evaluation checkpoint verification passes 182/182 tests, typecheck,
+  zero-warning lint, safety checks, secret-sanitized console build, explicit
+  console dry run, deterministic engine type check, and engine dry run.
+- Linux CI run `32553187482` passed all 13 gates on audit documentation commit
+  `df394b1`.
+- The public-website capture boundary now accepts only canonical public HTTP(S)
+  domain targets on standard ports, manually revalidates every redirect, limits
+  a capture to five redirects, ten seconds, and 1 MiB of HTML, and records
+  rejected/failed states without turning them into evidence. IP targets,
+  credentials, local/reserved names, non-HTML, loops, oversized responses, and
+  timeouts fail closed.
+- Cloudflare `global_fetch_strictly_public` is mandatory for the engine and is
+  enforced by the repository safety check. The adapter transport is injected in
+  tests and is not called by the inert Worker; no real business website was
+  fetched.
+- Public-capture checkpoint verification passes 193/193 tests, typecheck,
+  zero-warning lint, safety checks, secret-sanitized console build, explicit
+  console dry run, deterministic engine type check, and engine dry run.
+- A private seed-preparation command now turns up to 50 manually researched or
+  legacy-read-only KW businesses into a versioned ignored plan. It normalizes
+  public URLs, names, Canadian phones/postal codes, locations, city/niche cohort
+  runs, and stable identity/source IDs; likely duplicates fail closed.
+- Seed plans are research-only, zero-cost, and explicitly cannot qualify or
+  contact anyone. The command cannot use Cloudflare/providers and cannot write
+  outside `data/kw-evaluation/` or overwrite an existing plan. Real progress is
+  still 0/50 because no prospect data was committed or acquired.
+- The complete test glob previously omitted TypeScript tests in `scripts/`.
+  That is corrected and enforced by the safety checker. The private-import
+  checkpoint passes 200/200 tests and the complete local release gate.
+- Linux CI run `32554761048` passed all 13 gates on private-import documentation
+  commit `7cf0ec4`, including the newly enforced TypeScript script tests.
+- A versioned streaming HTML extractor now turns captured fixture HTML into
+  bounded metadata, visible text, actions, forms, trust markers, structured-data
+  types, and internal page links. It never executes scripts and blocks unsafe
+  navigation/form destinations.
+- Token, visible-text, JSON-LD, and output limits prevent unbounded parsing.
+  Above-the-fold and computed visibility remain explicitly unknown until Browser
+  Rendering proves them; truncated extraction is marked incomplete. No live site
+  or provider was called. The checkpoint passes 204/204 tests, `npm audit` with
+  zero vulnerabilities, and the complete local release gate.
+- A second guarded local command now converts a validated private KW import plan
+  into deterministic schema-0054 preflights and insert-if-absent statements for
+  only source runs, businesses, locations, and source records. Every statement
+  has an exact expected-state fingerprint so an identity collision or data drift
+  is visible before a later release-gated write can be considered idempotent.
+- The persistence artifact is explicitly `mutationAuthorized: false`; there is
+  no database executor, D1/Cloudflare/provider access, qualification row, contact
+  row, outreach row, or spend path. Tests apply its SQL only to a disposable
+  in-memory database. Real evaluation progress remains 0/50.
+- Validation-only persistence checkpoint verification passes 209/209 tests,
+  typecheck, zero-warning lint, safety checks, secret-sanitized console build,
+  explicit console dry run, deterministic engine type check, and engine dry run.
+- Linux CI run `32556171801` passed all 13 gates on persistence documentation
+  commit `420e1ba`.
+- A versioned Browser Rendering evidence contract now fixes comparable desktop
+  and mobile viewports, binds screenshots and measurements to artifact references
+  and SHA-256 digests, records coverage separately for layout/actions/forms/
+  navigation/text, and rejects cross-business, cross-page, cross-URL, duplicate-
+  viewport, malformed-artifact, and stale unreachable-site contamination.
+- Server HTML and browser measurements now merge conservatively. Missing,
+  failed, or partial browser work remains `UNKNOWN`; a screenshot alone cannot
+  become a website defect. The deterministic website audit advanced to v2 so
+  content/page-set completeness and visual coverage decide whether absence is a
+  supported failure or an owner-review gap.
+- Browser evidence remains fixture-only and disconnected from the new engine
+  Worker. No new engine Browser or R2 binding, session, request, artifact write,
+  provider cost, live website capture, database write, qualification, or outreach
+  occurred. The checkpoint passes 215/215 tests, typecheck, zero-warning lint,
+  safety checks, the secret-sanitized console build and dry run, deterministic
+  engine bindings, and the inert engine dry run.
+- Linux CI run `32557669210` passed all 13 gates on browser evidence checkpoint
+  `3042452`, including a clean Ubuntu build, all migrations, 215/215 tests, and
+  both no-upload Worker validations.
+- A fixture-only Browser measurement adapter now converts an injected runner
+  result into a bounded, zero-cost, unpersisted draft. Requests use fixed
+  desktop/mobile profiles and caps for navigation time, browser time, observed
+  requests, screenshot bytes, measurement JSON, and redirects.
+- Every document/redirect URL must remain canonical and public. The runner
+  receipt proves request interception and URL validation while forbidding
+  credentials, private-network access, form submission, downloads, service
+  workers, and cache reuse. Direct evidence validation repeats the public-URL
+  guard so callers cannot bypass the adapter.
+- Finalization recomputes artifact byte lengths and SHA-256 digests and accepts
+  only exact content-addressed references. Version 1 accepts `FIXTURE` runners
+  only, has no Browser/R2 imports or bindings, grants no artifact-write authority,
+  and spends nothing. No website, provider, database, or prospect was touched.
+- Fixture measurement checkpoint verification passes 220/220 tests, typecheck,
+  zero-warning lint, safety checks, the secret-sanitized console build, explicit
+  default console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. The console dry run still reports only the known
+  generated duplicate-key warnings documented for the legacy UI bundle.
+- Linux CI run `32558784285` passed all 13 gates on fixture measurement checkpoint
+  `a4d73fa`, including exact dependency installation, a clean Ubuntu Cloudflare
+  build, all migrations, 220/220 tests, and both no-upload Worker validations.
+- A fixture-only artifact-store contract now derives private Standard-storage
+  object keys from retention class, artifact kind, digest prefix, full SHA-256,
+  and media type. Plans remain shadow-only, provider-write unauthorized, capped,
+  and zero-cost; no R2 type, binding, bucket, API, or provider method is reachable.
+- Create-if-absent retries reuse an existing object only after its key, length,
+  digest, storage class, HTTP metadata, and custom metadata all match. Conflict or
+  partial failure creates a bounded failure receipt and cannot produce Browser
+  evidence references. Content-addressed partial objects are kept for safe retry
+  rather than deleted and are later handled by prefix lifecycle.
+- Planned automatic retention is 30 days for shadow evidence and 180 days for
+  uncontacted qualification evidence. Outreach-active and legal-hold evidence
+  have no guessed expiry and require owner/compliance release; current CRTC
+  guidance says CASL does not prescribe one universal record-retention period.
+- Artifact-contract checkpoint verification passes 228/228 tests, typecheck,
+  zero-warning lint, safety checks, the secret-sanitized console build, explicit
+  default console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. No Cloudflare resource was created or changed.
+- Linux CI run `32559645916` passed all 13 gates on artifact-contract checkpoint
+  `e77f613`, including exact dependencies, a clean Ubuntu Cloudflare build, all
+  migrations, 228/228 tests, and both no-upload Worker validations.
+- A fixture-only assembler now links captured pages, HTML facts, Browser
+  measurements, and completed content-addressed artifact receipts into one
+  deterministic website-audit input. It rejects stale, cross-site, duplicate,
+  over-budget, future-dated, mismatched, and noncanonical evidence before audit.
+- A full page set requires current home, service, about, and contact coverage,
+  complete desktop action/form facts on every selected page, and a fully measured
+  mobile homepage. Missing, failed, or incomplete coverage is reported as partial
+  and the deterministic audit v3 keeps unseen form absence `UNKNOWN`.
+- Business-level limits are fixed at five pages, six Browser captures, 120
+  Browser seconds, 30 MiB of artifacts, 5 MiB of HTML, 24-hour freshness, and
+  two-hour maximum capture skew. The assembler remains fixture-only with zero
+  provider operations and zero cost; no website, R2 object, database, prospect,
+  or production resource was touched.
+- Multi-page assembly checkpoint verification passes 235/235 tests, typecheck,
+  zero-warning lint, the repository safety check, secret-sanitized Cloudflare
+  build, explicit default console no-upload dry run, deterministic engine
+  bindings, and the inert engine no-upload dry run. The console build reports
+  only the known generated duplicate-key warnings documented for the legacy UI.
+- Linux CI run `32560819780` passed all 13 gates on multi-page assembly
+  checkpoint `7a6ac24`, including exact dependencies, a clean Ubuntu Cloudflare
+  build, all 55 migrations, 235/235 tests, and both no-upload Worker validations.
+- Artifact manifests can now be derived only from completed write/promotion
+  receipts. Qualification, outreach/consent/touch, and legal-hold uses compute the
+  minimum retention needed; promotion can move only upward and preserves the
+  exact content hash while changing its retention prefix and metadata.
+- The fixture promotion executor verifies the source manifest, performs
+  create-if-absent copies, reconciles existing targets, and emits bounded success
+  or partial-failure receipts without rollback deletion. A later promotion can
+  safely move qualification evidence to outreach protection and then legal hold.
+- Content-bound owner/compliance release records require every known use, exact
+  confirmation, a class-specific reason, rationale, actor, and decision digest.
+  They never authorize or perform provider deletion; a future deletion path must
+  recheck live references and pass another explicit release gate. No R2 binding,
+  object, provider operation, database write, prospect, or production resource
+  was touched.
+- Artifact-lifecycle checkpoint verification passes 244/244 tests, typecheck,
+  zero-warning lint, the repository safety check, secret-sanitized Cloudflare
+  build, explicit default console no-upload dry run, deterministic engine
+  bindings, and the inert engine no-upload dry run. The console build reports
+  only the known generated duplicate-key warnings documented for the legacy UI.
+- Linux CI run `32562059951` passed all 13 gates on artifact-lifecycle checkpoint
+  `3892c9b`, including exact dependencies, a clean Ubuntu Cloudflare build, all
+  55 migrations, 244/244 tests, and both no-upload Worker validations.
+- A deterministic page selector now turns fresh homepage link facts into one
+  unique home/service/about/contact capture plan. It scores all subpage roles
+  together, favours the business's expected services and niche, and records each
+  candidate's scores, eligibility, selection, and reasons in stable order.
+- Query URLs, homepage duplicates, non-HTML files, policy/blog/news/resource,
+  careers, account/commerce, FAQ, financing/rebate/promotion, off-site, reserved,
+  noncanonical, stale, and future-dated inputs cannot become selected pages.
+  Incomplete homepage extraction or a missing role remains `PARTIAL`; the planner
+  never improvises another crawl target.
+- Version 1 is deterministic fixture-only work with zero provider operations and
+  zero cost. It is not wired to capture, Browser Rendering, R2, D1, the engine
+  Worker, a live website, or a prospect.
+- Page-selection checkpoint verification passes 251/251 tests, typecheck,
+  zero-warning lint, the repository safety check, secret-sanitized Cloudflare
+  build, explicit default console no-upload dry run, deterministic engine
+  bindings, and the inert engine no-upload dry run. The console build reports
+  only the known generated duplicate-key warnings documented for the legacy UI.
+- Linux CI run `32563067858` passed all 13 gates on page-selection checkpoint
+  `f3b3812`, including exact dependencies, a clean Ubuntu Cloudflare build, all
+  55 migrations, 251/251 tests, and both no-upload Worker validations.
+- One fixture-only business workflow now composes homepage capture, HTML fact
+  extraction, high-signal page selection, selected-subpage capture, fixed Browser
+  measurements, content-addressed artifact receipts, multi-page assembly, and
+  deterministic audit through eight fixed checkpoint receipts.
+- An unavailable homepage is preserved as a completed `UNREACHABLE` observation.
+  A missing selected page or failed mobile measurement makes the run `PARTIAL`
+  and keeps unsupported website checks `UNKNOWN`. Capture identity, artifact
+  integrity, schema, or storage failures stop the run and publish no audit.
+- Workflow/page/artifact IDs are deterministic from the workflow identity.
+  Repeating the same input reuses exact matching artifacts; a retry after a
+  partial fixture write reconciles the immutable orphan rather than overwriting
+  or deleting it. Every receipt keeps provider operations and total cost at zero.
+- Fixture-workflow checkpoint verification passes 258/258 tests, typecheck,
+  zero-warning lint, the repository safety check, secret-sanitized Cloudflare
+  build, explicit default console no-upload dry run, deterministic engine
+  bindings, and the inert engine no-upload dry run. The first local build attempt
+  hit a transient Windows/OneDrive lock in generated `.next` output; moving only
+  that generated directory aside allowed the complete unchanged gate to pass.
+- Linux CI run `32564289630` passed all 13 gates on fixture-workflow checkpoint
+  `831bf77`, including exact dependencies, a clean Ubuntu Cloudflare build, all
+  55 migrations, 258/258 tests, and both no-upload Worker validations.
+- Additive migration 0056 now defines immutable website-evidence workflow runs,
+  per-attempt/per-step receipts, page selection/candidates, audit assemblies,
+  artifact manifests/items, evidence uses, ordered promotion links, and
+  content-bound release records. It creates no trigger, schedule, provider
+  binding, outreach path, or execution authority.
+- The fixture workflow aggregate now carries the exact manifest for every
+  successful artifact receipt. Persistence rejects a promotion or release that
+  attempts to introduce a manifest outside the workflow's receipt and ordered
+  promotion chain.
+- A deterministic persistence plan emits canonical row JSON/digests, one exact
+  preflight for every insert-if-absent statement, and visible conflict results
+  for stored drift or alternate identity collisions. It has no database client
+  or executor and explicitly sets both `mutationAuthorized` and
+  `resumeAuthorized` to false.
+- Durable-receipt checkpoint verification passes 262/262 tests, typecheck,
+  zero-warning lint, repository safety, a secret-sanitized Cloudflare build,
+  both no-upload Worker validations, and all 56 migrations from zero in an
+  isolated local D1 directory. Migration 0056 remains unapplied to staging and
+  production.
+- Linux CI run `32682397316` passed all 13 gates on durable-receipt checkpoint
+  `48c2149`, including exact dependencies, a clean Ubuntu Cloudflare build, all
+  56 migrations from zero, 262/262 tests, and both no-upload Worker validations.
+- The fixture workflow can now emit the full replayable output of every one of
+  its eight steps to an injected fixture-only checkpoint sink. Every artifact
+  attempt is observed before a failed receipt stops the workflow, so an orphaned
+  immutable object cannot disappear from recovery history.
+- The deterministic resume planner binds the current workflow graph and all
+  component versions, exact request/delivery identity, contiguous attempt
+  history, monotonically increasing fencing tokens, exclusive lease expiry, full
+  bounded checkpoint payloads/locators, and direct committed dependencies. It
+  reproduces cross-step audit results rather than trusting a summary digest.
+- Sealed completed, partial, and unreachable audit results are terminal. Active
+  running leases wait; stale or interrupted work can only propose a higher-fenced
+  takeover. Browser/storage interruption falls back before the side-effect
+  boundary and reconciles exact retained plans, while invalid receipts or object
+  identity mismatches block without deleting anything.
+- Resume-contract verification passes 283/283 tests, typecheck, zero-warning
+  lint, repository safety, the secret-sanitized Cloudflare build, explicit
+  default console no-upload dry run, deterministic engine bindings, the inert
+  engine no-upload dry run, and all 56 migrations from zero in isolated local D1
+  storage. The planner still has no persistence executor and grants no mutation,
+  execution, provider-operation, cost, or deletion authority.
+- Linux CI run `32685987966` passed all 13 gates on fenced-resume checkpoint
+  `fbabd3e`, including exact dependencies, a clean Ubuntu Cloudflare build, all
+  56 migrations from zero, 283/283 tests, and both no-upload Worker validations.
+- Additive migration 0057 now stores the exact workflow definition, delivery,
+  stable attempt identity, fenced lease, full checkpoint payload/locator,
+  dependency graph, checkpoint state receipt, artifact recovery plan/receipt,
+  aggregate receipt revision, and ended-attempt closure needed for recovery.
+- RUNNING attempts are represented by an identity with no closure; ended attempts
+  receive one immutable closure. Checkpoint identity/payload is separate from
+  append-only `PREPARED`/`COMMITTED` receipts, and artifact plans are stored once
+  independently of failed or completed retry receipts.
+- The new validation-only persistence planner refuses any blocked resume history,
+  returns every primary/alternate identity candidate with no `LIMIT 1`, rejects
+  drift or multiple matches, preserves byte payloads with an explicit encoding,
+  and still grants no D1 mutation, resume, execution, provider, or cost authority.
+- Fenced-persistence checkpoint verification passes 289/289 tests, typecheck,
+  zero-warning lint, repository safety, the secret-sanitized Cloudflare build,
+  explicit default console no-upload dry run, deterministic engine bindings, and
+  the inert engine no-upload dry run. All 57 migrations replayed from zero in
+  isolated local D1 directory
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-60ac76a9acb34866b2ed072652c587d5`.
+- Linux CI run `32688497512` passed all 13 gates on fenced-persistence
+  checkpoint `32c7ae2`, including a clean Ubuntu Cloudflare build, all 57
+  migrations from zero, 289/289 tests, and both no-upload Worker validations.
+- Additive migration 0058 now stores one immutable ending per exact evidence-use
+  version plus lineage-wide current-reference projections, per-use states, and
+  protecting-manifest candidates. Replacement endings bind the exact replacement
+  ID, record version, and digest; legal hold requires explicit compliance
+  clearance.
+- The deterministic projector selects the weakest verified-present, unexpired
+  manifest that still satisfies each active use. It preserves equal minimum-rank
+  candidates as ambiguous, falls back from expired/weaker or ended stronger
+  purposes safely, treats no-copy promotion as a link rather than a cycle, and
+  refuses a zero-reference result for stale, fixture-asserted, disconnected, or
+  unassigned history. The original root must match the shadow write contract and
+  every promoted manifest/use must close through exact completed history.
+- The validation-only persistence plan reproduces every projection from its
+  asserted source set, checks every primary/alternate collision candidate without
+  `LIMIT 1`, and emits ordered insert-if-absent SQL only. Fixture snapshots are
+  explicitly not transactionally complete, cannot suggest retention review, and
+  currentness requires deterministic replay inside a five-minute evidence window.
+  Mutation, retention conclusion, release, deletion, provider operations, and
+  cost authority remain false/zero; no executor or Cloudflare binding was added.
+- Artifact-reference hardening verification passes 310/310 tests, typecheck,
+  zero-warning lint, safety checks, the secret-sanitized console build, explicit
+  default console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. All 58 migrations replayed from zero in isolated
+  local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-f35f266d5fbc45dbae9063e709324ea8`.
+- Linux CI run `32692455530` passed every gate on documentation checkpoint
+  `a82246a`: fail-closed safety, deterministic bindings, a clean Ubuntu
+  Cloudflare build, all 58 migrations from zero, 310/310 tests, typecheck, lint,
+  and both no-upload Worker validations.
+- A versioned atomic artifact-reference plan now derives 15 exact D1 source sets
+  from the workflow and lineage root: complete fenced workflow history,
+  manifests/items, promotions/uses, manifest links, recursively referenced uses
+  and endings, and every persisted availability candidate. Canonical proofs bind
+  every raw row, stable identity, count, predicate version, and aggregate digest.
+- Migration 0059 adds append-only snapshot attempt/fence claims, content-bound
+  manifest availability receipts, future transaction-sealed completeness
+  receipts, and per-set proofs. Exact expiry permits only a contiguous,
+  strictly-higher-fence takeover; active unsealed attempts block contenders.
+- Caller observations and even structurally valid completeness JSON remain
+  explicitly untrusted. The code cannot mint a trusted receipt, and every
+  execution, projection, retention, release, deletion, provider, and cost gate
+  remains false/zero until a future private D1 transaction rechecks, commits,
+  and reloads the exact row. All source-writer fence guards are also explicitly
+  incomplete, so no executor or binding was added.
+- Atomic snapshot checkpoint verification passes 318/318 tests, typecheck,
+  zero-warning full lint, safety checks, the secret-sanitized Cloudflare build,
+  explicit default console no-upload dry run, deterministic engine bindings,
+  and the inert engine no-upload dry run. All 59 migrations replayed
+  from zero in isolated local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-3d63dc5743484ceb9ae060e718ba0950`,
+  with 59 migration receipts and all four new tables verified.
+- Linux CI run `32694884895` passed every gate on checkpoint `dc6e697`: a clean
+  Ubuntu Cloudflare build, all 59 migrations from zero, 318/318 tests,
+  fail-closed safety, deterministic bindings, typecheck, zero-warning lint, and
+  both no-upload Worker validations.
+
+## Safety and production
+
+- Repository automation target: all autonomous switches off; follow-ups off;
+  send cap zero.
+- Even if send configuration is later enabled, the final Gmail call now blocks
+  without an unexpired operator approval matching the exact message content.
+- Production D1 is `axiom-ops-omniscient` (58 tables, about 223 MB). Remote schema
+  is still at migration 0052; migrations 0053-0059 have not been applied.
+- At `2026-08-22T03:03:15Z`, the single global settings row was safely corrected
+  from `enabled=1` to `enabled=0`; global, emergency, intake, and follow-up pauses
+  all remain `1`. This was one reversible row update after the verified export.
+- No outbound email has been recorded since `2026-06-03T09:20:57Z`: 1,936 total,
+  zero in the last seven days. No new scrape job has been created since June 3.
+- A dormant legacy backlog remains: 472 ACTIVE and 14 QUEUED sequences with 1,537
+  scheduled steps. The database stops and removed cron prevent processing.
+- The deployed legacy Worker is version 683
+  (`9670516c-88cb-42b3-8ec2-dc48eea7a115`, deployed 2026-08-16). Its embedded
+  autonomous variables are still historically `true`, but it has no intended
+  scheduled execution and every database control is off. After the full trigger
+  propagation window, a read at `2026-08-22T03:18:07Z` still showed 1,695 skipped
+  runs and no run newer than `2026-08-22T03:00:46Z`.
+- The old cron had produced 287 zero-send SKIPPED runs in the preceding 24 hours.
+  Its trigger was removed without uploading code, changing routes, or migrating
+  data.
+- No live email, inbox sync, prospect contact, production code deployment, or
+  production database migration has been performed during this rebuild.
+- Legacy Worker/database identifiers remain for rollback and data continuity.
+
+## Current phase
+
+Phase 1 — durable project foundation (in progress), with the first Phase 2 domain
+slice implemented in shadow-only code.
+
+Completed gates:
+
+- Local folder connected to the real GitHub history.
+- GitHub repository is private and renamed.
+- Rebuild branch created without rewriting `main`.
+- Owner context, operating contract, master plan, and gotcha/runbook structure
+  established.
+- Permanent Sol integration / Luna max worker protocol, seven narrow roles,
+  fail-closed configuration checks, and recurring-heartbeat continuity established.
+- Private local CEO rebuild monitor with a conservative stage map, exact
+  checkpoint/working-copy separation, meaningful transition history, strict
+  privacy checks, and an owner guide established outside every Drive folder.
+- Fail-closed runtime/config/database defaults and guarded production commands.
+- GitHub CI plus an approval-phrase production workflow (not yet exercised).
+- Pinned OpenAI Responses provider with schema validation, retry/cost limits, and
+  deterministic qualification before AI.
+- Additive shadow tables for canonical businesses, evidence, contact routes,
+  qualification, coverage, verification, and costs.
+- The primary Leads workspace now ranks only current v2 evidence, keeps all five
+  quality scores separate, and explains the best supported route. Legacy data is
+  not silently promoted into the owner queue.
+- Phase 0 production safety: non-secret inventory, full export/checksum, Time
+  Travel bookmark, master database stop, and legacy cron removal are verified.
+- Inert typed engine: versioned Workflow input/receipt contracts, stable source,
+  audit, contact, verification, and mailbox adapter interfaces, two durable
+  fail-closed steps, generated bindings, safety tests, and CI dry-run coverage.
+- Deterministic website audit: bounded typed inputs, 18 visible checks, four
+  opportunity classes, evidence traceability, unknown-state handling, and tests
+  for modern, weak, unreachable, missing, mobile-failing, and minor sites.
+- KW evaluation gate: private-data contract, duplicate protection, balance
+  requirements, owner reasons, 85% agreement calculation, and owner guide.
+- Public website capture boundary: canonical public targets, redirect-by-redirect
+  validation, bounded HTML/time, explicit failure states, generated Cloudflare
+  types, and fake-network safety tests.
+- Private KW source/identity seed: ignored no-overwrite storage, strict input and
+  plan schemas, stable multi-signal identities, cohort provenance, duplicate and
+  market guards, and zero qualification/outreach authority.
+- Bounded HTML facts: standards-based streaming parse, non-executing scripts,
+  strict token/text/JSON-LD limits, safe URL resolution, explicit unknown visual
+  state, and adversarial fixture coverage.
+- Validation-only KW persistence: deterministic schema-bound preflights and
+  insert-if-absent plans, collision/drift detection, ignored no-overwrite output,
+  and in-memory migration compatibility/idempotency coverage with no executor.
+- Browser evidence boundary: fixed viewports, bounded measurement schemas,
+  artifact digests, explicit coverage, conservative HTML merge rules, and audit
+  v2 unknown-state semantics with no live Browser/R2 wiring.
+- Fixture Browser measurement boundary: injected fixture runner, public-only
+  redirect/network receipts, strict execution/payload limits, in-memory artifact
+  drafts, and content-hash finalization with safety-check enforcement.
+- Content-addressed artifact boundary: deterministic private keys and lifecycle
+  prefixes, create-if-absent idempotency, exact stored-object reconciliation,
+  no-delete retry receipts, and zero provider authority with fixture-only tests.
+- Multi-page audit assembly: required page-set coverage, same-business/site and
+  artifact-receipt reconciliation, evidence freshness/skew, whole-business
+  budgets, deterministic ordering, and audit v3 incomplete-coverage semantics.
+- Artifact lifecycle boundary: receipt-derived manifests, evidence-use-driven
+  monotonic retention, idempotent copy/reuse/failure receipts, exact plan
+  reconciliation, and owner/compliance release records with no delete authority.
+- Deterministic page selection: fresh same-authority homepage inputs, explainable
+  role/relevance scoring, global unique assignment, explicit noise exclusions,
+  stable receipts, and partial-state handling with no provider authority.
+- Fixture website-evidence workflow: eight ordered business checkpoints,
+  deterministic identities/output digests, explicit unreachable/partial/failed
+  semantics, content-addressed retry recovery, aggregate zero-cost budgets, and
+  end-to-end adversarial coverage with no live provider or Worker wiring.
+- Durable evidence-receipt persistence: additive migration 0056, immutable
+  attempt revisions, steps bound to the exact revision, queryable page/artifact
+  provenance, exact preflight/idempotency planning, drift/collision detection,
+  and zero mutation/resume/provider authority.
+- Fenced evidence resume: full payload/locator checkpoints, exact definition and
+  delivery contracts, contiguous attempts, stale-worker fencing, terminal-result
+  precedence, dependency-closed continuation, artifact reconciliation, and a
+  deterministic zero-authority plan covering crashes and duplicate delivery.
+- Fenced resume persistence: additive migration 0057, stable identity plus
+  immutable closure/state receipts, separate artifact plans and retry receipts,
+  collision-complete preflights, exact idempotency checks, base64-tagged fixture
+  bytes, and zero mutation/resume/execution/provider authority.
+- Artifact reference projection: additive migration 0058, immutable use endings,
+  fixture-asserted promotion-lineage snapshots, exact promotion/use closure,
+  content-bound short-lived availability, deterministic currentness replay,
+  weakest-valid protecting-copy selection, collision-complete persistence
+  planning, and zero retention/mutation/release/deletion/provider authority.
+- Atomic artifact-reference snapshot contract: additive migration 0059,
+  bounded append-only attempt/fence claims, persisted R2/fixture availability
+  observations, 15 exact source-set proofs, future completeness receipt shape,
+  generated D1 transaction SQL, exact-expiry takeover tests, and an explicit
+  untrusted-only boundary with no executor or receipt issuer.
+- Artifact-reference raw-row decoding: strict schemas and canonical JSON/digest/
+  denormalized-column reconciliation for all 15 source sets, one exact sealed
+  workflow result, explicit multi-root workflow-forest validation, selected-root
+  facts, recursive replacement closure, and fresh per-object R2 HEAD receipt
+  selection. In-memory D1 tests exercise the generated source SQL; trust,
+  projection persistence, retention, release, deletion, provider operations, and
+  cost all remain disabled.
+- Raw-row decoder checkpoint verification passes 326/326 tests, safety checks,
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build, explicit
+  default console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. All 59 migrations replayed from zero in isolated
+  local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-d7399a703f4d4486a783f7a305e644df`,
+  including all four migration-0059 tables. No staging/production migration,
+  deployment, D1/R2/Browser/provider call, or prospect action occurred.
+- Linux CI run `32698071984` passed every gate on checkpoint `0384a79`: clean
+  dependency installation, fail-closed safety, both Cloudflare builds, all 59
+  migrations from zero, 326/326 tests, typecheck, zero-warning lint, and both
+  no-upload Worker validations.
+- Atomic source-writer guards: additive local-only migration 0060, one scoped
+  freeze plus update/delete immutability triggers for all 15 source tables, and
+  append-only snapshot attempt/completeness/proof controls. The freeze covers
+  the complete workflow query domain and uses database time with a half-open
+  lease. Availability must precede the claim. The atomic plan now requires the
+  guarded schema. Projection persistence, retention, release, deletion, provider,
+  cost, outreach, and every live runtime path remain off.
+- Source-writer guard checkpoint verification passes 329/329 tests, fail-closed
+  safety, typecheck, zero-warning lint, the secret-sanitized Cloudflare build,
+  the console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. All 60 migrations replayed from zero in isolated
+  local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-46777bd38c2441f389d01e3ee69fdb78`,
+  with 60 migration receipts, 45 source-table triggers, and 51 total triggers.
+  No staging/production migration, deployment, D1/R2/Browser/provider call, or
+  prospect action occurred.
+- Linux CI run `32699873974` passed every gate on checkpoint `bd87195`: clean
+  dependency installation, fail-closed safety, both Cloudflare builds, all 60
+  migrations from zero, 329/329 tests, typecheck, zero-warning lint, and both
+  no-upload Worker validations.
+- Private D1 completeness executor: query contract v2 and plan v3 now rebuild the
+  complete control plan before use, verify all 51 database writer guards, use
+  database-time claim/read and exact 15-set recheck batches, collision-preflight
+  every receipt/proof target, atomically insert one parent plus 15 children,
+  post-verify them, and independently reload the exact committed rows. Only this
+  path returns `transactionallyTrusted=true`; raw decoding and structural receipt
+  parsing remain untrusted. Exact replay returns the historical receipt without
+  inventing materialized source rows.
+- Disposable-D1 adversarial coverage proves fresh commit, exact replay, redigested
+  control-SQL rejection before D1, missing-trigger rejection, source-result drift,
+  target collisions, child-failure parent rollback, expired database-time fences,
+  and divergent attempt identities. All projection persistence, retention,
+  release, deletion, provider, cost, and outreach authority remains false/zero.
+- Private executor checkpoint verification passes 336/336 tests, fail-closed
+  safety, typecheck, zero-warning lint, the secret-sanitized Cloudflare build,
+  the console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. All 60 migrations replayed from zero in isolated
+  local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-36f002cfd22d41ab9d265e9ab43439c3`,
+  with 60 migration receipts, 51 triggers, and 15 scoped insert freezes. No
+  staging/production migration, deployment, D1/R2/Browser/provider call, secret
+  access, or prospect action occurred.
+- Linux CI run `32703057529` passed every gate on checkpoint
+  `a6109e6bd6fca75180abcb64f1103a8eb149d5bd`: clean dependency installation,
+  fail-closed safety, both Cloudflare builds, all 60 migrations from zero,
+  336/336 tests, typecheck, zero-warning lint, and both no-upload Worker
+  validations.
+- Exact-head Linux CI run `32703474283` also passed every gate on the final
+  executor documentation checkpoint `a9a4703385595d074f7d58a757eaed4a011e4476`.
+- Trusted projection-v2 now accepts only the exact frozen in-process result of a
+  fresh D1 commit with materialized rows. It rejects stale windows, receipt-only
+  replay, cloned trust envelopes, and source drift, then replays the selected
+  lineage deterministically. Complete zero-active-use snapshots may report
+  `NO_CURRENT_REFERENCES`; ambiguous or unassigned active uses remain
+  `INDETERMINATE`.
+- The compatibility replay now matches availability v2: only shadow objects may
+  carry automatic object expiry. Qualification's 180-day policy is a retention
+  review boundary, not automatic R2 deletion. Projection persistence, retention
+  conclusions, release, deletion, provider operations, cost, outreach, and every
+  live runtime path remain false/zero/off.
+- Trusted-projection checkpoint verification passes 340/340 tests, fail-closed
+  safety, typecheck, zero-warning lint, the secret-sanitized Cloudflare build,
+  the console no-upload dry run, deterministic engine bindings, and the inert
+  engine no-upload dry run. All 60 migrations replayed from zero in isolated
+  local D1 at
+  `C:\Users\riley\AppData\Local\Temp\axiom-revenue-engine-migrations-82394009ccd04fa695f01c8e8ab1aedf`,
+  with 60 migration receipts, 51 triggers, and 15 scoped insert freezes. No
+  staging/production migration, deployment, D1/R2/Browser/provider call, secret
+  access, or prospect action occurred.
+- Exact-head Linux CI run `32705487957` passed every gate on the final trusted-
+  projection documentation checkpoint
+  `f95da36cb787cd0e89e1bc328ded610ada3b3f01`: clean install, fail-closed
+  safety, both Cloudflare builds/bindings, all 60 migrations from zero, 340/340
+  tests, typecheck, zero-warning lint, and both no-upload Worker validations.
+- Bounded manifest HEAD adapter v1 now attempts every exact manifest object in
+  canonical order through an injected fixture client. It binds explicit matched,
+  missing, mismatched, malformed, and client-error observations with a ten-object,
+  five-minute, zero-provider-operation, zero-cost ceiling. It always emits a
+  fixture availability receipt and cannot become an R2 winner or authorize
+  persistence, retry, release, deletion, provider work, outreach, or spend.
+- The lower-level artifact policy now agrees with projection v2: only shadow
+  objects have a planned automatic 30-day lifecycle. Qualification evidence has
+  a 180-day review boundary and no automatic delete; outreach and legal hold
+  remain protected as well. The staging activation/rollback procedure is now
+  explicit in `docs/runbooks/STAGING_R2_ACTIVATION.md`.
+- Manifest-HEAD checkpoint local verification passes 344/344 tests, fail-closed
+  safety, typecheck, zero-warning lint, the secret-sanitized Cloudflare build,
+  console no-upload dry run, deterministic engine bindings, and inert engine
+  no-upload dry run. No bucket, binding, provider request, lifecycle rule,
+  deployment, remote migration, D1 write, secret access, or prospect action
+  occurred.
+- Exact-head Linux CI run `32923727144` passed every gate on the final manifest-
+  HEAD/R2-runbook checkpoint `f17fc5d60142884617979d0f54b2c8206050932a`:
+  clean install, fail-closed safety, both Cloudflare builds/bindings, all 60
+  migrations from zero, 344/344 tests, typecheck, zero-warning lint, and both
+  no-upload Worker validations.
+- Owner lead projection v1 now turns current v2 business, KW location, audit,
+  evidence, contact, verification, and five-score qualification facts into a
+  deterministic owner view. It recomputes qualification, keeps non-email leads
+  valuable, prefers verified named/role email only when current, and routes phone,
+  form, and social as manual work. Stale/future/drifted facts become refresh work;
+  cross-business contamination fails closed.
+- The owner lead D1 reader uses two bounded SELECT-only contracts, validates
+  public URLs and stored JSON, reports malformed rows with bounded codes, and
+  exposes authenticated private/no-store `GET /api/v1/leads` with a maximum of
+  100 candidates. Every qualification, mutation, send, outreach, provider, and
+  cost authority remains false/zero.
+- Owner-read-model local verification passes 354/354 tests, fail-closed safety,
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build (including
+  `/api/v1/leads`), console no-upload dry run, deterministic engine bindings, and
+  inert engine no-upload dry run. No deployment, remote migration, provider call,
+  D1 write, mailbox action, secret access, or prospect contact occurred.
+- Exact-head Linux CI run `32925363253` (job `98047071013`) passed every gate on
+  the final owner-read-model documentation checkpoint
+  `2a131b71a34b33b41551ff316a58820c91c8e32d`: clean install, fail-closed
+  safety, both Cloudflare builds/bindings, all 60 migrations from zero, 354/354
+  tests, typecheck, zero-warning lint, and both no-upload Worker validations.
+- The primary owner navigation and installed-app shortcut now open `/leads`.
+  Its authenticated Server Component reads the bounded v2 owner model directly
+  and renders plain-English priority, all five separate scores, exact
+  why-this-lead evidence links, classification, current data quality, and the
+  strongest supported route. The legacy `/vault` remains available as a
+  migration reference but is no longer the primary Leads destination.
+- The Leads list has honest current, empty, loading, refresh, research, blocked,
+  rejected-data, and unavailable states. It cannot silently substitute legacy
+  rows. Phone, form, and social routes are visibly manual, and the list contains
+  no approval, direct-contact, send, provider, or mutation action.
+- Safety checks now enforce owner authentication, direct use of the bounded read
+  model, read-only copy, and absence of self-fetch, write methods, buttons,
+  forms, or direct email/phone links. Fixture-rendered tests verify semantic
+  headings, all five score labels, exact evidence, manual route copy, fail-closed
+  states, and navigation.
+- A local headed Playwright review used a temporary synthetic route at 1440x1000
+  and 390x844. Desktop and mobile layouts, semantic snapshots, focusable evidence
+  links, score readability, route prominence, and bottom navigation were
+  inspected; the temporary route and screenshots were removed before commit.
+- Owner-Leads workspace local verification passes 360/360 tests, fail-closed
+  safety, typecheck, zero-warning lint, the secret-sanitized Cloudflare build
+  (including dynamic `/leads`), console no-upload dry run, deterministic engine
+  bindings, and inert engine no-upload dry run. No deployment, remote migration,
+  provider request, D1 write, mailbox action, secret access, or prospect contact
+  occurred.
+- Exact-head Linux CI run `32943097435` (job `98098016868`) passed all 13 gates
+  on owner-Leads documentation checkpoint
+  `653bf5fa1abe79086866d9c072bdbbf00ae6cd65`: clean install, fail-closed
+  safety, both Cloudflare builds/bindings, all 60 migrations from zero, 360/360
+  tests, typecheck, zero-warning lint, and both no-upload Worker validations.
+- Every ranked lead now links to authenticated dynamic `/leads/[businessId]`.
+  Its exact-business reader reuses the deterministic owner projection, validates
+  the current website snapshot against its stored audit receipt, reads every
+  current contact route, and returns at most 100 factual v2 source, audit,
+  qualification, contact, and verification events. Invalid identities fail
+  before D1; missing dossiers return not found; inconsistent facts fail closed.
+- The dossier keeps all five scores visible, leads with the strongest supported
+  observations, groups audit findings as critical/important/minor, explains the
+  recommended route, and shows every recorded contact value without turning it
+  into a direct email, phone, form, social, approval, or send action. Opaque
+  desktop/mobile/DOM artifact references say that preview delivery is not yet
+  available. Outreach, reply, opportunity, and client history remain explicit
+  unavailable placeholders rather than guessed legacy history.
+- Authenticated private/no-store `GET /api/v1/leads/[businessId]` exposes the
+  same zero-authority contract. Safety checks enforce authenticated direct reads,
+  SELECT-only/provider-free data access, read-only copy, no write methods, and no
+  contact-action controls. The detail/list fixture suite and real migration-0054
+  SQL compilation pass; the complete repository suite is now 368/368 tests.
+- A headed Playwright review used a temporary synthetic local D1 and route at
+  1440x1000 and 390x844. Semantic structure, evidence hierarchy, route
+  prominence, long-page readability, and desktop/mobile layout were inspected;
+  mobile document width was 385 CSS pixels inside a 390-pixel viewport. The
+  temporary route, database, screenshots, logs, browser, and dev server were
+  removed before commit. The only browser console failure was the expected local
+  session lookup with no test auth secret; the dossier itself returned 200.
+- Lead-dossier local release verification passes fail-closed safety, 368/368
+  tests, typecheck, zero-warning lint, the secret-sanitized Cloudflare build
+  (including dynamic detail page/API routes), console no-upload dry run,
+  deterministic engine bindings, and inert engine no-upload dry run. No
+  deployment, remote migration, provider request, configured local/remote D1
+  write, mailbox action, secret access, prospect contact, or spend occurred; the
+  only write was the removed isolated synthetic preview database. Production and
+  staging automation state is unchanged and remains stopped.
+- Exact-head Linux CI run `32969626111` (job `98180042849`) passed all 13 gates
+  on dossier documentation checkpoint
+  `ded584857ece8c5c3409225de693877ee26781b8`, including all 60 migrations and
+  368/368 tests.
+- A repeatable owner acceptance command now starts the real Next.js console on
+  an ephemeral loopback port, applies all 60 migrations to a disposable
+  synthetic database, creates a real local Better Auth operator session, and
+  exercises the ranked Leads list plus evidence dossier in pinned Chromium.
+- The acceptance boundary blocks every browser request outside the exact local
+  origin and starts the app with intake, queueing, sending, follow-ups, scraping,
+  provider credentials, and all cost paths disabled. Successful fixtures and
+  screenshots are removed; bounded failure artifacts remain ignored for local
+  diagnosis only.
+- Four page/viewport states now pass axe-core WCAG 2.2 AA checks, 24-pixel target
+  minimums, responsive overflow checks, reduced-motion checks, distinct titles,
+  read-only control checks, mobile-navigation clearance, and keyboard/visible-
+  focus traversal from the skip link into the first evidence dossier. The last
+  clean local browser run found the list in 258 ms against a 10-second budget
+  and the dossier rationale in 2,872 ms against a 15-second budget at 1440x1000;
+  mobile width remained exactly 390 CSS pixels and external requests were zero.
+- This gate exposed and fixed a real route bug: the list percent-encoded `:` in
+  typed business IDs, while the dynamic route received the encoded text and
+  rejected a valid dossier. One shared identity contract now emits safe readable
+  paths, decodes route input exactly once, and rejects slashes, malformed escapes,
+  and double encoding before D1. Leads/dossiers also gained distinct page titles,
+  a focusable main landmark, and WCAG-AA contrast floors for small operational
+  labels.
+- Owner-acceptance local verification passes fail-closed safety, 372/372 unit and
+  characterization tests, the isolated browser gate, typecheck, zero-warning
+  lint, the secret-sanitized Cloudflare build, console no-upload dry run,
+  deterministic engine bindings, and inert engine no-upload dry run. No
+  deployment, remote migration, configured local/remote D1 write, provider call,
+  mailbox action, prospect contact, secret exposure, or runtime spend occurred.
+  Production and staging automation remain stopped.
+- Exact-head Linux CI run `32999604935` (job `98277643017`) passed all 13 gates
+  on owner-acceptance checkpoint
+  `0dfaafef6cc5b26ceaaec8bcc7344fc77e2ce89f`, including the isolated Chromium
+  owner gate, all 60 then-current migrations, and 372/372 tests.
+- The private shadow-assessment boundary now accepts only an exact sealed
+  website-evidence receipt, revalidates its digest/business/audit/evidence
+  identity, and combines current business-fit/timing basis with deterministic
+  rebuild evidence. Reachability remains zero and the route remains `RESEARCH`;
+  no email, contact, consent, provider, or owner-action state is inferred.
+- Migration 0061 adds an append-only assessment receipt and protects website
+  snapshots, capture-specific evidence claims, qualification snapshots, and the
+  receipt from update/delete. The injected D1 executor collision-preflights every
+  identity, checks fresh writes against D1 time, commits all missing rows in one
+  batch with the receipt last, reloads every exact row, and makes an exact replay
+  mutation-free.
+- Deterministic website audits advanced to v4 because repeat captures previously
+  reused claim IDs. Claim identity now includes business, audit version, capture
+  time, and check ID; the assessment boundary independently verifies that
+  identity before persistence.
+- Shadow-assessment local release verification passes fail-closed safety,
+  381/381 tests, typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, console no-upload dry run, deterministic console/engine bindings, inert
+  engine no-upload dry run, all 61 migrations, and the isolated owner browser
+  gate. Browser readiness was 243 ms for the list and 3,642 ms for the dossier;
+  all four WCAG views passed at desktop/mobile widths with zero external
+  requests.
+- Migration 0061 was applied only to ignored local Wrangler state, and all 61
+  migrations were also replayed in the disposable owner-acceptance database.
+  No staging/production migration, deployment, provider call, R2/Browser
+  operation, mailbox action, prospect contact, secret exposure, or runtime spend
+  occurred. Both deployed automation states remain stopped.
+- Exact-head Linux CI run `33021717611` (job `98353416589`) passed every gate on
+  shadow-assessment checkpoint
+  `27a909a758306d803d3e9f8cb84f63212f0b8dff`. A separate legacy Cloudflare
+  Workers Builds integration for `axiom-ops-omniscient` reported a blocked/failed
+  check without deploying; the Revenue Engine GitHub Actions gate remained green.
+- Private screenshot delivery now has a canonical HMAC-authenticated grant bound
+  to one exact authenticated user/session, business, website snapshot, logical
+  desktop/mobile screenshot, artifact reference, audit refresh deadline, and
+  artifact expiry. Grants last at most five minutes and possession alone is not
+  sufficient: validation requires the same current session and dossier context.
+- A fixture reader proves that only exact SHA-256-matching WebP bytes can become
+  a same-origin `private, no-store`, `nosniff` response. The browser-facing grant
+  contains no raw user/session identity, R2 URL, bucket, or object key; DOM
+  artifacts cannot be rendered through this boundary. The owner dossier remains
+  honest that previews are unavailable because no route or live reader exists.
+- Artifact-delivery local release verification passes fail-closed safety,
+  387/387 tests, typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, console no-upload dry run, deterministic console/engine bindings, inert
+  engine no-upload dry run, all 61 migrations, and the isolated owner browser
+  gate. Browser readiness was 611 ms for the list and 3,324 ms for the dossier;
+  four desktop/mobile WCAG views passed with zero external requests. No route,
+  binding, signing secret, R2 bucket/read, deployment, remote migration, provider
+  call, mailbox action, prospect contact, secret exposure, or runtime spend
+  occurred. Production and staging automation remain stopped.
+- A guarded ignored-local command can now bind one Riley/Aidan-approved KW
+  evaluation candidate to one exact sealed workflow receipt and invoke the
+  append-only assessment writer. Approval binds the source-plan digest,
+  candidate, receipt, business-fit/timing basis, scores, policy blocks, reviewer,
+  and one current timestamp. The command returns only content-derived IDs and
+  counts; reachability stays zero and the route stays `RESEARCH`.
+- The command accepts only direct-child JSON and `.sqlite` files under ignored
+  `data/kw-evaluation/`, opens one existing unattached local database, rebuilds
+  migrations 0054–0061 in memory, and requires every Revenue table, index, and
+  trigger to match exactly. It re-derives source persistence from trusted code
+  and requires every source run/business/location/source row to be one exact
+  existing match before any assessment write.
+- Private KW persistence advanced to collision-complete v2. Business and source-
+  record preflights no longer use `LIMIT 1`; zero rows are missing, one exact row
+  is idempotent, and multiple primary/alternate matches always conflict. This is
+  now locked by an adversarial test and the repository safety scan because the
+  DATA-002 gotcha repeated in the older planner.
+- Local release verification passes 392/392 tests, fail-closed safety, typecheck,
+  zero-warning lint, deterministic console/engine bindings, all 61 local
+  migrations, the secret-sanitized Cloudflare build, and both console/engine
+  no-upload dry runs. The disposable SQLite path proves fresh commit,
+  mutation-free exact replay, hidden alternate-phone collision rejection, and
+  modified-trigger rejection. The owner browser gate passes four desktop/mobile
+  WCAG views with zero external requests; the list was ready in 725 ms and the
+  dossier in 2,815 ms. Its first warmup produced one empty page-error event while
+  all requests returned 200 and the rendered dossier was complete; the immediate
+  clean rerun passed, and the bounded ignored failure artifact was retained for
+  diagnosis. Atomic commit, push, and exact-head Linux CI remain in this cycle.
+- No source/workflow/contact row was written outside disposable test databases;
+  no real KW record was loaded. No Worker/route, staging/production migration,
+  deployment, provider/network call, mailbox action, prospect contact, secret
+  exposure, or runtime spend occurred. Production and staging automation remain
+  stopped.
+- Contact discovery and verification now have separate content-bound v1
+  contracts. Discovery canonicalizes evidence-backed email, Canadian phone,
+  form, and supported social candidates, retains every source/time/method/
+  confidence/publication fact, and marks every route `NOT_VERIFIED`, consent-
+  unassessed, and non-automatable. Empty discovery produces research work rather
+  than invented reachability.
+- Verification binds one channel-specific fixture receipt to the exact business
+  and candidate digest. Only a current deliverable named/role email becomes an
+  owner-reviewable email route; generic business inboxes, catch-all, unknown,
+  and negative outcomes remain research. Positive phone, form, and social
+  results become manual routes only. All results retain zero provider, cost,
+  persistence, outreach, send, and autonomous-email authority.
+- Stable adapter interfaces now use those exact contracts. The safety scan
+  requires fixture-only/zero-authority fields, forbids provider/runtime/database
+  access in both modules, and prevents the inert Worker from wiring them.
+  Fifteen new tests cover multi-source evidence, channel normalization, empty
+  research, identity conflicts, generic-email impersonation, stale/private
+  proof, caps, cross-business/channel drift, catch-all/freshness semantics,
+  manual-only routes, and redigested semantic tampering.
+- Contact-contract local release verification passes fail-closed safety,
+  407/407 tests, typecheck, zero-warning lint, deterministic console/engine
+  bindings, all 61 local migrations, the secret-sanitized Cloudflare build, both
+  console/engine no-upload dry runs, and the isolated owner browser gate. No
+  external browser requests occurred; the desktop list was ready in 324 ms and
+  the dossier in 3,368 ms, both inside their 10/15-second owner budgets. No
+  provider, network request, contact/verification persistence, Worker/route,
+  mailbox action, prospect contact, deployment, remote migration, secret
+  exposure, or runtime spend occurred. Production and staging automation remain
+  stopped.
+- Migration 0062 now stores exact discovery receipts, versioned contact points,
+  reusable public evidence plus discovery-owned evidence-use links, and versioned
+  verification receipts. New contact/verification inserts must satisfy the full
+  content-bound contract; all five record types reject update/delete with a
+  stable append-only error. Existing legacy rows remain readable but are now
+  immutable.
+- Migration 0063 adds four independent direct-SQL lineage guards. Receipt counts
+  must match the embedded candidate/evidence set; a contact version must be one
+  exact candidate from its parent result; an evidence-use link must reference an
+  exact claim inside that candidate; and every stored verification payload must
+  agree with its contact, observation, projection, timestamps, and zero-authority
+  fields. It adds no data mutation or operational authority.
+- Stable `candidateId` is no longer confused with one mutable database row. A
+  later discovery of the same route appends a new contact-point version bound to
+  its discovery result and candidate digest, while later verification refreshes
+  append distinct receipts. Consent stays `UNASSESSED`; neither public
+  publication nor deliverability creates a consent record.
+- A deterministic schema-0063 persistence planner now emits every exact
+  prerequisite/collision preflight and append-only insert needed for one
+  discovery bundle. It blocks multiple identity matches, divergent rows,
+  discovery-owned orphans, and an existing receipt with missing children; exact
+  globally reusable evidence is allowed. It reports `FRESH_PLAN` or
+  `EXACT_REPLAY` but has no executor and grants zero database, mutation,
+  qualification, provider, outreach, send, consent, or cost authority.
+- The owner reader now selects the latest immutable version for each stable
+  candidate and derives current owner status from its latest verification.
+  Non-email availability no longer enters the email-deliverability parser. The
+  isolated browser fixture now uses the exact persistence plan rather than loose
+  contact inserts and still passes all four owner views.
+- Contact-persistence local release verification passes fail-closed safety,
+  415/415 tests, typecheck, zero-warning lint, the isolated owner browser gate,
+  the secret-sanitized Cloudflare build, and the explicit console and inert-engine
+  no-upload dry runs. Browser readiness was 320 ms for the list and 3,879 ms for
+  the dossier; desktop/mobile WCAG views passed with zero external requests. No
+  external provider, business website, mailbox, prospect, staging/production
+  database, deployment, secret, or paid runtime was touched. Production and
+  staging automation remain stopped.
+- A separate ignored-local source/workflow approval now binds the exact private
+  KW source plan, one candidate, deterministic audit input, evidence completion,
+  reviewer, and a source/workflow-specific confirmation. Trusted code re-derives
+  source persistence plus the deterministic audit; it never executes a saved SQL
+  plan or accepts a caller-supplied audit result.
+- The new command requires an existing direct-child `.sqlite` file whose Revenue
+  schema exactly matches migrations 0054–0064. It acquires one SQLite
+  `IMMEDIATE` transaction before collision preflight, inserts only missing exact
+  source and six sealed-workflow rows, inserts its materialization receipt last,
+  and reloads every row before commit. An exact replay writes nothing; a stale
+  approval, partial receipt, drift, or multiple primary/alternate identity match
+  stops.
+- Migration 0064 adds the append-only materialization receipt and a direct-SQL
+  lineage guard requiring one exact sealed, shadow, zero-cost workflow for the
+  approved business. Its database constraints authorize only the named local
+  source/workflow transaction; assessment, schema changes, capture, contacts,
+  providers, outreach, send, and cost remain false or zero.
+- The executable integration test proves the assessment command fails before
+  materialization, succeeds only after the distinct materialization approval,
+  and still performs no source/workflow writes itself. Separate tests prove
+  transaction rollback when the final receipt fails and reject an exact primary
+  business row hidden beside an alternate-phone collision.
+- Source/workflow-materialization local verification passes fail-closed safety,
+  421/421 tests, typecheck, zero-warning repository lint, all 64 local migrations,
+  the secret-sanitized Cloudflare build, deterministic engine bindings, explicit
+  console and inert-engine no-upload dry runs, and the isolated owner browser
+  gate. Browser readiness was 322 ms for the list and 4,152 ms for the dossier;
+  four desktop/mobile WCAG views passed with zero external requests. The console
+  dry run emitted only the already documented generated duplicate-`options`
+  warnings. Commit `13bbfca89f3c60e0ca561bf023b016a11d3ebe23` is pushed and
+  exact-head Linux CI run `33093774396` passed.
+- No real KW record was imported or assessed. No website/provider request,
+  artifact operation, contact action, mailbox/prospect action, staging/production
+  database, deployment, secret, or paid runtime was touched. Only migration 0064
+  was applied to ignored local Wrangler state; deployed automation remains
+  stopped.
+- A separate local contact-persistence approval now binds one exact business,
+  discovery result ID/digest, re-derived schema-0063 validation-plan digest,
+  every verification result ID/digest, reviewer, current timestamp, rationale,
+  and contact-specific confirmation. The trusted builder parses the original
+  fixture results and re-derives SQL; saved plans and caller SQL are not accepted
+  as authority.
+- The typed executor now verifies the complete canonical migrations 0054–0067 schema
+  and one unattached SQLite database before opening a single `IMMEDIATE`
+  transaction. It collision-checks every row, permits only a completely fresh
+  discovery-owned bundle or exact replay, commits its separate completion receipt
+  last, and reloads every exact row before commit. Exact globally reusable
+  evidence is allowed; a partial bundle or a complete bundle without its final
+  receipt is blocked instead of repaired.
+- Migration 0065 adds the immutable
+  `RevenuePrivateKwContactPersistenceReceipt`. Its direct-SQL guard requires the
+  exact discovery, contact versions, evidence uses/claims, and verification IDs
+  before insert and constrains consent, qualification, provider, outreach, send,
+  and cost authority to zero. Migration 0066 separately hardens the content-
+  derived receipt identity and bidirectional, duplicate-free verification set.
+- The lower-level executor still has no file reader, CLI, Worker, route, queue,
+  Cloudflare binding, discovery/verification provider, consent decision,
+  outreach, send, staging, or production path. The separately reviewed local
+  invocation below is its only operator boundary; the engine Worker cannot
+  import either path.
+- Local contact-executor verification passes fail-closed safety, 426/426 tests,
+  typecheck, zero-warning lint, all 66 local migrations, deterministic console
+  and engine bindings, the secret-sanitized Cloudflare build, and explicit
+  console plus inert-engine no-upload dry runs. The owner browser gate also
+  passed four desktop/mobile WCAG scans with zero external requests; list readiness
+  was 694 ms and dossier readiness was 3,323 ms. The console dry run emitted only
+  the already documented generated duplicate-`options` warnings. Commit
+  `6521dcd535bfa613beca939f9438400b5586ffa6` is pushed and exact-head Linux CI
+  run `33098011119` passed all repository gates.
+- No real contact evidence was discovered, verified, imported, or persisted.
+  No consent record, lead score, message, mailbox/prospect action, provider or
+  network request, remote database, deployment, secret, or paid runtime was
+  touched. Only migrations 0065–0066 were added to ignored local Wrangler state;
+  production and staging automation remain stopped.
+- Contact invocation now has a separate read-only preparation command. It opens
+  one canonical local SQLite database with `readonly: true`, proves the exact
+  source plan already exists, reconstructs the persisted assessment from its
+  sealed workflow receipt, derives fixture discovery/verification from reviewed
+  observations, and writes one no-overwrite owner packet. It performs no
+  database mutation or provider operation.
+- A different current owner approval binds that exact review, source-plan
+  digest, assessment receipt/digest, re-derived contact plan, every verification
+  result, reviewer, timestamp, rationale, and contact-specific confirmation. One
+  outer SQLite `IMMEDIATE` transaction revalidates the complete lineage, calls
+  the proven contact executor, then inserts and reloads migration 0067's final
+  invocation receipt. The receipt retains the complete review rather than only a
+  hash; a final-receipt failure rolls the entire contact bundle back.
+- The executable synthetic chain passes source materialization, assessment,
+  read-only review, approval-drift rejection with zero contact rows, final-
+  receipt rollback, fresh contact commit, exact replay, full-review persistence,
+  and append-only update/delete rejection. Consent remains `UNASSESSED`, the
+  existing qualification row is unchanged, and live discovery/verification,
+  providers, outreach, sending, remote databases, and cost remain unavailable.
+- Reviewed-contact invocation local release verification is green: fail-closed
+  safety, 427/427 tests, typecheck, zero-warning lint, all 67 local migrations,
+  deterministic console and engine bindings, the secret-sanitized Cloudflare
+  build, and explicit console plus inert-engine no-upload dry runs passed. The
+  owner browser gate also passed four desktop/mobile WCAG scans with zero
+  external requests; list readiness was 1,191 ms and dossier readiness was
+  2,845 ms. The console dry run emitted only the already documented generated
+  duplicate-`options` warnings.
+- No real business or contact evidence was used. No business website, provider,
+  mailbox, prospect, staging/production database, deployment, secret, or paid
+  runtime was touched. Migration 0067 exists only in source, ignored local
+  Wrangler state, and disposable tests; deployed automation remains stopped.
+- The authenticated owner list/dossier acceptance database no longer inserts
+  contact planner mutations directly. It now creates one exact synthetic
+  discovery/verification bundle, supplies the dedicated zero-provider local
+  approval, and calls the same fail-closed contact executor used by the guarded
+  local pipeline.
+- The acceptance setup requires a fresh executor commit, the immutable
+  schema-0065/0066 completion receipt, exact reload, and a write-free exact
+  replay before Next.js starts. The desktop dossier must then render the exact
+  executor-produced phone, form, and unverified email routes. A repository
+  safety rule prevents the loose-planner-insert shortcut from returning.
+- Executor-backed dossier local release verification is green: fail-closed
+  safety, 427/427 tests, typecheck, zero-warning lint, deterministic console and
+  engine bindings, the secret-sanitized Cloudflare build, and explicit console
+  plus inert-engine no-upload dry runs passed. The final sequential owner browser
+  gate rendered all three executor-produced routes, passed four desktop/mobile
+  WCAG scans, attempted zero external requests, and met the owner timing budgets;
+  list readiness was 1,126 ms and dossier readiness was 2,479 ms. The console
+  dry run emitted only the already documented generated duplicate-`options`
+  warnings.
+- No real lead, provider request, consent decision, qualification change,
+  outreach, mailbox/prospect action, remote database, deployment, secret, or
+  paid runtime was touched. The executor ran only against a disposable synthetic
+  SQLite browser-test database; production and staging automation remain stopped.
+- The first real-business integration cohort is now a content-bound manifest of
+  exactly ten manually reviewed, independent KW businesses. It refuses source
+  evidence older than 90 days, source-plan or candidate drift, duplicate
+  identities, unknown/chain status, and a mix with fewer than two businesses in
+  any pilot city or niche.
+- Its five phases are fixed as source/workflow, current website evidence,
+  assessment, contact review, and owner dossier. Every phase remains a different
+  approval gate; the manifest starts at `SOURCE_REVIEWED` and cannot claim later
+  progress without future receipt-bound work.
+- `kw:prepare-shadow-slice` reads only two ignored local JSON inputs and writes
+  one no-overwrite ignored manifest. Repository safety checks keep the planner
+  and command disconnected from databases, runtime bindings, providers,
+  networking, Cloudflare, and the engine Worker, with every mutation, capture,
+  consent, qualification, mailbox, outreach, deployment, and send authority
+  false and provider/cost authority zero.
+- Bounded-shadow-slice local release verification is green: fail-closed safety,
+  432/432 tests, typecheck, zero-warning lint, deterministic console and engine
+  bindings, the secret-sanitized Cloudflare build, explicit console plus inert-
+  engine no-upload dry runs, and the final sequential owner browser gate passed.
+  The browser gate scanned four desktop/mobile WCAG views, made zero external
+  requests, and met the owner budgets with 1,170 ms list readiness and 2,321 ms
+  dossier readiness. The console dry run emitted only the already documented
+  generated duplicate-`options` warnings.
+- No real business was selected and no private business record was committed.
+  No source acquisition, website capture, Browser/R2 operation, contact
+  discovery or verification, consent decision, qualification change, database,
+  deployment, mailbox/prospect action, provider operation, secret, or paid
+  runtime was touched; production and staging automation remain stopped.
+- The owner dossier now has a plain-language contact-review checkpoint backed
+  by the latest immutable migration-0067 invocation receipt. It says who
+  reviewed the exact packet, when, why local storage was approved, how many
+  candidates/checks/routes were supported, and whether the receipt still matches
+  the current website audit and qualification snapshot.
+- A missing receipt is labelled `Contact review not recorded`; an older receipt
+  is labelled as stale instead of approving the current assessment. The reader
+  validates the complete content-derived invocation JSON and its source,
+  assessment, discovery, materialization, reviewer, and zero-authority lineage.
+  Malformed or tampered proof fails the dossier closed.
+- The UI keeps consent explicitly unassessed and explains that a contact review
+  authorized local record storage only—not qualification, outreach, sending,
+  provider use, or spend. The page remains read-only with no button, form,
+  `mailto:`, or `tel:` action.
+- Owner contact-review local release verification is green: fail-closed safety,
+  434/434 tests, typecheck, zero-warning lint, deterministic console and engine
+  bindings, the secret-sanitized Cloudflare build, and explicit console plus
+  inert-engine no-upload dry runs passed. The final owner browser rerun passed
+  four desktop/mobile WCAG scans, made zero external requests, and met the owner
+  budgets with 1,162 ms list readiness and 2,443 ms dossier readiness. Its first
+  warmup hit the already documented generated-asset `SyntaxError`; the immediate
+  clean rerun passed after every build/dry-run process had exited. The console
+  dry run emitted only the already documented generated duplicate-`options`
+  warnings.
+- No prospect, external website, provider, mailbox, remote database, staging or
+  production resource, deployment, secret, or paid runtime was touched. Spend
+  impact is C$0, and every automation/sending capability remains stopped.
+- The 50-lead quality gate now has a resumable ignored-local owner workflow. A
+  read-only command reconstructs every selected current assessment from its
+  exact sealed receipt, verifies the complete migration-0054–0067 schema and
+  source materialization, refuses partial or changing cohorts, and produces an
+  owner-readable checkpoint bound to the exact 50-business source plan,
+  assessments, engine policy, evidence, and five scores.
+- Riley or Aidan can label a partial batch Strong, Weak, or Wrong with one or
+  more controlled reasons and an optional note. Recording produces a new
+  content-derived packet that names its parent; it never overwrites or mutates
+  an earlier checkpoint. Packet drift, invented or duplicate leads, predating,
+  and attempts to relabel a completed entry fail closed, allowing another Codex
+  task to resume from the latest exact file without relying on chat history.
+- Owner-labelling verification passed fail-closed safety, 442/442 tests,
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build, and the
+  explicit console plus inert-engine no-upload dry runs. Engine binding types
+  also remain deterministic. The unchanged console type-generation recheck and
+  optional owner-browser rerun later exhausted the Windows host's available
+  memory after repeated OpenNext builds; the required release commands had
+  already passed, no UI/runtime file changed, and the preceding owner-dossier
+  checkpoint retains its green four-view browser evidence. Linux CI remains the
+  clean-host verification after push.
+- No real evaluation lead or review was created; progress remains 0/50. No
+  database write, external website, provider, mailbox, prospect, remote
+  database, staging/production resource, deployment, secret, or paid runtime
+  was touched. Spend impact is C$0 and every autonomous capability remains off.
+- The owner-first Quality Lab is implemented in the current worktree at
+  `/leads/evaluation`. It validates the exact fixed 50-business checkpoint,
+  shows the business, audit, five separate scores, engine verdict, and
+  URL-backed evidence, then lets Riley or Aidan choose Strong/Weak/Wrong with a
+  controlled reason and optional note. Drafts resume only for the exact packet
+  digest; export creates the existing immutable review-submission contract.
+- The Quality Lab route requires an authenticated session, accepts only bounded
+  JSON, returns private/no-store responses, and has no database or provider
+  binding. The UI cannot acquire, qualify, assess consent, contact, send, deploy,
+  or spend. The existing guarded local command remains the only recorder of a
+  downloaded batch.
+- The complete release gate now passes: fail-closed safety, 449/449 tests,
+  standalone typecheck, zero-warning lint, secret-sanitized OpenNext/Cloudflare
+  build, and explicit default-environment Wrangler no-upload dry run. Wrangler
+  emitted only the existing generated duplicate-`options` warnings; every
+  autonomous switch and cap shown by the dry run remains off or zero.
+- The final isolated owner browser gate passes six desktop/mobile WCAG views,
+  made zero external requests, found the ranked lead in 492 ms against a
+  10-second budget, and opened its evidence dossier in 2,361 ms against a
+  15-second budget. It also loaded the exact 50-business packet, recorded and
+  downloaded one zero-authority Strong fixture review, then proved the draft
+  resumes only for that packet on desktop and mobile.
+- A hydration readiness race discovered during acceptance is now closed: the
+  file input remains disabled until the Quality Lab client is ready, and the
+  browser gate waits for that exact state. The gate also clears only this
+  repository's generated `.next` directory before starting Next dev, preventing
+  stale OpenNext production chunks from causing a first-run SyntaxError. The
+  corrected gotcha and automated browser proof are part of this checkpoint.
+- No real business data or owner review was created. No database, website,
+  provider, mailbox, prospect, staging/production resource, deployment, secret,
+  or paid runtime was touched. Spend impact is C$0 and all autonomous capabilities
+  remain off.
+- The exact current Leads, dossier, and Quality Lab candidate now has a
+  content-addressed isolated-staging release packet. It binds the pushed commit,
+  Git tree, 18 scoped source blobs, owner routes/APIs, staging Worker and D1,
+  Browser/assets bindings, existing secret name, rollback deployment, local
+  verification receipts, approval state, and packet digest. Reordering or
+  changing any bound value changes the digest; source drift, a wrong target,
+  untracked packet, non-ancestor candidate, or added authority fails verification.
+- The packet is explicitly `PREPARED_NOT_APPROVED`: deployment, migration,
+  engine release, provider use, external website access, mailbox/prospect action,
+  and spend authority are all false or zero. It requires the exact separate
+  phrase `DEPLOY AXIOM REVENUE ENGINE CONSOLE TO ISOLATED STAGING` after exact-head
+  Linux CI passes. A packet is evidence for a decision, not deployment permission.
+- Release-packet verification is green locally: fail-closed safety, 453/453
+  tests, typecheck, zero-warning lint, the secret-sanitized Cloudflare build,
+  default console no-upload dry run, and isolated-staging no-upload dry run all
+  passed. The staging dry run exposed only the isolated D1, Browser Rendering,
+  assets, and fail-closed variables; every autonomous switch and intake/send cap
+  was off or zero. The final browser gate passed six desktop/mobile WCAG views,
+  made zero external requests, loaded the list in 1,151 ms, and loaded the
+  evidence dossier in 2,323 ms. Exact-head Linux CI run `33221735787` then
+  passed every step on commit `c201122446439914517ea0ec4ce06a94b9cdf8fd`,
+  including the immutable packet check, deterministic console/engine bindings,
+  all 67 migrations from scratch, 453/453 tests, owner-browser acceptance,
+  typecheck, lint, and both no-upload Worker validations. No staging smoke test
+  can run before a separately approved deployment.
+- No Cloudflare upload, deployment, migration, provider request, website fetch,
+  mailbox sync, prospect action, secret change, or paid operation occurred.
+  Spend impact is C$0; production and staging automation remain stopped.
+- Recording the terminal Linux-CI result changed documentation only. Its local
+  checkpoint gate also passed fail-closed safety, 453/453 tests, typecheck,
+  zero-warning lint, the secret-sanitized Cloudflare build, and the explicit
+  default-environment no-upload dry run. The final sequential owner-browser
+  acceptance passed six desktop/mobile WCAG views with zero external requests;
+  list readiness was 689 ms and dossier readiness was 2,325 ms. No runtime
+  configuration, release packet, staging resource, or application code changed.
+- The ten-business shadow slice now has a content-addressed, parent-linked
+  progress checkpoint for each selected business. It records only five fixed
+  phases—source/workflow materialization, current website evidence, assessment,
+  contact review, and owner dossier acceptance—and derives the next gate from
+  the exact immutable receipt chain rather than an editable status label.
+- Each append advances exactly one business by one phase and binds its manifest,
+  business, candidate, proof receipt ID and digest, supporting receipts,
+  predecessor phase receipt, and completion time. Skipped phases, a wrong
+  predecessor, cross-business proof, reused proof, time reversal, manifest
+  drift, altered summaries, and content tampering all fail closed.
+- A guarded ignored-local command creates the first checkpoint or appends one
+  verified phase receipt to a later checkpoint. Inputs and output must be
+  distinct paths, existing files are never overwritten, and the command has no
+  database, Cloudflare, provider, network, runtime, deployment, acquisition, or
+  contact authority. It records evidence that an already approved phase
+  completed; it cannot execute or approve that phase.
+- Receipt-bound progress verification is green: fail-closed safety, 459/459
+  tests, standalone typecheck, zero-warning lint, the secret-sanitized
+  Cloudflare build, and the explicit default-environment no-upload dry run all
+  pass. The final sequential owner-browser gate passed six desktop/mobile WCAG
+  views with zero external requests; list readiness was 301 ms and dossier
+  readiness was 2,429 ms.
+- No real manifest, business, website evidence, owner decision, or progress
+  record was created. No external website, database, provider, mailbox,
+  prospect, Cloudflare resource, deployment, migration, secret, or paid runtime
+  was touched. Spend impact is C$0 and every autonomous capability remains off.
+- The first `SOURCE_WORKFLOW` progress input now has a guarded adapter instead
+  of relying on hand-authored receipt references. It re-derives the exact
+  owner-approved materialization from the manifest, source plan, and approval;
+  then it opens only the ignored local SQLite database read-only and query-only.
+- Preparation requires the canonical migration-0054–0067 Revenue schema and an
+  atomic exact snapshot of every expected source and workflow row. The final
+  materialization receipt, completed workflow receipt, and sealed closure must
+  all match their content-derived IDs, digests, business, candidate, source
+  record, and terminal-receipt lineage. Missing, duplicate, altered, partial,
+  outside-manifest, predating, or non-canonical proof fails closed.
+- The adapter writes one new ignored JSON input through the existing
+  no-overwrite file boundary. It cannot execute or approve the workflow, mutate
+  SQLite, access a provider/network/Cloudflare resource, advance progress,
+  contact anyone, deploy, send, or spend; the separate progress recorder must
+  still validate and append it.
+- Source/workflow progress-proof verification is green: 16/16 focused
+  materialization, adapter, recorder, and progress-chain tests pass. The complete
+  gate also passes fail-closed safety, 463/463 tests, standalone typecheck,
+  zero-warning lint, the secret-sanitized Cloudflare build, and the explicit
+  default-environment no-upload dry run. The final sequential owner-browser gate
+  passed six desktop/mobile WCAG views with zero external requests; list
+  readiness was 1,204 ms and dossier readiness was 2,315 ms.
+- Only synthetic fixtures were used and their ignored temporary files were
+  removed. No real business, manifest, receipt, or progress record was created;
+  no staging/production resource, external website, provider, mailbox, prospect,
+  secret, migration, deployment, or paid runtime was touched. Spend impact is
+  C$0 and every autonomous capability remains off.
+- The `CURRENT_WEBSITE_EVIDENCE` contract now produces one deterministic
+  content-addressed proof only from an exact reviewed manifest business,
+  completed source/workflow predecessor, complete captured fixture workflow,
+  desktop and mobile homepage evidence, ready deterministic audit, durable
+  persistence plan, and the exact full artifact-manifest/availability set.
+- Identity drift, missing or stale artifacts, non-fixture availability,
+  incomplete mobile proof, time reversal, content tampering, and altered
+  authority fail closed. Fixture availability validation now has one reusable
+  public validator; the production R2-winner selector remains stricter and
+  unchanged.
+- The synthetic proof explicitly authorizes no progress append, Browser/R2
+  operation, database mutation, provider work, qualification, outreach,
+  deployment, send, or spend. The progress phase now separately requires a
+  content-addressed `website-evidence-eligibility:*` receipt, and no code creates
+  that trusted receipt yet. This prevents a hand-authored synthetic proof from
+  being mistaken for completion of real website evidence.
+- Focused verification is green: 10/10 proof, progress-chain, and recorder tests
+  pass. The complete checkpoint gate also passes fail-closed safety, 467/467
+  tests, standalone typecheck, zero-warning source lint, the secret-sanitized
+  Cloudflare build, and the explicit default-environment no-upload Wrangler dry
+  run. Wrangler retained only the already documented generated duplicate-key
+  warnings. The final sequential owner-browser gate passed six desktop/mobile
+  WCAG views with zero external requests; list readiness was 741 ms and dossier
+  readiness was 3,330 ms.
+- No Browser Rendering, website fetch, R2 activation/read/write, D1 access,
+  provider call, real business data, progress append, staging/production change,
+  mailbox/prospect action, secret change, deployment, migration, or paid runtime
+  occurred. Spend impact is C$0 and every autonomous capability remains off.
+- The `ASSESSMENT` progress boundary now requires a separate content-addressed
+  `assessment-proof:*` reference. Its synthetic builder binds one exact manifest
+  business and completed website-evidence phase to the exact website proof and
+  eligibility reference, sealed workflow/audit, immutable assessment IDs and
+  digests, exact deterministic claim set, and committed-and-reloaded D1 result.
+- Cross-business evidence, wrong predecessors, workflow/audit drift, redigested
+  assessment content, invented insert counts, stale evidence, time reversal,
+  missing proof references, content tampering, and altered authority all fail
+  closed. Fresh commits and exact replays have different enforced row-count
+  semantics.
+- The builder cannot create a phase input or progress receipt and authorizes no
+  database read/write, website capture, artifact operation, qualification run,
+  contact work, provider call, outreach, deployment, send, or spend. The real
+  chain remains stopped earlier because no implementation creates the trusted
+  `website-evidence-eligibility:*` receipt.
+- This checkpoint also closed a repeated Next-development acceptance race:
+  after clearing `.next`, the browser gate now compiles all measured owner
+  routes in a disposable authenticated page, closes it, and performs the timed
+  and error-audited run from a fresh page. It still reports every later console,
+  page, HTTP, WCAG, layout, motion, or external-request failure.
+- The mobile acceptance now also centres the dossier action, proves its click
+  target is clear of the fixed primary navigation, verifies the exact href, and
+  requires arrival at the exact dossier route before evaluating the page.
+- Focused assessment/progress verification passes 18/18 tests. The complete
+  release gate passes fail-closed safety, 472/472 tests, standalone typecheck,
+  zero-warning source lint, the secret-sanitized Cloudflare build, and the
+  explicit default-environment no-upload Wrangler dry run. Wrangler retained
+  only the documented generated duplicate-key warnings. The hardened owner UI
+  gate passed all six desktop/mobile WCAG views with zero external requests;
+  its final rebuilt run found the next lead in 414 ms and opened the dossier in
+  854 ms.
+- Only synthetic fixtures were used. No real assessment, current-evidence
+  eligibility receipt, progress record, business data, Browser/R2/D1 operation,
+  provider, mailbox, prospect, staging/production resource, secret, deployment,
+  migration, or paid runtime was touched. Spend impact is C$0 and every
+  autonomous capability remains off.
+- The trusted current-website-evidence eligibility builder now accepts only the
+  exact frozen in-process results of the private D1 completeness executor. It
+  requires one fresh `FRESH_COMMIT` per exact website artifact root and binds
+  the complete persisted terminal workflow, business, request, audit, homepage
+  desktop/mobile proof, workflow forest, completeness receipt, availability
+  source-set proof, artifact manifest digest, and current `R2_HEAD` receipt.
+- Every screenshot/measurement manifest must be covered exactly once. Missing,
+  duplicate, cross-business, cross-workflow, stale, future, non-R2, unverified,
+  manifest-drifted, copied-execution, hand-addressed-eligibility, and tampered
+  results fail closed. Execution order cannot change the content-addressed
+  result.
+- The eligibility output is frozen and content-addressed, but schema-valid JSON
+  alone is explicitly not authenticity. A future durable consumer must create
+  its own exact persistence-and-reload trust boundary. This checkpoint adds no
+  phase-input adapter or progress append and authorizes no Browser, R2, D1,
+  provider, qualification, contact, deployment, send, or spend operation.
+- Focused trusted D1/R2 eligibility verification passes 16/16 tests. The full
+  release gate passes fail-closed safety, 474/474 tests, standalone typecheck,
+  zero-warning source lint, the secret-sanitized Cloudflare build, and the
+  explicit default-environment no-upload Wrangler dry run. Wrangler retained
+  only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG browser gate passed with zero external
+  requests; the next lead was ready in 384 ms and its dossier in 851 ms. The
+  gate now waits a bounded five seconds for each exact Next route title after
+  visible readiness, closing a transient asynchronous metadata race without
+  weakening the expected title.
+- Only synthetic SQLite rows and in-memory fixtures were used. No real business,
+  Browser Rendering, R2 bucket/read/write, Cloudflare D1 database, provider,
+  progress record, mailbox, prospect, staging/production resource, secret,
+  deployment, migration, or paid runtime was touched. Spend impact is C$0 and
+  every autonomous capability remains off.
+- Migration 0068 now defines one append-only durable website-evidence
+  eligibility receipt. Its insert guard binds the canonical receipt to the
+  exact stored business, sealed workflow, terminal artifact set, manifest
+  digests, completeness receipts, availability source-set proofs, and current
+  R2 HEAD receipts while constraining every phase/provider/outreach/cost field
+  to zero.
+- The private injected D1 boundary accepts a fresh row only from the exact
+  frozen in-process eligibility result. It commits and reloads that row in one
+  batch, replays it idempotently, and lets a later process reload the exact
+  canonical receipt by content-derived ID and digest. Copied inputs are rejected
+  before database access, and copied output envelopes cannot impersonate the
+  module-private durable reload result.
+- Every reload uses database time and keeps `NOT_YET_CURRENT`, `CURRENT`, and
+  `STALE` distinct. An expired receipt remains verifiable audit history but
+  fails the current-result guard. Persistence therefore survives a lost Codex
+  task without extending evidence freshness or granting progress.
+- Focused durable-eligibility verification passes 21/21 transaction/evidence
+  tests. It also proves every exact migration-0068 writer guard before trusting
+  a durable row, SQL-gates the fresh insert on those same guards so a failed
+  post-batch check cannot leave a row behind, proves atomic rollback on forged
+  lineage, rejects a drifted replay result without changing stored history, and
+  re-derives the exact earliest workflow/artifact freshness boundary so
+  redigested JSON cannot resurrect expired evidence. The complete release gate
+  passes fail-closed safety, 479/479 tests,
+  standalone typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, and the explicit default-environment no-upload Wrangler dry run.
+  Wrangler retained only the documented generated duplicate-key warnings.
+- The first owner-browser run correctly rejected the new table because the
+  canonical ignored-local schema fingerprint still stopped at migration 0067.
+  The single canonical range, affected tests, operator docs, and fixture setup
+  now agree on 0054–0068. No schema mismatch is hidden or auto-repaired.
+- A reproduced intermittent mobile link timeout also strengthened the existing
+  fixed-navigation gate. It now proves the link centre is the active pointer
+  target, clicks that exact already-verified coordinate without a second
+  locator auto-scroll, starts the exact URL wait first, and reports the failing
+  stage and current URL. Five consecutive final six-view desktop/mobile WCAG
+  runs passed with zero external requests; the final release run found the next
+  lead in 332 ms and opened the dossier in 852 ms.
+- Only synthetic in-memory SQLite and fixture artifacts were used. Migration
+  0068 was replayed in tests but not applied to an ignored real-business,
+  staging, or production database. No Browser/R2/Cloudflare D1/provider,
+  real-business, progress, mailbox, prospect, secret, deployment, or paid
+  runtime operation occurred. Spend impact is C$0 and every autonomous
+  capability remains off.
+- The validation-only `CURRENT_WEBSITE_EVIDENCE` adapter now accepts only the
+  exact frozen in-process `CURRENT` result of a `DURABLE_RELOAD`. Fresh commit
+  and replay responses, copied envelopes, stale history, wrong predecessors,
+  proof drift, and false chronology fail closed.
+- It rechecks the exact ten-business manifest/checkpoint scope, selected
+  business and URLs, source/workflow predecessor, website proof, durable
+  eligibility receipt, sealed workflow/audit/artifact lineage, and half-open
+  evidence window before returning one frozen zero-authority normalized phase
+  input. The existing progress checkpoint remains unchanged.
+- Static safety enforcement prevents this adapter from importing the generic
+  progress appender or phase-receipt builder, connecting to the inert Worker,
+  reading a runtime binding/database/provider, mutating data, or authorizing
+  execution. There is no operator command or live-data path.
+- Focused website-evidence transaction/progress verification passes 24/24
+  tests. The complete release gate passes fail-closed safety, 482/482 tests,
+  standalone typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, and the explicit default-environment no-upload Wrangler dry run.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 419 ms and the dossier in
+  428 ms. Only synthetic in-memory SQLite and fixture artifacts were used; no
+  real business, progress record, Browser/R2/Cloudflare D1/provider, mailbox,
+  prospect, secret, staging/production resource, deployment, migration, or paid
+  runtime operation occurred. Spend impact is C$0 and every autonomous
+  capability remains off.
+- The trusted website-evidence phase input now privately retains the exact
+  manifest and full parent checkpoint ID/digest used to derive it. A safely
+  reloaded content-identical parent is accepted; any changed and redigested
+  ten-business state is rejected before append.
+- A separate validation-only in-memory boundary calls the canonical progress
+  appender, then independently proves that exactly one website-evidence receipt
+  was added to the selected business, its prior prefix and every other business
+  stayed unchanged, the summary increased by one, and the result names the
+  exact parent. The result is deeply frozen.
+- An identical retry returns the same cached checkpoint instance. Copied phase
+  inputs, changed parents, and replay against the already-completed child fail
+  closed. The generic operator recorder and inert Worker cannot import this
+  boundary.
+- Focused website-evidence transaction/progress verification passes 26/26
+  tests. The complete release gate passes fail-closed safety, 484/484 tests,
+  standalone typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, and the explicit default-environment no-upload Wrangler dry run.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; two consecutive post-fix runs included a lead list ready
+  in 606 ms and dossier in 917 ms. The mobile pointer check now
+  requires the dossier action to remain geometrically stable before clicking,
+  after two reproduced timeouts proved that a one-frame coordinate could become
+  stale. No file or database progress record, real business,
+  Browser/R2/Cloudflare D1/provider operation, mailbox, prospect, secret,
+  staging/production resource, deployment, migration, or paid runtime operation
+  occurred. Spend impact is C$0 and every autonomous capability remains off.
+- Assessment progress no longer accepts a schema-valid D1 writer response. The
+  private durable loader starts from only an assessment ID/digest, verifies all
+  eight migration-0061 immutable triggers and D1 time, and reloads the exact
+  receipt, sealed source, business, website snapshot, evidence set, and
+  qualification snapshot.
+- The loader reconstructs the original request and deterministically rebuilds
+  the assessment from its sealed workflow source. Canonical source drift, stored
+  row drift, missing/ambiguous rows, missing guards, or identity drift fails
+  closed. Current versus not-yet-current versus stale history comes only from
+  the database clock.
+- The result is deeply frozen and registered in a module-private trust set.
+  Only that exact in-process `CURRENT` reload can feed the assessment proof;
+  serialization or cloning removes trust. The proof now records the D1 clock,
+  receipt time, exact row counts, source rebuild, and guard verification.
+- This boundary is read-only and disconnected: it adds no assessment phase
+  input, progress append, operator command, Worker import, live database,
+  provider, real business, deployment, outreach, send, or spend. No owner
+  decision was needed and every autonomous capability remains off.
+- Focused durable-assessment/progress verification passes 10/10 tests. The
+  complete release gate passes fail-closed safety, 484/484 tests, standalone
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build, and the
+  explicit default-environment no-upload Wrangler dry run. Wrangler retained
+  only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 390 ms and the dossier in
+  838 ms. No production or staging deployment, migration, provider operation,
+  mailbox action, prospect contact, real-business execution, or paid runtime
+  work occurred. Spend impact is C$0.
+- The validation-only `ASSESSMENT` adapter now accepts only the exact frozen
+  in-process `CURRENT` durable assessment reload. It regenerates the
+  `assessment-proof:*` internally, rechecks the exact manifest business and
+  two-receipt website-evidence prefix, and returns one deeply frozen normalized
+  phase input using the assessment receipt time and D1 clock.
+- The input is privately bound to the exact manifest and complete parent
+  checkpoint. A canonical parent may include a later receipt for another
+  business, but an edited/re-hashed checkpoint time, a parent newer than the D1
+  reload, a changed parent after derivation, copied input/reload JSON, stale
+  history, or lineage drift fails closed.
+- Static safety checks prevent progress append/receipt creation, caller clocks,
+  operator/Worker imports, files, databases, runtime bindings, providers, or
+  mutations. Focused durable-assessment/proof/input verification passes 15/15.
+- The complete release gate passes fail-closed safety, 489/489 tests,
+  standalone typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, and the explicit default-environment no-upload Wrangler dry run.
+  Wrangler retained only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 358 ms and the dossier in
+  848 ms. No production or staging deployment, migration, provider operation,
+  mailbox action, prospect contact, real-business execution, or paid runtime
+  work occurred. Spend impact is C$0.
+- The exact assessment input can now enter only a separate guarded in-memory
+  append boundary. It requires the manifest and content-addressed parent used at
+  derivation, calls the canonical appender, then independently proves the exact
+  parent, one added assessment receipt, the two-receipt prior prefix, the
+  website-evidence-to-assessment summary transition, and unchanged other nine
+  business records.
+- Exact retry returns the same deeply frozen checkpoint instance. Copied input,
+  changed manifest or parent, and replay against the already-completed child
+  fail closed. The generic operator recorder and inert Worker cannot import the
+  boundary.
+- Static safety checks prevent files, databases, runtime bindings, providers,
+  external operations, or mutation APIs. Focused durable-assessment/proof/input/
+  append verification passes 17/17.
+- The complete release gate passes fail-closed safety, 491/491 tests,
+  standalone typecheck, zero-warning lint, the secret-sanitized Cloudflare
+  build, and the explicit default-environment no-upload Wrangler dry run.
+  Wrangler retained only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 357 ms and the dossier in
+  854 ms. No production or staging deployment, migration, provider operation,
+  mailbox action, prospect contact, real-business execution, or paid runtime
+  work occurred. Spend impact is C$0.
+- Contact-review progress no longer trusts the reviewed invocation or its writer
+  response. The read-only loader starts from only the invocation ID/digest,
+  verifies 27 source/contact/invocation immutable guards, rebuilds the exact
+  durable assessment under its eight assessment guards, reloads the matching
+  source materialization, deterministically rebuilds the complete contact plan,
+  and requires every row plus the final materialization receipt.
+- The database clock is read after all rows have been checked. Clock regression
+  fails, and currentness ends at the earlier of assessment refresh or the first
+  verification expiry. Missing or ambiguous receipts, incomplete rows, source,
+  assessment, review, or manifest drift, stale history, copied JSON, and copied
+  in-process trust all fail closed.
+- `contact-review-proof:*` additionally binds the exact guarded assessment
+  checkpoint's source receipt and assessment proof to the exact reviewed
+  invocation, discovery result, and final contact receipt. It cannot create a
+  phase input, receipt, or checkpoint and has no operator, Worker, file, live
+  database, provider, contact, outreach, send, deployment, or spend path.
+- Seven focused proof tests cover the success path and adversarial trust,
+  completeness, freshness, lineage, and clock-regression cases, while
+  the contact writer integration now reloads its actual rows through the new
+  boundary in real in-memory SQLite. The complete release gate passes
+  fail-closed safety, 498/498 tests, standalone typecheck, zero-warning lint,
+  the secret-sanitized Cloudflare build, and the explicit default-environment
+  no-upload Wrangler dry run. Wrangler retained only the documented generated
+  duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 410 ms and the dossier in
+  610 ms.
+- Only synthetic fixtures and in-memory SQLite were used. No real business,
+  progress record, Cloudflare D1/R2/Browser/provider, mailbox, prospect,
+  staging/production resource, deployment, migration, or paid runtime operation
+  occurred. Spend impact is C$0 and every autonomous capability remains off.
+- The validation-only `CONTACT_REVIEW` adapter now accepts only the exact frozen
+  in-process `CURRENT` durable contact reload and exact guarded assessment
+  checkpoint. It regenerates `contact-review-proof:*` internally, rechecks the
+  complete manifest scope, selected business, three-receipt predecessor,
+  reviewed invocation, final materialization, and database chronology, then
+  returns one deeply frozen normalized input.
+- The input uses the durable invocation receipt for completion time and the final
+  database clock for recording time. A module-private trust set rejects copied
+  input JSON, while private parent context rejects a changed or re-digested
+  assessment checkpoint. Copied/stale durable reloads, copied parents,
+  cross-manifest lineage, and out-of-window evidence fail closed.
+- The static safety gate prevents the adapter from importing the generic
+  appender or receipt builder, connecting to the operator recorder or inert
+  Worker, accepting a caller clock, accessing files/databases/runtime/providers,
+  or using mutation APIs. The assessment parent remains unchanged and no
+  contact-review receipt or checkpoint is created.
+- Focused contact durable-proof/input verification passes 11/11 tests. The
+  complete release gate passes fail-closed safety, 502/502 tests, standalone
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build, and the
+  explicit default-environment no-upload Wrangler dry run. Wrangler retained
+  only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 349 ms and the dossier in
+  836 ms. Only synthetic fixtures and in-memory SQLite were used. No real
+  business, durable progress write, Cloudflare D1/R2/Browser/provider, mailbox,
+  prospect, staging/production resource, deployment, migration, or paid runtime
+  operation occurred. Spend impact is C$0 and every autonomous capability
+  remains off.
+- The exact contact-review input can now enter only a separate guarded in-memory
+  append boundary. It requires the manifest and content-addressed assessment
+  parent used at derivation, calls the canonical receipt builder/appender, then
+  independently proves the exact parent, one added contact-review receipt, the
+  three-receipt prior prefix, the assessment-to-contact-review summary
+  transition, and unchanged other nine business records.
+- Exact retry returns the same deeply frozen checkpoint instance. Copied input,
+  changed manifest or parent, and replay against the already-completed child
+  fail closed. The checkpoint stops at `OWNER_DOSSIER_ACCEPTANCE` and grants no
+  new authority.
+- Static safety requires exact input/parent trust, canonical append behaviour,
+  one-record summary proof, deep freeze, and exact retry caching. It forbids
+  file/database/runtime/provider/network/mutation paths and prevents the generic
+  recorder or inert Worker from owning this boundary.
+- The first full-suite run exposed an older Windows test-clock race: JavaScript
+  stamped a synthetic eligibility event one millisecond after SQLite's
+  independently sampled database time. The production fail-closed rule was
+  correct. The fixture now derives evaluation time from its latest trusted
+  database receipt; BUILD-007 records the proven cause and prevention.
+- Focused contact proof/input/append verification passes 13/13 tests. The final
+  complete release gate passes fail-closed safety, 504/504 tests, standalone
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build, and the
+  explicit default-environment no-upload Wrangler dry run. Wrangler retained
+  only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 352 ms and the dossier in
+  874 ms. Only synthetic fixtures and in-memory SQLite were used. No real
+  business, durable progress write, Cloudflare D1/R2/Browser/provider, mailbox,
+  prospect, staging/production resource, deployment, migration, or paid runtime
+  operation occurred. Spend impact is C$0 and every autonomous capability
+  remains off.
+
+- The owner-dossier reader now deep-freezes and privately registers only its
+  exact response. Schema-valid clones fail provenance checks.
+- `owner-dossier-acceptance:*` binds the complete dossier digest, current data
+  quality, website/qualification/contact-review lineage, exact contact parent,
+  manifest business/source identity, and an explicit acceptance declaration
+  made within five minutes of dossier generation.
+- The proof states that session authentication is not proven and no durable
+  owner decision exists. The separate `OWNER_DOSSIER` adapter regenerates proof
+  internally, returns one frozen parent-bound zero-authority input, and creates
+  no receipt or checkpoint.
+- Qualification now revalidates against its recorded channel context while the
+  current best route is projected independently. This prevents a newly found
+  email or manual route from falsely producing `qualification_snapshot_drift`;
+  it does not raise a business's fit or rebuild-need score.
+- Static safety forbids the new proof/input from operator, Worker, API/page/UI,
+  file, database, network, provider, mutation, append, deployment, outreach,
+  send, and cost paths. Focused verification passes 22/22 tests. The complete
+  release gate passes fail-closed safety, 511/511 tests, standalone typecheck,
+  zero-warning lint, the secret-sanitized Cloudflare build, and the explicit
+  default-environment no-upload Wrangler dry run. Wrangler retained only the
+  documented generated duplicate-key warnings. The final six-view
+  desktop/mobile WCAG owner-browser gate passed with zero external requests;
+  the lead list was ready in 791 ms and the dossier in 848 ms.
+- The exact owner-dossier input can now enter only a separate guarded in-memory
+  append boundary. It requires the unchanged content-addressed contact-review
+  parent, uses the canonical final receipt/appender, and independently proves
+  one completed business, the next-incomplete cohort pointer, the exact prior
+  four-receipt prefix, the complete manifest-bound business/evaluation/source
+  identity, and unchanged other nine businesses.
+- Exact retry returns the same deeply frozen checkpoint instance. Copied
+  input/result JSON, another manifest, a parent changed by another business,
+  any re-digested parent, and completed-child replay fail closed. A dedicated
+  canonical-ledger regression proves that final completion advances the pointer
+  to the next business.
+- Static safety requires exact input/parent trust, the canonical receipt and
+  append kernel, independently derived final summary/pointer checks, deep freeze,
+  and exact retry memory. It forbids authentication, operator/UI/API, file,
+  database, runtime, provider, network, mutation, deployment, outreach, send,
+  and cost paths.
+- A fresh read-only code review caught that the target's source-record identity
+  was only implicitly preserved by the shared appender. The boundary now proves
+  the complete manifest-to-parent-to-child identity tuple independently; the
+  focused re-review found no remaining Critical or Important issue.
+- Focused final-phase and canonical-ledger verification passes 13/13 tests. The
+  complete release gate passes fail-closed safety, 514/514 tests, standalone
+  typecheck, zero-warning lint, the secret-sanitized Cloudflare build, and the
+  explicit default-environment no-upload Wrangler dry run. Wrangler retained
+  only the documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 377 ms and the dossier in
+  464 ms. Only synthetic fixtures and in-memory/local test state were used. No
+  owner was authenticated, no decision or progress was persisted, and no real
+  business, Cloudflare resource operation, mailbox, prospect, staging/production
+  change, deployment, migration, provider call, or paid runtime operation
+  occurred. Spend impact is C$0 and every autonomous capability remains off.
+- The authenticated owner-decision candidate now accepts a declaration with no
+  reviewer or client-selected timestamp, derives Riley/Aidan only from a
+  normalized Better Auth session with `emailVerified: true`, derives decision
+  time from the server clock, and requires the session to be active at that
+  instant. The current app still disables email verification, so no production
+  owner action can satisfy this boundary yet.
+- HMAC-SHA-256 binds the authenticated subject, session, explicit key version,
+  exact `owner-dossier-acceptance:*` proof, decision, owner, and time. The frozen
+  record contains only opaque 64-character bindings and the owner enum; raw user
+  ID, session ID, session token, email, and binding key are absent. Copied JSON,
+  weak keys, unverified/unauthorized sessions, stale dossier windows, changed
+  manifest/parent, and browser-selected reviewer/time fail closed.
+- Source-only migration 0069 defines `RevenuePrivateKwOwnerDecision` with exact
+  JSON/column lineage, one row per acceptance proof, unique decision binding,
+  raw-auth-key rejection, active-session/database chronology, append-only
+  update/delete guards, and every downstream authority fixed to zero. The
+  complete canonical ignored-local schema is now 0054–0069. No migration was
+  applied and no D1 writer/reader exists; direct SQL or schema-valid JSON is not
+  trusted durable proof.
+- ADR 0046 records the threat model for session fixation/replay, identity and
+  parent substitution, stale evidence, copied trust, raw-identifier leakage,
+  weak/rotated keys, duplicate decisions, direct SQL, CSRF, clock drift, and
+  authority creep. AUTH-001 records the proven distinction between a signed-in
+  session, verified email ownership, and Axiom owner authorization.
+- Focused authenticated-decision, owner-dossier, full-migration, local schema,
+  and safety verification passes 22/22 tests. The complete release gate passes
+  fail-closed safety, 519/519 tests, standalone typecheck, zero-warning lint,
+  the secret-sanitized Cloudflare build, and the explicit default-environment
+  no-upload Wrangler dry run. Wrangler retained only the documented generated
+  duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 353 ms and the dossier in
+  401 ms. Only synthetic fixtures and in-memory SQLite were used. No real owner
+  decision, database read/write, migration, Cloudflare resource operation,
+  mailbox, prospect, staging/production change, deployment, provider call, or
+  paid runtime operation occurred. Spend impact is C$0 and every autonomous
+  capability remains off.
+- The authenticated owner-decision candidate now shares one versioned HMAC
+  derivation path for creation, current-session continuity recheck, and stored
+  decision verification. Digest comparison is constant-time. The continuity
+  recheck is not a Better Auth lookup; any future route must obtain its session
+  through a server-only adapter and must reject browser-supplied session fields.
+- A disconnected injected D1-shaped boundary now requires the exact private
+  candidate and same verified session before database access. One atomic batch
+  SQL-gates the only insert on the active-session window and all three exact
+  migration-0069 trigger operations/abort markers, reads database time after
+  the generated write time, reloads every mirror, verifies the stored HMAC, and
+  distinguishes `FRESH_COMMIT`, mutation-free `EXACT_REPLAY`, and historical
+  `DURABLE_RELOAD`. A different row with the same unique proof cannot become a
+  replay.
+- Durable reload survives process loss but explicitly does not prove a current
+  session or authorize progress. Results are deeply frozen/private, and every
+  runtime, phase, provider, outreach, send, deployment, and cost authority stays
+  false or zero. Static safety now scans the complete `src` and `scripts` trees
+  so a new route, Worker, UI file, or operator script cannot silently import the
+  boundary.
+- The first complete-suite run exposed a real database-clock ordering defect:
+  sampling the verification clock before SQLite generated `recordedAt` could
+  make a valid commit appear chronologically impossible under load. The batch
+  now reads the verification clock after the insert, the regression fixes
+  BUILD-007's prevention rule, and repeated focused/full runs pass.
+- Focused authenticated-decision verification passes 11/11 tests. The complete
+  release gate passes fail-closed safety, 525/525 tests, standalone typecheck,
+  zero-warning lint, the secret-sanitized Cloudflare build, and the explicit
+  default-environment no-upload Wrangler dry run. Wrangler retained only the
+  documented generated duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 345 ms and the dossier in
+  872 ms. Only synthetic fixtures and in-memory SQLite were used. No binding key
+  was configured, migration 0069 was not applied, and no real owner session,
+  decision, progress, Cloudflare resource operation, mailbox, prospect,
+  staging/production change, deployment, provider call, or paid runtime
+  operation occurred. Spend impact is C$0 and every autonomous capability
+  remains off.
+- Official OpenAI/Codex guidance was checked before establishing the permanent
+  agent split. Project-local configuration now keeps Sol at high reasoning as
+  the sole integrator and defaults every child to Luna at max reasoning with low
+  verbosity and a three-child ceiling.
+- Seven narrow roles cover repository exploration, first-party research,
+  lead-quality review, security review, test review, owner UI QA, and exclusive
+  non-overlapping implementation. Each role forbids nested delegation, Drive
+  access, secrets, live resources, prospect contact, deployments, migrations,
+  and repository history changes. Only the isolated implementation role may
+  write, and it cannot own shared controls or status.
+- `AGENTS.md`, the README, ADR 0048, `docs/CODEX_AGENT_PROTOCOL.md`, the safety
+  checker, and the active recurring heartbeat now carry the same task-packet,
+  concise-handoff, writer-isolation, and Sol-verification contract. This keeps
+  the rule available after quota exhaustion or a lost conversation.
+- Machine-level policy was verified without printing secrets: the Google Drive
+  plugin is disabled, the canonical non-synced checkout is trusted, and no stale
+  OneDrive APE trust entry remains.
+- Two Luna-max reviews challenged the enforcement rather than trusting the
+  prose. The hardened guard now discovers the complete role directory, permits
+  only the closed approved set, strictly parses the supported TOML subset,
+  rejects duplicate table declarations and duplicate/unknown/conflicting keys,
+  enforces exact model/reasoning/verbosity/sandbox values, rejects authority
+  exceptions, and pins every normalized role instruction body to a reviewed
+  SHA-256 digest. The final independent review reported no remaining Critical
+  or Important blocker.
+- Nine focused mutation tests prove the valid policy and fail on an extra role,
+  duplicate keys, a repeated table, ordinary or creatively worded prohibition
+  exceptions, model/reasoning/verbosity/sandbox drift, missing writer-allowlist
+  evidence, and any unreviewed role-instruction edit. Sol is also required to
+  avoid dispatch overrides and compare a writer's starting commit and allowlist
+  with the final changed-file set before accepting it.
+- The validation-only owner-dossier progress authorization boundary now accepts
+  only the exact process-loss durable owner-decision reload plus a newly
+  obtained, verified owner-session context. It reuses canonical HMAC/session
+  binding checks, requires authorization at or after the reload clock and within
+  one minute, and emits a frozen content-addressed token with exact dossier,
+  manifest, source, parent, and acceptance lineage. It creates no phase input,
+  receipt, checkpoint, database operation, route, UI action, provider call,
+  outreach, send, deployment, or spend; all such authority remains false.
+- Four focused authorization tests cover the positive contract, copied and
+  non-reload provenance, session/key failures, chronology/freshness, zero
+  database calls, and absence of raw auth identifiers. ADR 0049 records the
+  threat model and the remaining server-only Better Auth activation boundary.
+- Owner-authentication readiness is now an executable disconnected policy. It
+  requires exactly Riley and Aidan, verified-email delivery before sessions,
+  TOTP enrollment, encrypted single-use recovery codes, lockout, server-only
+  sessions, exact production origins, Fetch Metadata/origin checks, and atomic
+  idempotency. Its result is frozen and `VALIDATED_NOT_ACTIVATED` with every
+  route, UI, database, provider, progress, outreach, send, deployment, and cost
+  authority false; the four focused tests reject weak defaults, unsafe origins,
+  duplicate owners, body-controlled sessions, and copied trust.
+- The server-only owner-auth request boundary is now defined as a separate
+  validation-only contract. It derives the owner only from a current
+  server-supplied verified session, ignores request-body identity fields,
+  requires exact Origin and same-origin Fetch Metadata, and validates an
+  actor/operation/payload-bound idempotency key. Its frozen result contains no
+  raw auth identifiers and grants zero mutation, route, database, provider,
+  outreach, send, deployment, or cost authority. Four focused tests cover body
+  spoofing, stale/unverified sessions, unsafe CSRF metadata, forged keys, and
+  copied-result trust; ADR 0051 records the boundary and remaining activation
+  work.
+- The atomic owner-auth replay layer is now defined behind an injected store
+  seam. It records one bounded secret-free result for each owner/operation/
+  payload key, returns `FRESH_COMMIT` once and `EXACT_REPLAY` thereafter, and
+  rejects conflicting payloads, results, forged rows, stale sessions, cycles,
+  and copied envelopes. Its four focused tests include concurrent-attempt
+  convergence, and static checks keep the
+  boundary disconnected from D1, Better Auth, routes, providers, and all live
+  mutation authority; ADR 0052 records the transaction/outbox work still
+  required.
+- All eight project TOML files parse. The complete release gate passes
+  fail-closed safety, 555/555 tests, standalone typecheck, zero-warning lint,
+  the secret-sanitized Cloudflare build, and the explicit default-environment
+  no-upload Wrangler dry run. Wrangler retained only the documented generated
+  duplicate-key warnings.
+- The final six-view desktop/mobile WCAG owner-browser gate passed with zero
+  external requests; the lead list was ready in 372 ms and the dossier in
+  449 ms. No application runtime, provider, Cloudflare resource, database,
+  prospect, mailbox, deployment, migration, or production control changed.
+  Spend impact is C$0 and every autonomous capability remains off.
+
+Still required for Phase 1:
+
+- The protected production environment and manual workflow are configured, but
+  Cloudflare deployment credentials remain intentionally absent and production
+  deploy is not approved. GitHub required reviewers are unavailable for this
+  private repository on the current plan; `main` restriction plus exact SHA,
+  backup reference, and approval phrase are the no-cost gates.
+- Remaining staging resources: R2 and deployment of the typed engine Workflow.
+  The source scaffold is complete but intentionally has no live resource or
+  consumer. The console, D1, and job/DLQ Queues are complete and isolated.
+- Characterization coverage retained while first v2 modules are introduced.
+
+## Budget
+
+Approved runtime ceiling: C$50/month excluding ChatGPT/Codex. New paid providers
+or overage billing are not yet authorized. Cost ledger implementation is pending.
+As checked against Cloudflare's published pricing on 2026-08-25, the planned R2
+contract uses Standard storage, whose included allowance is 10 GB-month plus one
+million Class A and ten million Class B operations monthly. HEAD is Class B. R2
+is not activated and the project has incurred zero artifact-storage cost. The
+dashboard price and any activation commitment must be rechecked immediately
+before approval. The Sol/Luna Codex work-model checkpoint changes no application
+runtime subscription or approved C$50 operating budget and incurred C$0.
+
+## Blockers / owner actions
+
+- No new owner decision is required for the agent-model policy. Riley explicitly
+  selected Sol as orchestrator and Luna max for useful bounded subagent work.
+  This does not authorize wasteful delegation, live operations, or a merge to
+  `main`.
+- Recreate and secure `riley@getaxiom.ca` and `aidan@getaxiom.ca` in Google
+  Workspace; verify send/receive, MFA, SPF, DKIM, DMARC, and recovery ownership.
+- Before any owner-decision writer or UI action can be activated, Better Auth
+  must enforce verified email for both owner accounts and the MFA/recovery setup
+  above must be proven. A signed-in but unverified session is intentionally
+  rejected by the new contract.
+- Confirm who owns replies for each mailbox before the pilot.
+- Later: label the first 50 KW leads strong/weak/wrong with a short reason.
+- R2 activation currently requires the exact owner phrase in
+  `docs/runbooks/STAGING_R2_ACTIVATION.md` after the Cloudflare dashboard proves
+  it fits inside the existing C$50 ceiling. No R2 resource, binding, operation,
+  lifecycle rule, or charge has been created yet.
+- No new owner decision is required for the shadow-assessment persistence
+  checkpoint.
+- No new owner decision is required for the source-only private artifact-delivery
+  checkpoint. R2 activation and any live preview route remain separately gated.
+- No new owner decision is required for the guarded local assessment invocation.
+  A real execution will require Riley or Aidan to review the exact record and
+  supply the explicit local-shadow confirmation at that time.
+- No new owner decision is required for the fixture-only contact contract. A
+  provider, paid verification credit, contact persistence path, consent decision,
+  or live route remains separately gated.
+- No new owner decision is required to build the reviewed local contact
+  invocation. A real ignored-local bundle requires Riley or Aidan to inspect the
+  generated review and provide its different current contact-persistence
+  approval. Providers, consent, staging/production migration, outreach, and send
+  remain separately gated.
+- No new owner decision is required for the executor-backed synthetic owner
+  dossier gate. It adds no UI action or live capability and has zero spend.
+- No new owner decision is required for the source/workflow materialization
+  framework. A real execution requires Riley or Aidan to review the exact source
+  plan and deterministic audit input and supply the dedicated confirmation;
+  assessment still requires a separate later approval.
+- No new owner decision was required to define the bounded shadow-slice
+  contract. Populating it with ten real businesses requires Riley or Aidan to
+  review the exact identities, independence, market, niche, and source evidence;
+  any live source, Browser, R2, or verification-provider use remains a separate
+  privacy/budget decision.
+- No new owner decision was required for the read-only contact-review dossier.
+  Publishing this new build to isolated staging remains a separate release-gated
+  deployment and was not inferred from implementation approval.
+- No new owner decision was required to build the resumable owner-labelling
+  framework. Using it with actual businesses requires current assessed records
+  and Riley or Aidan's explicit labels and reasons; those reviews grant no
+  downstream authority.
+- No new product decision is required for the verified Quality Lab. Publishing
+  it to isolated staging remains a separate release-gated deployment decision.
+- No decision was required to prepare and verify the content-bound staging
+  packet. Its exact-head Linux CI run is now green. Riley or Aidan may either
+  provide the exact staging-only approval phrase for packet digest
+  `a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9`
+  or leave the existing staging version unchanged. No other wording grants
+  deployment authority.
+- No new owner decision is required for the receipt-bound shadow progress
+  framework. A real phase can be recorded only after its separate approval,
+  execution, and exact proof receipts already exist; the progress checkpoint
+  grants no downstream authority.
+- No new owner decision is required for the read-only source/workflow proof
+  adapter. Using it with a real business still requires the already separate
+  manifest review and source/workflow materialization approval; its output
+  grants no phase or downstream authority.
+- No new owner decision is required for the synthetic current-website-evidence
+  proof contract. A real eligibility receipt remains blocked behind the separate
+  privacy/budget decisions for Browser Rendering, R2, and exact durable-state
+  verification; this checkpoint inferred none of those approvals.
+- No new owner decision is required for the synthetic assessment progress proof.
+  It now requires an exact current durable assessment reload but still cannot
+  create a phase input or advance the chain. Its upstream trusted
+  website-evidence eligibility and any real assessment execution remain
+  separately gated.
+- No new owner decision is required for the validation-only trusted website
+  evidence eligibility contract. Real Browser capture, R2 activation/HEAD
+  reads, Cloudflare D1 execution, durable eligibility persistence, phase
+  recording, and any downstream assessment remain separately approval-gated.
+- No new owner decision is required for the disconnected durable eligibility
+  schema and adapter. Applying migration 0068 to any real or remote database,
+  connecting the Cloudflare D1 adapter, creating an operator command, or using
+  the receipt with real business data remains a separate reviewed and
+  approval-gated change.
+- No new owner decision is required for the validation-only website-evidence
+  phase-input adapter. It adds no live operation or progress mutation. Applying
+  migration 0068, connecting live D1/Browser/R2, using real businesses, or
+  persisting the resulting checkpoint through any operator or durable path remains
+  separately reviewed and approval-gated.
+- No new owner decision is required for the guarded in-memory website-evidence
+  append. It creates no durable record or operational authority. Any operator
+  command, ignored-local persistence, real-business use, or live resource
+  connection remains separately reviewed and approval-gated.
+- No new owner decision is required for the validation-only assessment
+  phase-input adapter. It creates no receipt or checkpoint and adds no live or
+  real-business path. Assessment progress append and any durable/operator wiring
+  remain separately reviewed and approval-gated.
+- No new owner decision is required for the guarded in-memory assessment append.
+  It creates no file or database record and grants no contact, provider,
+  deployment, outreach, or send authority. Durable/operator progress remains a
+  separate change.
+- No new owner decision is required for the durable contact-review proof. It is
+  read-only, synthetic/in-memory only, and grants no phase or operational
+  authority. Operator/durable progress and any real-business or provider use
+  remain separate reviewed and approval-gated changes.
+- No new owner decision is required for the validation-only contact-review phase
+  input. It creates no receipt or checkpoint and adds no operator, live, or
+  real-business path.
+- No new owner decision is required for the guarded in-memory contact-review
+  append. It creates no durable record and grants no owner-dossier, contact,
+  provider, deployment, outreach, send, or spend authority. Owner-dossier proof
+  and every durable/operator progress path remain separate reviewed milestones.
+- No new owner decision is required for the validation-only owner-dossier proof
+  and phase input. Synthetic tests do not create Riley's or Aidan's acceptance,
+  session authentication is explicitly unproven, and no decision or checkpoint
+  is stored. Authentication, durable owner-decision recording, guarded append,
+  operator wiring, and real-business use remain separate reviewed milestones.
+- No new owner decision is required for the guarded in-memory owner-dossier
+  append. It creates no authenticated or durable owner decision, file/database
+  output, operator action, live resource, real-business progress, deployment,
+  outreach, send, or spend authority. An authenticated append-only decision
+  contract and persistence threat model must be reviewed separately before any
+  operator/UI or real-business path exists.
+- No new owner decision is required for the authenticated decision contract and
+  source-only schema 0069. No account was used and no decision was stored.
+  Applying migration 0069, configuring binding material, connecting the
+  disconnected D1 boundary to any real resource, exposing a route/button, or
+  using the result for progress are separate reviewed and approval-gated changes.
+- No new owner decision is required for the disconnected exact D1
+  writer/reloader. It has no configured key, Cloudflare adapter, route, UI,
+  operator command, progress bridge, or real-data path and incurred C$0.
+- No new owner decision is required for the source-only D1 idempotency/outbox
+  schema and plan. Migration 0070 has not been applied, the operation-specific
+  mutation slot is deliberately non-executable, and the plan adds no live
+  database, route, provider, deployment, outreach, send, or spend authority.
+- No new owner decision is required for the source-only abandonment/count proof.
+  It creates no recovery row, migration, replacement key, database adapter,
+  owner mutation, route, deployment, provider, outreach, send, or spend
+  authority. Retention is a technical proposal, not a legal conclusion or a
+  deletion schedule. Engineering design and disposable tests can continue;
+  activation, deletion, and real owner operations retain their existing gates.
+- No new owner decision is required for the concrete source-only
+  `owner.dossier.accept` transaction plan. It remains unreachable from runtime,
+  uses only disposable in-memory SQLite evidence, and grants no database,
+  owner-action, route, deployment, provider, outreach, send, or spend authority.
+  Live D1 wiring, Miniflare proof, migration application, and owner UI action
+  remain separate reviewed gates.
+- No new owner decision is required for the disconnected D1 result executor.
+  Its structural adapter has no named binding or runtime importer, source
+  migrations remain unapplied, and its successful result explicitly says live
+  D1 execution is unproven. An isolated D1/Miniflare rehearsal, migration
+  application, owner UI action, progress bridge, and every live operation remain
+  separate reviewed gates.
+- No new owner decision is required for the next local CEO rebuild monitor.
+  Riley explicitly requested it. It must stay private on this computer, outside
+  OneDrive and Google Drive, open inside Codex desktop, expose no secrets or
+  hidden reasoning, contact no provider, deploy nowhere, and cost C$0.
+- Riley directed that this rebuild branch should eventually become `main`. That
+  is recorded as the intended final cutover, not approval to merge now. The merge
+  remains gated by the completed rebuild, full safety/review/rollback evidence,
+  and an explicit final release decision.
+
+### Security audit owner decision and spend
+
+- No new Riley decision is required to close the source-level Critical and High
+  findings. Public signup, insecure shared authority, SSRF, replay, unsafe direct
+  sends, and unproven release evidence are not acceptable defaults.
+- Before any real deployment or provider activation, Riley must complete the
+  account-security checklist in `docs/SECURITY_AUDIT.md` and explicitly approve
+  the isolated-staging security test scope. That future approval does not grant
+  production deployment, email, provider, or prospect-contact authority.
+- Spend impact remains C$0. This audit used local source/tests and read-only
+  public documentation; it created no subscription, provider call, deployment,
+  migration, mailbox action, or external contact.
+
+## Next three actions
+
+1. Complete SEC-002's verified owner-enrollment, MFA, recovery, and owner-facing
+   session controls with
+   synthetic tests. Retain the registration-denial and stale-cache regressions;
+   keep real account changes and staging activation separately approval-gated.
+2. Retain SEC-008's shared mutation-origin and browser regressions. Finish the
+   remaining browser boundary: private/no-store responses, framing/MIME/referrer/permissions headers,
+   and CSP report-only staging preparation.
+3. Retire or redesign the legacy MCP token, agent replay/job-fencing, browser
+   SSRF, and direct Gmail reply paths before any provider or automation can be
+   activated. The deferred disposable D1 rehearsal resumes only after the open
+   Critical and High security boundaries are closed.
+
+## Resume instructions
+
+Read `AGENTS.md`, `docs/OWNER_CONTEXT.md`, this file, `docs/MASTER_PLAN.md`, and
+`docs/GOTCHAS.md`; verify Git status and branch; then start with the first pending
+action above. Do not infer live production state from this document if it is more
+than one work cycle old—verify it read-only.

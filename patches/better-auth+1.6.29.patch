@@ -1,0 +1,30 @@
+diff --git a/node_modules/better-auth/dist/plugins/admin/admin.mjs b/node_modules/better-auth/dist/plugins/admin/admin.mjs
+index b27646d..6acd460 100644
+--- a/node_modules/better-auth/dist/plugins/admin/admin.mjs
++++ b/node_modules/better-auth/dist/plugins/admin/admin.mjs
+@@ -35,12 +35,20 @@ const admin = (options) => {
+ 					const user = await ctx.context.internalAdapter.findUserById(session.userId);
+ 					if (user?.banned) {
+ 						if (user.banExpires && new Date(user.banExpires).getTime() < Date.now()) {
+-							await ctx.context.internalAdapter.updateUser(session.userId, {
+-								banned: false,
+-								banReason: null,
+-								banExpires: null
++							const cleared = await ctx.context.adapter.update({
++								model: "user",
++								where: [
++									{ field: "id", value: session.userId },
++									{ field: "banned", value: true },
++									{ field: "banExpires", value: user.banExpires },
++									{ field: "banReason", value: user.banReason ?? null },
++									{ field: "updatedAt", value: user.updatedAt }
++								],
++								update: { banned: false, banReason: null, banExpires: null }
+ 							});
+-							return;
++							if (cleared) return;
++							const current = await ctx.context.internalAdapter.findUserById(session.userId);
++							if (current && !current.banned) return;
+ 						}
+ 						throw APIError.from("FORBIDDEN", {
+ 							message: opts.bannedUserMessage,

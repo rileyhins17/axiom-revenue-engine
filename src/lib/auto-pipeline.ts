@@ -9,6 +9,8 @@
  */
 
 import { enrichLead } from "@/lib/outreach-enrichment";
+import { evaluateAutomationSafety } from "@/lib/automation-safety";
+import { getServerEnv } from "@/lib/env";
 import { hasValidPipelineEmail } from "@/lib/lead-qualification";
 import { READY_FOR_FIRST_TOUCH_STATUS } from "@/lib/outreach";
 import {
@@ -269,9 +271,10 @@ async function autoQueue(
 export async function runAutoPipeline(systemUserId: string): Promise<AutoPipelineResult> {
   const prisma = getPrisma();
   const settings = await getAutomationSettings(prisma);
+  const safety = evaluateAutomationSafety({ env: getServerEnv(), phase: "queue", settings });
 
-  if (settings.emergencyPaused) {
-    console.log("[auto-pipeline] Skipped — emergency kill switch is active");
+  if (!safety.allowed) {
+    console.log(`[auto-pipeline] Skipped — ${safety.reason}`);
     return {
       enriched: 0,
       enrichFailed: 0,

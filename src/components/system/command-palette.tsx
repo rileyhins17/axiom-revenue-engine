@@ -35,8 +35,8 @@ export function CommandPalette({ open, onClose, onOpenShortcuts }: CommandPalett
         const controller = new AbortController();
         const timer = setTimeout(() => {
             fetch(`/api/vault/leads?search=${encodeURIComponent(query)}&limit=5`, { signal: controller.signal })
-                .then((r) => r.json())
-                .then((data: { leads?: LeadSearchResult[] }) => setLeadResults(data.leads ?? []))
+                .then(async (r) => await r.json() as { leads?: LeadSearchResult[] })
+                .then((data) => setLeadResults(data.leads ?? []))
                 .catch(() => {});
         }, 200);
         return () => { clearTimeout(timer); controller.abort(); };

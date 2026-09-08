@@ -1,561 +1,113 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  Loader2,
-  Mail,
-  MailOpen,
-  Pencil,
-  RefreshCw,
-  Send,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { z } from "zod";
 
-import { cn } from "@/lib/utils";
+const pageSchema = z.object({
+  source: z.literal("SAVED_OUTBOUND_ONLY"),
+  records: z.array(z.object({
+    intentId: z.string().regex(/^[a-f0-9]{64}$/), mailboxId: z.string().min(1).max(256),
+    state: z.enum(["SENT", "UNKNOWN", "DISPATCHING", "REJECTED"]),
+    from: z.string().max(254), to: z.string().max(254), subject: z.string().max(200),
+    bodyPlain: z.string().max(131072), recordedAt: z.number().int().nonnegative().max(8640000000000),
+  }).strict()).max(5),
+  nextCursor: z.string().max(81).regex(/^(0|[1-9][0-9]{0,15})\.[a-f0-9]{64}$/).nullable(),
+}).strict();
+type HistoryPage = z.infer<typeof pageSchema>;
+type Props = { leadId: number; leadName: string; leadEmail: string | null };
 
-// ─── Types ──────────────────────────────────────────────────────────
+const states = {
+  SENT: { title: "Accepted by mail service", detail: "Acceptance is recorded. This is not confirmation of inbox delivery.", color: "text-emerald-300" },
+  UNKNOWN: { title: "Delivery uncertain", detail: "The outcome is unresolved. Do not send this message again.", color: "text-amber-300" },
+  DISPATCHING: { title: "Delivery uncertain", detail: "An attempt was recorded without a final result. Do not send this message again.", color: "text-amber-300" },
+  REJECTED: { title: "Rejected by mail service", detail: "A rejection was recorded. This page will not retry it.", color: "text-rose-300" },
+} as const;
+const buttonClass = "rounded-lg border border-white/20 px-3 py-2 text-sm text-zinc-200 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300 disabled:opacity-50";
 
-type EmailMessage = {
-  id: string;
-  threadId: string;
-  internalDate: string;
-  from: string;
-  to: string;
-  subject: string;
-  bodyPlain: string;
-  bodyHtml: string;
-  labelIds: string[];
-};
-
-type EmailThread = {
-  id: string;
-  messages: EmailMessage[];
-};
-
-type EmailThreadPanelProps = {
-  leadId: number;
-  leadName: string;
-  leadEmail: string | null;
-};
-
-// ─── Helpers ────────────────────────────────────────────────────────
-
-function formatEmailDate(internalDateMs: string) {
-  const date = new Date(Number(internalDateMs));
-  if (isNaN(date.getTime())) return "";
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const days = Math.floor(diff / 86400000);
-
-  if (days === 0) {
-    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  }
-  if (days === 1) return "Yesterday";
-  if (days < 7) return date.toLocaleDateString("en-US", { weekday: "short" });
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+/** Keyed by client so a prop change cannot display the previous client's mail,
+ * even for the frame before effects run. No hidden legacy composer or inbox sync. */
+export function EmailThreadPanel(props: Props) {
+  return <SavedHistory key={props.leadId} leadId={props.leadId} leadName={props.leadName} />;
 }
 
-function formatFullDate(internalDateMs: string) {
-  const date = new Date(Number(internalDateMs));
-  if (isNaN(date.getTime())) return "";
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function extractName(from: string) {
-  const match = from.match(/^"?([^"<]+)"?\s*</);
-  if (match) return match[1].trim();
-  return from.split("@")[0];
-}
-
-function extractEmail(from: string) {
-  const match = from.match(/<([^>]+)>/);
-  return match ? match[1] : from;
-}
-
-function isOurEmail(from: string, senderEmail: string | null) {
-  if (!senderEmail) return false;
-  return extractEmail(from).toLowerCase() === senderEmail.toLowerCase();
-}
-
-function stripQuotedText(text: string): string {
-  // Remove forwarded/quoted sections that start with common patterns
-  const lines = text.split("\n");
-  const cleaned: string[] = [];
-  for (const line of lines) {
-    // Stop at "On ... wrote:" pattern
-    if (/^On .+ wrote:\s*$/.test(line)) break;
-    // Stop at "> " quoted lines
-    if (/^>/.test(line.trim())) break;
-    // Stop at "------" dividers
-    if (/^-{3,}/.test(line.trim())) break;
-    // Stop at "From:" header in forwarded emails
-    if (/^From:\s/i.test(line.trim())) break;
-    cleaned.push(line);
-  }
-  return cleaned.join("\n").trim();
-}
-
-// ─── Composer Component ──────────────────────────────────────────────
-
-function ReplyComposer({
-  leadId,
-  leadName,
-  thread,
-  senderEmail,
-  onSent,
-  onCancel,
-}: {
-  leadId: number;
-  leadName: string;
-  thread: EmailThread;
-  senderEmail: string | null;
-  onSent: () => void;
-  onCancel: () => void;
-}) {
-  const [replyText, setReplyText] = useState("");
-  const [sending, setSending] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const lastMessage = thread.messages[thread.messages.length - 1];
-  const replyTo = isOurEmail(lastMessage.from, senderEmail)
-    ? lastMessage.to
-    : lastMessage.from;
-  const subject = lastMessage.subject;
-
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.max(120, textareaRef.current.scrollHeight)}px`;
-    }
-  }, [replyText]);
-
-  const handleGenerateReply = useCallback(async () => {
-    setGenerating(true);
-    setError(null);
-    try {
-      // Build thread context from messages
-      const threadContext = thread.messages
-        .map((msg) => {
-          const sender = extractName(msg.from);
-          const date = formatFullDate(msg.internalDate);
-          const body = stripQuotedText(msg.bodyPlain) || "(no text content)";
-          return `From: ${sender}\nDate: ${date}\n\n${body}`;
-        })
-        .join("\n\n---\n\n");
-
-      const res = await fetch(`/api/clients/${leadId}/emails/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          threadContext,
-          tone: "professional",
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to generate reply");
-      }
-
-      const data = await res.json();
-      setReplyText(data.generatedReply || "");
-      textareaRef.current?.focus();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Generation failed");
-    } finally {
-      setGenerating(false);
-    }
-  }, [leadId, thread.messages]);
-
-  const handleSend = useCallback(async () => {
-    if (!replyText.trim()) return;
-    setSending(true);
-    setError(null);
-    try {
-      const plainText = replyText.trim();
-      const htmlBody = `<div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; line-height: 1.5; color: #1a1a1a;">${plainText.replace(/\n/g, "<br>")}</div>`;
-
-      const res = await fetch(`/api/clients/${leadId}/emails/reply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          threadId: thread.id,
-          to: extractEmail(replyTo),
-          subject,
-          bodyHtml: htmlBody,
-          bodyPlain: plainText,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to send reply");
-      }
-
-      setReplyText("");
-      onSent();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Send failed");
-    } finally {
-      setSending(false);
-    }
-  }, [leadId, replyText, thread.id, replyTo, subject, onSent]);
-
-  return (
-    <div className="border-t border-white/[0.06] pt-4">
-      <div className="mb-2 flex items-center gap-2 text-xs text-zinc-500">
-        <Mail className="size-3.5" />
-        Reply to {extractName(replyTo)}
-        <span className="text-zinc-700">&lt;{extractEmail(replyTo)}&gt;</span>
-      </div>
-
-      <textarea
-        ref={textareaRef}
-        value={replyText}
-        onChange={(e) => setReplyText(e.target.value)}
-        placeholder={`Write a reply to ${leadName}...`}
-        className="w-full resize-none rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
-        style={{ minHeight: "120px" }}
-      />
-
-      {error && (
-        <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-300">
-          {error}
-        </div>
-      )}
-
-      <div className="mt-3 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={handleSend}
-          disabled={sending || !replyText.trim()}
-          className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:border-emerald-500/50 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {sending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
-          {sending ? "Sending..." : "Send reply"}
-        </button>
-
-        <button
-          type="button"
-          onClick={handleGenerateReply}
-          disabled={generating}
-          className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 transition hover:border-cyan-500/50 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {generating ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-          {generating ? "Generating..." : "AI draft"}
-        </button>
-
-        <button
-          type="button"
-          onClick={onCancel}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-zinc-500 transition hover:bg-white/[0.04] hover:text-zinc-300"
-        >
-          <X className="size-3" />
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Single Message ──────────────────────────────────────────────────
-
-function MessageBubble({
-  message,
-  senderEmail,
-  isLast,
-}: {
-  message: EmailMessage;
-  senderEmail: string | null;
-  isLast: boolean;
-}) {
-  const [expanded, setExpanded] = useState(isLast);
-  const isSent = isOurEmail(message.from, senderEmail);
-  const name = extractName(message.from);
-  const cleanBody = stripQuotedText(message.bodyPlain) || "(no text content)";
-
-  return (
-    <div className={cn("group flex gap-3", isSent && "flex-row-reverse")}>
-      <div
-        className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-          isSent
-            ? "bg-emerald-500/15 text-emerald-400"
-            : "bg-cyan-500/15 text-cyan-400",
-        )}
-      >
-        {name.charAt(0).toUpperCase()}
-      </div>
-
-      <div className={cn("min-w-0 max-w-[85%]", isSent && "text-right")}>
-        <div className="mb-1 flex items-center gap-2">
-          <span className={cn("text-xs font-medium", isSent ? "text-emerald-300" : "text-cyan-300")}>
-            {isSent ? "You" : name}
-          </span>
-          <span className="text-[10px] text-zinc-600">{formatEmailDate(message.internalDate)}</span>
-        </div>
-
-        <div
-          className={cn(
-            "rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
-            isSent
-              ? "bg-emerald-500/10 border border-emerald-500/20 text-zinc-200"
-              : "bg-white/[0.04] border border-white/[0.08] text-zinc-300",
-          )}
-        >
-          {expanded ? (
-            <div className="whitespace-pre-wrap">{cleanBody}</div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setExpanded(true)}
-              className="w-full text-left"
-            >
-              <div className="line-clamp-2 whitespace-pre-wrap">{cleanBody}</div>
-              <span className="mt-1 inline-block text-[11px] text-zinc-500 hover:text-zinc-400">
-                Show more
-              </span>
-            </button>
-          )}
-        </div>
-        <div className="mt-0.5 text-[10px] text-zinc-700" title={formatFullDate(message.internalDate)}>
-          {formatFullDate(message.internalDate)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Thread List Item ────────────────────────────────────────────────
-
-function ThreadItem({
-  thread,
-  senderEmail,
-  leadId,
-  leadName,
-  onRefresh,
-}: {
-  thread: EmailThread;
-  senderEmail: string | null;
-  leadId: number;
-  leadName: string;
-  onRefresh: () => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [composing, setComposing] = useState(false);
-
-  const lastMessage = thread.messages[thread.messages.length - 1];
-  const firstMessage = thread.messages[0];
-  const subject = firstMessage?.subject || "No subject";
-  const messageCount = thread.messages.length;
-  const lastSender = extractName(lastMessage?.from || "");
-  const lastPreview = stripQuotedText(lastMessage?.bodyPlain || "").slice(0, 120);
-  const isLastFromUs = isOurEmail(lastMessage?.from || "", senderEmail);
-
-  return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] overflow-hidden transition-colors hover:border-white/[0.1]">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-start gap-3 px-4 py-3 text-left"
-      >
-        <div className={cn(
-          "mt-1 flex size-8 shrink-0 items-center justify-center rounded-full",
-          isLastFromUs ? "bg-emerald-500/15" : "bg-cyan-500/15",
-        )}>
-          {isLastFromUs
-            ? <Send className="size-3.5 text-emerald-400" />
-            : <MailOpen className="size-3.5 text-cyan-400" />}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium text-white">{subject}</span>
-            <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-zinc-400">
-              {messageCount}
-            </span>
-          </div>
-          <div className="mt-0.5 flex items-center gap-1.5">
-            <span className={cn("text-xs font-medium", isLastFromUs ? "text-emerald-400" : "text-cyan-400")}>
-              {isLastFromUs ? "You" : lastSender}
-            </span>
-            <span className="text-xs text-zinc-600">·</span>
-            <span className="text-xs text-zinc-500">{formatEmailDate(lastMessage?.internalDate || "")}</span>
-          </div>
-          {!expanded && (
-            <div className="mt-1 line-clamp-1 text-xs text-zinc-500">{lastPreview}</div>
-          )}
-        </div>
-
-        <div className="ml-2 mt-1 shrink-0 text-zinc-600">
-          {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="border-t border-white/[0.06] px-4 py-4">
-          <div className="flex flex-col gap-4">
-            {thread.messages.map((msg, i) => (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                senderEmail={senderEmail}
-                isLast={i === thread.messages.length - 1}
-              />
-            ))}
-          </div>
-
-          {composing ? (
-            <div className="mt-4">
-              <ReplyComposer
-                leadId={leadId}
-                leadName={leadName}
-                thread={thread}
-                senderEmail={senderEmail}
-                onSent={() => {
-                  setComposing(false);
-                  onRefresh();
-                }}
-                onCancel={() => setComposing(false)}
-              />
-            </div>
-          ) : (
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setComposing(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-200 transition hover:border-emerald-500/50 hover:bg-emerald-500/20"
-              >
-                <Pencil className="size-3" />
-                Reply
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Main Email Thread Panel ─────────────────────────────────────────
-
-export function EmailThreadPanel({ leadId, leadName, leadEmail }: EmailThreadPanelProps) {
-  const [threads, setThreads] = useState<EmailThread[]>([]);
-  const [senderEmail, setSenderEmail] = useState<string | null>(null);
+function SavedHistory({ leadId, leadName }: Pick<Props, "leadId" | "leadName">) {
+  const [page, setPage] = useState<HistoryPage | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
-
-  const fetchThreads = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const [error, setError] = useState(false);
+  const [cursors, setCursors] = useState<Array<string | null>>([null]);
+  const active = useRef<AbortController | null>(null);
+  const load = useCallback(async (cursor: string | null, nextCursors: Array<string | null>) => {
+    active.current?.abort();
+    const controller = new AbortController();
+    active.current = controller;
+    setLoading(true); setError(false); setPage(null);
     try {
-      const res = await fetch(`/api/clients/${leadId}/emails`);
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to load email threads");
-      }
-      const data = await res.json();
-      setThreads(data.threads || []);
-      setSenderEmail(data.senderEmail || null);
-      setWarning(data.warning || null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      const response = await fetch(`/api/clients/${leadId}/emails${cursor ? "?cursor=" + encodeURIComponent(cursor) : ""}`, {
+        signal: controller.signal, cache: "no-store", credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error("History unavailable");
+      const result = pageSchema.parse(await response.json());
+      if (controller.signal.aborted) return;
+      setPage(result); setCursors(nextCursors);
+    } catch {
+      if (!controller.signal.aborted) setError(true);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [leadId]);
-
-  useEffect(() => {
-    fetchThreads();
-  }, [fetchThreads]);
+  useEffect(() => { void load(null, [null]); return () => active.current?.abort(); }, [load]);
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Mail className="size-4 text-zinc-500" />
-          <h3 className="text-sm font-semibold text-white">Email Threads</h3>
-          {threads.length > 0 && (
-            <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-zinc-400">
-              {threads.length}
-            </span>
-          )}
+    <section aria-label={`Saved email activity for ${leadName}`} className="min-w-0 rounded-2xl border border-white/10 bg-zinc-950 p-4 text-zinc-200 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Saved email activity</h3>
+          <p className="mt-1 max-w-xl text-sm text-zinc-400">Recorded outgoing replies only—not a live inbox. Reading this page never contacts a mail service.</p>
         </div>
-        <button
-          type="button"
-          onClick={fetchThreads}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/[0.04] hover:text-zinc-300 disabled:opacity-50"
-          title="Refresh threads"
-        >
-          <RefreshCw className={cn("size-3", loading && "animate-spin")} />
-          Refresh
-        </button>
+        <button type="button" className={buttonClass} disabled={loading}
+          onClick={() => void load(cursors[cursors.length - 1], cursors)}>Refresh saved records</button>
       </div>
-
-      {warning && (
-        <div className="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
-          {warning}
-        </div>
-      )}
-
-      {loading && threads.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <Loader2 className="size-6 animate-spin text-zinc-600" />
-          <p className="text-sm text-zinc-500">Loading email threads...</p>
-        </div>
-      ) : error ? (
-        <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-300">
-            {error}
-          </div>
-          <button
-            type="button"
-            onClick={fetchThreads}
-            className="text-xs text-zinc-500 hover:text-zinc-300"
-          >
-            Try again
-          </button>
-        </div>
-      ) : threads.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-12 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-white/[0.04]">
-            <Mail className="size-5 text-zinc-600" />
-          </div>
-          <p className="text-sm text-zinc-500">No email threads found</p>
-          <p className="text-xs text-zinc-600">
-            {leadEmail
-              ? "Emails will appear here once outreach begins."
-              : "This client has no email address on file."}
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {threads.map((thread) => (
-            <ThreadItem
-              key={thread.id}
-              thread={thread}
-              senderEmail={senderEmail}
-              leadId={leadId}
-              leadName={leadName}
-              onRefresh={fetchThreads}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+      <p className="my-4 rounded-xl border border-violet-300/20 bg-violet-300/5 p-3 text-sm text-violet-200">
+        Read-only during the rebuild. Reply approval and incoming-mail integration are not ready.
+        Legacy emails are not automatically imported into this view.
+      </p>
+      <div aria-live="polite" aria-atomic="true" className="text-sm text-zinc-300">
+        {loading ? "Loading saved records…" : error ? "Saved records could not be loaded. No mailbox was contacted." :
+          page?.records.length ? `Page ${cursors.length} · ${page.records.length} saved records` :
+          "No saved outgoing replies for this client. This does not mean their inbox is empty."}
+      </div>
+      {error && <button type="button" className={buttonClass + " mt-3"}
+        onClick={() => void load(cursors[cursors.length - 1], cursors)}>Try reading again</button>}
+      {page && <ol className="mt-4 space-y-3" aria-label="Saved outgoing replies">
+        {page.records.map(record => {
+          const state = states[record.state];
+          return <li key={record.intentId} className="min-w-0 rounded-xl border border-white/10 bg-zinc-900/50 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <h4 className="min-w-0 break-words text-base font-medium text-white">{record.subject}</h4>
+              <span className={"text-sm font-medium " + state.color}>{state.title}</span>
+            </div>
+            <p className="mt-2 text-sm text-zinc-300">{state.detail}</p>
+            <dl className="mt-3 grid min-w-0 gap-1 text-sm text-zinc-400">
+              <div className="break-all"><dt className="inline text-zinc-300">From: </dt><dd className="inline">{record.from}</dd></div>
+              <div className="break-all"><dt className="inline text-zinc-300">To: </dt><dd className="inline">{record.to}</dd></div>
+              <div><dt className="inline text-zinc-300">Recorded: </dt><dd className="inline"><time dateTime={new Date(record.recordedAt * 1000).toISOString()}>
+                {new Intl.DateTimeFormat("en-CA", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Toronto" }).format(record.recordedAt * 1000)} ET
+              </time></dd></div>
+            </dl>
+            <details className="mt-3">
+              <summary className="cursor-pointer rounded text-sm text-violet-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300">View exact saved message</summary>
+              <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-200">{record.bodyPlain}</p>
+              <p className="mt-3 break-all text-xs text-zinc-400">Reply reference: {record.intentId}</p>
+            </details>
+          </li>;
+        })}
+      </ol>}
+      {page && <nav aria-label="Saved email pages" className="mt-4 flex flex-wrap gap-2">
+        <button type="button" className={buttonClass} disabled={loading || cursors.length < 2}
+          onClick={() => { const prior = cursors.slice(0, -1); void load(prior[prior.length - 1], prior); }}>Newer records</button>
+        <button type="button" className={buttonClass} disabled={loading || !page.nextCursor}
+          onClick={() => { if (page.nextCursor) void load(page.nextCursor, [...cursors, page.nextCursor]); }}>Older records</button>
+      </nav>}
+    </section>
   );
 }

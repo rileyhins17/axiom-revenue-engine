@@ -8,34 +8,45 @@ import {
   exchangeCodeForTokens,
   fetchGoogleUserInfo,
   normalizeGmailAddress,
-  parseGmailOAuthState,
+  getOAuthRedirectUri,
 } from "@/lib/gmail";
+import { consumeGmailOAuthTransaction } from "@/lib/gmail-oauth-transaction";
+import { getDatabase } from "@/lib/cloudflare";
 import { getServerEnv } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireAdminApiSession } from "@/lib/session";
 
-export async function GET(request: NextRequest) {
+async function handleCallback(request: NextRequest) {
   try {
-    const session = await requireSession();
+    const auth = await requireAdminApiSession(request);
+    if ("response" in auth) return auth.response;
+    const session = auth.session;
     const env = getServerEnv();
     const url = new URL(request.url);
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     const error = url.searchParams.get("error");
-    const parsedState = parseGmailOAuthState(state);
+    const callback = new URL(getOAuthRedirectUri());
+    if ((request.headers.get("host") ?? url.host) !== callback.host || url.protocol !== callback.protocol || url.pathname !== callback.pathname
+      || url.searchParams.getAll("state").length !== 1 || url.searchParams.getAll("code").length > 1
+      || url.searchParams.getAll("error").length > 1) {
+      return NextResponse.redirect(`${env.APP_BASE_URL.replace(/\/$/, "")}/settings?gmail_error=invalid_state`);
+    }
+    const parsedState = await consumeGmailOAuthTransaction(getDatabase(), env.BETTER_AUTH_SECRET, state, {
+      userId: session.user.id, sessionId: session.session.id, redirectUri: getOAuthRedirectUri(),
+    });
 
     const baseUrl = env.APP_BASE_URL.replace(/\/$/, "");
 
-    if (!parsedState || parsedState.sessionId !== session.session.id) {
+    if (!parsedState) {
       return NextResponse.redirect(
         `${baseUrl}/settings?gmail_error=invalid_state`,
       );
     }
 
     if (error) {
-      console.error("Gmail OAuth error:", error);
       return NextResponse.redirect(
-        `${baseUrl}/settings?gmail_error=${encodeURIComponent(error)}`,
+        `${baseUrl}/settings?gmail_error=authorization_declined`,
       );
     }
 
@@ -64,12 +75,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (parsedState.targetEmail && gmailAddress !== parsedState.targetEmail) {
+    if (gmailAddress !== parsedState.targetEmail) {
       return NextResponse.redirect(
-        `${baseUrl}/settings?gmail_error=wrong_account&expected=${encodeURIComponent(parsedState.targetEmail)}&actual=${encodeURIComponent(gmailAddress)}`,
+        `${baseUrl}/settings?gmail_error=wrong_account`,
       );
     }
 
+    // Provider round trips are not authority to retain an obsolete session.
+    const current = await requireAdminApiSession(request);
+    if ("response" in current) return current.response;
+    if (current.session.user.id !== session.user.id || current.session.session.id !== session.session.id) {
+      return NextResponse.redirect(`${baseUrl}/settings?gmail_error=invalid_state`);
+    }
     // Encrypt tokens before storage
     const encryptedAccess = await encryptToken(tokens.access_token);
     const encryptedRefresh = await encryptToken(tokens.refresh_token);
@@ -124,13 +141,18 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.redirect(`${baseUrl}/settings?gmail_connected=true`);
-  } catch (error: unknown) {
-    console.error("Gmail callback error:", error);
-    const env = getServerEnv();
-    const baseUrl = env.APP_BASE_URL.replace(/\/$/, "");
-    const message = error instanceof Error ? error.message : "callback_failed";
-    return NextResponse.redirect(
-      `${baseUrl}/settings?gmail_error=${encodeURIComponent(message)}`,
-    );
+  } catch {
+    return NextResponse.json({ error: "gmail_callback_failed" }, {
+      status: 503, headers: { "Cache-Control": "private, no-store" },
+    });
   }
+}
+
+export async function GET(request: NextRequest) {
+  if (request.method !== "GET") return NextResponse.json({ error: "Method not allowed" }, {
+    status: 405, headers: { Allow: "GET", "Cache-Control": "private, no-store" },
+  });
+  const response = await handleCallback(request);
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
 }

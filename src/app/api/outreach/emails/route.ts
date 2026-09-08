@@ -1,45 +1,19 @@
-import { NextResponse } from "next/server";
+import { getDatabase } from "@/lib/cloudflare";
+import { requireAdminApiSession } from "@/lib/session";
+import { createLegacyMailHistory, legacyMailHeaders } from "@/lib/revenue-engine/legacy-mail-history";
 
-import { getErrorMessage } from "@/lib/errors";
-import { getPrisma } from "@/lib/prisma";
-import { requireApiSession } from "@/lib/session";
-
+export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
-  const authResult = await requireApiSession(request);
-  if ("response" in authResult) {
-    return authResult.response;
+  const auth = await requireAdminApiSession(request);
+  if ("response" in auth) {
+    Object.entries(legacyMailHeaders).forEach(([key,value]) => auth.response.headers.set(key,value));
+    return auth.response;
   }
-
+  const json = (data: unknown, status = 200) => Response.json(data,{ status, headers: legacyMailHeaders });
   try {
-    const prisma = getPrisma();
-    const emails = await prisma.outreachEmail.findMany({
-      orderBy: { sentAt: "desc" },
-      take: 200,
-    });
-
-    const leadIds = Array.from(new Set(emails.map((email) => email.leadId)));
-    const leads = leadIds.length > 0
-      ? await prisma.lead.findMany({
-        where: { id: { in: leadIds } },
-        select: {
-          id: true,
-          businessName: true,
-        },
-      })
-      : [];
-    const leadNames = new Map(leads.map((lead) => [lead.id, lead.businessName]));
-
-    return NextResponse.json({
-      emails: emails.map((email) => ({
-        ...email,
-        businessName: leadNames.get(email.leadId) || `Lead #${email.leadId}`,
-      })),
-    });
-  } catch (error: unknown) {
-    console.error("Email log error:", error);
-    return NextResponse.json(
-      { error: getErrorMessage(error, "Failed to fetch email log") },
-      { status: 500 },
-    );
-  }
+    const history = await createLegacyMailHistory(getDatabase())(
+      { userId: auth.session.user.id, sessionId: auth.session.session.id });
+    if (!history) return json({ error: "Legacy history unavailable" },404);
+    return json({ emails: history.emails, hasMore: history.hasMore, source: history.source });
+  } catch { return json({ error: "Legacy history is unavailable. No mailbox was contacted." },503); }
 }

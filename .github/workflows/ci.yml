@@ -1,0 +1,79 @@
+name: Revenue Engine CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BETTER_AUTH_SECRET: ci-only-secret-that-is-longer-than-thirty-two-characters
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install owner UI browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify fail-closed configuration
+        run: npm run check:safety
+
+      - name: Verify exact isolated-staging console packet
+        run: npm run staging:verify-console-release -- docs/releases/staging/2026-08-28-owner-quality-lab.json
+
+      # Wrangler evaluates the custom OpenNext build before checking bindings,
+      # so this step also proves the production Cloudflare build.
+      - name: Verify generated bindings and Cloudflare build
+        run: npm run cf:typegen:check
+
+      - name: Verify inert engine bindings
+        run: npm run cf:engine:typegen:check
+
+      - name: Apply all migrations to a fresh local D1 database
+        run: npm run db:migrate:local
+
+      - name: Unit and characterization tests
+        run: npm test
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Validate deploy bundle without deploying
+        run: npx wrangler deploy --env="" --dry-run --autoconfig false
+
+      - name: Validate inert engine bundle without deploying
+        run: npm run cf:engine:dry-run
+
+      # These gates share built assets; finish all bundle checks before browsers.
+      - name: Saved email activity browser acceptance
+        run: npm run test:saved-email-ui
+
+      - name: Legacy email privacy browser acceptance
+        run: npm run test:legacy-email-ui
+
+      - name: Authenticated owner and email summary browser acceptance
+        run: npm run test:owner-ui

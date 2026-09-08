@@ -1391,10 +1391,12 @@ async function runStatement(query: string, params: unknown[] = []) {
     .run() as Promise<PreparedStatementResult>;
 }
 
-function createModel<T extends Record<string, unknown>>(spec: TableSpec<T>) {
+function createModel<T extends Record<string, unknown>>(spec: TableSpec<T>, readOnly = false) {
+  const ensureSchema = () => readOnly ? Promise.resolve() : ensureTableSchema(spec);
+  const assertWritable = () => { if (readOnly) throw new Error("READ_ONLY_MODEL"); };
   return {
     async count(args?: CountArgs) {
-      await ensureTableSchema(spec);
+      await ensureSchema();
       const params: unknown[] = [];
       const whereClause = buildWhereClause(args?.where, params);
       const query = `SELECT COUNT(*) as count FROM ${quoteIdentifier(spec.tableName)}${whereClause ? ` WHERE ${whereClause}` : ""}`;
@@ -1403,7 +1405,8 @@ function createModel<T extends Record<string, unknown>>(spec: TableSpec<T>) {
     },
 
     async create(args: CreateArgs) {
-      await ensureTableSchema(spec);
+      assertWritable();
+      await ensureSchema();
       const now = new Date();
       const data = { ...args.data } as Record<string, unknown>;
       const existingColumns = new Set(await getExistingTableColumns(spec.tableName));
@@ -1444,6 +1447,7 @@ function createModel<T extends Record<string, unknown>>(spec: TableSpec<T>) {
     },
 
     async delete(args: { where: WhereInput }) {
+      assertWritable();
       const params: unknown[] = [];
       const whereClause = buildWhereClause(args.where, params);
       if (!whereClause) {
@@ -1454,7 +1458,7 @@ function createModel<T extends Record<string, unknown>>(spec: TableSpec<T>) {
     },
 
     async findFirst<S extends SelectMap<T> | undefined = undefined>(args?: FindManyArgs<T, S>) {
-      await ensureTableSchema(spec);
+      await ensureSchema();
       const rows = await this.findMany({
         ...args,
         take: 1,
@@ -1463,7 +1467,7 @@ function createModel<T extends Record<string, unknown>>(spec: TableSpec<T>) {
     },
 
     async findMany<S extends SelectMap<T> | undefined = undefined>(args?: FindManyArgs<T, S>) {
-      await ensureTableSchema(spec);
+      await ensureSchema();
       const params: unknown[] = [];
       const whereClause = buildWhereClause(args?.where, params);
       const availableColumns = (await getExistingTableColumns(spec.tableName)) as Array<keyof T>;
@@ -1487,7 +1491,7 @@ function createModel<T extends Record<string, unknown>>(spec: TableSpec<T>) {
     },
 
     async findUnique<S extends SelectMap<T> | undefined = undefined>(args: FindUniqueArgs<T, S>) {
-      await ensureTableSchema(spec);
+      await ensureSchema();
       const params: unknown[] = [];
       const whereClause = buildWhereClause(args.where, params);
       if (!whereClause) {
@@ -1503,7 +1507,8 @@ function createModel<T extends Record<string, unknown>>(spec: TableSpec<T>) {
     },
 
     async update(args: MutationArgs) {
-      await ensureTableSchema(spec);
+      assertWritable();
+      await ensureSchema();
       const params: unknown[] = [];
       const existingColumns = new Set(await getExistingTableColumns(spec.tableName));
       const filteredData = Object.fromEntries(
@@ -1529,7 +1534,8 @@ function createModel<T extends Record<string, unknown>>(spec: TableSpec<T>) {
     },
 
     async updateMany(args: UpdateManyArgs) {
-      await ensureTableSchema(spec);
+      assertWritable();
+      await ensureSchema();
       const params: unknown[] = [];
       const existingColumns = new Set(await getExistingTableColumns(spec.tableName));
       const filteredData = Object.fromEntries(
@@ -1553,22 +1559,22 @@ function createModel<T extends Record<string, unknown>>(spec: TableSpec<T>) {
   };
 }
 
-function createPrismaLike(): PrismaLike {
+function createPrismaLike(readOnly = false): PrismaLike {
   return {
-    auditEvent: createModel(auditEventTable),
-    lead: createModel(leadTable),
-    crmActivity: createModel(crmActivityTable),
-    rateLimitWindow: createModel(rateLimitWindowTable),
-    scrapeRun: createModel(scrapeRunTable),
-    user: createModel(userTable),
-    gmailConnection: createModel(gmailConnectionTable),
-    outreachEmail: createModel(outreachEmailTable),
-    outreachAutomationSetting: createModel(outreachAutomationSettingTable),
-    outreachMailbox: createModel(outreachMailboxTable),
-    outreachSequence: createModel(outreachSequenceTable),
-    outreachSequenceStep: createModel(outreachSequenceStepTable),
-    outreachSuppression: createModel(outreachSuppressionTable),
-    outreachRun: createModel(outreachRunTable),
+    auditEvent: createModel(auditEventTable, readOnly),
+    lead: createModel(leadTable, readOnly),
+    crmActivity: createModel(crmActivityTable, readOnly),
+    rateLimitWindow: createModel(rateLimitWindowTable, readOnly),
+    scrapeRun: createModel(scrapeRunTable, readOnly),
+    user: createModel(userTable, readOnly),
+    gmailConnection: createModel(gmailConnectionTable, readOnly),
+    outreachEmail: createModel(outreachEmailTable, readOnly),
+    outreachAutomationSetting: createModel(outreachAutomationSettingTable, readOnly),
+    outreachMailbox: createModel(outreachMailboxTable, readOnly),
+    outreachSequence: createModel(outreachSequenceTable, readOnly),
+    outreachSequenceStep: createModel(outreachSequenceStepTable, readOnly),
+    outreachSuppression: createModel(outreachSuppressionTable, readOnly),
+    outreachRun: createModel(outreachRunTable, readOnly),
   };
 }
 
@@ -1578,4 +1584,11 @@ export function getPrisma(): PrismaLike {
   }
 
   return globalForPrisma.axiomPrisma;
+}
+
+/** Display-only adapter: missing schema fails at read, never triggers ALTER or
+ * CREATE. Mutation methods fail before touching storage, including accidental
+ * calls from legacy helpers retained for their read-only calculations. */
+export function getReadOnlyPrisma(): PrismaLike {
+  return createPrismaLike(true);
 }

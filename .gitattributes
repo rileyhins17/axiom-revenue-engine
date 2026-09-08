@@ -1,0 +1,2 @@
+cloudflare-env.d.ts linguist-generated=true -whitespace
+src/engine/worker-env.d.ts linguist-generated=true -whitespace

@@ -1,19 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { z } from "zod";
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, Copy, Inbox, Send, ShieldCheck, X } from "lucide-react";
 
-type EmailDetail = {
-  id: string;
-  senderEmail: string;
-  recipientEmail: string;
-  subject: string;
-  bodyHtml: string | null;
-  bodyPlain: string | null;
-  status: string;
-  errorMessage: string | null;
-  sentAt: string;
-};
+import { legacyEmailSchema, type LegacyEmail as EmailDetail } from "@/lib/revenue-engine/legacy-mail-contract";
 
 export function SentEmailViewerTrigger({
   emailId,
@@ -34,7 +25,7 @@ export function SentEmailViewerTrigger({
       >
         {children}
       </button>
-      {open ? <SentEmailViewerModal emailId={emailId} onClose={() => setOpen(false)} /> : null}
+      {open ? <SentEmailViewerModal key={emailId} emailId={emailId} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -76,16 +67,6 @@ function senderInitials(email: string): string {
   return display.slice(0, 2).toUpperCase();
 }
 
-function extractEmailBodyMarkup(bodyHtml: string): string {
-  const bodyMatch = bodyHtml.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
-  return (bodyMatch?.[1] ?? bodyHtml).trim();
-}
-
-export function buildEmailHtmlSrcDoc(bodyHtml: string): string {
-  const messageHtml = extractEmailBodyMarkup(bodyHtml);
-  return `<!doctype html><html><head><base target="_blank"><style>:root{color-scheme:dark;}html{background:#080d15;}body{font:15.5px/1.74 "Aptos","Inter","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;color:#e7edf6;padding:48px 40px 56px;margin:0;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;background:linear-gradient(180deg,#0b111c,#070b12);}main.message{max-width:640px;margin:0 auto;padding:0 0 0 28px;border-left:1px solid rgba(125,211,252,.24);}a{color:#7dd3fc;text-decoration:underline;text-decoration-color:rgba(125,211,252,0.32);text-underline-offset:3px;text-decoration-thickness:1px;}a:hover{text-decoration-color:rgba(125,211,252,0.78);}p{margin:0 0 18px;}p:last-child{margin-bottom:0;}strong,b{font-weight:650;color:#fff;}img{max-width:100%;height:auto;border-radius:8px;}blockquote{border-left:2px solid rgba(125,211,252,0.36);margin:2px 0 18px;padding:2px 0 2px 16px;color:#aab4c2;}ul,ol{padding-left:22px;margin:0 0 18px;}li{margin:4px 0;}@media (max-width:640px){body{padding:34px 24px 40px;font-size:15.5px;}main.message{padding-left:18px;}}</style></head><body><main class="message">${messageHtml}</main></body></html>`;
-}
-
 function SentEmailViewerModal({ emailId, onClose }: { emailId: string; onClose: () => void }) {
   const [email, setEmail] = useState<EmailDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,24 +74,23 @@ function SentEmailViewerModal({ emailId, onClose }: { emailId: string; onClose: 
   const [copied, setCopied] = useState<"plain" | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/outreach/emails/${emailId}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((data) => {
-        if (!cancelled) {
-          setEmail(data.email);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load email");
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
+    const controller = new AbortController();
+    // The keyed modal remounts for a different message; initial state is empty.
+    fetch(`/api/outreach/emails/${encodeURIComponent(emailId)}`, {
+      signal: controller.signal, credentials: "same-origin", cache: "no-store",
+    }).then(async response => {
+      if (!response.ok) throw new Error("Unavailable");
+      const data = await response.json();
+      const parsed = z.object({ email: legacyEmailSchema }).parse(data).email;
+      if (parsed.id !== emailId) throw new Error("Wrong message");
+      if (!controller.signal.aborted) setEmail(parsed);
+    }).catch(() => {
+      if (!controller.signal.aborted) {
+        setEmail(null);
+        setError("This legacy message is unavailable. Close and reopen to try again. No mailbox was contacted.");
+      }
+    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [emailId]);
 
   useEffect(() => {
@@ -145,7 +125,7 @@ function SentEmailViewerModal({ emailId, onClose }: { emailId: string; onClose: 
 
   const statusLabel = email
     ? email.status === "sent" || email.status === "delivered"
-      ? "Delivered"
+      ? "Legacy sent record"
       : email.status.replace(/_/g, " ")
     : "";
   const statusIsHealthy = email?.status === "sent" || email?.status === "delivered";
@@ -168,7 +148,7 @@ function SentEmailViewerModal({ emailId, onClose }: { emailId: string; onClose: 
               <div className="flex flex-wrap items-center gap-2.5">
                 <span className="email-viewer-kicker">
                   <Send className="size-3" strokeWidth={2.4} />
-                  Sent email
+                  Legacy email
                 </span>
                 {statusLabel ? (
                   <span
@@ -246,8 +226,8 @@ function SentEmailViewerModal({ emailId, onClose }: { emailId: string; onClose: 
         <footer className="email-viewer-footer flex items-center justify-between gap-3 px-5 py-3 sm:px-8">
           <div className="min-w-0 truncate text-[12px] text-zinc-500">
             {sentAbsolute ? <>Sent {sentAbsolute}</> : null}
-            {email?.status && !statusIsHealthy && email.errorMessage ? (
-              <span className="ml-2 text-amber-300">- {email.errorMessage}</span>
+            {email?.status && !statusIsHealthy && email.failureRecorded ? (
+              <span className="ml-2 text-amber-300">- Legacy failure recorded; provider details are not displayed.</span>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
@@ -289,7 +269,7 @@ function EmailMetaRail({
   statusIsHealthy: boolean;
 }) {
   return (
-    <aside className="email-viewer-meta-rail" aria-label="Delivery details">
+    <aside className="email-viewer-meta-rail" aria-label="Historical message details">
       <div className="email-viewer-thread-map">
         <AddressCard
           label="From"
@@ -315,7 +295,7 @@ function EmailMetaRail({
       <div className="email-viewer-detail-list">
         <DetailRow
           icon={<ShieldCheck className="size-4" strokeWidth={2.2} />}
-          label="Delivery"
+          label="Legacy status"
           value={statusLabel || "Unknown"}
           tone={statusIsHealthy ? "healthy" : "warning"}
         />
@@ -332,10 +312,10 @@ function EmailMetaRail({
         />
       </div>
 
-      {email.errorMessage ? (
+      {email.failureRecorded ? (
         <div className="email-viewer-rail-alert">
           <AlertTriangle className="size-4" strokeWidth={2.2} />
-          <span>{email.errorMessage}</span>
+          <span>Legacy failure recorded; provider details are not displayed.</span>
         </div>
       ) : null}
     </aside>
@@ -399,23 +379,11 @@ function DetailRow({
 }
 
 function EmailBody({ email }: { email: EmailDetail }) {
-  if (email.bodyHtml && email.bodyHtml.trim().length > 0) {
-    const srcDoc = buildEmailHtmlSrcDoc(email.bodyHtml);
-    return (
-      <iframe
-        title={email.subject}
-        srcDoc={srcDoc}
-        sandbox=""
-        className="email-viewer-frame w-full bg-transparent"
-        style={{ minHeight: 420, height: "64vh", border: 0 }}
-      />
-    );
-  }
-  return (
-    <div className="email-viewer-plain-wrap">
-      <pre className="email-viewer-plain">
-        {email.bodyPlain || "(empty)"}
-      </pre>
-    </div>
-  );
+  return <div className="email-viewer-plain-wrap">
+    <p className="mb-4 text-sm text-zinc-300">Saved plain text only. No remote images or mailbox connection. A legacy sent record does not prove delivery.</p>
+    <pre className="email-viewer-plain whitespace-pre-wrap break-words">
+      {email.bodyUnavailable === "TOO_LARGE" ? "Text exceeds the safe display limit. The original record remains saved."
+        : email.bodyPlain || "No plain-text copy is available. HTML is not loaded."}
+    </pre>
+  </div>;
 }

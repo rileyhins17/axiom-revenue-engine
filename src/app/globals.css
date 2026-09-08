@@ -160,7 +160,7 @@
 }
 
 /* ============================================================
-   AXIOM PIPELINE ENGINE v3 — DESIGN SYSTEM
+   AXIOM REVENUE ENGINE — DESIGN SYSTEM
    ============================================================ */
 
 /* ========== AMBIENT AURORA BACKGROUND ========== */
@@ -945,6 +945,41 @@ body::after {
 }
 
 /* Also honor OS preference */
+@media (max-width: 639px) {
+  /* Owner review starts with the business, not a viewport of header chrome. */
+  .owner-review-page .page-header > .page-header-main {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .owner-review-page .page-header-icon,
+  .owner-review-page .page-header-eyebrow {
+    display: none;
+  }
+
+  .owner-review-page .page-header-description {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .owner-review-page .page-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .owner-review-page .page-metric {
+    padding: 10px;
+  }
+
+  .owner-review-page .page-metric > div {
+    flex-wrap: wrap;
+    gap: 2px 6px;
+  }
+
+  .owner-review-page .page-metric-detail {
+    white-space: normal;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   body::before,
@@ -1918,7 +1953,7 @@ body::after {
 }
 
 /* ============================================================
-   AXIOM OPS 04 — QUIET CONTROL ROOM
+   AXIOM REVENUE ENGINE — QUIET CONTROL ROOM
    The v4 layer deliberately removes the ornamental motion and glass
    effects from earlier iterations. Dense operational data now sits on
    calm, predictable surfaces with one brand accent.
@@ -2151,7 +2186,7 @@ body::after {
   font-weight: 650;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #717784;
+  color: #9298a4;
 }
 
 .page-metric-value {
@@ -2164,7 +2199,7 @@ body::after {
 
 .page-metric-detail {
   overflow: hidden;
-  color: #686e79;
+  color: #8d949f;
   font-size: 10.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2413,4 +2448,21 @@ body::after {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Owner acceptance contrast floor. Small operational labels must remain legible
+   against the quiet-control-room surfaces at WCAG AA contrast. */
+.v2-sidebar .text-zinc-500,
+.v2-sidebar .text-zinc-600,
+.v2-sidebar .text-zinc-700,
+.v2-header .text-zinc-500,
+.v2-header .text-zinc-600,
+.v2-header .text-zinc-700,
+nav[aria-label="Primary"] .text-zinc-500,
+nav[aria-label="Primary"] .text-zinc-600,
+nav[aria-label="Primary"] .text-zinc-700,
+[data-owner-content] .text-zinc-500,
+[data-owner-content] .text-zinc-600,
+[data-owner-content] .text-zinc-700 {
+  color: #a1a1aa;
 }

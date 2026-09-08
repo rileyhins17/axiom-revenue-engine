@@ -4,17 +4,12 @@ import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 
 import { writeAuditEvent } from "@/lib/audit";
-import { getClientIp, getCloudflareBindings } from "@/lib/cloudflare";
-import { getAllowedEmails, getServerEnv, getTrustedOrigins, isAdminEmail } from "@/lib/env";
+import { getClientIp, getCloudflareBindings, getDatabase } from "@/lib/cloudflare";
+import { getServerEnv, getTrustedOrigins } from "@/lib/env";
 import { ensureLocalDatabaseDirectory, getLocalDatabasePath } from "@/lib/local-sqlite";
-import { getPrisma } from "@/lib/prisma";
 import { assertRateLimit } from "@/lib/rate-limit";
-
-function isAllowedEmail(email: string) {
-  const allowed = getAllowedEmails();
-  if (allowed.length === 0) return false;
-  return allowed.includes(email.trim().toLowerCase());
-}
+import { isBlockedAdminAuthPath, operatorBanSchemaReady } from "@/lib/operator-ban-schema";
+import { assertOperatorAdmission, finishOperatorSessionCreation, reconcileOperatorAdmission } from "@/lib/operator-owner-policy";
 
 const globalForAuth = globalThis as typeof globalThis & {
   // better-auth's plugin-augmented return type is not stable through ReturnType<typeof betterAuth>.
@@ -53,17 +48,31 @@ export function getAuth() {
     trustedOrigins: getTrustedOrigins(),
     emailAndPassword: {
       enabled: true,
-      autoSignIn: true,
-      requireEmailVerification: false,
+      disableSignUp: true,
+      autoSignIn: false,
+      requireEmailVerification: true,
     },
     session: {
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 6,
       cookieCache: {
-        enabled: true,
-        maxAge: 300,
-        refreshCache: false,
-        strategy: "compact",
+        // Authorization must observe session revocation and role changes in
+        // the database, including when a browser replays an older signed cache.
+        enabled: false,
+      },
+    },
+    databaseHooks: {
+      session: {
+        create: {
+          before: async (session) => {
+            // Includes internal adapter calls without a request context.
+            await assertOperatorAdmission(getDatabase(), session.userId);
+            return { data: session };
+          },
+          after: async (session) => {
+            await finishOperatorSessionCreation(getDatabase(), session);
+          },
+        },
       },
     },
     hooks: {
@@ -80,12 +89,26 @@ export function getAuth() {
         }
 
         if (ctx.path === "/sign-up/email") {
-          const email = String(ctx.body?.email || "").trim().toLowerCase();
-          if (!email || !isAllowedEmail(email)) {
-            throw new APIError("FORBIDDEN", {
-              message: "This email address is not authorized for Axiom ops access.",
-            });
-          }
+          // An allowlisted email string is not proof of mailbox ownership.
+          // Keep this denial in addition to Better Auth's disableSignUp option.
+          throw new APIError("FORBIDDEN", {
+            message: "Public registration is disabled. Contact your workspace administrator.",
+          });
+        }
+        if (!await operatorBanSchemaReady(getDatabase())) {
+          throw new APIError("SERVICE_UNAVAILABLE", {
+            message: "Operator access is temporarily unavailable. Contact your administrator.",
+          });
+        }
+        if (isBlockedAdminAuthPath(ctx.path)) {
+          throw new APIError("FORBIDDEN", {
+            message: "This administrative operation is disabled. Use the reviewed operator controls.",
+          });
+        }
+        const policy = await reconcileOperatorAdmission(getDatabase());
+        if (ctx.path === "/sign-in/email" && (typeof ctx.body?.email !== "string"
+          || !policy.allowedEmails.includes(ctx.body.email.toLowerCase()))) {
+          throw new APIError("FORBIDDEN", { message: "This account is not approved for owner access." });
         }
       }),
       after: createAuthMiddleware(async (ctx) => {
@@ -98,27 +121,6 @@ export function getAuth() {
             actorUserId: session.user.id,
             ipAddress,
             metadata: { email: session.user.email },
-          });
-        }
-
-        if (ctx.path === "/sign-up/email" && session) {
-          const promotedToAdmin = isAdminEmail(session.user.email);
-
-          if (promotedToAdmin) {
-            await getPrisma().user.update({
-              where: { id: session.user.id },
-              data: { role: "admin" },
-            });
-          }
-
-          await writeAuditEvent({
-            action: "auth.sign_up",
-            actorUserId: session.user.id,
-            ipAddress,
-            metadata: {
-              email: session.user.email,
-              promotedToAdmin,
-            },
           });
         }
 

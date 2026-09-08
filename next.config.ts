@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { browserSecurityHeaders } from "./src/lib/browser-security-headers";
 
 // Only initialize OpenNext Cloudflare bindings when explicitly running in a
 // Cloudflare-style dev context. This avoids local Node/Windows weirdness.
@@ -18,6 +19,9 @@ if (
 
 const nextConfig: NextConfig = {
   typedRoutes: true,
+  async headers() {
+    return [{ source: "/:path*", headers: browserSecurityHeaders }];
+  },
 
   // Keep native / heavy server-only packages out of the webpack bundle.
   serverExternalPackages: [

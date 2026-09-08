@@ -1,3 +1,4 @@
+import { ownerSummaryScope, type OwnerSummaryActor } from "./revenue-engine/owner-summary-scope";
 import { AUTOMATION_SETTINGS_DEFAULTS, isAdequateAutonomousLead, MAILBOX_DAILY_SEND_TARGET, MAILBOX_HOURLY_SEND_TARGET, MAILBOX_MIN_DELAY_SECONDS } from "@/lib/automation-policy";
 import { getDatabase, type D1DatabaseLike } from "@/lib/cloudflare";
 import { isLeadOutreachEligible, normalizePipelineEmail } from "@/lib/lead-qualification";
@@ -274,7 +275,8 @@ export function humanizeOperatorBlocker(reason: string | null | undefined): Oper
   }
 }
 
-export async function getAutomationOperatorConsole(now = new Date(), db: D1DatabaseLike = getDatabase()): Promise<AutomationOperatorConsoleData> {
+export async function getAutomationOperatorConsole(actor: OwnerSummaryActor, now = new Date(), db: D1DatabaseLike = getDatabase()): Promise<AutomationOperatorConsoleData> {
+  const scope = await ownerSummaryScope(actor, db);
   const [
     settingsRow,
     mailboxRows,
@@ -285,14 +287,15 @@ export async function getAutomationOperatorConsole(now = new Date(), db: D1Datab
     sequenceBlockerRows,
   ] = await Promise.all([
     readSettings(db),
-    readMailboxes(db, now),
-    readQueueCounts(db),
-    readNextEmails(db),
-    readRecentSent(db),
-    readStepBlockers(db),
-    readSequenceBlockers(db),
+    readMailboxes(db, now, scope.userId),
+    readQueueCounts(db, scope.userId),
+    readNextEmails(db, scope.userId),
+    readRecentSent(db, scope.userId),
+    readStepBlockers(db, scope.userId),
+    readSequenceBlockers(db, scope.userId),
   ]);
 
+  if (!settingsRow) throw new Error("OWNER_SUMMARY_UNAVAILABLE");
   const settings = normalizeSettings(settingsRow);
   const mailboxes = mailboxRows.map((row) => normalizeMailbox(row, now));
   const readyMailboxes = mailboxes.filter((mailbox) => mailbox.readyNow).length;
@@ -312,6 +315,7 @@ export async function getAutomationOperatorConsole(now = new Date(), db: D1Datab
     actionNeededCount: actions.length,
   });
 
+  await scope.assertCurrent();
   return {
     generatedAt: now.toISOString(),
     settings,
@@ -422,19 +426,19 @@ async function readSettings(db: D1DatabaseLike) {
        "globalPaused",
        "emergencyPaused",
        "emergencyPausedAt",
-       "emergencyPausedBy",
-       "emergencyPauseReason",
+       NULL AS "emergencyPausedBy",
+       CASE WHEN "emergencyPauseReason" IS NOT NULL THEN 'Emergency stop recorded' ELSE NULL END AS "emergencyPauseReason",
        "intakePaused",
        "intakePausedAt",
-       "intakePausedBy",
+       NULL AS "intakePausedBy",
        "followUpsPaused"
      FROM "OutreachAutomationSetting"
      WHERE "id" = 'global'
      LIMIT 1`,
-  ).first<SettingsRow>().catch(() => null);
+  ).first<SettingsRow>();
 }
 
-async function readMailboxes(db: D1DatabaseLike, now: Date) {
+async function readMailboxes(db: D1DatabaseLike, now: Date, userId: string) {
   const todayStart = startOfDay(now).toISOString();
   const hourStart = startOfHour(now).toISOString();
   const rows = await db.prepare(
@@ -450,58 +454,57 @@ async function readMailboxes(db: D1DatabaseLike, now: Date) {
        (
          SELECT COUNT(*)
          FROM "OutreachEmail" e
-         WHERE e."mailboxId" = m."id"
+         WHERE e."mailboxId" = m."id" AND e."senderUserId" = m."userId"
            AND e."status" IN ('sent', 'delivered')
            AND datetime(e."sentAt") >= datetime(?)
        ) AS "sentToday",
        (
          SELECT COUNT(*)
          FROM "OutreachEmail" e
-         WHERE e."mailboxId" = m."id"
+         WHERE e."mailboxId" = m."id" AND e."senderUserId" = m."userId"
            AND e."status" IN ('sent', 'delivered')
            AND datetime(e."sentAt") >= datetime(?)
        ) AS "sentThisHour"
      FROM "OutreachMailbox" m
-     WHERE m."gmailAddress" IN ('riley@getaxiom.ca', 'aidan@getaxiom.ca')
-        OR m."gmailConnectionId" IS NOT NULL
+     WHERE m."userId" = ?
      ORDER BY lower(m."gmailAddress") ASC`,
-  ).bind(todayStart, hourStart).all<MailboxRow>().catch(() => ({ results: [] as MailboxRow[] }));
+  ).bind(todayStart, hourStart, userId).all<MailboxRow>();
 
   return rows.results ?? [];
 }
 
-async function readQueueCounts(db: D1DatabaseLike): Promise<QueueRow> {
+async function readQueueCounts(db: D1DatabaseLike, userId: string): Promise<QueueRow> {
   const row = await db.prepare(
     `SELECT
        (
          SELECT COUNT(*)
          FROM "OutreachSequenceStep" st
          JOIN "OutreachSequence" seq ON seq."id" = st."sequenceId"
-         WHERE st."status" = 'SCHEDULED'
+         WHERE seq."queuedByUserId"=? AND st."status" = 'SCHEDULED'
            AND st."stepNumber" = 1
            AND seq."status" IN ('QUEUED', 'ACTIVE', 'WAITING', 'BLOCKED', 'SENDING')
        ) AS "scheduledInitialSteps",
        (
          SELECT COUNT(*)
          FROM "OutreachSequence"
-         WHERE "status" IN ('QUEUED', 'ACTIVE', 'WAITING', 'BLOCKED', 'SENDING')
+         WHERE "queuedByUserId"=? AND "status" IN ('QUEUED', 'ACTIVE', 'WAITING', 'BLOCKED', 'SENDING')
        ) AS "queuedSequences",
        (
          SELECT COUNT(*)
-         FROM "OutreachSequenceStep"
-         WHERE "status" = 'SCHEDULED'
+         FROM "OutreachSequenceStep" st JOIN "OutreachSequence" seq ON seq."id"=st."sequenceId"
+         WHERE seq."queuedByUserId"=? AND st."status" = 'SCHEDULED'
        ) AS "scheduledRawSteps",
        (
          SELECT COUNT(*)
-         FROM "OutreachSequenceStep"
-         WHERE "status" IN ('CLAIMED', 'GENERATING', 'SENDING')
+         FROM "OutreachSequenceStep" st JOIN "OutreachSequence" seq ON seq."id"=st."sequenceId"
+         WHERE seq."queuedByUserId"=? AND st."status" IN ('CLAIMED', 'GENERATING', 'SENDING')
        ) AS "sendingNow",
        (
          SELECT COUNT(*)
          FROM "OutreachSequence"
-         WHERE "status" IN ('BLOCKED', 'PAUSED')
+         WHERE "queuedByUserId"=? AND "status" IN ('BLOCKED', 'PAUSED')
        ) AS "blocked"`,
-  ).first<Partial<QueueRow>>().catch(() => null);
+  ).bind(userId,userId,userId,userId,userId).first<Partial<QueueRow>>();
 
   return {
     scheduledInitialSteps: toNumber(row?.scheduledInitialSteps),
@@ -513,7 +516,7 @@ async function readQueueCounts(db: D1DatabaseLike): Promise<QueueRow> {
   };
 }
 
-async function readNextEmails(db: D1DatabaseLike) {
+async function readNextEmails(db: D1DatabaseLike, userId: string) {
   const rows = await db.prepare(
     `SELECT
        st."id",
@@ -537,13 +540,13 @@ async function readNextEmails(db: D1DatabaseLike) {
      FROM "OutreachSequenceStep" st
      JOIN "OutreachSequence" seq ON seq."id" = st."sequenceId"
      JOIN "Lead" l ON l."id" = seq."leadId"
-     LEFT JOIN "OutreachMailbox" m ON m."id" = seq."assignedMailboxId"
-     WHERE st."status" = 'SCHEDULED'
+     LEFT JOIN "OutreachMailbox" m ON m."id" = seq."assignedMailboxId" AND m."userId" = seq."queuedByUserId"
+     WHERE seq."queuedByUserId" = ? AND st."status" = 'SCHEDULED'
        AND st."stepNumber" = 1
        AND seq."status" IN ('QUEUED', 'ACTIVE', 'WAITING', 'SENDING')
      ORDER BY datetime(st."scheduledFor") ASC
      LIMIT 80`,
-  ).all<NextEmailRow>().catch(() => ({ results: [] as NextEmailRow[] }));
+  ).bind(userId).all<NextEmailRow>();
 
   return (rows.results ?? []).filter(isNextEmailRowSendable).slice(0, 5);
 }
@@ -564,7 +567,7 @@ function isNextEmailRowSendable(row: NextEmailRow) {
   return Boolean(row.enrichmentData) && isLeadOutreachEligible(lead) && isAdequateAutonomousLead(lead);
 }
 
-async function readRecentSent(db: D1DatabaseLike) {
+async function readRecentSent(db: D1DatabaseLike, userId: string) {
   const rows = await db.prepare(
     `SELECT
        e."id",
@@ -575,19 +578,19 @@ async function readRecentSent(db: D1DatabaseLike) {
        l."businessName"
      FROM "OutreachEmail" e
      LEFT JOIN "Lead" l ON l."id" = e."leadId"
-     WHERE e."status" IN ('sent', 'delivered')
+     WHERE e."senderUserId" = ? AND e."status" IN ('sent', 'delivered')
      ORDER BY datetime(e."sentAt") DESC
      LIMIT 10`,
-  ).all<RecentSentRow>().catch(() => ({ results: [] as RecentSentRow[] }));
+  ).bind(userId).all<RecentSentRow>();
 
   return rows.results ?? [];
 }
 
-async function readStepBlockers(db: D1DatabaseLike) {
+async function readStepBlockers(db: D1DatabaseLike, userId: string) {
   const rows = await db.prepare(
     `SELECT st."errorMessage" AS "reason", COUNT(*) AS "count"
-     FROM "OutreachSequenceStep" st
-     WHERE st."errorMessage" IN (
+     FROM "OutreachSequenceStep" st JOIN "OutreachSequence" seq ON seq."id"=st."sequenceId"
+     WHERE seq."queuedByUserId"=? AND st."errorMessage" IN (
        'mailbox_disconnected',
        'mailbox_disabled',
        'global_pause',
@@ -599,16 +602,16 @@ async function readStepBlockers(db: D1DatabaseLike) {
      )
      GROUP BY st."errorMessage"
      LIMIT 12`,
-  ).all<BlockerRow>().catch(() => ({ results: [] as BlockerRow[] }));
+  ).bind(userId).all<BlockerRow>();
 
   return rows.results ?? [];
 }
 
-async function readSequenceBlockers(db: D1DatabaseLike) {
+async function readSequenceBlockers(db: D1DatabaseLike, userId: string) {
   const rows = await db.prepare(
     `SELECT seq."stopReason" AS "reason", COUNT(*) AS "count"
      FROM "OutreachSequence" seq
-     WHERE seq."stopReason" IN (
+     WHERE seq."queuedByUserId"=? AND seq."stopReason" IN (
        'mailbox_disconnected',
        'mailbox_disabled',
        'global_pause',
@@ -620,7 +623,7 @@ async function readSequenceBlockers(db: D1DatabaseLike) {
      )
      GROUP BY seq."stopReason"
      LIMIT 12`,
-  ).all<BlockerRow>().catch(() => ({ results: [] as BlockerRow[] }));
+  ).bind(userId).all<BlockerRow>();
 
   return rows.results ?? [];
 }

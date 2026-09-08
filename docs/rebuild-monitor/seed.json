@@ -1,0 +1,94 @@
+{
+  "monitorVersion": "axiom-rebuild-monitor-v1",
+  "updatedAt": "2026-09-06T03:42:03-04:00",
+  "state": "coding",
+  "milestone": "Build Riley's private local rebuild monitor inside Codex desktop",
+  "lastMeaningfulUpdate": "The D1 safety checkpoint was verified, committed, and pushed; the private CEO monitor is now being built.",
+  "lastVerifiedCheckpoint": {
+    "sha": "f99784e219d4b5e5d6e07ac1b062a62d275d4b20",
+    "shortSha": "f99784e2",
+    "title": "Verify owner dossier D1 results",
+    "branch": "RileyHinsperger/axiom-revenue-engine-rebuild",
+    "verifiedAt": "2026-09-06T03:42:03-04:00"
+  },
+  "completedWork": [
+    "Repository recovered, renamed, made private, and protected by fail-closed automation controls.",
+    "Owner-first Leads list, evidence dossier, and Quality Lab work with synthetic local data.",
+    "The first owner decision transaction now has an independently reviewed, exact-result safety proof."
+  ],
+  "currentWork": [
+    "Build a plain-English monitor that survives quota exhaustion and new Codex tasks.",
+    "Separate the last verified Git checkpoint from live uncommitted working-copy status.",
+    "Make every future agent update it at meaningful planning, coding, testing, fixing, verification, commit, and blocker transitions."
+  ],
+  "nextWork": [
+    "Verify the monitor locally and challenge its privacy and truthfulness controls.",
+    "Rehearse the owner decision adapter against a disposable local D1 or Miniflare database.",
+    "Keep all staging, production, provider, mailbox, and prospect work approval-gated."
+  ],
+  "blocker": null,
+  "safety": {
+    "outboundSending": "OFF",
+    "productionChanges": "NONE",
+    "externalProspectContact": "NONE",
+    "paidProviderOperations": "NONE",
+    "spendImpactCad": 0,
+    "storageBoundary": "LOCAL_CANONICAL_CHECKOUT_ONLY"
+  },
+  "stages": [
+    {
+      "id": "privacy-safety",
+      "label": "1. Privacy, safety, and identity",
+      "state": "in_progress",
+      "summary": "The engine is stopped and backed up; Riley and Aidan still need fresh secured business mailboxes before outreach."
+    },
+    {
+      "id": "durable-foundation",
+      "label": "2. Durable rebuild foundation",
+      "state": "in_progress",
+      "summary": "Repository rules, CI, status, gotchas, staging isolation, and resumable checkpoints exist; the rebuild is not yet feature-complete."
+    },
+    {
+      "id": "lead-quality",
+      "label": "3. Lead-quality engine",
+      "state": "in_progress",
+      "summary": "Evidence, audit, scoring, coverage, contact, and ten-business shadow contracts are built; real KW evaluation remains gated."
+    },
+    {
+      "id": "responsible-outreach",
+      "label": "4. Reachability and responsible outreach",
+      "state": "not_started",
+      "summary": "Channel contracts exist, but verified email delivery, consent evidence, reply sync, and approved campaigns are not active."
+    },
+    {
+      "id": "owner-application",
+      "label": "5. Owner-first application",
+      "state": "in_progress",
+      "summary": "Leads, dossiers, and Quality Lab pass local owner checks; their newer staging release still awaits approval, and Today, Outreach, Revenue, and System need the full rebuild."
+    },
+    {
+      "id": "kw-pilot",
+      "label": "6. Controlled KW pilot",
+      "state": "not_started",
+      "summary": "No real pilot sends have started; the 50-lead quality set and shadow run must pass first."
+    },
+    {
+      "id": "limited-autonomy",
+      "label": "7. Limited autonomy and expansion",
+      "state": "locked",
+      "summary": "Autonomy stays locked until quality, deliverability, compliance, owner capacity, and revenue gates are proven."
+    }
+  ],
+  "timeline": [
+    {
+      "at": "2026-09-06T03:42:03-04:00",
+      "state": "coding",
+      "message": "Started the private local CEO rebuild monitor after pushing the reviewed D1 safety checkpoint."
+    },
+    {
+      "at": "2026-09-06T03:34:00-04:00",
+      "state": "committed",
+      "message": "Checkpoint f99784e passed 579 tests, the Cloudflare dry checks, owner UI acceptance, and a clean Luna max review."
+    }
+  ]
+}

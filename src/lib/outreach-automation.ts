@@ -1,3 +1,6 @@
+import { normalizeSuppressionDomain as normalizeDomain } from "./suppression-normalization";
+import { ownerSummaryScope, type OwnerSummaryActor } from "./revenue-engine/owner-summary-scope";
+import { projectAutomationOverview } from "./revenue-engine/automation-summary-projection";
 import {
   generateSequenceStepEmail,
   MESSAGE_POLICY_VERSION,
@@ -55,11 +58,12 @@ import {
 } from "@/lib/automation-policy";
 import { isGenericRoleEmail } from "@/lib/contact-validation";
 import { recordFunnelEvent } from "@/lib/funnel-events";
+import { requireOutreachApproval } from "@/lib/outreach-approval";
 import { hasValidPipelineEmail, isLeadOutreachEligible, normalizePipelineEmail } from "@/lib/lead-qualification";
 import { resolveLeadEnrichment } from "@/lib/outreach-enrichment";
-import { getPrisma } from "@/lib/prisma";
+import { getPrisma, getReadOnlyPrisma } from "@/lib/prisma";
 import { READY_FOR_FIRST_TOUCH_STATUS } from "@/lib/outreach";
-import type { D1DatabaseLike } from "@/lib/cloudflare";
+import { getDatabase, type D1DatabaseLike } from "@/lib/cloudflare";
 import type {
   GmailConnectionRecord,
   LeadRecord,
@@ -453,22 +457,6 @@ const NON_BUSINESS_DOMAIN_EXACTS = new Set([
   "tiktok.com",
   "x.com",
 ]);
-
-function normalizeDomain(domain: string | null | undefined) {
-  const raw = (domain || "").trim().toLowerCase();
-  if (!raw) return "";
-  try {
-    const parsed = new URL(raw.includes("://") ? raw : `https://${raw}`);
-    return parsed.hostname.replace(/^www\./, "");
-  } catch {
-    return raw
-      .replace(/^https?:\/\//, "")
-      .replace(/^www\./, "")
-      .split("/")[0]
-      .split("?")[0]
-      .trim();
-  }
-}
 
 function isSharedEmailProviderDomain(domain: string | null | undefined) {
   const normalized = normalizeDomain(domain);
@@ -1106,7 +1094,19 @@ async function listSendableMailboxes(prisma: PrismaLike) {
   }) as Promise<OutreachMailboxRecord[]>;
 }
 
-async function getMailboxLoad(prisma: PrismaLike, mailboxId: string, now: Date) {
+async function getMailboxLoad(prisma: PrismaLike, mailboxId: string, now: Date, senderUserId?: string) {
+  if (senderUserId) {
+    // Summary data contains both SQLite and ISO timestamps. Text comparison
+    // against an ISO bound silently misses same-day SQLite-formatted records.
+    const row = await getDatabase().prepare(`SELECT
+      COALESCE(SUM(CASE WHEN datetime(sentAt)>=datetime(?) THEN 1 ELSE 0 END),0) AS sentToday,
+      COALESCE(SUM(CASE WHEN datetime(sentAt)>=datetime(?) THEN 1 ELSE 0 END),0) AS sentThisHour
+      FROM "OutreachEmail" WHERE mailboxId=? AND senderUserId=? AND status='sent'`)
+      .bind(startOfDay(now).toISOString(),startOfHour(now).toISOString(),mailboxId,senderUserId)
+      .first<{sentToday:number;sentThisHour:number}>();
+    if (!row) throw new Error("OWNER_SUMMARY_UNAVAILABLE");
+    return {sentToday:Number(row.sentToday),sentThisHour:Number(row.sentThisHour)};
+  }
   const [sentToday, sentThisHour] = await Promise.all([
     prisma.outreachEmail.count({
       where: {
@@ -1521,8 +1521,7 @@ async function rescheduleFollowUpIfTooEarly(
   return true;
 }
 
-export async function getActiveAutomationLeadIds() {
-  const prisma = getPrisma();
+export async function getActiveAutomationLeadIds(prisma: PrismaLike = getPrisma(), recoverStale = true) {
   const sequences = await prisma.outreachSequence.findMany({
     where: { status: { in: [...ACTIVE_SEQUENCE_STATUSES] } },
   }) as OutreachSequenceRecord[];
@@ -1543,7 +1542,7 @@ export async function getActiveAutomationLeadIds() {
     for (const sequence of recoverableSequences) {
       if (nextStepMap.has(sequence.id)) {
         blockingLeadIds.push(sequence.leadId);
-      } else {
+      } else if (recoverStale) {
         await stopSequenceInternal(prisma, sequence, "stale_empty_sequence_recovered").catch(() => null);
       }
     }
@@ -1736,8 +1735,8 @@ export function selectAutomationReadyLeads(
   return { leads: readyLeads, diagnostics };
 }
 
-export async function getAutomationReadyLeadSnapshot(prisma: PrismaLike = getPrisma()) {
-  const activeLeadIds = new Set(await getActiveAutomationLeadIds());
+export async function getAutomationReadyLeadSnapshot(prisma: PrismaLike = getPrisma(), recoverStale = true) {
+  const activeLeadIds = new Set(await getActiveAutomationLeadIds(prisma, recoverStale));
   const [activeRecipientEmails, sentRecipientEmails, openFirstTouchState, suppressions] = await Promise.all([
     getActiveAutomationRecipientEmails(prisma),
     getSentRecipientEmails(),
@@ -2276,18 +2275,6 @@ async function getLeadMap(prisma: PrismaLike, leadIds: number[]) {
   return new Map(leads.map((lead) => [lead.id, lead]));
 }
 
-async function getMailboxMap(prisma: PrismaLike, mailboxIds: string[]) {
-  if (mailboxIds.length === 0) return new Map<string, OutreachMailboxRecord>();
-  const mailboxes: OutreachMailboxRecord[] = [];
-  for (const chunk of chunkArray(mailboxIds)) {
-    const chunkMailboxes = (await prisma.outreachMailbox.findMany({
-      where: { id: { in: chunk } },
-    })) as OutreachMailboxRecord[];
-    mailboxes.push(...chunkMailboxes);
-  }
-  return new Map(mailboxes.map((mailbox) => [mailbox.id, mailbox]));
-}
-
 async function getNextPendingStep(prisma: PrismaLike, sequenceId: string) {
   return prisma.outreachSequenceStep.findFirst({
     where: {
@@ -2384,22 +2371,20 @@ type SequenceRuntimeContext = {
   suppressedDomains?: Set<string>;
 };
 
-export async function listAutomationOverview() {
-  const prisma = getPrisma();
+export async function listAutomationOverview(actor: OwnerSummaryActor) {
+  const scope = await ownerSummaryScope(actor);
+  const prisma = getReadOnlyPrisma();
   const now = new Date();
-  const [settings] = await Promise.all([
-    getSettings(prisma),
-    syncMailboxesForGmailConnections().catch((error) => {
-      console.warn("[automation] Failed to sync Gmail mailboxes before overview:", error);
-    }),
-  ]);
+  const settingsRow = await prisma.outreachAutomationSetting.findUnique({ where: { id: "global" } });
+  if (!settingsRow) throw new Error("OWNER_SUMMARY_UNAVAILABLE");
+  const settings = normalizeAutomationSettings(settingsRow);
   const [mailboxes, sequences, recentRuns, ready, recentSentRaw] = await Promise.all([
-    prisma.outreachMailbox.findMany({ orderBy: { updatedAt: "desc" } }) as Promise<OutreachMailboxRecord[]>,
-    prisma.outreachSequence.findMany({ orderBy: { createdAt: "desc" }, take: 300 }) as Promise<OutreachSequenceRecord[]>,
+    prisma.outreachMailbox.findMany({ where: { userId: scope.userId }, orderBy: { updatedAt: "desc" } }) as Promise<OutreachMailboxRecord[]>,
+    prisma.outreachSequence.findMany({ where: { queuedByUserId: scope.userId }, orderBy: { createdAt: "desc" }, take: 300 }) as Promise<OutreachSequenceRecord[]>,
     prisma.outreachRun.findMany({ orderBy: { startedAt: "desc" }, take: 20 }) as Promise<OutreachRunRecord[]>,
-    listAutomationReadyLeads(prisma),
+    getAutomationReadyLeadSnapshot(prisma, false).then(snapshot => snapshot.leads),
     prisma.outreachEmail.findMany({
-      where: { status: "sent", sequenceId: { not: null } },
+      where: { senderUserId: scope.userId, status: "sent", sequenceId: { not: null } },
       orderBy: { sentAt: "desc" },
       take: 12,
     }),
@@ -2408,7 +2393,7 @@ export async function listAutomationOverview() {
   const sequenceIds = sequences.map((sequence) => sequence.id);
   const [leadMap, mailboxMap, nextStepMap] = await Promise.all([
     getLeadMap(prisma, Array.from(new Set(sequences.map((sequence) => sequence.leadId)))),
-    getMailboxMap(prisma, Array.from(new Set(sequences.map((sequence) => sequence.assignedMailboxId).filter(Boolean) as string[]))),
+    Promise.resolve(new Map(mailboxes.map(mailbox => [mailbox.id, mailbox]))),
     getNextPendingStepMap(prisma, sequenceIds),
   ]);
 
@@ -2423,7 +2408,7 @@ export async function listAutomationOverview() {
     Promise.all(
       mailboxes.map(async (mailbox) => ({
         ...mailbox,
-        ...(await getMailboxLoad(prisma, mailbox.id, now)),
+        ...(await getMailboxLoad(prisma, mailbox.id, now, scope.userId)),
         nextAvailableAt: getMailboxNextAvailableAt(mailbox, settings, now),
       })),
     ),
@@ -2493,9 +2478,15 @@ export async function listAutomationOverview() {
   const repliedCount = summaries.filter((sequence) => sequence.blockerReason === "reply_detected").length;
   const sendReadyCount = enrichedCount + readyForTouchCount;
   const [totalQueuedCount, totalWaitingCount, totalScheduledInitialCount] = await Promise.all([
-    prisma.outreachSequence.count({ where: { status: "QUEUED" } }),
-    prisma.outreachSequence.count({ where: { status: "ACTIVE" } }),
-    prisma.outreachSequenceStep.count({ where: { status: "SCHEDULED", stepNumber: 1 } }),
+    prisma.outreachSequence.count({ where: { queuedByUserId: scope.userId, status: "QUEUED" } }),
+    prisma.outreachSequence.count({ where: { queuedByUserId: scope.userId, status: "ACTIVE" } }),
+    getDatabase().prepare(`SELECT COUNT(*) AS count FROM "OutreachSequenceStep" st
+      JOIN "OutreachSequence" seq ON seq.id=st.sequenceId
+      WHERE seq.queuedByUserId=? AND st.status='SCHEDULED' AND st.stepNumber=1`)
+      .bind(scope.userId).first<{ count: number }>().then(row => {
+        if (!row) throw new Error("OWNER_SUMMARY_UNAVAILABLE");
+        return Number(row.count);
+      }),
   ]);
   const effectiveSchedule = resolveAutomationScheduleForOverview({
     futureSendAt: sampledFutureSendAt,
@@ -2504,7 +2495,8 @@ export async function listAutomationOverview() {
     now,
   });
 
-  return {
+  await scope.assertCurrent();
+  return projectAutomationOverview({
     settings,
     ready,
     mailboxes: mailboxStats,
@@ -2545,7 +2537,7 @@ export async function listAutomationOverview() {
       replied: repliedCount,
       scheduledToday,
     },
-  } satisfies AutomationOverview;
+  } satisfies AutomationOverview);
 }
 
 export async function updateAutomationSettings(data: Partial<OutreachAutomationSettingRecord>) {
@@ -2553,14 +2545,6 @@ export async function updateAutomationSettings(data: Partial<OutreachAutomationS
   const settings = await getSettings(prisma);
   return prisma.outreachAutomationSetting.update({
     where: { id: settings.id },
-    data,
-  });
-}
-
-export async function updateMailbox(mailboxId: string, data: Partial<OutreachMailboxRecord>) {
-  const prisma = getPrisma();
-  return prisma.outreachMailbox.update({
-    where: { id: mailboxId },
     data,
   });
 }
@@ -3714,6 +3698,23 @@ async function sendScheduledStep(
     generatedBodyHtml: email.bodyHtml,
     generatedBodyPlain: email.bodyPlain,
   }).catch(() => null);
+
+  const approval = await requireOutreachApproval({
+    bodyHtml: email.bodyHtml,
+    bodyPlain: email.bodyPlain,
+    campaignKey: email.campaignKey || null,
+    leadId: context.lead.id,
+    messagePolicyVersion: email.messagePolicyVersion || null,
+    recipientEmail,
+    sequenceId: claim.sequence.id,
+    sequenceStepId: claim.step.id,
+    subject: email.subject,
+    variantKey: email.variantKey || null,
+  });
+  if (!approval.allowed) {
+    await setSequenceBlocked(prisma, claim, "human_approval_required");
+    throw new AutomationSkipError("human_approval_required");
+  }
 
   await _advancePhase(claim.step.id, "SENDING").catch(() => null);
 

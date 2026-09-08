@@ -9,13 +9,13 @@ import { PerformanceProvider } from "@/lib/ui/performance";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Axiom Pipeline Engine",
-  description: "Axiom Pipeline Engine for lead extraction, enrichment, outreach, and operations control.",
-  applicationName: "Axiom Pipeline Engine",
+  title: "Axiom Revenue Engine",
+  description: "Evidence-first lead quality, outreach review, and revenue operations for Axiom Web.",
+  applicationName: "Axiom Revenue Engine",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Axiom Ops",
+    title: "Axiom Revenue",
     statusBarStyle: "black-translucent",
   },
   icons: {

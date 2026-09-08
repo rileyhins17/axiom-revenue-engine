@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Install Axiom Ops on iOS",
-  description: "Add the Axiom Pipeline Engine to your iPhone Home Screen as a full-screen app.",
+  title: "Install Axiom Revenue on iOS",
+  description: "Add the Axiom Revenue Engine to your iPhone Home Screen as a full-screen app.",
 };
 
 const STEPS = [
@@ -10,7 +10,7 @@ const STEPS = [
   "Tap Download profile below. Safari will ask to allow the download — tap Allow.",
   "Open Settings. A new Profile Downloaded banner appears near the top — tap it.",
   "Tap Install (top right), enter your passcode, then tap Install again to confirm.",
-  "Done. The Axiom Ops icon is now on your Home Screen — full screen, no address bar.",
+  "Done. The Axiom Revenue icon is now on your Home Screen — full screen, no address bar.",
 ];
 
 export default function InstallPage() {
@@ -22,10 +22,10 @@ export default function InstallPage() {
             iOS Home Screen App
           </span>
           <h1 className="text-2xl font-semibold tracking-[-0.02em] text-white">
-            Install Axiom Ops
+            Install Axiom Revenue
           </h1>
           <p className="text-sm leading-6 text-zinc-400">
-            Adds the pipeline to your iPhone Home Screen as a full-screen app with the Axiom
+            Adds the Revenue Engine to your iPhone Home Screen as a full-screen app with the Axiom
             icon and no Safari address bar. Always points at the live dashboard, so it can
             never land on a broken link.
           </p>
