@@ -18,6 +18,8 @@
     "worker:local": "tsx scripts/local-scrape-worker.ts",
     "test": "tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\" \"scripts/**/*.test.mjs\"",
     "test:owner-ui": "tsx scripts/verify-owner-ui-acceptance.ts",
+    "test:saved-email-ui": "tsx scripts/verify-saved-email-ui.ts",
+    "test:legacy-email-ui": "tsx scripts/verify-legacy-email-ui.ts",
     "rebuild-monitor": "tsx scripts/serve-rebuild-monitor.ts",
     "rebuild-monitor:update": "tsx scripts/update-rebuild-monitor.ts",
     "rebuild-monitor:check": "tsx scripts/verify-rebuild-monitor.ts",

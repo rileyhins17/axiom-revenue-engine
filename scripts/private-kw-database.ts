@@ -40,8 +40,15 @@ export function assertCanonicalPrivateKwRevenueSchema(database: Database.Databas
   try {
     reference.pragma("foreign_keys = ON");
     applyCanonicalPrivateKwMigrations(reference);
-    if (JSON.stringify(revenueSchemaRows(database)) !== JSON.stringify(revenueSchemaRows(reference))) {
-      throw new Error(`Private KW database Revenue schema differs from canonical migrations ${PRIVATE_KW_CANONICAL_MIGRATION_RANGE}.`);
+    const actual = JSON.stringify(revenueSchemaRows(database));
+    if (actual === JSON.stringify(revenueSchemaRows(reference))) return;
+    // The new mailbox metadata shares the Revenue prefix but is independent of
+    // KW materialization. Accept only its COMPLETE canonical table/index/trigger
+    // extension, never arbitrary extra tables or filtered-out schema objects.
+    // This changes only the disposable reference, not the inspected database.
+    reference.exec(readFileSync(new URL("../migrations/0075_provider_neutral_reply_identity.sql", import.meta.url), "utf8"));
+    if (actual !== JSON.stringify(revenueSchemaRows(reference))) {
+      throw new Error(`Private KW database Revenue schema differs from canonical migrations ${PRIVATE_KW_CANONICAL_MIGRATION_RANGE} (optionally with exact mailbox migration 0075).`);
     }
   } finally {
     reference.close();

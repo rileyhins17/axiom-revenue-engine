@@ -65,9 +65,9 @@ export function AutomationConsole({ data }: Props) {
   return (
     <div className="mx-auto flex w-full max-w-[1540px] flex-col gap-5">
       <PageHeader
-        eyebrow="Autonomous execution"
+        eyebrow="Your saved mail and queue"
         title="Automation"
-        description={data.status.sentence}
+        description={`${data.status.sentence} Showing your legacy mailbox and message records, not a live provider health check or sending approval.`}
         icon={Bot}
         status={
           <div className="flex flex-wrap items-center gap-2">

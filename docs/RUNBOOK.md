@@ -1,5 +1,26 @@
 # Operator and release runbook
 
+## Owner deployment hold (2026-09-08)
+
+Do not deploy or publish the unfinished app, including hosted previews, staging
+and production. This hold supersedes earlier release instructions and historical
+approvals. Local development, loopback previews, builds, tests and no-upload dry
+runs may continue. Finish implementation and required local acceptance gates,
+present Riley with an exact-candidate readiness review and all outstanding
+live-only checks, then obtain his explicit release approval before any upload.
+Neither green CI nor a staging packet authorizes deployment. No existing resource
+is to be removed or changed merely to implement this hold.
+
+The local implementation now routes both `npm run deploy` and
+`npm run deploy:production` to an unconditional denial. The checked-in production
+workflow's deploy job is disabled and requests no provider credentials. These
+guards have no argument or environment override; restoring a release path needs
+a reviewed source change after the owner's readiness decision. Safety checks and
+`scripts/deployment-hold.test.mjs` protect these entry points. Builds and explicit
+`--dry-run` checks remain available. This is not a machine-wide block on manually
+invoking Wrangler and does not change old workflow versions already on GitHub.
+Never invoke another upload command to bypass the hold.
+
 ## Emergency stop
 
 1. Use the visible emergency stop in System/Outreach.
@@ -145,6 +166,169 @@ requires a current approved admin session and a durable audit event in the same
 database transaction; a repeated identical request adds no event. Missing batch
 support or audit storage fails closed. This source-only change enables no mail.
 
+### Manual reply boundary (local partial integration)
+
+The actual `/api/clients/[id]/emails/reply` POST now requires the shared current
+administrator/origin fence and routes through `handleApprovedManualReply`.
+`getManualReplyRuntime()` deliberately returns `null`: authenticated requests
+receive private/no-store HTTP 503 without an outbound credential lookup, token
+refresh, outbound database operation or Gmail fallback. Authentication still
+uses its normal database checks. No environment value enables the mail runtime.
+
+The injected local path accepts only `{ "intentId": "<64 lowercase hex characters>" }`.
+The runtime first checks owner-scoped recorded outcomes with a SELECT-only reader.
+If no outcome exists, an approval reader loads the immutable intent and current stored
+envelope; the handler compares authenticated owner, URL client, mailbox, mode,
+Message-ID and exact content digest before invoking the guarded runtime. Bodies are
+limited to 1024 actual bytes and five seconds, with strict JSON/UTF-8 validation.
+The browser cannot submit authoritative sender, recipient, content, cost or policy.
+
+Responses distinguish accepted mail (`SENT`), accepted mail needing history repair
+(`SENT_HISTORY_PENDING`), uncertain delivery (`DELIVERY_UNCERTAIN`), confirmed
+rejection (`REJECTED`) and unavailable status (`STATUS_UNAVAILABLE`). A 2xx alone
+is not success. Keep the same intent reference for all recovery; never generate a
+new one to retry uncertainty. `SENT` means provider acceptance, not inbox delivery.
+
+The old raw-envelope composer is removed from the client email panel. Saved email
+activity is now read-only; no generate/reply button can submit the obsolete request.
+Durable exact approval and retained-intent recovery must be implemented before
+replying is available. Do not restore a Gmail call or count a read-only panel as
+completion of the required reply feature.
+The synthetic route test calls the real approval writer after seeding synthetic
+provider identity metadata. It substitutes provider health/consent/capacity and
+transport, not approval creation or the durable receipt reader. Its claim now
+uses current database account/session/reviewer, exact approval, lead archive,
+global/emergency stop and suppression checks in the SAME INSERT as the budget
+reservation. A second check before fake transport catches changes after claiming;
+that failed attempt remains reserved and non-resendable. The final budget check
+allows an already-reserved amount at the ceiling but rejects a paused or stale
+month. This is not an in-flight recall guarantee.
+
+Legacy source `REPLY` (case/whitespace normalized) stops automated sequences, not owner responses. It is not
+consent and does not classify the inbound content. Explicit unsubscribe/opt-out,
+complaint, bounce and no-MX sources cannot become sendable merely by expiring;
+other legacy cooldowns may expire on a valid database timestamp. Unknown/malformed
+expiry stays blocked. The separate inbound classifier/opt-out writer is unfinished.
+Legacy address wrappers, encoded values and `www.` domain forms use the existing
+email parser and a shared pure domain normalizer. A bounded read maps exact raw
+suppression inputs to normalized values; the SQL write rechecks every current row
+against that mapping. A new or changed row stops the claim instead of using a stale
+"not suppressed" answer. The same check runs again before transport. More than
+1,000 legacy suppression rows, invalid fields or a mapping over 128 KiB stops for
+review; rows are never silently omitted. This compatibility limit must be addressed
+with a reviewed canonical suppression migration before larger-scale activation,
+not bypassed or described as complete scalable provider policy.
+Tests cover changed policy after lookup, zero effects on denial, post-claim stops,
+and successful manual responses with automation disabled. A disposable Miniflare
+D1 test interleaves changes immediately before the SQL write and repeats concurrent
+requests, with zero external requests. These proofs are NOT full policy, the
+owner approval UI, production history repair or inbound/opt-out processing.
+Those gates, trusted provider ingestion/health and the scheduler's second
+outbound caller remain open under ADR 0059. Do not connect a bare intent-store
+claim as authorization or repurpose the test runtime as a live configuration.
+
+Source-only migration 0075 and manual envelope v2 now bind the immutable reply
+target through its conversation to the exact mailbox and client. Approval writes,
+reloads, claims and final checks all require matching sender, connection, recipient,
+thread, parent Message-ID and References. The general lead email is not the reply
+authority. Missing/default-disconnected/paused/retired metadata stops; READY does
+not prove real health. Retirement is permanent. Corrections/reconnections use new
+identities and fresh approval, never edits that redirect existing permission.
+No migration or provider ingestion is authorized by this runbook. v1 is retained
+for legacy characterization, not automatically promoted into new manual approval.
+Retirement blocks new sending, not visibility of saved outcomes. History is derived
+from immutable intent/approval records, without new writes, claims or provider calls.
+It remains scoped to the current admitted owner/session and exact client. Revocation,
+expiry and archived leads do not erase a past receipt; expired/impersonated/banned
+sessions cannot read it. A storage failure is STATUS_UNAVAILABLE, not permission to
+create another attempt. recordedAt means locally observed acceptance, not delivery.
+
+`createManualReplyRuntime` owns mandatory claim/final checks and accepts no injectable
+claim or outcome/history writer. Additional provider policy is still incomplete;
+the real getter remains null. The GET email reader now serves saved activity only;
+see below. The local receipt reader is not a completed inbox, legacy CRM repair or approval UI.
+See ADR 0059 for trade-offs and remaining gates.
+
+### Saved email activity (local, read-only)
+
+`GET /api/clients/[id]/emails` requires a current administrator session and returns
+`source: SAVED_OUTBOUND_ONLY`, up to five `records`, and nullable `nextCursor`.
+Only the optional single `cursor` query parameter is allowed. The cursor is a
+createdAt/id position, not permission: every page rechecks exact owner/session/client
+scope and each immutable message digest. Status codes: 400 invalid input, 404 absent
+or unadmitted scope, 503 unavailable/invalid storage, 200 valid saved page. Responses
+are private/no-store. Reading never contacts a provider, refreshes credentials or
+writes history/budget. Authentication retains its normal admission behavior.
+
+The panel renders plain text, not HTML, remote images or live thread contents.
+Accepted is not delivered; UNKNOWN/DISPATCHING stay uncertain. Missing records do
+not prove an empty inbox, and legacy records are not automatically promoted.
+Mailbox retirement, approval revocation and archived leads do not hide past records
+from a currently admitted owner. Invalid v1/legacy or missing schema is not migrated
+by reading. No live database was opened to demonstrate this behavior.
+
+After builds and dry runs exit, run `npm run test:saved-email-ui`. It uses the actual
+component, built CSS, real saved-history handler and disposable synthetic storage
+on loopback. It tests desktop/mobile, keyboard details, plain-text safety, paging,
+loading/errors/client switching and WCAG AA. Screenshots go to ignored
+`output/playwright/saved-email-history/`. This is not a full application sign-in,
+inbound-mail, production-data or approval/composer acceptance test.
+
+### Legacy email history (local candidate)
+
+The client server page, client metadata GET, and legacy email list/detail GETs use
+the same SELECT-only reader. Require a current verified, unbanned administrator,
+exact live session without impersonation, and current configured owner admission.
+Email ownership is `senderUserId`; sequence history uses `queuedByUserId`, not
+the assigned mailbox or address. Recheck admission after asynchronous reads.
+Ordinary client pages still reject archived clients; explicit historical email
+lookup remains available to its current owner after archive.
+
+Legacy records are explicitly `LEGACY_OUTREACH_EMAIL`, never approved send intents.
+Profile history shows at most 50 records; the metadata list returns at most 200,
+both with an explicit `hasMore` indication. Detail returns one sender-owned record.
+Bodies are plain text, at most 32 KiB, with explicit unavailable reasons for an
+oversized or missing text copy. No HTML fallback, raw provider error, Gmail ID,
+unused sequence body, credential query, provider call or history write is allowed.
+Do not infer delivery from a legacy sent flag. Data remains saved unchanged.
+
+Run `npm run test:legacy-email-ui` after every build/dry run has exited. It exercises
+actual client-page props, the full ClientProfile and message viewer with synthetic
+auth and disposable SQLite; screenshots are under ignored
+`output/playwright/legacy-email-history/`. This is not an app sign-in, approved
+reply composer, incoming-mail integration or legacy dashboard/automation test.
+The independent overview aggregators now have the sibling current-owner boundary
+below. Current verification and remaining gaps live in STATUS.
+
+### Dashboard and automation summaries (local candidate)
+
+Both summary readers require the exact current session, verified/unbanned admin
+and configured owner admission, rechecked after their asynchronous reads. Email
+rows use `senderUserId`, sequences/steps use `queuedByUserId`, and mailbox metadata
+uses `userId`; a reassigned foreign mailbox cannot expose its address through an
+owned sequence. The API exports explicit metadata, not raw step bodies, sequence
+snapshots, connection identifiers or run diagnostics. Shared business/pipeline
+and run-count summaries remain explicitly separate from owner message data.
+
+Dashboard and automation pages pass their server-authenticated actor. Ordinary
+members see an access-required dashboard instead of a redirect loop or mail data.
+The overview and legacy Gmail status GETs require admin access and use private,
+no-store responses, including errors. Gmail status is saved metadata only: no
+mailbox synchronization, token refresh, provider health probe or sending authority.
+
+The read-only ORM instance bypasses schema repair and rejects mutation methods.
+The overview requires existing settings and computes ready-lead summaries without
+stale-sequence recovery. Missing settings/storage are unavailable, not repaired by
+viewing the page. Scheduler maintenance defaults are unchanged and remain disabled
+by the rebuild controls; this change grants no maintenance or execution authority.
+
+Run `scripts/automation-summary-privacy.test.ts` and
+`scripts/automation-summary-d1.test.ts` for the actual entry-point and local-D1
+regressions. The full `npm run test:owner-ui` additionally covers real authenticated
+dashboard/automation-to-message flows at desktop/mobile sizes using only disposable
+accounts and storage. This does not prove live provider integration, all-app security
+or the completed redesign. No deployment is permitted by these checks.
+
 ### Bounded milestone checklist
 
 
@@ -161,7 +345,9 @@ support or audit storage fails closed. This source-only change enables no mail.
 3. Back up D1 before any remote migration; record export location and checksum.
 4. Run test, typecheck, lint, the secret-sanitizing Cloudflare build, and Wrangler
    dry run on Linux CI. A bundle secret-scan failure is a hard stop.
-5. Deploy staging; use test providers/mail sinks only.
+5. Stop at the owner deployment hold above. Only after finished implementation,
+   local acceptance and Riley's exact-release approval may a staging validation
+   deployment proceed; use test providers/mail sinks only.
 6. Exercise owner flows, workflow retry/idempotency, cost stop, and rollback.
 7. Record exact versions/config/resources and obtain production approval.
 8. Deploy through the protected GitHub production environment.
@@ -204,7 +390,8 @@ It does not deploy it.
    ```
 
 5. Push the packet and require Linux CI to verify the same committed candidate.
-6. Stop. A later deployment requires Riley's or Aidan's separate exact approval
+6. Stop. The owner deployment hold above must first be satisfied. A later
+   deployment requires Riley's separate exact approval
    phrase `DEPLOY AXIOM REVENUE ENGINE CONSOLE TO ISOLATED STAGING`, bound to the
    packet digest. Do not infer approval from the packet, this runbook, prior chat,
    implementation approval, or a green CI run.
@@ -517,6 +704,13 @@ never configure binding material, apply migration 0069, hand-insert an owner
 decision, connect the boundary, or use one to append real progress.
 
 ## Owner-approved local KW materialization and assessment
+
+The exact-schema guard accepts the original canonical Revenue tables from
+0054-0069, or those tables plus the **complete exact** provider-neutral mailbox
+extension from source migration 0075. It does not ignore tables by prefix or
+permit arbitrary extra objects: partial/altered tables, indexes or triggers still
+deny. This is compatibility validation, not migration authority. The inspector
+creates only a disposable in-memory reference; the supplied database is unchanged.
 
 This procedure is local shadow evaluation only. Source/workflow materialization
 and assessment are two different owner decisions. Neither authorizes capture,

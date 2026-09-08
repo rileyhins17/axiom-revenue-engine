@@ -42,6 +42,7 @@ import { verifyOwnerCsrf } from "./owner-csrf-acceptance";
 import { verifyOwnerBrowserSecurity } from "./owner-browser-security-acceptance";
 import { verifyOwnerOAuth } from "./owner-oauth-acceptance";
 import { verifyOwnerMailboxSettings } from "./owner-mailbox-settings-acceptance";
+import { verifyOwnerMailSummaries } from "./owner-mail-summary-acceptance";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
@@ -1073,6 +1074,11 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
         owner: { email: FIXTURE_EMAIL, password: FIXTURE_PASSWORD },
         administrator: { email: FIXTURE_ADMIN_EMAIL, password: FIXTURE_PASSWORD },
       });
+      stage = "owner mail summaries";
+      authDatabase.prepare('DELETE FROM "RateLimitWindow"').run();
+      await verifyOwnerMailSummaries({ context, baseUrl, database: authDatabase,
+        adminEmail: FIXTURE_ADMIN_EMAIL, ownerEmail: FIXTURE_EMAIL, password: FIXTURE_PASSWORD,
+        outputDirectory });
     } finally {
       authDatabase.close();
     }

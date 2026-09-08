@@ -39,7 +39,8 @@ import { getDatabase } from "@/lib/cloudflare";
 import { getServerEnv } from "@/lib/env";
 import { getAutomationOperatorConsole } from "@/lib/automation-operator-view";
 import { listAutomationOverview } from "@/lib/outreach-automation";
-import { getPrisma } from "@/lib/prisma";
+import { getReadOnlyPrisma } from "@/lib/prisma";
+import { ownerSummaryScope } from "@/lib/revenue-engine/owner-summary-scope";
 import { listScrapeJobs } from "@/lib/scrape-jobs";
 import { listRecentScrapeTargets, pickNextScrapeTarget, countActiveScrapeTargets } from "@/lib/scrape-targets";
 import { requireSession } from "@/lib/session";
@@ -48,8 +49,6 @@ import { isSendableMailbox, resolveGlobalDailySendCap, startOfUtcDay } from "@/l
 import { SentEmailViewerTrigger } from "@/components/sent-email-viewer";
 
 export const dynamic = "force-dynamic";
-
-const EXPECTED_MAILBOX_COUNT = 2;
 
 function emptyAutomationOverview() {
   return {
@@ -62,7 +61,7 @@ function emptyAutomationOverview() {
     finished: [],
     recentSent: [],
     engine: {
-      mode: "ACTIVE" as const,
+      mode: "DISABLED" as const,
       nextSendAt: null,
       overdueSendAt: null,
       scheduledToday: 0,
@@ -168,15 +167,15 @@ function relativeFuture(date: Date | string | null | undefined): string {
   return `in ${days}d`;
 }
 
-async function getSendsToday(): Promise<{ total: number; perSender: Record<string, number> }> {
+async function getSendsToday(userId: string): Promise<{ total: number; perSender: Record<string, number> }> {
   const since = startOfUtcDay().toISOString();
   const result = await getDatabase()
     .prepare(
       `SELECT "senderEmail", COUNT(*) AS count FROM "OutreachEmail"
-       WHERE "status" = 'sent' AND "sentAt" >= ?
+       WHERE "senderUserId" = ? AND "status" = 'sent' AND datetime("sentAt") >= datetime(?)
        GROUP BY "senderEmail"`,
     )
-    .bind(since)
+    .bind(userId, since)
     .all<{ senderEmail: string; count: number | string }>();
 
   const perSender: Record<string, number> = {};
@@ -542,9 +541,13 @@ async function getScrapeTargetList(): Promise<ScrapeTargetRow[]> {
 }
 
 export default async function DashboardPage() {
-  await requireSession();
+  const session = await requireSession();
+  // requireAdminSession redirects members here; never create a redirect loop.
+  if (session.user.role !== "admin") return <main><h1>Administrator access required</h1><p>No private operating data is shown.</p></main>;
+  const actor = { userId: session.user.id, sessionId: session.session.id };
+  const scope = await ownerSummaryScope(actor);
 
-  const prisma = getPrisma();
+  const prisma = getReadOnlyPrisma();
   const renderNowMs = new Date().getTime();
   const emptyFollowUps = { overdue: [], dueToday: [], stale: [], risky: [], now: new Date().toISOString() };
 
@@ -572,8 +575,8 @@ export default async function DashboardPage() {
     auditLog,
     scrapeTargetList,
   ] = await Promise.all([
-    listAutomationOverview().catch(() => emptyAutomationOverview()),
-    getAutomationOperatorConsole().catch(() => null),
+    listAutomationOverview(actor).catch(() => emptyAutomationOverview()),
+    getAutomationOperatorConsole(actor).catch(() => null),
     listScrapeJobs(8).catch(() => []),
     prisma.lead.count({ where: { isArchived: false } }),
     prisma.lead.count({ where: { outreachStatus: "REPLIED", isArchived: false } }),
@@ -584,7 +587,7 @@ export default async function DashboardPage() {
       return Number(r?.c || 0);
     }),
     countAdequateLeadsToday().catch(() => 0),
-    getSendsToday().catch(() => ({ total: 0, perSender: {} as Record<string, number> })),
+    getSendsToday(scope.userId).catch(() => ({ total: 0, perSender: {} as Record<string, number> })),
     listRecentScrapeTargets(5).catch(() => []),
     pickNextScrapeTarget().catch(() => null),
     countActiveScrapeTargets().catch(() => 0),
@@ -600,7 +603,8 @@ export default async function DashboardPage() {
     // Direct mailbox-table check — independent of listAutomationOverview()
     // so a broken helper doesn't make the banner falsely show "not connected".
     getDatabase()
-      .prepare(`SELECT LOWER("gmailAddress") AS gmailAddress, "status", "gmailConnectionId", "dailyLimit" FROM "OutreachMailbox"`)
+      .prepare(`SELECT LOWER("gmailAddress") AS gmailAddress, "status", "gmailConnectionId", "dailyLimit" FROM "OutreachMailbox" WHERE "userId"=?`)
+      .bind(scope.userId)
       .all<{ gmailAddress: string; status: string | null; gmailConnectionId: string | null; dailyLimit: number | string | null }>()
       .then((r) => r.results ?? [])
       .catch(() => [] as Array<{ gmailAddress: string; status: string | null; gmailConnectionId: string | null; dailyLimit: number | string | null }>),
@@ -617,32 +621,26 @@ export default async function DashboardPage() {
     getScrapeTargetList().catch(() => [] as ScrapeTargetRow[]),
   ]);
 
+  await scope.assertCurrent();
   const activeScrape = scrapeJobs.find((j) => j.status === "running" || j.status === "claimed") ?? null;
   const replyRate = contactedCount > 0 ? (repliedCount / contactedCount) * 100 : 0;
   const intakeCap = getAutonomousDailyLeadCap();
+  const expectedMailboxCount = Math.max(1, connectedRows.length);
   const globalSendCap = resolveGlobalDailySendCap({
     envCap: getServerEnv().AUTONOMOUS_MAX_SENDS_PER_DAY,
     mailboxCaps: connectedRows.filter(isSendableMailbox).map((row) => Number(row.dailyLimit || 0)),
     fallbackPerMailboxCap: MAILBOX_DAILY_SEND_TARGET,
-    expectedMailboxCount: EXPECTED_MAILBOX_COUNT,
+    expectedMailboxCount,
   });
-
-  const aidanSends = sendsToday.perSender["aidan@getaxiom.ca"] || 0;
-  const rileySends = sendsToday.perSender["riley@getaxiom.ca"] || 0;
 
   const intakePct = Math.min(100, (adequateToday / intakeCap) * 100);
   const sendPct = Math.min(100, (sendsToday.total / globalSendCap) * 100);
-  const aidanPct = Math.min(100, (aidanSends / MAILBOX_DAILY_SEND_TARGET) * 100);
-  const rileyPct = Math.min(100, (rileySends / MAILBOX_DAILY_SEND_TARGET) * 100);
-
   const intakeTone: ToneKey = adequateToday >= intakeCap ? "amber" : "emerald";
   const sendTone: ToneKey = sendsToday.total >= globalSendCap ? "amber" : "cyan";
 
   const connectedSet = new Set(connectedRows.filter(isSendableMailbox).map((r) => (r.gmailAddress || "").toLowerCase()));
-  const aidanConnected = connectedSet.has("aidan@getaxiom.ca");
-  const rileyConnected = connectedSet.has("riley@getaxiom.ca");
-  const connectedMailboxCount = [aidanConnected, rileyConnected].filter(Boolean).length;
-  const mailboxGapCount = EXPECTED_MAILBOX_COUNT - connectedMailboxCount;
+  const connectedMailboxCount = connectedSet.size;
+  const mailboxGapCount = expectedMailboxCount - connectedMailboxCount;
   const followUpAttentionCount = followUps.overdue.length + followUps.dueToday.length;
   const sendCapacityRemaining = Math.max(0, globalSendCap - sendsToday.total);
   const nextQueueEmails = operatorConsole?.nextEmails ?? [];
@@ -668,15 +666,15 @@ export default async function DashboardPage() {
   const runbookItems = [
     mailboxGapCount > 0
       ? {
-          label: "Connect Gmail senders",
-          detail: "Restore full outbound capacity before the next send window.",
+          label: "Review saved mailbox status",
+          detail: "Stored metadata only. The non-Google provider integration is still pending.",
           href: "/settings" as Route,
           icon: <PlugZap className="size-4" />,
           tone: "amber" as ToneKey,
         }
       : {
-          label: "Mailboxes armed",
-          detail: `${connectedMailboxCount}/${EXPECTED_MAILBOX_COUNT} sender accounts available.`,
+          label: "Saved mailboxes",
+          detail: `${connectedMailboxCount}/${expectedMailboxCount} of your saved sender accounts marked connected.`,
           href: "/settings" as Route,
           icon: <MailCheck className="size-4" />,
           tone: "emerald" as ToneKey,
@@ -796,7 +794,7 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      {(!aidanConnected || !rileyConnected) ? (
+      {mailboxGapCount > 0 ? (
         <div
           className="flex flex-wrap items-center gap-3 rounded-md border border-amber-400/25 bg-amber-400/[0.05] px-4 py-3 text-sm"
           role="alert"
@@ -805,20 +803,17 @@ export default async function DashboardPage() {
           <Activity className="size-4 text-amber-300" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <span className="font-medium text-amber-200">
-              {[!aidanConnected && "aidan@getaxiom.ca", !rileyConnected && "riley@getaxiom.ca"]
-                .filter(Boolean)
-                .join(" and ")}{" "}
-              not connected.
+              Your saved mailbox status needs review.
             </span>
             <span className="ml-2 text-amber-100/70">
-              Connect Gmail in Settings to restore outbound capacity (one-time OAuth).
+              This is legacy account metadata, not a live connection test. The rebuild requires a separately approved non-Google provider.
             </span>
           </div>
           <Link
             href="/settings"
             className="inline-flex items-center gap-1 rounded-md border border-amber-400/30 bg-amber-500/[0.08] px-2 py-1 text-[11px] font-semibold text-amber-200 transition hover:bg-amber-500/[0.16]"
           >
-            Connect now
+            Review settings
             <ArrowRight className="size-3" aria-hidden="true" />
           </Link>
         </div>
@@ -907,8 +902,13 @@ export default async function DashboardPage() {
             footnote={`${MAILBOX_DAILY_SEND_TARGET}/day per mailbox · ${globalSendCap}/day configured`}
           />
           <Divider />
-          <MailboxBar email="aidan@getaxiom.ca" sent={aidanSends} cap={MAILBOX_DAILY_SEND_TARGET} pct={aidanPct} connected={aidanConnected} />
-          <MailboxBar email="riley@getaxiom.ca" sent={rileySends} cap={MAILBOX_DAILY_SEND_TARGET} pct={rileyPct} connected={rileyConnected} />
+          {connectedRows.map(mailbox => {
+            const sent = sendsToday.perSender[mailbox.gmailAddress] || 0;
+            const cap = Number(mailbox.dailyLimit) || MAILBOX_DAILY_SEND_TARGET;
+            return <MailboxBar key={mailbox.gmailAddress} email={mailbox.gmailAddress} sent={sent} cap={cap}
+              pct={Math.min(100, sent / cap * 100)} connected={connectedSet.has(mailbox.gmailAddress)} />;
+          })}
+          {connectedRows.length === 0 ? <p className="text-sm text-muted-foreground">No saved mailbox for your account.</p> : null}
           <Divider />
           <KvRow icon={<Mail className="size-3.5" />} label="Total sent (all-time)" value={totalSentAllTime.toLocaleString()} />
           <KvRow icon={<MailCheck className="size-3.5" />} label="Reply rate" value={`${replyRate.toFixed(1)}%`} />
@@ -1184,12 +1184,12 @@ function SendsTimeline({ upcoming, recent, followUpsPaused, nowMs }: { upcoming:
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
               <Clock3 className="size-4 text-emerald-300" />
-              Next 5 emails
+              Your saved email queue
             </div>
             <div className="mt-0.5 text-[11px] text-zinc-500">
               {followUpsPaused
                 ? "First-touch-only mode. Follow-ups paused, not shown here."
-                : "Who's getting an email next, from which inbox, and exactly when."}
+                : "Your previously scheduled email tasks. Saved schedules are not sending approval."}
             </div>
           </div>
           <Link href={"/automation" as Route} className="text-[11px] text-zinc-400 hover:text-white inline-flex items-center gap-1">
@@ -1268,7 +1268,7 @@ function SendsTimeline({ upcoming, recent, followUpsPaused, nowMs }: { upcoming:
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
               <Mail className="size-4 text-cyan-300" />
-              Recent emails
+              Your recent legacy emails
             </div>
             <div className="mt-0.5 text-[11px] text-zinc-500">
               Click any row to read the full email that went out.

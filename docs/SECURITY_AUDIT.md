@@ -450,17 +450,20 @@ evidence above refers to the pre-retirement source.
 
 ### SEC-006 — High — Manual Gmail replies bypass the engine's send safety contract
 
-**Status:** Open; route must remain unusable without mailbox credentials.
-**Reachability:** Reachable to any authenticated user with a Gmail connection.
+**Status:** Open; partial local manual-route integration, not complete remediation.
+**Current source reachability:** the manual POST requires an administrator and its
+runtime is unconfigured, so it returns 503 without reaching any mailbox. Existing
+deployed code was not inspected or changed. The legacy scheduler remains a second
+unintegrated outbound caller.
 
-The reply route correctly verifies that a thread and recipient belong to the
+At baseline commit `93f498c`, the reply route verifies that a thread and recipient belong to the
 lead, but it calls Gmail without proving an administrator role, global pause,
 mailbox health, suppression, complaint state, current approval, budget, or an
 idempotency key. The provider side effect happens before the local records. A
 timeout or retry can therefore send the same message twice, and a failure after
 Gmail succeeds can leave no trustworthy local receipt.
 
-**Evidence:**
+**Baseline evidence (line references apply to `93f498c`, not current source):**
 
 - `src/app/api/clients/[id]/emails/reply/route.ts:21-27` requires only a normal
   authenticated session.
@@ -476,6 +479,149 @@ transactional send-intent/idempotency boundary. Recheck owner role, exact
 mailbox, recipient, suppression, mailbox health, global stop, approval, and
 budget immediately before dispatch. Recover an ambiguous provider response by
 provider message ID rather than sending again.
+
+**Current local integration evidence (2026-09-08):** before the patch the actual
+route, transpiled into a VM with synthetic dependencies, sent twice for retries
+and twice more after post-send CRM failures. The regression now executes the
+changed route, real approved-reference reader, ledger and dispatcher against
+disposable SQLite. It proves one fake send across concurrent requests/replay,
+explicit uncertainty without resend, idempotent synthetic history repair,
+owner/client/content conflicts, approval revocation, policy/budget denial and
+bounded malformed requests. Production composition is deliberately unavailable;
+no Gmail fallback or browser-injected runtime exists. The test seeds an existing
+approval and fakes remaining mailbox/consent/capacity policy, provider and
+projection; it does not prove the owner approval flow or complete current-policy
+SQL. No mailbox was used.
+
+The subsequent revocation-after-lookup regression reproduced an additional gap:
+the bare fixture claim returned HTTP 200 after approval revocation. Its replacement
+uses fixed current actor/session/reviewer, exact approval JSON, unarchived lead,
+global/emergency stop and suppression predicates within the budget-backed INSERT.
+The trigger no longer reproduces: the request is denied with no new intent, debit
+or fake provider call. Account removal, invalid/expired session, ban/demotion,
+archive, pause and suppression interleavings also deny. Legacy `REPLY` markers
+stop automated follow-ups without blocking a manual response; they never establish
+consent or classify opt-out content. Explicit opt-out/complaint/bounce/no-MX sources
+do not expire themselves into permission. A final recheck catches post-claim stops,
+keeps the reservation and never grants another attempt. Disposable Miniflare D1
+also exercises the actual handler, policy-at-write changes and concurrent replay
+with zero external requests. This is partial boundary evidence, not full SEC-006
+closure; complete mailbox/thread/recipient and inbound policy remain required.
+Independent candidate review then identified legacy suppression normalization as
+weaker than the old readers. Shared email/domain normalization plus a raw-input
+mapping rechecked inside the claim now covers wrappers, encoded email, `www.` and
+source case/whitespace. Unknown/changed rows at the write deny; SQLite and D1
+regressions cover the review examples and mapping-to-write races. The compatibility
+read is capped at 1,000 rows/128 KiB and fails rather than omitting data. Canonical
+suppression persistence, accurate inbound source classification and mandatory
+guarded runtime composition remain activation gaps; a generic dependency type
+still accepts a bare persistence callback. No active runtime is configured.
+ADR 0059 selects a shared durable send-intent boundary that preserves replies.
+Source migration 0073 and its injected store now have disposable SQLite tests for
+atomic claim, identity conflict, forward-only outcomes and lost acknowledgements.
+The new dispatcher and exact-envelope adapter now compose with that store in
+synthetic tests, preserving subject/body content and denying altered approvals or
+mailbox identities before delivery. Budget reservation is atomic in the source
+schema, but authoritative accounting and current policy remain unwired. The real
+approval loader now reads new source-only 0074 records created through a fresh
+administrator/session-guarded writer, binds exact intent/envelope content and
+rejects revocation, expiry and intervening admission changes in synthetic tests.
+Its reference-only reader is now exercised through the route's injected local
+composition; the live runtime and atomic claim's full authorization predicate
+remain absent.
+A read-only exact mailbox/connection resolver
+now checks real-schema ownership, addresses, status, scope, expiry and post-decrypt
+drift in synthetic SQLite integration tests. Its independent candidate review
+was interrupted by a subagent usage limit and is not a passed review. Neither live
+outbound caller uses these modules yet. This is not a fixed finding; policy, UI, scheduler, provider
+reconciliation and stable UI intent integration remain required before closure.
+
+The bounded candidate review found no active direct-Gmail/parser bypass in the
+new manual route. It identified the old composer's false `res.ok` success, now
+locally corrected with a receipt interpreter and ambiguity/pending-history hold.
+It also confirmed unresolved approval-to-thread/recipient admission, real
+deterministic CRM projection, the raw-envelope composer contract and runtime
+policy wiring. Three response-feedback tests are not a browser/reload proof;
+do not close SEC-006 or activate the runtime from these results.
+
+Preceding local SEC-006 identity slice: the real approval writer accepted an unrelated
+recipient with a recomputed matching digest before the patch. Migration 0075 and
+v2 target-bound envelopes now require an exact immutable mailbox/conversation/
+recipient/parent chain in approval writes/reloads, claim and final check. The same
+regression denies with zero approvals. Synthetic SQLite and D1 route fixtures now
+use the real approval writer; cross-identity, lifecycle, correction and
+lookup/write/transport races are covered. No Gmail tables are needed by the new
+approval writer. Provider ingestion/health remain synthetic, not externally proved.
+Forty focused checks, 703 full tests and all six required local checks passed.
+The independent candidate reviewer attested the canonical checkout/branch/HEAD,
+passed the same 40 focused checks and found no concrete identity bypass in this
+bounded candidate. It confirmed existing bare-claim composition and old-composer
+activation gaps. Full evidence is in the active STATUS brief. This is NOT SEC-006 closure:
+full policy, UI, inbound opt-outs, scheduler and real provider integration remained
+unfinished at that checkpoint. The following recovery slice supersedes only its
+mandatory-composition and local terminal-history gaps.
+
+Current local recovery slice: a handler regression reproduced lost SENT visibility
+after fake acceptance/history failure followed by mailbox retirement and approval
+revocation. The runtime now owns guarded claim/final check and does not accept a raw
+claim callback. Its separate SELECT-only history reader joins durable intent and
+immutable approval, validates exact content and current owner/session/client twice
+around hashing, and never selects the attempt token. Recovery ignores expired or
+revoked sending permission but not current reader authorization. All four recorded
+states remain non-resendable, without SQL writes or additional budget/provider work.
+The test now recovers SENT; SQLite total_changes/debit/send assertions and real
+local D1 coverage prove the bounded behavior. Twenty-four focused tests, 708 full
+tests, typecheck, lint, safety, Cloudflare build/sanitizer and no-upload Wrangler
+dry run passed. Fresh independent Luna-max review attested the canonical checkout,
+passed 24 focused tests and found no concrete bypass/regression in the bounded v2
+candidate. It noted generic-dispatch future-call-site risk and remaining activation
+gaps; no current bare-claim production caller was found in its scoped trace.
+This is not legacy CRM repair, a working inbox/approval UI or SEC-006 closure. The
+separate email-history GET's replacement is recorded below. Full policy, trusted ingestion/health, inbound opt-outs, second outbound
+caller and reviewed non-Google transport remain open; the real runtime is null.
+
+Current saved-activity slice: the actual legacy GET reproduction made two simulated
+provider calls and a credential update just to view a client. Its replacement has
+no Gmail/credential/Prisma imports and uses current administrator authentication,
+strict URL inputs and a bounded SELECT-only owner/session/client reader. Every
+selected receipt is digest validated; final admission also guards empty pages.
+The client panel no longer submits the obsolete raw envelope or renders a fake
+live inbox. It renders exact plain text, truthful outcome states and bounded pages;
+client switches abort stale requests and remount the view. No legacy data is deleted
+or imported. Seven new route tests and an extended local D1 reader proof passed;
+715 full tests and all six required checks passed. The isolated actual-component
+desktop/mobile browser gate passed WCAG AA, keyboard, paging, errors and switching,
+with zero external requests or new writes/sends. Fresh-agent creation was unavailable
+at the thread limit: parent performed the separate review locally and reused the
+completed Luna reviewer for an additional read-only candidate review. That review
+re-attested the canonical checkout, passed seven focused route tests and found no
+concrete provider bypass, scope leak, paging race or false state in the new path.
+This closes only the tested GET provider-side-effect path in local source, not the
+full SEC-006 finding, real authentication integration, inbox sync or approved replies.
+
+The follow-through candidate now replaces that separate legacy client-page path,
+client metadata GET and equivalent legacy email list/detail GETs with one current
+admin/session/sender-scoped SELECT reader. Actual pre-patch page/API tests exposed
+another sender's records. The candidate preserves owner history and shared CRM
+notes, strips HTML/provider errors/Gmail IDs/unused sequence bodies before
+serialization, and renders literal plain text in both client-profile and modal
+viewers. History uses durable sender/queue-creator ownership, not current mailbox
+assignment. UTC timestamps are normalized before browser display. Oversized or
+HTML-only bodies have explicit unavailable text, not truncation or HTML fallback.
+Current local tests, browser artifacts and release-check results are in STATUS.
+
+**Summary follow-through candidate:** disposable baseline tests reproduced foreign
+mail in both `automation-operator-view` and `listAutomationOverview`. Both now
+require current owner/session admission and filter private rows by durable sender,
+sequence-creator and mailbox-owner IDs. Explicit overview projections omit raw
+step bodies, snapshots, Gmail linkage and run diagnostics. Dashboard/automation
+callers pass the actor, and overview/status APIs are private/no-store. Page views
+no longer upsert Gmail mailboxes, create settings, recover stale sequences or use
+the ORM's automatic schema repair. The reused Luna reviewer found no concrete
+surviving bypass or GET mutation in this scope; current gate evidence is in STATUS,
+not an exact-commit release claim.
+SEC-006 remains open for complete send-policy, owner approval/composer and inbound
+integration. No production data, provider or live browser exploit was used.
 
 ### SEC-007 — High — Production release evidence is descriptive, not provider-bound
 
@@ -812,7 +958,7 @@ Engineering cannot protect accounts Riley controls if the surrounding identity
 layer is weak. Before activation Riley must:
 
 1. Use unique password-manager-generated credentials for GitHub, Cloudflare,
-   Google Workspace, domain registrar, and OpenAI.
+   the selected non-Google mail provider, domain registrar, and OpenAI.
 2. Enable phishing-resistant MFA/security keys where supported, with two secure
    recovery methods and no shared personal recovery inbox.
 3. Keep Riley and Aidan as separate named accounts; never share one login.

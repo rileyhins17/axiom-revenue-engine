@@ -228,7 +228,12 @@ function buildRfc2822Message(options: {
   bodyPlain: string;
   inReplyTo?: string;
   references?: string;
+  rfcMessageId?: string;
 }): string {
+  if (options.rfcMessageId !== undefined && (options.rfcMessageId.length > 254
+    || !/^<[A-Za-z0-9._-]+@[A-Za-z0-9.-]+>(?![\s\S])/.test(options.rfcMessageId))) {
+    throw new Error("Invalid outbound message identifier");
+  }
   const boundary = `boundary_${crypto.randomUUID().replace(/-/g, "")}`;
   const fromHeader = formatAddressHeader(options.from, options.fromName);
   const unsubEmail = sanitizeHeaderValue(options.from);
@@ -238,6 +243,7 @@ function buildRfc2822Message(options: {
     `To: ${sanitizeHeaderValue(options.to)}`,
     `Subject: ${encodeMimeHeader(options.subject)}`,
     `MIME-Version: 1.0`,
+    ...(options.rfcMessageId ? [`Message-ID: ${options.rfcMessageId}`] : []),
     // RFC 8058: List-Unsubscribe-Post=One-Click requires an HTTPS URL in
     // List-Unsubscribe. We only have a mailto unsubscribe, so emit just that
     // header — pairing it with the one-click post header is invalid and trips
@@ -355,6 +361,7 @@ export async function sendGmailEmail(options: {
   threadId?: string;
   inReplyTo?: string;
   references?: string;
+  rfcMessageId?: string;
 }): Promise<SendEmailResult> {
   const rawMessage = buildRfc2822Message(options);
   const encoded = base64UrlEncodeUtf8(rawMessage);
@@ -379,10 +386,22 @@ export async function sendGmailEmail(options: {
     throw new Error(`Gmail send failed (${response.status}): ${text}`);
   }
 
-  const result = (await response.json()) as { id?: string; threadId?: string };
+  let result: unknown;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error("Gmail delivery result is uncertain");
+  }
+  if (!result || typeof result !== "object"
+    || !("id" in result) || typeof result.id !== "string"
+    || !("threadId" in result) || typeof result.threadId !== "string"
+    || !/^[\x21-\x7e]{1,256}(?![\s\S])/.test(result.id)
+    || !/^[\x21-\x7e]{1,256}(?![\s\S])/.test(result.threadId)) {
+    throw new Error("Gmail delivery result is uncertain");
+  }
   return {
-    messageId: result.id || "",
-    threadId: result.threadId || "",
+    messageId: result.id,
+    threadId: result.threadId,
   };
 }
 
@@ -662,6 +681,7 @@ export async function sendGmailReply(options: {
   bodyPlain: string;
   threadId: string;
   inReplyTo?: string;
+  rfcMessageId?: string;
 }): Promise<SendEmailResult> {
   return sendGmailEmail({
     accessToken: options.accessToken,
@@ -674,6 +694,7 @@ export async function sendGmailReply(options: {
     threadId: options.threadId,
     inReplyTo: options.inReplyTo,
     references: options.inReplyTo,
+    rfcMessageId: options.rfcMessageId,
   });
 }
 

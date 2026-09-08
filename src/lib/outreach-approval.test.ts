@@ -44,3 +44,22 @@ test("approval is valid only for the exact approved content", async () => {
   assert.equal(evaluateOutreachApproval(approved, digest, new Date("2026-08-19T12:00:00.000Z")).reason, "approval_expired");
   assert.equal(evaluateOutreachApproval(null, digest).reason, "approval_missing");
 });
+
+test("approval rejects malformed, future and contradictory times instead of bypassing expiry", async () => {
+  const digest = await buildOutreachContentDigest(content);
+  const now = new Date("2026-08-17T12:00:00.000Z");
+  const approved = { contentDigest: digest, decision: "APPROVED",
+    decidedAt: "2026-08-16T12:00:00.000Z", expiresAt: "2026-08-18T12:00:00.000Z", revokedAt: null };
+  for (const expiresAt of ["invalid", "", "2026-02-30T12:00:00Z", "2026-08-18T12:00:00"]) {
+    assert.equal(evaluateOutreachApproval({ ...approved, expiresAt }, digest, now).allowed, false, `invalid expiry: ${expiresAt}`);
+  }
+  for (const decidedAt of ["invalid", "2026-08-19T12:00:00Z", "2026-02-30T12:00:00Z"]) {
+    assert.equal(evaluateOutreachApproval({ ...approved, decidedAt }, digest, now).allowed, false, `invalid decision: ${decidedAt}`);
+  }
+  assert.equal(evaluateOutreachApproval(approved, digest, new Date("invalid")).allowed, false);
+  assert.equal(evaluateOutreachApproval({ ...approved, expiresAt: approved.decidedAt }, digest, now).allowed, false);
+  assert.equal(evaluateOutreachApproval({ ...approved, expiresAt: now.toISOString() }, digest, now).allowed, false);
+  assert.equal(evaluateOutreachApproval({ ...approved, expiresAt: null }, digest, now).allowed, true);
+  assert.equal(evaluateOutreachApproval({ ...approved, decidedAt: "2026-08-16 12:00:00", expiresAt: "2026-08-18 12:00:00" }, digest, now).allowed, true);
+  assert.equal(evaluateOutreachApproval({ ...approved, decidedAt: "2026-08-16T08:00:00-04:00" }, digest, now).allowed, true);
+});

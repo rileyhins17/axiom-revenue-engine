@@ -54,6 +54,10 @@ in both the release receipt and Linux workflow. Release proof v2 now requires al
 twelve ordered checks; old ten-check v1 receipts cannot certify this candidate.
 Sixteen monitor/deployment-focused tests, safety, monitor check and diff checks pass.
 The final committed tree still needs the complete proof before any push claim.
+The owner-constraints/deployment-hold group is saved locally as `82a46a0`.
+This is an unpushed intermediate commit, not a newly verified release. The next
+group retains the provider-neutral guarded reply groundwork and complete saved/
+legacy/summary privacy path together; the full live-send policy remains unfinished.
 
 The actual reply POST no longer calls Gmail, refreshes tokens or selects the first
 user mailbox. It requires the shared current administrator/origin fence, accepts

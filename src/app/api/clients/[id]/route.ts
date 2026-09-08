@@ -1,60 +1,26 @@
-import { NextResponse } from "next/server";
-
+import { getDatabase } from "@/lib/cloudflare";
 import { getPrisma } from "@/lib/prisma";
-import { requireApiSession } from "@/lib/session";
+import { requireAdminApiSession } from "@/lib/session";
+import { createLegacyMailHistory, legacyMailHeaders, parseLegacyLeadId } from "@/lib/revenue-engine/legacy-mail-history";
 
 export const dynamic = "force-dynamic";
-
-function parseLeadId(value: string) {
-  const leadId = Number(value);
-  return Number.isFinite(leadId) && leadId > 0 ? leadId : null;
-}
-
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const authResult = await requireApiSession(request);
-  if ("response" in authResult) return authResult.response;
-
-  const { id } = await params;
-  const leadId = parseLeadId(id);
-  if (!leadId) {
-    return NextResponse.json({ error: "Invalid client id" }, { status: 400 });
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdminApiSession(request);
+  if ("response" in auth) {
+    Object.entries(legacyMailHeaders).forEach(([key,value]) => auth.response.headers.set(key,value));
+    return auth.response;
   }
-
-  const prisma = getPrisma();
-  const lead = await prisma.lead.findUnique({
-    where: { id: leadId },
-  });
-
-  if (!lead || lead.isArchived) {
-    return NextResponse.json({ error: "Client not found" }, { status: 404 });
-  }
-
-  const [activities, outreachEmails] = await Promise.all([
-    prisma.crmActivity.findMany({
-      where: { leadId },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    }),
-    prisma.outreachEmail.findMany({
-      where: { leadId },
-      orderBy: { sentAt: "desc" },
-      take: 20,
-      select: {
-        id: true,
-        leadId: true,
-        senderEmail: true,
-        recipientEmail: true,
-        subject: true,
-        status: true,
-        errorMessage: true,
-        sentAt: true,
-        gmailThreadId: true,
-      },
-    }),
-  ]);
-
-  return NextResponse.json({ lead, activities, outreachEmails });
+  const json = (data: unknown, status = 200) => Response.json(data, { status, headers: legacyMailHeaders });
+  const leadId = parseLegacyLeadId((await params).id);
+  if (!leadId) return json({ error: "Invalid client id" },400);
+  try {
+    const prisma = getPrisma();
+    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead || lead.isArchived) return json({ error: "Client not found" },404);
+    const activities = await prisma.crmActivity.findMany({ where: { leadId }, orderBy: { createdAt: "desc" }, take: 100 });
+    const history = await createLegacyMailHistory(getDatabase())(
+      { userId: auth.session.user.id, sessionId: auth.session.session.id }, { leadId });
+    if (!history) return json({ error: "Client history unavailable" },404);
+    return json({ lead, activities, outreachEmails: history.emails, legacyMailHasMore: history.hasMore });
+  } catch { return json({ error: "Client history is unavailable. Try reading it again later." },503); }
 }

@@ -56,14 +56,11 @@ import {
   isActionOverdue,
   type CrmActivityType,
 } from "@/lib/crm";
-import type { CrmActivityRecord, LeadRecord, OutreachEmailRecord } from "@/lib/prisma";
+import type { CrmActivityRecord, LeadRecord } from "@/lib/prisma";
 import { getProjectMilestoneChecks } from "@/lib/ui/data-accuracy";
 import { cn } from "@/lib/utils";
 
-type ProfileOutreachEmail = Pick<
-  OutreachEmailRecord,
-  "id" | "leadId" | "senderEmail" | "recipientEmail" | "subject" | "bodyHtml" | "bodyPlain" | "status" | "errorMessage" | "sentAt" | "gmailThreadId"
->;
+import type { LegacyEmail as ProfileOutreachEmail } from "@/lib/revenue-engine/legacy-mail-contract";
 
 type SequenceInfo = {
   id: string; status: string; currentStep: string;
@@ -74,13 +71,13 @@ type SequenceInfo = {
 type SequenceStepInfo = {
   id: string; stepType: string; status: string;
   scheduledFor: string | null; sentAt: string | null;
-  subject: string | null; bodyPlain: string | null;
 };
 
 type ClientProfileProps = {
   lead: LeadRecord;
   initialActivities: CrmActivityRecord[];
   outreachEmails: ProfileOutreachEmail[];
+  legacyMailHasMore?: boolean;
   sequence?: SequenceInfo;
   sequenceSteps?: SequenceStepInfo[];
 };
@@ -221,7 +218,7 @@ function ContactLink({
   );
 }
 
-export function ClientProfile({ lead, initialActivities, outreachEmails, sequence, sequenceSteps = [] }: ClientProfileProps) {
+export function ClientProfile({ lead, initialActivities, outreachEmails, legacyMailHasMore = false, sequence, sequenceSteps = [] }: ClientProfileProps) {
   const [activities, setActivities] = useState(initialActivities);
   const [activityType, setActivityType] = useState<CrmActivityType>("NOTE");
   const [activityTitle, setActivityTitle] = useState("");
@@ -456,7 +453,7 @@ export function ClientProfile({ lead, initialActivities, outreachEmails, sequenc
             <Send className="size-3.5" />
             Outreach
           </div>
-          <div className="text-sm font-semibold text-white">{sentEmails} sent</div>
+          <div className="text-sm font-semibold text-white">{sentEmails} legacy sent records shown</div>
           <div className="mt-1 text-xs text-zinc-500">{lead.outreachStatus ?? "No status"}</div>
         </div>
         <div className="v2-card p-4">
@@ -474,7 +471,7 @@ export function ClientProfile({ lead, initialActivities, outreachEmails, sequenc
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] xl:gap-6">
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           <Section title="Deal Record" icon={<BriefcaseBusiness className="size-4" />}>
             <dl>
               <FieldRow label="Stage" value={getDealStageLabel(lead.dealStage)} />
@@ -565,7 +562,7 @@ export function ClientProfile({ lead, initialActivities, outreachEmails, sequenc
 
           {/* Outreach Sequence Status */}
           {sequence && (
-            <Section title="Outreach Sequence" icon={<Bot className="size-4" />}>
+            <Section title="Your legacy sequence" icon={<Bot className="size-4" />}>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] uppercase tracking-[0.14em] text-zinc-500">Status</span>
@@ -585,7 +582,7 @@ export function ClientProfile({ lead, initialActivities, outreachEmails, sequenc
                 </div>
                 {sequence.nextScheduledAt && !sequence.replyDetectedAt && sequence.status !== "COMPLETED" && (
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-500">Next send</span>
+                    <span className="text-zinc-500">Previously scheduled</span>
                     <span className="text-zinc-300">{formatDateTime(sequence.nextScheduledAt)}</span>
                   </div>
                 )}
@@ -617,7 +614,9 @@ export function ClientProfile({ lead, initialActivities, outreachEmails, sequenc
             </Section>
           )}
 
-          <Section title="Outreach History" icon={<Send className="size-4" />}>
+          <Section title="Your legacy outreach history" icon={<Send className="size-4" />}>
+            <p className="mb-3 text-sm text-zinc-300">Historical records for your sender identity only. No mailbox is contacted. A legacy sent status does not prove delivery.</p>
+            {legacyMailHasMore && <p className="mb-3 text-sm text-amber-200">Showing your latest 50 records. Older records remain saved.</p>}
             <dl className="mb-4">
               <FieldRow label="First contacted" value={formatDateTime(lead.firstContactedAt)} />
               <FieldRow label="Last contacted" value={formatDateTime(lead.lastContactedAt)} />
@@ -627,7 +626,7 @@ export function ClientProfile({ lead, initialActivities, outreachEmails, sequenc
             {outreachEmails.length > 0 ? (
               <div className="divide-y divide-white/[0.05]">
                 {outreachEmails.map((email) => {
-                  const body = email.bodyPlain || email.bodyHtml || "";
+                  const body = email.bodyPlain || "";
                   const isExpanded = expandedEmails.has(email.id);
                   const hasBody = body.trim().length > 0;
                   return (
@@ -635,6 +634,7 @@ export function ClientProfile({ lead, initialActivities, outreachEmails, sequenc
                       <button
                         type="button"
                         onClick={() => hasBody && toggleEmailExpand(email.id)}
+                        aria-expanded={isExpanded}
                         className={cn("w-full text-left", hasBody && "cursor-pointer")}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -662,32 +662,23 @@ export function ClientProfile({ lead, initialActivities, outreachEmails, sequenc
                           </span>
                         </div>
                       </button>
-                      {email.errorMessage ? <div className="mt-2 text-xs text-red-300">{email.errorMessage}</div> : null}
+                      {email.failureRecorded ? <div className="mt-2 text-xs text-red-300">Legacy failure recorded; provider details are not displayed.</div> : null}
+                      {email.bodyUnavailable && <p className="mt-2 text-xs text-zinc-400">{email.bodyUnavailable === "TOO_LARGE" ? "Message text exceeds the safe display limit; the original record remains saved." : "No plain-text copy is available. HTML is not loaded."}</p>}
                       {isExpanded && hasBody ? (
-                        email.bodyHtml && email.bodyHtml.trim().length > 0 ? (
-                          <iframe
-                            title={email.subject || "Email body"}
-                            srcDoc={`<base target="_blank"><style>body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#e4e4e7;background:#0a121c;padding:16px;margin:0;}a{color:#34d399;}img{max-width:100%;height:auto;}</style>${email.bodyHtml}`}
-                            sandbox=""
-                            className="mt-3 w-full rounded-lg border border-white/[0.06]"
-                            style={{ minHeight: 320, height: 420, background: "#0a121c" }}
-                          />
-                        ) : (
-                          <pre className="mt-3 rounded-lg border border-white/[0.06] bg-black/30 p-3 text-xs leading-5 text-zinc-300 whitespace-pre-wrap font-sans">
+                        <pre className="mt-3 rounded-lg border border-white/[0.06] bg-black/30 p-3 text-xs leading-5 text-zinc-300 whitespace-pre-wrap break-words font-sans">
                             {email.bodyPlain}
                           </pre>
-                        )
                       ) : null}
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-sm text-zinc-600">No outreach emails recorded for this lead.</p>
+              <p className="text-sm text-zinc-600">No legacy outreach records for your sender identity on this client.</p>
             )}
           </Section>
 
-          <Section title="Email Conversations" icon={<Mail className="size-4" />}>
+          <Section title="Saved email activity" icon={<Mail className="size-4" />}>
             <EmailThreadPanel
               leadId={lead.id}
               leadName={lead.businessName}
@@ -696,7 +687,7 @@ export function ClientProfile({ lead, initialActivities, outreachEmails, sequenc
           </Section>
         </div>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           <Section title="Log Activity" icon={<Plus className="size-4" />}>
             <form onSubmit={handleAddActivity} className="flex flex-col gap-3">
               <div className="grid gap-3 sm:grid-cols-[140px_1fr]">
@@ -873,7 +864,7 @@ export function ClientProfile({ lead, initialActivities, outreachEmails, sequenc
                             </div>
                           </div>
                           <div className="mt-1 text-[11px] text-zinc-600">{formatDateTime(email.sentAt)}</div>
-                          {email.errorMessage ? <div className="mt-1 text-xs text-red-300">{email.errorMessage}</div> : null}
+                          {email.failureRecorded ? <div className="mt-1 text-xs text-red-300">Legacy failure recorded; provider details are not displayed.</div> : null}
                         </div>
                       </div>
                     );
