@@ -4,7 +4,44 @@ Last updated: 2026-09-08 (America/Toronto)
 
 ## Plain-English status
 
-### Current candidate: bounded mailbox settings (SEC-011)
+### Current milestone: retire legacy shared-token control (SEC-003)
+
+Verified predecessor: `084ff3e70328af4c09e43e11bf618963b8bb257e`.
+All ten release checks passed, including 623 tests, six browser/accessibility
+pages, 241 ms lead-list readiness, 98 ms dossier readiness and zero outside
+requests. The exact commit was pushed and the monitor verified local/upstream/
+GitHub equality. SEC-011 is therefore verified in source, not deployed.
+
+The next bounded repair retires the legacy MCP and internal cron-tick authority,
+as explicitly permitted by SEC-003 and the engine migration plan. A disposable
+characterization test confirmed that one synthetic token exposes read tools,
+scheduler execution, queueing and force-unblock controls, with wildcard CORS.
+No tool was executed; the test rejects database access. The root console's
+scheduled self-dispatch is its only source caller found so far; the owner UI
+uses its separate authenticated routes. Independent compatibility investigation
+found no current owner-UI/nonlegacy caller requiring preservation. The candidate
+now replaces both endpoints with pure fixed-410 responses, removes shared-token
+settings/declarations, and makes the root scheduler inert. Targeted tests prove
+no request/binding inspection and zero dispatch with old flags/credentials, while
+preserving console fetch/cache exports. All 625 tests, type-check, lint and safety
+check pass. The real-route browser gate passed both endpoints/all seven methods,
+six WCAG pages, 214 ms lead-list readiness, 101 ms dossier readiness, and zero
+outside requests. Independent candidate review found no concrete surviving
+shared-token bypass or nonlegacy console regression. The new engine remains
+disconnected and off. Exact-commit release verification remains the final gate;
+its immutable local receipt and pushed checkpoint are recorded by the monitor.
+
+Next three actions:
+1. Complete the exact-commit release gate and push this branch only if it passes.
+2. Record the immutable receipt and verified remote checkpoint in the monitor.
+3. Continue remaining security findings, including legacy browser/agent authority;
+   owner MFA/recovery and production release gates stay open.
+
+No owner action is required for source retirement already in the approved plan.
+No production resource, mailbox, prospect, persistent database or secret was
+accessed. External spend remains C$0; no migration, deployment or activation.
+
+### Previous checkpoint: bounded mailbox settings (SEC-011)
 
 Verified predecessor: `96c9b02002a1be1fb6beb94418f9e9bd2c19f2ba`
 (SEC-010; its exact-commit release receipt and pushed checkpoint are persisted).
@@ -28,8 +65,9 @@ metadata edits, identical retry and audit rollback; six WCAG pages, 387 ms list,
 found no concrete SEC-011 bypass or production regression. Environment policy is
 sampled immediately before the atomic batch, not transactionally locked across
 external configuration changes; unrelated mailbox workflows remain separately audited.
-Full exact-commit release verification has not run for this candidate;
-do not call SEC-011 fixed or push until every required gate passes.
+Subsequent exact-commit release verification passed all ten checks at
+`084ff3e70328af4c09e43e11bf618963b8bb257e`, and the branch push was verified.
+This repairs source only; production rollout remains unauthorized.
 
 No production, persistent database, mailbox/provider or prospect was accessed.
 No deployment/migration or sending/syncing was enabled. Spend impact: C$0.

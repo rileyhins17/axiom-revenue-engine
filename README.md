@@ -9,10 +9,16 @@ channel, preparing specific outreach, and learning which work becomes revenue.
 
 ## Current state
 
-Mailbox settings hardening is being verified: only a label and valid timezone
+Legacy remote control is being retired in source. `/api/mcp` and the old
+internal cron-tick endpoint return HTTP 410, and the console no longer dispatches
+scheduled work. Old MCP tokens cannot reactivate these paths. The normal owner
+console remains; future background execution belongs to the separately gated
+Revenue Engine Worker. Nothing has been deployed or enabled by this change.
+
+Mailbox settings hardening passed its source-level release gate: only a label and valid timezone
 can be edited through the metadata endpoint. Identity, connection, send limits,
 health and lifecycle state stay system-controlled. Changes and their audit record
-must succeed together. This is source-only work, not an enabled mailbox or release.
+must succeed together. This is not an enabled mailbox or production deployment.
 
 Mailbox connection hardening now uses signed, short-lived, one-time server
 transactions instead of exposing session IDs in connection links. Fresh admin

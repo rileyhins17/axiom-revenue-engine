@@ -9,7 +9,6 @@ interface CloudflareEnv {
   DEEPSEEK_API_KEY?: string;
   GMAIL_CLIENT_ID?: string;
   GMAIL_CLIENT_SECRET?: string;
-  MCP_API_TOKEN?: string;
   OPENAI_API_KEY?: string;
 }
 
@@ -20,7 +19,6 @@ declare namespace Cloudflare {
     DEEPSEEK_API_KEY?: string;
     GMAIL_CLIENT_ID?: string;
     GMAIL_CLIENT_SECRET?: string;
-    MCP_API_TOKEN?: string;
     OPENAI_API_KEY?: string;
   }
 }

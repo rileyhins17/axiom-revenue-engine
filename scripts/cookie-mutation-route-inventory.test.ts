@@ -12,8 +12,9 @@ const services = new Map([
   ["agent/jobs/[id]/heartbeat/route.ts", "requireAgentAuth"],
   ["agent/jobs/[id]/logs/route.ts", "requireAgentAuth"],
   ["agent/jobs/[id]/results/route.ts", "requireAgentAuth"],
-  ["mcp/route.ts", "requireMcpAuth"],
 ]);
+
+const retired = new Set(["mcp/route.ts", "internal/cron-tick/route.ts"]);
 
 test("every custom unsafe API export starts with the shared cookie or exact service boundary", () => {
   const root = join(process.cwd(), "src/app/api");
@@ -25,6 +26,23 @@ test("every custom unsafe API export starts with the shared cookie or exact serv
   for (const path of files(root)) {
     const name = relative(root, path).replaceAll("\\", "/");
     const source = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
+    if (retired.has(name)) {
+      // This is not an authentication exemption: prove the entire module is
+      // only seven fixed no-authority responses and its single pure import.
+      assert.equal(source.statements.length, 8, name);
+      const imported = source.statements[0];
+      assert(ts.isImportDeclaration(imported) && ts.isStringLiteral(imported.moduleSpecifier), name);
+      assert.equal(imported.moduleSpecifier.text, "@/lib/retired-legacy-control", name);
+      const methods: string[] = [];
+      for (const node of source.statements.slice(1)) {
+        assert(ts.isFunctionDeclaration(node) && node.name && node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword), name);
+        assert.equal(node.parameters.length, 0, name);
+        assert.equal(node.body?.getText(source), "{ return retiredLegacyControlResponse(); }", name);
+        methods.push(node.name.text);
+      }
+      assert.deepEqual(methods.sort(), ["GET","HEAD","POST","PUT","PATCH","DELETE","OPTIONS"].sort(), name);
+      continue;
+    }
     for (const node of source.statements) {
       // Do not silently overlook aliases or export-const handlers in a new route.
       if (ts.isExportDeclaration(node) || ts.isExportAssignment(node)) assert.fail(`Review API export form: ${name}`);
@@ -37,12 +55,6 @@ test("every custom unsafe API export starts with the shared cookie or exact serv
         || !/^(POST|PUT|PATCH|DELETE)$/.test(node.name?.text ?? "")) continue;
       if (name === "auth/[...all]/route.ts") {
         assert.match(node.body?.getText(source) ?? "", /return createHandlers\(\)\.(POST|PATCH|PUT|DELETE)\(request\)/);
-        continue;
-      }
-      if (name === "internal/cron-tick/route.ts") {
-        assert.equal(node.name?.text, "POST");
-        assert.match(node.body?.getText(source) ?? "", /if \(!expected \|\| token !== expected\)/);
-        assert(!source.text.includes("requireApiSession"));
         continue;
       }
       const first = node.body?.statements[0];

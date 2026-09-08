@@ -314,7 +314,8 @@ fencing for every non-admin legacy mutation.
 
 ### SEC-003 — High — One MCP token carries broad read and mutation authority
 
-**Status:** Open; do not activate the legacy MCP/cron surface.
+**Status:** Source retirement reviewed; exact-commit release receipt required.
+No live route, trigger or credential has been changed.
 **Reachability:** Dormant if the token is absent and automation remains off.
 
 One bearer token protects a large MCP surface that includes scheduler triggers,
@@ -337,6 +338,20 @@ mutation, and scheduler authority into scoped credentials. Prefer a Cloudflare
 service binding for internal jobs. Enforce strict schemas, request/body/batch
 limits, rate and cost limits, constant-time credential comparison, origin/CORS
 policy, and redacted error responses.
+
+**Candidate evidence (2026-09-08):** pre-removal characterization proved that a
+synthetic shared token listed both read and mutation tools and that a fake
+scheduled event dispatched scheduler/pipeline requests with that same token.
+No tool, database or provider was used. The candidate removes the tool dispatcher
+and shared-token cron implementation, supplies pure fixed-410 responses for both
+exact routes, and makes the root scheduler inert. Current console fetch/cache
+exports and separately authenticated owner endpoints remain. Retirement tests
+reject any binding/request inspection and prove zero scheduled dispatch even
+with enabled flags and an old credential. All 625 tests and the actual-route
+browser gate pass, including all seven supported methods and six WCAG pages
+with zero outside requests. Independent candidate review found no concrete
+surviving bypass or nonlegacy console regression. Broader legacy agent/browser/send
+paths remain separate findings, not implicitly fixed by this retirement.
 
 ### SEC-004 — High — Legacy website browsing can reach attacker-selected hosts
 
@@ -567,7 +582,8 @@ No live Google exchange, deployment or migration has been performed.
 
 ### SEC-011 — Medium — Mailbox PATCH permits broad record mutation
 
-**Status:** Candidate source fix; exact-commit release gate still pending.
+**Status:** Verified source fix at `084ff3e70328af4c09e43e11bf618963b8bb257e`;
+all ten exact-commit release checks and branch push passed. Not deployed.
 Automation/mailboxes remain off; no live fix is claimed.
 **Reachability:** Reachable to an administrator when mailbox data exists.
 
@@ -595,7 +611,9 @@ Numeric settings are derived on connection sync and are not misleadingly exposed
 as persistent owner overrides. Lifecycle transitions stay outside this metadata
 endpoint. Targeted SQLite/D1 adversarial and audit-rollback tests and actual
 route/browser proof pass. Independent bounded review found no concrete bypass or
-regression. Complete exact-commit release evidence is required before closure.
+regression. The complete exact-commit release receipt is recorded at the SHA
+above; the final six-page browser gate made zero external requests. Live
+deployment, mailbox activation and unrelated security findings remain open.
 
 ### SEC-012 — Medium — Security audit events fail open
 

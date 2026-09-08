@@ -13,6 +13,23 @@
 
 ## Safe work-cycle start
 
+### Retired legacy remote control (source-only)
+
+The rebuild no longer serves the shared-token MCP tools or internal cron-tick
+dispatcher. Both exact endpoints return an empty HTTP 410 with private/no-store
+headers for all supported methods, without parsing credentials or bodies. The
+root console's scheduled handler is inert even if an obsolete trigger remains.
+Ordinary owner routes and the console's OpenNext request/cache exports remain.
+Existing external MCP clients intentionally stop working after an approved
+rollout; use the owner console, not an alternate legacy token or endpoint.
+
+`MCP_API_TOKEN` is no longer a runtime setting or declared secret binding.
+This does not remove any secret from Cloudflare or an external client. Inventory
+and revoke obsolete configured credentials during the separately approved release;
+do not read or copy their values. Do not restore this shared-key design to repair
+a client connection. New integrations require reviewed scoped authorization,
+bounded input/cost, auditability and the Revenue Engine's execution gates.
+
 ### Operator accounts after the security lockdown
 
 Public registration is disabled at the server, including for allowlisted owner

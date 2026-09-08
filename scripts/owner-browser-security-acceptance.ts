@@ -4,6 +4,18 @@ import { browserSecurityHeaders } from "../src/lib/browser-security-headers";
 
 export async function verifyOwnerBrowserSecurity(context: BrowserContext, baseUrl: string) {
   assert.equal(new URL(baseUrl).hostname, "127.0.0.1");
+  for (const path of ["/api/mcp", "/api/internal/cron-tick?task=scheduler"]) {
+    for (const method of ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]) {
+      const response = await context.request.fetch(`${baseUrl}${path}`, {
+        method, timeout: 10_000, headers: { authorization: "Bearer synthetic-retired-token", origin: "https://foreign.example.invalid" },
+        ...(["POST", "PUT", "PATCH"].includes(method) ? { data: [{jsonrpc:"2.0",id:1,method:"tools/call",params:{name:"force_unblock"}}] } : {}),
+      });
+      assert.equal(response.status(),410,`${method} ${path}`);
+      assert.equal(await response.text(),"");
+      assert.equal(response.headers()["cache-control"],"private, no-store");
+      assert.equal(response.headers()["access-control-allow-origin"],undefined);
+    }
+  }
   for (const path of ["/sign-in", "/leads", "/offline", "/api/vault/leads", "/sw.js", "/icons/icon-192.png", "/manifest.webmanifest", "/missing-security-fixture.txt"]) {
     const response = await context.request.get(`${baseUrl}${path}`);
     assert.equal(response.status(), path === "/missing-security-fixture.txt" ? 404 : 200, path);
