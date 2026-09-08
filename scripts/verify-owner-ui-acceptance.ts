@@ -36,6 +36,8 @@ import { auditWebsiteDeterministically } from "../src/lib/revenue-engine/website
 import { executePrivateKwContactPersistenceForLocalDatabase } from "./private-kw-contact-persistence-executor";
 import { verifyOwnerSessionRevocation } from "./owner-session-acceptance";
 import { verifyOwnerBanLifecycle } from "./owner-ban-acceptance";
+import { verifyOwnerAdmission } from "./owner-admission-acceptance";
+import { postOwnerSignIn } from "./owner-auth-request";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
@@ -489,7 +491,7 @@ function seedOwnerLead(database: SqliteDatabase) {
   });
 }
 
-function startNextServer(baseUrl: string, databasePath: string, logLines: string[]) {
+async function startNextServer(baseUrl: string, databasePath: string, logLines: string[]) {
   const port = new URL(baseUrl).port;
   const nextBinary = join(REPOSITORY_ROOT, "node_modules", "next", "dist", "bin", "next");
   const childEnvironment: Record<string, string | undefined> = {};
@@ -515,7 +517,9 @@ function startNextServer(baseUrl: string, databasePath: string, logLines: string
     APP_BASE_URL: baseUrl,
     AGENT_SHARED_SECRET: "",
     AUTH_ALLOWED_EMAILS: `${FIXTURE_EMAIL},${FIXTURE_ADMIN_EMAIL},${UNPROVISIONED_ADMIN_EMAIL}`,
-    AUTH_ADMIN_EMAILS: UNPROVISIONED_ADMIN_EMAIL,
+    // An approval ceiling, not role assignment: the primary fixture remains a
+    // stored ordinary user except during explicit role-revocation tests.
+    AUTH_ADMIN_EMAILS: `${FIXTURE_EMAIL},${FIXTURE_ADMIN_EMAIL},${UNPROVISIONED_ADMIN_EMAIL}`,
     AUTH_ALLOWED_ORIGINS: baseUrl,
     AUTONOMOUS_INTAKE_ENABLED: "false",
     AUTONOMOUS_QUEUE_ENABLED: "false",
@@ -534,24 +538,33 @@ function startNextServer(baseUrl: string, databasePath: string, logLines: string
     NEXT_TELEMETRY_DISABLED: "1",
     OPENAI_API_KEY: "",
   });
-  const child = spawn(process.execPath, [nextBinary, "dev", "--webpack", "-H", "127.0.0.1", "-p", port], {
-    cwd: REPOSITORY_ROOT,
-    // Generated Cloudflare globals intentionally narrow production env values.
-    // This isolated child uses explicit synthetic values instead.
-    env: childEnvironment as unknown as NodeJS.ProcessEnv,
-    stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true,
-  });
-  child.stdout?.setEncoding("utf8");
-  child.stderr?.setEncoding("utf8");
   const capture = (chunk: string) => {
     const safe = chunk.replaceAll(TEST_AUTH_SECRET, "[test-secret-redacted]");
     logLines.push(...safe.split(/\r?\n/).filter(Boolean));
     if (logLines.length > 200) logLines.splice(0, logLines.length - 200);
   };
-  child.stdout?.on("data", capture);
-  child.stderr?.on("data", capture);
-  return child;
+  const launch = (args: string[], timeout?: number) => {
+    const child = spawn(process.execPath, [nextBinary, ...args], {
+      cwd: REPOSITORY_ROOT,
+      // Both build and server use the same explicit fake credentials and DB.
+      env: childEnvironment as unknown as NodeJS.ProcessEnv,
+      stdio: ["ignore", "pipe", "pipe"], windowsHide: true, timeout,
+    });
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", capture);
+    child.stderr?.on("data", capture);
+    return child;
+  };
+  // Development on-demand compilation can race its own manifests even after
+  // warmup. Test an immutable production build, not a live-recompiling server.
+  const build = launch(["build", "--webpack"], 180_000);
+  await new Promise<void>((resolveBuild, rejectBuild) => {
+    build.once("error", rejectBuild);
+    build.once("exit", (code) => code === 0 ? resolveBuild()
+      : rejectBuild(new Error(`Isolated owner acceptance build failed (code ${code}).`)));
+  });
+  return launch(["start", "-H", "127.0.0.1", "-p", port]);
 }
 
 async function waitForServer(baseUrl: string, child: ChildProcess) {
@@ -597,7 +610,7 @@ async function authenticate(context: BrowserContext, baseUrl: string) {
     assert.equal((await context.cookies(baseUrl)).some((cookie) => cookie.name.includes("session")), false,
       "Rejected registration must not establish a session.");
   }
-  const deniedSignIn = await context.request.post(`${baseUrl}/api/auth/sign-in/email`, {
+  const deniedSignIn = await postOwnerSignIn(context.request, baseUrl, {
     data: { email: UNPROVISIONED_ADMIN_EMAIL, password: FIXTURE_PASSWORD },
     headers: { origin: baseUrl },
   });
@@ -609,7 +622,7 @@ async function authenticate(context: BrowserContext, baseUrl: string) {
   assert.equal(await registrationPage.locator("form, input").count(), 0, "Closed registration must expose no form.");
   await registrationPage.close();
 
-  const response = await context.request.post(`${baseUrl}/api/auth/sign-in/email`, {
+  const response = await postOwnerSignIn(context.request, baseUrl, {
     data: { email: FIXTURE_EMAIL, password: FIXTURE_PASSWORD },
     headers: { origin: baseUrl },
   });
@@ -686,7 +699,10 @@ async function assertReadOnlyOwnerSurface(page: Page, label: string) {
   const unsafe = await page.locator("[data-owner-content] button, [data-owner-content] form, [data-owner-content] a[href^='mailto:'], [data-owner-content] a[href^='tel:']").count();
   assert.equal(unsafe, 0, `${label} unexpectedly exposes a mutation or direct-contact control.`);
   assert.equal(await page.locator("main#main-content").count(), 1, `${label} must have one main landmark.`);
-  assert.equal(await page.locator("h1").count(), 1, `${label} must have one primary heading.`);
+  // Production navigation can retain inactive page DOM. Assert both the
+  // rendered and accessible heading, not detached-from-view history entries.
+  assert.equal(await page.locator("h1:visible").count(), 1, `${label} must have one visible primary heading.`);
+  assert.equal(await page.getByRole("heading", { level: 1 }).count(), 1, `${label} must have one accessible primary heading.`);
 }
 
 async function assertReducedMotion(page: Page, label: string) {
@@ -869,16 +885,14 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     });
     await authenticate(context, baseUrl);
 
-    // Compile mutation handlers with denied/no-op requests before measured
-    // pages exist. On-demand compilation must not replace their asset manifests.
+    // Warm authenticated handlers with denied/no-op requests before measuring.
     assert.equal((await context.request.get("/api/admin/users")).status(), 403);
     assert.equal((await context.request.patch("/api/user/profile", {
       data: {}, headers: { origin: baseUrl },
     })).status(), 400);
 
-    // Next dev compiles route chunks on demand. Compile every owner acceptance
-    // route in a disposable page before attaching the measured/error-audited
-    // page so route prefetch cannot replace a chunk during the real run.
+    // Warm server-side reads in a disposable page before measuring the owner's
+    // interaction time. The compiled production assets remain unchanged.
     stage = "owner route warmup";
     const warmupPage = await context.newPage();
     await warmupPage.goto("/leads", { waitUntil: "domcontentloaded" });
@@ -941,7 +955,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
     await page.locator("[data-quality-lab-ready='true']").waitFor();
     await assertOwnerPageTitle(page, "Quality Lab | Axiom Revenue Engine");
-    await page.getByLabel("Choose owner-review checkpoint").setInputFiles({
+    await page.locator('input[type="file"][aria-label="Choose owner-review checkpoint"]:enabled:visible').setInputFiles({
       name: "owner-labeling-checkpoint.json",
       mimeType: "application/json",
       buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
@@ -973,7 +987,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     stage = "desktop quality lab resume";
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.locator("[data-quality-lab-ready='true']").waitFor();
-    await page.getByLabel("Choose owner-review checkpoint").setInputFiles({
+    await page.locator('input[type="file"][aria-label="Choose owner-review checkpoint"]:enabled:visible').setInputFiles({
       name: "owner-labeling-checkpoint.json",
       mimeType: "application/json",
       buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
@@ -1006,7 +1020,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
     await page.locator("[data-quality-lab-ready='true']").waitFor();
-    await page.getByLabel("Choose owner-review checkpoint").setInputFiles({
+    await page.locator('input[type="file"][aria-label="Choose owner-review checkpoint"]:enabled:visible').setInputFiles({
       name: "owner-labeling-checkpoint.json",
       mimeType: "application/json",
       buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
@@ -1024,14 +1038,22 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     // not keep fetching/refetching sessions while those cookie jars are changed.
     await page.close();
     page = null;
-    stage = "owner session revocation";
+    stage = "owner admission";
     const authDatabase = new Database(databasePath, { fileMustExist: true });
     try {
+      // Independent lifecycle scenarios share one disposable DB. Reset only its
+      // fake rate windows between scenarios; retain the real configured limit.
+      authDatabase.prepare('DELETE FROM "RateLimitWindow"').run();
+      await verifyOwnerAdmission({ context, baseUrl, database: authDatabase,
+        credentials: { email: FIXTURE_EMAIL, password: FIXTURE_PASSWORD } });
+      stage = "owner session revocation";
+      authDatabase.prepare('DELETE FROM "RateLimitWindow"').run();
       await verifyOwnerSessionRevocation({
         context, baseUrl, database: authDatabase, fixtureSecret: TEST_AUTH_SECRET,
         credentials: { email: FIXTURE_EMAIL, password: FIXTURE_PASSWORD },
       });
       stage = "owner ban lifecycle";
+      authDatabase.prepare('DELETE FROM "RateLimitWindow"').run();
       await verifyOwnerBanLifecycle({
         context, baseUrl, database: authDatabase,
         owner: { email: FIXTURE_EMAIL, password: FIXTURE_PASSWORD },
@@ -1078,11 +1100,10 @@ async function run() {
     database.close();
     const port = await freeLoopbackPort();
     const baseUrl = `http://127.0.0.1:${port}`;
-    // OpenNext leaves production assets in `.next`. A fresh Next dev server can
-    // briefly serve those files beside newly compiled development chunks, so
-    // clear only this repository's generated Next directory before startup.
+    // Clear only this repository's generated artifacts, then compile a fresh
+    // fixture-only production build. Never reuse a different environment's build.
     await rm(join(REPOSITORY_ROOT, ".next"), { recursive: true, force: true });
-    server = startNextServer(baseUrl, databasePath, serverLogs);
+    server = await startNextServer(baseUrl, databasePath, serverLogs);
     await waitForServer(baseUrl, server);
     result = await runBrowserAcceptance(baseUrl, outputDirectory, databasePath);
     const verifiedDatabase = new Database(databasePath, { readonly: true });

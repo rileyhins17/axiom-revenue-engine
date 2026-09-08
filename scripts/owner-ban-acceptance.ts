@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import type Database from "better-sqlite3";
 import type { BrowserContext } from "playwright";
+import { postOwnerSignIn } from "./owner-auth-request";
 
 export async function verifyOwnerBanLifecycle(input: {
   context: BrowserContext;
@@ -14,7 +15,7 @@ export async function verifyOwnerBanLifecycle(input: {
   assert.equal(new URL(baseUrl).hostname, "127.0.0.1");
   const login = async (credentials: { email: string; password: string }) => {
     await context.clearCookies();
-    const response = await context.request.post(`${baseUrl}/api/auth/sign-in/email`, {
+    const response = await postOwnerSignIn(context.request, baseUrl, {
       data: credentials, headers: { origin: baseUrl },
     });
     assert.equal(response.status(), 200, "The synthetic account must be able to sign in.");
@@ -85,7 +86,7 @@ export async function verifyOwnerBanLifecycle(input: {
   assert.equal(sessions(), 0, "Ban must revoke all existing sessions in the same database change.");
   await assertOldCookieRejected();
   await context.clearCookies();
-  const deniedLogin = await context.request.post(`${baseUrl}/api/auth/sign-in/email`, {
+  const deniedLogin = await postOwnerSignIn(context.request, baseUrl, {
     data: input.owner, headers: { origin: baseUrl },
   });
   assert.equal(deniedLogin.status(), 403, "A permanent ban must not inherit an old expired ban deadline.");

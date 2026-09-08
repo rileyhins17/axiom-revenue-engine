@@ -17,7 +17,7 @@
 
 Public registration is disabled at the server, including for allowlisted owner
 addresses. The old `/sign-up` URL only explains that access is private. Existing
-accounts can still sign in; this source change does not create, delete, verify,
+approved, verified accounts can still sign in; this source change does not create, delete, verify,
 or reset any production account.
 
 Do not temporarily reopen signup to provision or recover an owner. Verified
@@ -33,8 +33,27 @@ each authorization request. Old signed cache cookies cannot restore deleted or
 expired sessions or a removed administrator role. The disposable browser gate
 tests the existing revoke-all-sessions endpoint; this is not yet an owner-facing
 session-management UI or proof of deployed behavior. A request already in flight
-and data already viewed cannot be recalled. Allowlist removal still needs its
-separate SEC-002 fix.
+and data already viewed cannot be recalled.
+
+The source now requires exact, valid `AUTH_ALLOWED_EMAILS` and
+`AUTH_ADMIN_EMAILS` lists, with at least one address in each and administrators
+a subset of owners. Both are read freshly at each authentication boundary.
+Missing, malformed, duplicate, wildcard, or contradictory settings stop access
+without deleting all sessions or changing roles. An incomplete Cloudflare
+environment never falls back to process/build-time approval values.
+
+A valid policy removal revokes the affected owner's sessions when a request
+observes it. Admin approval removal demotes their stored role while preserving
+ordinary access if they remain an approved, verified owner. Re-adding an address
+never restores old sessions or automatically grants admin powers. Use the
+reviewed ban control for permanent removal: toggling configuration off and back
+on without a request observing it is not a durable revocation operation.
+
+Before rollout, verify both owners' account provenance and approved settings.
+An unverified legacy account will be denied; do not bypass this by manually
+marking it verified, reopening signup, or removing the checks. Verified
+enrollment/recovery and MFA still need a reviewed implementation and rehearsal.
+This patch itself makes no live account or configuration change.
 
 ### Ban lifecycle rollout (source-only; not permission to migrate)
 
@@ -67,8 +86,8 @@ approved application/schema pair is restored. Do not remove the guards or
 restore old sessions as an emergency access workaround. Session deletion is
 intentional; affected users must sign in again after an explicit unban. Restoring
 a backup containing old sessions requires separately invalidating those sessions
-before the console can reopen. MFA, secure recovery/enrollment, allowlist
-enforcement, and remaining audit blockers still prevent production activation.
+before the console can reopen. MFA, secure recovery/enrollment, deployed
+admission proof, and remaining audit blockers still prevent production activation.
 
 ### Start a bounded milestone
 

@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 
 import type Database from "better-sqlite3";
 import type { BrowserContext } from "playwright";
+import { postOwnerSignIn } from "./owner-auth-request";
 
 type SessionSnapshot = {
   session: { id: string; [key: string]: unknown };
@@ -92,7 +93,7 @@ export async function verifyOwnerSessionRevocation(input: {
     // Revoking sessions does not revoke the account. A new legitimate login
     // must work, but a server-expired session must not be extended by old cache.
     await context.clearCookies();
-    const login = await context.request.post(`${baseUrl}/api/auth/sign-in/email`, {
+    const login = await postOwnerSignIn(context.request, baseUrl, {
       headers: { origin: baseUrl }, data: input.credentials,
     });
     assert.equal(login.status(), 200, "Revocation must preserve a fresh password login.");

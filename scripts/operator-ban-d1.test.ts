@@ -7,6 +7,8 @@ import { admin } from "better-auth/plugins";
 import { convertV4MiniflareOptions, Miniflare } from "miniflare";
 
 import { changeOperatorAccess } from "../src/lib/operator-access";
+import { setCloudflareBindings } from "../src/lib/cloudflare";
+import { assertOperatorAdmission, reconcileOperatorAdmission } from "../src/lib/operator-owner-policy";
 
 test("ban guards and atomic actor fence execute in local D1, without a live binding", async () => {
   const runtime = new Miniflare(convertV4MiniflareOptions({
@@ -18,6 +20,8 @@ test("ban guards and atomic actor fence execute in local D1, without a live bind
     }],
   }));
   try {
+    setCloudflareBindings({ AUTH_ALLOWED_EMAILS: "admin@example.invalid,target@example.invalid",
+      AUTH_ADMIN_EMAILS: "admin@example.invalid,target@example.invalid" });
     const db = await runtime.getD1Database("DB");
     const schema = readFileSync("migrations/0001_cloudflare_auth_security.sql", "utf8");
     for (const table of ["User", "Session"]) {
@@ -26,7 +30,7 @@ test("ban guards and atomic actor fence execute in local D1, without a live bind
       await db.prepare(ddl[0]).run();
     }
     for (const id of ["admin", "target"]) {
-      await db.prepare(`INSERT INTO User (id,name,email,role,updatedAt) VALUES (?,?,?,'admin',CURRENT_TIMESTAMP)`)
+      await db.prepare(`INSERT INTO User (id,name,email,role,emailVerified,updatedAt) VALUES (?,?,?,'admin',1,CURRENT_TIMESTAMP)`)
         .bind(id, id, `${id}@example.invalid`).run();
       await db.prepare(`INSERT INTO Session (id,userId,token,expiresAt,updatedAt)
         VALUES (?,?,?,datetime('now','+1 day'),CURRENT_TIMESTAMP)`).bind(id, id, id).run();
@@ -77,5 +81,10 @@ test("ban guards and atomic actor fence execute in local D1, without a live bind
     await assert.rejects(before(sessionInput, { context: raceContext } as typeof hookContext),
       (error: unknown) => error instanceof Error && "status" in error && error.status === "FORBIDDEN");
     assert.deepEqual(await db.prepare("SELECT banned FROM User WHERE id = 'target'").first(), { banned: 1 });
-  } finally { await runtime.dispose(); }
+    setCloudflareBindings({ AUTH_ALLOWED_EMAILS: "target@example.invalid", AUTH_ADMIN_EMAILS: "target@example.invalid" });
+    await reconcileOperatorAdmission(db);
+    assert.equal(await db.prepare("SELECT id FROM Session WHERE id = 'admin'").first(), null);
+    await assert.rejects(assertOperatorAdmission(db, "admin"), { status: "FORBIDDEN" });
+    assert.deepEqual(await db.prepare("SELECT role FROM User WHERE id = 'admin'").first(), { role: "user" });
+  } finally { setCloudflareBindings(null); await runtime.dispose(); }
 });

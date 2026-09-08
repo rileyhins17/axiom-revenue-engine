@@ -14,6 +14,14 @@ the read-only reference until the new engine passes its shadow and pilot gates.
 All autonomous repository defaults are off, follow-ups are disabled, and no test
 is allowed to send real outreach.
 
+Owner access is being hardened in source: public registration is closed,
+approved email ownership is required, old sessions cannot survive observed
+owner removal or banning, and administrator approval does not automatically
+grant privileges. Missing access configuration stops login. These changes are
+not deployed; verified enrollment, MFA/recovery and the remaining security
+audit gates still block activation. See the account section of
+[`docs/RUNBOOK.md`](docs/RUNBOOK.md) before any future rollout.
+
 Start with [`docs/STATUS.md`](docs/STATUS.md) for the current verified checkpoint,
 the next three actions, blockers, live-system state, and budget. The full approved
 direction lives in [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md).
@@ -397,14 +405,21 @@ delegated merely to satisfy a model policy.
 ```powershell
 npm run check:safety
 npm test
-npm run test:owner-ui
 npm run typecheck
 npm run lint
 npm run build:cloudflare
 npx wrangler deploy --env="" --dry-run --autoconfig false
 npm run cf:engine:typegen:check
 npm run cf:engine:dry-run
+npm run test:owner-ui
 ```
+
+Run these sequentially. The browser gate builds and starts its own
+production-mode app using fake accounts and a disposable local database; it
+never reuses a live database or contacts a provider. It keeps production login
+throttling enabled and waits only for explicit, bounded rate-limit responses.
+All other build/dry-run processes must exit before it starts because they share
+the generated build directory.
 
 ## Documentation map
 

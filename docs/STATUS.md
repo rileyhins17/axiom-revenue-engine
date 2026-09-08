@@ -4,22 +4,23 @@ Last updated: 2026-09-07 (America/Toronto)
 
 ## Plain-English status
 
-Account banning is the current source-level security milestone. The local
-attack test reproduced a banned account retaining its login. The candidate now
-revokes all target sessions atomically, blocks a login arriving after a ban,
-and requires a fresh login after unbanning. It also prevents an expired
-temporary-ban check from overwriting a newer ban. This requires the reviewed
-source-only migration 0071 and pinned login-library patch together; neither has
-been deployed or applied to any live database. MFA, secure enrollment/recovery,
-allowlist removal, other audit findings, and production proof remain open.
+Owner admission is the current source-level security milestone. A local attack
+test proved that an account outside the approved owner list could still read
+leads. The candidate now checks current approval and verified email across
+login, existing sessions, and account administration. Removing an owner revokes
+their sessions when the policy is checked; re-adding them requires a fresh login.
+Admin approval is a separate ceiling and never automatically promotes anyone.
+Missing or invalid configuration stops access without mass-changing accounts.
+These are source changes, not a production rollout. MFA, secure enrollment and
+recovery, session-management UI, other audit findings, and live proof remain open.
 
-The next source-level security fix removes stale login-cookie authorization.
-A local attack test proved that a saved admin cookie retained access after a
+The preceding verified source checkpoints closed stale login-cookie authorization
+and ban-lifecycle bypasses. A local attack test proved that a saved admin cookie retained access after a
 database demotion. The app now asks the database for the current session and
 role instead of trusting that cached identity. Regression checks cover old
 signed cookies, demotion, revocation, expiry, and normal sign-in. This does not
-yet complete MFA, recovery, account banning, or allowlist removal, and it has
-not been deployed. No production account, session, mailbox, or provider is used.
+yet complete MFA or recovery, and it has not been deployed. No production
+account, session, mailbox, or provider is used.
 
 The security audit's critical public-registration path is now closed in the
 rebuild source: even an approved admin email cannot create an account through
@@ -198,6 +199,70 @@ file; tracked code, the safe seed, and this status document remain recoverable
 through Git. ADR 0058 and `docs/REBUILD_MONITOR.md` define the workflow.
 
 ## Verified checkpoint
+
+- Last fully release-proven and pushed commit:
+  `f8946bf6ce4ccc416232911cd2fc2c188268d1c6` (ban lifecycle). Its exact-commit
+  receipt passed all ten gates, including 605 tests and the owner browser gate:
+  six WCAG pages, desktop 1440/mobile 390, list 1,939 ms, dossier 586 ms, zero
+  external requests. That is the verified predecessor, not this working copy.
+- Current bounded change: enforce approved-owner admission and the separate
+  administrator ceiling through the shared auth boundary, session-creation
+  hook, and mutation-time actor fence. Verified email is required; neither a
+  request body nor configuration alone grants an admin role. Invalid settings
+  fail closed before cleanup. Only disposable test accounts were changed.
+- Baseline evidence at `f8946bf`: the new browser assertion returned HTTP 200
+  for a stored owner email outside the allowlist (expected 401). Focused tests
+  now cover actual cached Better Auth admission on local D1, configuration
+  removal/re-add without cache resets, raw auth and app lookup, unverified
+  accounts, disabled identity edits, admin ceilings, and normal fresh login.
+  SQLite/D1 tests also cover cleanup failure and mutation-time identity drift.
+- Verification in progress: 23 focused checks, all 613 repository tests, safety,
+  typecheck and lint passed. The
+  first browser baseline stopped earlier on the known Next dev manifest issue;
+  moving the independent admission scenario first established the actual
+  200-versus-401 failure. The expanded scenario then hit the real login-rate
+  limit across independent cases. The fixture now clears only its disposable
+  rate windows between scenarios; production limits are unchanged. The browser
+  identity snapshot also caught an over-broad role cleanup touching the internal
+  `system` service identity; cleanup now only changes roles that actually grant
+  admin permission, with a regression preserving service metadata. The complete
+  browser gate passed: list 663 ms, dossier 836 ms, six WCAG pages, zero outside
+  requests. Independent review then identified approved legacy multi-role
+  admin compatibility and the admission-to-insert timing gap. Both were
+  confirmed and addressed: approved role combinations remain intact; a final
+  creation check removes the new session and rejects login when identity or
+  approval changed during insertion. All 23 focused checks pass after those
+  changes. Final exact-commit proof must rerun every gate, including the browser,
+  before push; the release receipt/monitor records that candidate SHA.
+- The reviewed timing tests now exercise both internal creation and the real
+  HTTP route for email, verification, and configuration changes during login.
+  All reject and delete the new session. Because the library queues after-hooks
+  beyond its router, the route now converts those typed rejections to uncached
+  403/503 responses; it does not turn other errors into success. Typecheck and
+  the real-adapter tests pass with this integration. Approved legacy multi-role
+  admins and the unrelated service identity remain unchanged. No second review
+  cycle or broader authentication redesign was introduced.
+- The first exact-commit gate stopped on a Next development-server JSON parse
+  error (500, not an accepted security denial); no receipt or push occurred.
+  The browser harness now builds and runs a fresh production-mode fixture with
+  the same fake identity settings and disposable database. It selects active
+  controls rather than hidden navigation-history DOM and respects production
+  login throttling with bounded, explicit 429 retry delays. No production
+  protection was disabled, and other errors are never retried. The resulting
+  complete gate passed: list 217 ms, dossier 106 ms, desktop 1440/mobile 390,
+  six WCAG pages, zero outside requests. Three helper regressions cover retry
+  limits, error preservation and loopback-only destinations. The amended
+  working copy passes all 616 tests, typecheck and lint. Its checkpoint must
+  pass the entire exact-commit gate before it is pushed.
+- No owner action or new subscription is needed for this source-only milestone.
+  A future rollout must review approved owner/admin configuration and account
+  provenance; do not manually mark unverified owners verified or reopen signup.
+  Permanent removal uses the explicit ban control. A configuration change that
+  is removed and reverted without any request observing it cannot revoke old
+  sessions; no such guarantee is claimed. Runtime cost impact C$0; no live
+  account, database, mailbox, deployment, provider, or prospect was touched.
+
+### Ban security checkpoint (historical)
 
 - Latest fully release-proven and pushed predecessor:
   `4a945473645951443e6a0785452f35277103dfe1` (current-database session authority).
@@ -2577,8 +2642,8 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
 
 ## Next three actions
 
-1. Complete SEC-002's allowlist-removal enforcement, then verified
-   owner-enrollment, MFA, recovery, and owner-facing session controls with
+1. Complete SEC-002's verified owner-enrollment, MFA, recovery, and owner-facing
+   session controls with
    synthetic tests. Retain the registration-denial and stale-cache regressions;
    keep real account changes and staging activation separately approval-gated.
 2. Add one tested browser/request security boundary for custom mutation origin

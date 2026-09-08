@@ -1,19 +1,24 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { test } from "node:test";
+import { afterEach, beforeEach, test } from "node:test";
 import Database from "better-sqlite3";
 
 import type { D1DatabaseLike, D1PreparedStatementLike } from "./cloudflare";
+import { setCloudflareBindings } from "./cloudflare";
+import { assertOperatorAdmission, reconcileOperatorAdmission } from "./operator-owner-policy";
 import { changeOperatorAccess, isOperatorAction } from "./operator-access";
 import { isBlockedAdminAuthPath, operatorBanSchemaReady } from "./operator-ban-schema";
 
 const migration = readFileSync("migrations/0071_operator_ban_session_guards.sql", "utf8");
 const schema = readFileSync("migrations/0001_cloudflare_auth_security.sql", "utf8");
+const approved = "admin@example.invalid,target@example.invalid";
+beforeEach(() => setCloudflareBindings({ AUTH_ALLOWED_EMAILS: approved, AUTH_ADMIN_EMAILS: approved }));
+afterEach(() => setCloudflareBindings(null));
 function fixture(applyGuards = true) {
   const db = new Database(":memory:");
   db.exec(schema);
   for (const [id, role] of [["admin", "admin"], ["target", "user"]]) {
-    db.prepare('INSERT INTO User (id, name, email, role, updatedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)')
+    db.prepare('INSERT INTO User (id, name, email, role, emailVerified, updatedAt) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)')
       .run(id, id, `${id}@example.invalid`, role);
     db.prepare(`INSERT INTO Session (id, userId, token, expiresAt, updatedAt)
       VALUES (?, ?, ?, datetime('now', '+1 day'), CURRENT_TIMESTAMP)`).run(id, id, id);
@@ -89,6 +94,8 @@ for (const [name, change] of [
   ["revoked actor", "DELETE FROM Session WHERE id = 'admin'"],
   ["expired actor", "UPDATE Session SET expiresAt = datetime('now','-1 second') WHERE id = 'admin'"],
   ["invalid expiry", "UPDATE Session SET expiresAt = 'invalid' WHERE id = 'admin'"],
+  ["unapproved actor", "UPDATE User SET email = 'removed@example.invalid' WHERE id = 'admin'"],
+  ["unverified actor", "UPDATE User SET emailVerified = 0 WHERE id = 'admin'"],
 ]) {
   test(`the mutation-time fence rejects a ${name}`, async () => {
     const { db, adapter, input } = fixture();
@@ -134,4 +141,69 @@ test("admin auth policy permits inspection but denies mutation shortcuts and unk
     "/admin/remove-user", "/admin/set-user-password", "/admin/impersonate-user", "/admin/stop-impersonating",
     "/admin/revoke-user-session", "/admin/revoke-user-sessions", "/admin/new-operation", "/admin/list-users/"])
     assert.equal(isBlockedAdminAuthPath(path), true);
+});
+
+test("current owner policy revokes removed identities without reviving old sessions on re-add", async () => {
+  const { db, adapter } = fixture();
+  try {
+    await assertOperatorAdmission(adapter, "target");
+    setCloudflareBindings({ AUTH_ALLOWED_EMAILS: "admin@example.invalid", AUTH_ADMIN_EMAILS: "admin@example.invalid" });
+    await reconcileOperatorAdmission(adapter);
+    assert.equal(db.prepare("SELECT id FROM Session WHERE id = 'target'").get(), undefined);
+    assert(db.prepare("SELECT id FROM Session WHERE id = 'admin'").get());
+    await assert.rejects(assertOperatorAdmission(adapter, "target"), { status: "FORBIDDEN" });
+    setCloudflareBindings({ AUTH_ALLOWED_EMAILS: approved, AUTH_ADMIN_EMAILS: approved });
+    await reconcileOperatorAdmission(adapter);
+    await assertOperatorAdmission(adapter, "target");
+    assert.equal(db.prepare("SELECT id FROM Session WHERE id = 'target'").get(), undefined);
+    db.exec("UPDATE User SET emailVerified = 0 WHERE id = 'admin'");
+    await reconcileOperatorAdmission(adapter);
+    assert.equal(db.prepare("SELECT id FROM Session WHERE id = 'admin'").get(), undefined);
+    await assert.rejects(assertOperatorAdmission(adapter, "admin"), { status: "FORBIDDEN" });
+  } finally { db.close(); }
+});
+
+test("admin approval is a ceiling, removal demotes without banning, and re-add never promotes", async () => {
+  const { db, adapter, input } = fixture();
+  try {
+    db.exec(`INSERT INTO User (id,name,email,role,updatedAt)
+      VALUES ('system','Internal','system@example.invalid','system',CURRENT_TIMESTAMP)`);
+    setCloudflareBindings({ AUTH_ALLOWED_EMAILS: approved, AUTH_ADMIN_EMAILS: "target@example.invalid" });
+    // The mutation fence independently checks fresh policy even before cleanup.
+    assert.equal(await changeOperatorAccess(adapter, input), null);
+    await reconcileOperatorAdmission(adapter);
+    assert.deepEqual(db.prepare("SELECT role, banned FROM User WHERE id = 'admin'").get(), { role: "user", banned: 0 });
+    assert(db.prepare("SELECT id FROM Session WHERE id = 'admin'").get());
+    setCloudflareBindings({ AUTH_ALLOWED_EMAILS: approved, AUTH_ADMIN_EMAILS: approved });
+    await reconcileOperatorAdmission(adapter);
+    assert.equal((db.prepare("SELECT role FROM User WHERE id = 'admin'").get() as { role: string }).role, "user");
+    db.exec("UPDATE User SET role = 'admin' WHERE id = 'admin'");
+    setCloudflareBindings({ AUTH_ALLOWED_EMAILS: approved, AUTH_ADMIN_EMAILS: "admin@example.invalid" });
+    assert.equal(await changeOperatorAccess(adapter, { ...input, action: "make_admin" }), null);
+    db.exec("UPDATE User SET role = 'user,admin' WHERE id = 'target'");
+    await reconcileOperatorAdmission(adapter);
+    assert.equal((db.prepare("SELECT role FROM User WHERE id = 'target'").get() as { role: string }).role, "user",
+      "Legacy comma-separated plugin roles must not bypass the exact admin ceiling.");
+    assert.equal((db.prepare("SELECT role FROM User WHERE id = 'system'").get() as { role: string }).role, "system",
+      "The internal service identity is not an operator administrator and must remain unchanged.");
+    assert.equal(await changeOperatorAccess(adapter, input), "banned", "Other reviewed admin actions remain available.");
+    db.exec("UPDATE User SET role = 'admin,user' WHERE id = 'admin'");
+    await reconcileOperatorAdmission(adapter);
+    assert.equal((db.prepare("SELECT role FROM User WHERE id = 'admin'").get() as { role: string }).role, "admin,user",
+      "A verified, approved legacy multi-role administrator retains the existing grant.");
+  } finally { db.close(); }
+});
+
+test("invalid owner configuration and database failures stop access without destructive cleanup", async () => {
+  const { db, adapter } = fixture();
+  try {
+    setCloudflareBindings({ AUTH_ALLOWED_EMAILS: "", AUTH_ADMIN_EMAILS: "" });
+    await assert.rejects(reconcileOperatorAdmission(adapter), { status: "SERVICE_UNAVAILABLE" });
+    assert.equal((db.prepare("SELECT COUNT(*) n FROM Session").get() as { n: number }).n, 2);
+    assert.equal((db.prepare("SELECT role FROM User WHERE id = 'admin'").get() as { role: string }).role, "admin");
+    setCloudflareBindings({ AUTH_ALLOWED_EMAILS: approved, AUTH_ADMIN_EMAILS: approved });
+    const unavailable = { prepare() { throw new Error("synthetic database failure"); } };
+    await assert.rejects(reconcileOperatorAdmission(unavailable), /synthetic database failure/);
+    await assert.rejects(assertOperatorAdmission(unavailable, "admin"), /synthetic database failure/);
+  } finally { db.close(); }
 });

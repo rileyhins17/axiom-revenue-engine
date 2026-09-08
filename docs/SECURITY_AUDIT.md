@@ -157,14 +157,14 @@ revoke unrecognized sessions; never infer deployment from this source fix.
 **Status:** Open; activation blocker already acknowledged in project status.
 **Reachability:** Reachable whenever the console is deployed.
 
-The console currently relies on password authentication without verified email
-or an application MFA/WebAuthn policy. Sessions last seven days and the sign-in
-UI explicitly requests a remembered session. There is no proven Cloudflare
+At the initial audit, the console relied on password authentication without
+verified email or an application MFA/WebAuthn policy. Sessions last seven days
+and the sign-in UI explicitly requests a remembered session. There is no proven Cloudflare
 Access layer, recovery procedure, or owner-facing active-session inventory.
 The initial audit had no forced session-revocation proof; the follow-up below
 adds a regression for the concrete stale-cache authorization path.
 
-**Evidence:**
+**Initial audit evidence (follow-up source fixes below supersede these gaps):**
 
 - `src/lib/auth.ts:54-67` configures unverified password auth and seven-day
   sessions.
@@ -252,7 +252,60 @@ account was accessed, and no deployment or persistent migration was performed.
 The fix requires both the schema guards and application/dependency patch in a
 separately approved release. Do not bulk-apply the unrelated 0070 design.
 
-SEC-002 remains **open**: MFA, verified enrollment, recovery, allowlist removal,
+**Partial remediation — owner admission and administrator ceiling:** a browser
+reproduction at `f8946bf` returned HTTP 200 from `/api/v1/leads` after the stored
+account email moved outside the configured owner list (expected 401). The
+configuration helpers existed but no authentication path enforced them.
+
+`src/lib/operator-owner-policy.ts` now reads current bindings on every check,
+without the environment or auth-singleton cache. It rejects missing, malformed,
+wildcard, duplicate, or contradictory lists; administrators must be a subset of
+approved owners. A present but incomplete Cloudflare environment cannot fall
+back to process/build-time values. Invalid configuration denies authentication
+before destructive cleanup. Database failure also denies access.
+
+The global auth before-hook deletes sessions belonging to unapproved or
+unverified current database identities before any endpoint/session lookup. It
+demotes stored admin roles outside current approval, including legacy
+comma-separated combinations that grant admin permissions. Approved multi-role
+administrators and non-admin service roles retain their existing values.
+Approval is only a ceiling:
+re-adding configuration cannot restore sessions or promote roles. The session
+creation hook independently checks the current verified, approved database user,
+including internal adapter calls with no HTTP context. Password sign-in also
+requires email verification. Identity-edit/admin shortcuts remain disabled.
+An independent review identified the admission-check-to-insert interval. A
+deterministic test reproduced a late session created after the stored email
+changed. The creation after-hook now rechecks the completed session against
+current policy and identity, deleting only that newly created session before
+rejecting the login if approval changed. Tests interleave email, verification,
+and policy removal during actual internal and HTTP session creation. This is a
+final completion check, not a transaction spanning external configuration;
+every later request still checks current authority.
+Queued after-hook rejections are converted by the auth route to explicit,
+uncached 403/503 responses instead of escaping as generic server errors. The
+integration test invokes that real route, not a duplicate test-only handler.
+The custom admin mutation independently fences the actor's verified identity
+against fresh admin approval in the same SQL statement; promotion also requires
+the target's verified identity to be approved for administration.
+
+`scripts/operator-owner-auth.test.ts` exercises the actual cached application
+auth instance on disposable local D1: configuration removal/re-add with no
+cache reset, raw auth/app session rejection, direct session-creation denial,
+verification, role ceiling, identity edit rejection, invalid configuration,
+sign-out and normal fresh login. The browser test exercises removed/unverified
+owner reads and sign-in using real fake-account cookies. SQLite and D1 tests
+cover cleanup, re-add, unsupported role representations, errors, and the actor
+fence. None of these tests contacts a live account or external service.
+
+Policy removal takes effect when a request observes it. A remove/re-add cycle
+entirely between checks cannot be observed; use the explicit ban/revocation
+operation for permanent removal, rather than treating configuration as an
+account-management transaction. Already-running non-admin requests cannot be
+recalled. Verification enforcement does not provide verified enrollment or
+retroactively prove old account provenance. Those remain release blockers.
+
+SEC-002 remains **open**: MFA, verified enrollment, recovery,
 owner-facing session controls, and staging/production evidence remain missing.
 Already-running requests and information already downloaded cannot be recalled
 by revocation. The custom admin write has a transaction-time actor fence and

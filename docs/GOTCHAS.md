@@ -185,11 +185,18 @@ Retire entries when the architecture makes them impossible.
 
 - **Symptom:** a future owner-decision design could have accepted any current
   Better Auth session whose email string matched Riley or Aidan, even though the
-  current app does not require email verification.
+  original app did not require email verification.
 - **Root cause:** session authentication, email ownership verification, and
   business authorization are three separate facts. A session proves possession
   of account credentials; it does not by itself prove the account email belongs
   to the human owner.
+- **Source hardening follow-up:** SEC-002 now enforces verified owner admission
+  in shared auth/session-creation hooks and the admin-write fence. The formerly
+  unused approval settings are read freshly, not captured by the auth singleton.
+  `scripts/operator-owner-auth.test.ts` exercises removal/re-add on the actual
+  cached app instance, plus unverified accounts and admin ceilings. Invalid
+  settings deny access without mass-deleting sessions. Permanent removal uses
+  the explicit ban; an unobserved configuration toggle is not revocation.
 - **Proven fix:** the owner-decision contract requires `emailVerified: true`,
   normalizes the server-side session email, maps only the fixed two-owner
   allowlist, derives reviewer/time server-side, and keeps the route/recorder
@@ -494,11 +501,15 @@ Retire entries when the architecture makes them impossible.
   its development chunks finish replacing them. Even after cleanup, Next dev
   compiles linked routes on demand; automatic route prefetch can therefore
   replace a development chunk while the measured page is already executing.
+  A later serial run still reproduced `Unexpected end of JSON input` while
+  recompiling an auth route, so warmup alone is not a reliable release gate.
 - **Proven fix:** let every Next/OpenNext/Cloudflare build and dry run exit before
   starting `npm run test:owner-ui`, then remove only the repository's generated
-  `.next` directory before starting the isolated development server. Compile all
-  measured owner routes in a disposable authenticated page, close it, and use a
-  fresh page for timed/error-audited acceptance. Preserve detailed page-error
+  `.next` directory. The gate now builds and starts a fresh production-mode
+  fixture with the same fake credentials, disabled providers and disposable DB
+  for both processes. There is no runtime development recompilation. Warm
+  server-side reads in a disposable page, then use a fresh measured page.
+  Preserve detailed page-error
   name/message/stack diagnostics; do not suppress syntax errors or blank errors.
   Wait up to five seconds for each exact route title after visible readiness;
   this allows asynchronous metadata application without weakening the expected
@@ -506,11 +517,19 @@ Retire entries when the architecture makes them impossible.
 - **Prevention/test:** `AGENTS.md` forbids concurrent execution, and the owner UI
   acceptance command clears its exact generated `.next` directory, warms every
   measured route, waits for exact titles, and then proves six fresh-page views.
+  Production navigation may preserve inactive DOM; heading checks cover both
+  visible and accessible headings, and file upload selects the enabled visible
+  control. Production login throttling stays enabled: only explicit 429s with
+  the installed library's bounded retry delay are retried; auth/server failures
+  are never retried or accepted as passes. Unit tests enforce those limits.
   GitHub CI and every local release cycle run the commands sequentially.
 - **Affected area:** owner UI acceptance, Next.js development server, OpenNext,
   Wrangler dry runs, Windows/OneDrive workspaces, and local release evidence.
 - **Verifying commit:** branch HEAD containing the sequential browser-gate rule,
   exact `.next` cleanup, and six-view Quality Lab acceptance.
+  The owner-admission checkpoint additionally proves the production-mode gate
+  and unchanged auth/ban denials; `docs/STATUS.md` records the exact predecessor
+  and the release receipt records the candidate SHA.
 
 ## BUILD-007 — Independent JavaScript and SQLite clocks made a current fixture flaky
 

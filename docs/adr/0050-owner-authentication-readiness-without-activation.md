@@ -6,7 +6,7 @@
 
 ## Context
 
-The application currently uses Better Auth with email verification disabled and
+At this decision's original baseline, the application used Better Auth with email verification disabled and
 without a proven owner MFA/recovery rollout. ADRs 0046–0049 define the future
 owner-decision and progress-authorisation contracts, but none may be activated
 until a real owner session is high assurance and its request origin is safe.
@@ -92,3 +92,15 @@ preserving the current no-live-operation boundary.
    rollback evidence.
 5. [ ] Implement the server-only session adapter and mutation idempotency bridge
    only after the preceding controls and explicit release approval pass.
+
+## Source hardening follow-up — 2026-09-07
+
+SEC-002 now enforces verified, configured owner admission at the shared auth
+boundary and session creation, without activating any owner-decision writer.
+Current approval is checked without cached environment values. Observed removal
+revokes sessions; administrator configuration only limits existing grants and
+never promotes a role. Invalid configuration denies access before cleanup.
+Permanent revocation remains an explicit ban operation, not an unobserved
+configuration toggle. Synthetic local SQLite/D1/browser checks are not live
+enrollment, delivery, MFA or recovery evidence. All original activation and
+exact-two-owner readiness requirements remain in force.
