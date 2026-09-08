@@ -56,9 +56,6 @@ jobs:
       - name: Unit and characterization tests
         run: npm test
 
-      - name: Owner Leads browser acceptance
-        run: npm run test:owner-ui
-
       - name: Type-check
         run: npm run typecheck
 
@@ -70,3 +67,13 @@ jobs:
 
       - name: Validate inert engine bundle without deploying
         run: npm run cf:engine:dry-run
+
+      # These gates share built assets; finish all bundle checks before browsers.
+      - name: Saved email activity browser acceptance
+        run: npm run test:saved-email-ui
+
+      - name: Legacy email privacy browser acceptance
+        run: npm run test:legacy-email-ui
+
+      - name: Authenticated owner and email summary browser acceptance
+        run: npm run test:owner-ui

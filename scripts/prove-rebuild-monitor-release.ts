@@ -45,7 +45,7 @@ function main() {
     throw new Error("The commit changed while the release gate was running.");
   }
   const proof = parseRebuildMonitorReleaseProof({
-    proofVersion: "axiom-rebuild-monitor-release-v1",
+    proofVersion: "axiom-rebuild-monitor-release-v2",
     sha,
     treeSha,
     branch: REBUILD_MONITOR_BRANCH,

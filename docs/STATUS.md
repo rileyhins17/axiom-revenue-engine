@@ -21,12 +21,17 @@ are history, not current instructions. The full rebuild objective is unchanged.
 
 ### Verified checkpoint versus current work
 
-HEAD remains `93f498c4d5c399f2402b262c2b07c05e4074a2af`, on
-`RileyHinsperger/axiom-revenue-engine-rebuild`. The preceding cycle recorded that
-commit's full ten-check receipt and push. It does not cover the current dirty tree.
-No new commit, push, main merge or exact-commit release receipt is claimed.
-All prior unfinished source/UI/documentation changes are preserved. No production
-state was queried or changed.
+Last fully verified and pushed checkpoint before this preparation:
+`93f498c4d5c399f2402b262c2b07c05e4074a2af`, on
+`RileyHinsperger/axiom-revenue-engine-rebuild`. Its ten-check receipt does not cover
+the newer work. The local series below preserves that work in separate commits.
+The final candidate is the commit containing this checkpoint-preparation brief,
+following `f0f6c4e`; resolve its exact SHA with `git log -1 --format=%H -- docs/STATUS.md`.
+For current verification, require `data/rebuild-monitor/release-proof.<SHA>.json`
+(v2, all twelve checks) and local/upstream/remote equality. Do not infer success
+from this pre-verification committed document. The monitor records those facts
+only after the command finishes and the exact commit is pushed. No main merge,
+deployment, production query or production state change is part of this checkpoint.
 
 ### Current result: partial manual-reply integration, not a finished email feature
 
@@ -62,6 +67,13 @@ That integrated security group is now local commit `e9fac9a`. Mobile review and
 sidebar changes are being saved separately with their existing interaction tests
 and synthetic walkthrough. The dark HTML proposal remains a local design artifact,
 not owner approval and not an implemented replacement application.
+The visual group is local commit `f0f6c4e`. The final verification commit adds the
+twelve-check receipt, matching sequential Linux browser gates and this handoff.
+The reused Luna-max dependency review attested canonical root, branch and starting
+`93f498c`, found no missing traced import, and required hunk staging for package
+commands and the shared owner-browser harness. Those groups were staged separately.
+No live policy or provider authority was added. Human decisions required: none for
+checkpointing. Active duration and model usage were not measured; no speed claim.
 
 The actual reply POST no longer calls Gmail, refreshes tokens or selects the first
 user mailbox. It requires the shared current administrator/origin fence, accepts
@@ -373,9 +385,10 @@ verification above. The overall send-policy/composer/inbound SEC-006 work remain
 open. The reused Luna-max reviewer completed the bounded candidate review;
 fresh-agent creation previously reached its limit.
 
-1. Organize the locally verified integrated security work into coherent exact-commit checkpoints;
-   do not bundle unrelated visual/design/deployment edits or claim unpushed work
-   as remote truth. Do not redo the now-tested client/history/viewer paths.
+1. Verify the final candidate's v2 receipt and exact Git equality. If either is
+   absent, finish that checkpoint before new code; the grouped source is already
+   committed and must not be recreated. Then continue the remaining send-policy
+   integration below. Do not redo the tested client/history/viewer paths.
 2. Complete remaining consent, verification, capacity and message-policy facts in
    the existing claim, keeping replies distinct from cold outreach. Connect exact
    owner approval and a retained intent to the actual composer;

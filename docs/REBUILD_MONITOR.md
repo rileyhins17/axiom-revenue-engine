@@ -62,6 +62,12 @@ and the other release checks in their required sequence. The updater then proves
 that local `HEAD`, its tree, its upstream, and the current GitHub branch all equal
 that receipt. It derives the commit instead of trusting typed text.
 
+Release proof v2 requires twelve ordered checks, including saved-email and legacy-
+email browser fixtures after all bundle checks and before the full authenticated
+owner browser gate. Historical v1 ten-check receipts remain historical evidence;
+they cannot certify the new mail surfaces. Neither receipt version is deployment
+approval. The owner hold still forbids publishing the unfinished app anywhere.
+
 Current state and the local release receipt are written atomically under the
 ignored `data/rebuild-monitor/` directory. A tracked safe seed at
 `docs/rebuild-monitor/seed.json` lets a fresh checkout start without inventing

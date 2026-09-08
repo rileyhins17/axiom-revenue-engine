@@ -28,7 +28,7 @@ const checkpoint = {
   verifiedAt: "2026-09-06T08:00:00.000Z",
 };
 const releaseProof = {
-  proofVersion: "axiom-rebuild-monitor-release-v1" as const,
+  proofVersion: "axiom-rebuild-monitor-release-v2" as const,
   sha: checkpoint.sha,
   treeSha: "b".repeat(40),
   branch: checkpoint.branch,
@@ -74,6 +74,32 @@ test("release proof requires every exact gate in execution order", () => {
     ...releaseProof,
     checks: [...releaseProof.checks].reverse(),
   }), /execution order/i);
+});
+
+test("checkpoint proof includes both email browser gates after all bundle checks", () => {
+  const checks: readonly string[] = REBUILD_MONITOR_RELEASE_CHECKS;
+  const lastBundle = checks.indexOf("cf:engine:dry-run");
+  for (const gate of ["test:saved-email-ui", "test:legacy-email-ui"]) {
+    assert.ok(checks.indexOf(gate) > lastBundle, `${gate} must follow bundle checks`);
+    assert.ok(checks.indexOf(gate) < checks.indexOf("test:owner-ui"));
+  }
+  assert.throws(() => parseRebuildMonitorReleaseProof({
+    ...releaseProof, proofVersion: "axiom-rebuild-monitor-release-v1",
+  }), "Historical v1 receipts cannot stand in for the current gate.");
+  assert.throws(() => parseRebuildMonitorReleaseProof({
+    ...releaseProof,
+    checks: releaseProof.checks.filter((gate) => !["test:saved-email-ui", "test:legacy-email-ui"].includes(gate)),
+  }), "A receipt that omits email privacy browser proof must not validate.");
+});
+
+test("Linux CI preserves the same email browser gates without concurrent builds", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const commands = [...workflow.matchAll(/^\s+run: (.+)$/gm)].map((match) => match[1]);
+  const lastBundle = commands.indexOf("npm run cf:engine:dry-run");
+  for (const gate of ["test:saved-email-ui", "test:legacy-email-ui", "test:owner-ui"]) {
+    assert.ok(commands.indexOf(`npm run ${gate}`) > lastBundle,
+      `${gate} must run sequentially after the last CI bundle check`);
+  }
 });
 
 test("checkpoint and timeline chronology cannot claim future verification", () => {

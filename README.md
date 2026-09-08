@@ -9,6 +9,74 @@ channel, preparing specific outreach, and learning which work becomes revenue.
 
 ## Current state
 
+**Email decision:** [the non-Google owner guide](docs/EMAIL_PROVIDER_DECISION.md)
+separates ordinary inboxes from permitted outreach, records provider integration
+risks and corrects the unverified all-in C$50 assumption. No provider or budget
+increase is selected. The app still has no working non-Google email integration.
+The manual reply endpoint no longer calls Gmail directly. Its real default is
+unavailable; the new approved-reply path is tested with disposable storage and a
+fake mail sink only. This is partial integration, not a working reply composer.
+Local approval now checks a recorded non-Google-capable mailbox, client conversation
+and exact reply recipient; those records are still synthetic in tests, not synced
+from a real provider. Retirement or disconnection blocks the send path.
+Recorded reply outcomes now remain readable after retirement or approval revocation,
+using the exact saved message and acceptance receipt without sending again. This
+is local recovery logic, not a live inbox or a completed CRM/composer integration.
+Client email history now uses a read-only Saved email activity panel and a local
+owner-scoped reader, with five-record pages and no Google token refresh or inbox
+fetching. It labels acceptance, uncertainty and rejection separately and displays
+plain text only. The incompatible old composer is removed from this view; the
+exact-approval reply journey and incoming-mail integration still need completion.
+Legacy messages are not silently imported or presented as verified new records.
+The client profile and legacy email list/detail now use a separate sender-scoped,
+plain-text-only history view in local source. Business notes remain intact; HTML,
+tracking resources and raw provider errors are not sent to either message viewer.
+Dashboard/automation summaries now use current-owner mail, queue and mailbox
+projections in local source. Viewing them no longer synchronizes Gmail mailboxes,
+creates missing settings or recovers stale sequences. Shared business counts stay
+separate from private email rows. Saved mailbox metadata is not live provider health.
+See the current status for verification and remaining email integration gaps.
+See the [reply boundary and remaining gates](docs/RUNBOOK.md#manual-reply-boundary-local-partial-integration).
+
+**Deployment hold:** Riley requires the app to be finished before deployment.
+No unfinished hosted previews, staging or production updates. Development and
+testing remain local; an exact release still requires Riley's explicit approval.
+See the [deployment boundary](docs/OWNER_CONTEXT.md#deployment-boundary-owner-correction-2026-09-08).
+Both npm deployment commands are blocked in the versioned source, and the production
+workflow is disabled there. Local builds and no-upload checks still work; changing
+source does not alter existing hosted resources or old GitHub workflow versions.
+
+**Design correction:** Riley rejected the old-pipeline resemblance and confirmed
+dark. The [new dark workspace prototype](docs/design/dark-workspace.html) is a
+separate, local-only visual proposal with fictional data and in-memory decisions.
+It does not replace the current app or prove any new business capability.
+
+**Where to start:** the [active owner brief](docs/STATUS.md#active-owner-brief)
+separates the verified checkpoint from unfinished work and names the next result
+to demonstrate. The [delivery agreement](docs/CODEX_AGENT_PROTOCOL.md#owner-outcome-work-contract-2026-09-08)
+requires usable end-to-end outcomes, explicit business decisions and proof before
+progress claims. Older status entries are history, not the current work queue.
+The exact checkpoint receipt now requires twelve ordered local checks, including
+both email-view browser fixtures and the authenticated owner journey. Historical
+ten-check receipts cannot certify these mail changes. GitHub CI runs the same
+browser suites after bundle checks; green checks never authorize deployment.
+
+See the [verified owner walkthrough](docs/OWNER_WALKTHROUGH.md) for actual
+desktop/mobile screenshots, demonstrated capabilities and remaining gaps.
+Regenerate synthetic captures with `npm run test:owner-ui -- --capture-walkthrough`;
+wait for other builds/dry runs to exit first. This is not a production preview.
+
+The local review UI now has a compact mobile header, a collapsible business queue
+and keyboard-accessible evidence/verdict shortcuts. The sidebar links to the
+current lead counts instead of polling legacy counters or claiming "prod".
+Review drafts still require export; direct permanent saving is not connected.
+
+**Email requirement: no Google Workspace.** The rebuilt engine will use a
+non-Google mailbox provider, still to be verified and selected within C$50/month.
+Existing Gmail code is legacy/reference, not a requirement to buy Workspace.
+Provider-neutral approval, exact-message and duplicate-send protections remain
+required. See `docs/MASTER_PLAN.md` and `docs/STATUS.md` for the current constraint.
+
 Legacy browser scraping is being retired in source. The old runner cannot launch
 a browser, navigate a website, call AI, or claim a job. Historical parsing helpers
 and the owner console remain, as does the separate new evidence-capture workflow.

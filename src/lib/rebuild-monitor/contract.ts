@@ -161,11 +161,13 @@ export const REBUILD_MONITOR_RELEASE_CHECKS = [
   "cf:dry-run",
   "cf:engine:typegen:check",
   "cf:engine:dry-run",
+  "test:saved-email-ui",
+  "test:legacy-email-ui",
   "test:owner-ui",
 ] as const;
 
 export const RebuildMonitorReleaseProofSchema = z.object({
-  proofVersion: z.literal("axiom-rebuild-monitor-release-v1"),
+  proofVersion: z.literal("axiom-rebuild-monitor-release-v2"),
   sha: z.string().regex(/^[a-f0-9]{40}$/),
   treeSha: z.string().regex(/^[a-f0-9]{40}$/),
   branch: z.literal("RileyHinsperger/axiom-revenue-engine-rebuild"),
