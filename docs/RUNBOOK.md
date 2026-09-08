@@ -625,6 +625,29 @@ decision, outreach, sending, deployment, remote database, or spend.
 4. Review qualified replies, opportunities, customers, deliverability, and spend.
 5. Approve or reject the one proposed targeting/scoring/message experiment.
 
+## Browser-protection release gate (SEC-009)
+
+`next.config.ts` applies the shared browser headers to application responses.
+`public/_headers` covers Cloudflare static assets, which can bypass that code;
+the policy test requires exact parity. Preserve route-specific content types,
+CORS and caching. See [Cloudflare static headers](https://developers.cloudflare.com/workers/static-assets/headers/).
+
+Framing, object embedding, MIME sniffing, referrer disclosure and unnecessary
+camera/microphone/location/payment/USB access are restricted. Script/style CSP
+is deliberately report-only; inline Next hydration and existing styles require
+compatibility evaluation. There is no external reporting endpoint or telemetry
+upload. Never add unsafe-inline/unsafe-eval to a production script policy simply
+to make a browser test green.
+
+Before a separately authorized release, verify headers on HTTPS pages, denied
+API requests, errors, static assets and redirects through the actual adapter.
+Collect only directive/disposition counts from browser CSP violation events in
+a synthetic session; do not log source snippets, private URLs or message data.
+Resolve violations using a Next-compatible nonce/hash strategy, verify ordinary
+owner flows, then enforce strict CSP. HSTS requires verified HTTPS and a rollback
+plan; start with an approved host-only policy, not unverified includeSubDomains
+or preload. SEC-009 is not fully closed before these gates pass.
+
 ## Resume/handoff
 
 Before stopping, update `docs/STATUS.md` with the verified commit, production and

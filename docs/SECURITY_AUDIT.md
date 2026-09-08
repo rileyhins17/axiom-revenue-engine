@@ -505,7 +505,7 @@ mutations cannot omit it.
 
 ### SEC-009 — Medium — Global browser security headers are absent
 
-**Status:** Open.
+**Status:** Partially remediated in source; strict CSP and verified HTTPS HSTS remain open.
 **Reachability:** Reachable when the console is deployed.
 
 No global Content Security Policy, frame restriction, MIME-sniffing protection,
@@ -514,7 +514,10 @@ Next configuration or middleware. This permits clickjacking and removes useful
 containment if a future XSS or content-type error is introduced.
 
 **Evidence:** `next.config.ts` and `middleware.ts` contain no global security
-header policy at this snapshot.
+header policy at the original audit snapshot. The current candidate adds an
+enforced framing/object/base policy plus XFO, nosniff, no-referrer and minimal
+permissions through Next configuration and matching Cloudflare `public/_headers`.
+Script/style restrictions remain report-only. No live deployment is claimed.
 
 **Required fix:** add and integration-test `frame-ancestors 'none'`,
 `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, a strict referrer

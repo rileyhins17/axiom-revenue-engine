@@ -4,7 +4,32 @@ Last updated: 2026-09-07 (America/Toronto)
 
 ## Plain-English status
 
-The current bounded milestone is SEC-008: prevent another website from making
+### Current checkpoint: browser protection (SEC-009)
+
+Verified predecessor: `c569fec3b4385f218590c26e2f95ae8cabf2dc24`
+(SEC-008, exact release receipt and branch push verified). The current candidate
+adds global framing, MIME-sniffing, referrer and browser-permission protections
+to Next responses and matching Cloudflare static-asset rules. Script/style CSP
+is report-only, not a claim of XSS prevention. Targeted policy/parity checks,
+type-check and lint pass. The expanded production-mode browser gate passes:
+framing blocked, sandboxed preview preserved, report-only script event observed,
+expected page/static/error statuses and denied API privacy headers preserved;
+six WCAG pages, 224 ms list, 100 ms dossier, zero outside requests. Independent
+review found no concrete bypass/regression. Exact-commit release verification
+must pass before push; its immutable receipt is the authority for that result.
+SEC-009 remains open for strict CSP evaluation/enforcement and HSTS on a verified
+HTTPS deployment. No production resource, provider, mailbox or prospect is used;
+spend impact is C$0. No owner decision is needed for this source-only patch.
+
+Next three actions:
+1. Complete exact-commit release checks, verify built static-header parity, and push.
+2. Fix SEC-010's OAuth state transaction using disposable tests, without connecting a mailbox.
+3. Complete remaining owner MFA/enrollment/recovery and authorized CSP/HSTS staging
+   verification before any activation; no production approval is assumed.
+
+### Previous checkpoint: request-origin protection
+
+The previous bounded milestone was SEC-008: prevent another website from making
 owner changes with a logged-in browser's cookie. At verified predecessor
 `7d1eef221a25ac4ccdb99dbeeb7e6aa52b7e5832`, a disposable Chromium reproduction
 archived a fake lead through the real bulk route from a different same-site
@@ -16,8 +41,9 @@ unsafe-method handlers are inventoried; auth and separately authenticated servic
 routes are not blanket cookie-policy exemptions. Independent bounded review
 found no concrete remaining bypass/regression. The production-mode browser gate
 passes, including the unwanted POST/403 and unchanged fake row, preserved normal
-archive, six WCAG pages and zero outside requests. This is not a production fix
-claim: the exact-commit full gate must pass before push.
+archive, six WCAG pages and zero outside requests. Its exact-commit full gate and
+branch push passed at `c569fec3b4385f218590c26e2f95ae8cabf2dc24`.
+This is not a production fix claim.
 No live deployment, database, mailbox, provider, prospect contact or spend occurs.
 
 ### Previous owner-admission source checkpoint

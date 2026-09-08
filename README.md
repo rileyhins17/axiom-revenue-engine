@@ -9,6 +9,12 @@ channel, preparing specific outreach, and learning which work becomes revenue.
 
 ## Current state
 
+The source now includes browser framing and privacy protections for application
+responses and static assets. The stricter script policy is report-only until
+compatibility is verified; this is not a claim that XSS is impossible. HTTPS-only
+HSTS activation and live header verification remain release gates. See the
+browser-protection section in `docs/RUNBOOK.md`.
+
 The application is in a controlled rebuild. The legacy production application is
 the read-only reference until the new engine passes its shadow and pilot gates.
 All autonomous repository defaults are off, follow-ups are disabled, and no test

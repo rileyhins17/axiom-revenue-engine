@@ -39,6 +39,7 @@ import { verifyOwnerBanLifecycle } from "./owner-ban-acceptance";
 import { verifyOwnerAdmission } from "./owner-admission-acceptance";
 import { postOwnerSignIn } from "./owner-auth-request";
 import { verifyOwnerCsrf } from "./owner-csrf-acceptance";
+import { verifyOwnerBrowserSecurity } from "./owner-browser-security-acceptance";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
@@ -1043,6 +1044,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     const authDatabase = new Database(databasePath, { fileMustExist: true });
     try {
       stage = "owner request origin";
+      await verifyOwnerBrowserSecurity(context, baseUrl);
       await verifyOwnerCsrf({ context, baseUrl, database: authDatabase });
       // Independent lifecycle scenarios share one disposable DB. Reset only its
       // fake rate windows between scenarios; retain the real configured limit.
