@@ -109,7 +109,7 @@ export function OwnerLeadList({ data }: { data: OwnerLeadListResponse }) {
   const omittedCount = data.summary.rejectedBusinesses + data.summary.ignoredContactRows;
 
   return (
-    <div className="mx-auto flex max-w-[1500px] flex-col gap-5">
+    <div className="owner-review-page mx-auto flex max-w-[1500px] flex-col gap-5">
       <PageHeader
         eyebrow="Evidence-first pipeline"
         title="Leads"

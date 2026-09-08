@@ -945,6 +945,41 @@ body::after {
 }
 
 /* Also honor OS preference */
+@media (max-width: 639px) {
+  /* Owner review starts with the business, not a viewport of header chrome. */
+  .owner-review-page .page-header > .page-header-main {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .owner-review-page .page-header-icon,
+  .owner-review-page .page-header-eyebrow {
+    display: none;
+  }
+
+  .owner-review-page .page-header-description {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .owner-review-page .page-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .owner-review-page .page-metric {
+    padding: 10px;
+  }
+
+  .owner-review-page .page-metric > div {
+    flex-wrap: wrap;
+    gap: 2px 6px;
+  }
+
+  .owner-review-page .page-metric-detail {
+    white-space: normal;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   body::before,

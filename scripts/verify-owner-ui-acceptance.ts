@@ -862,7 +862,7 @@ async function openMobileDossier(page: Page) {
   ]);
 }
 
-async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, databasePath: string) {
+async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, databasePath: string, walkthroughDirectory?: string) {
   let browser: Browser | null = null;
   let page: Page | null = null;
   const externalRequests: string[] = [];
@@ -871,6 +871,11 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
   const ownerLabelingPacket = buildCompleteOwnerLabelingPacketFixture();
   const firstEvaluationBusiness = ownerLabelingPacket.entries[0]!.businessName;
   let stage = "startup";
+  const captureWalkthrough = async (name: string) => {
+    if (!walkthroughDirectory || !page) return;
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: join(walkthroughDirectory, `${name}.png`), fullPage: true });
+  };
   try {
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({
@@ -935,6 +940,12 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     const desktopWidth = await assertResponsive(page, "desktop leads");
     await assertReducedMotion(page, "desktop leads");
     await assertKeyboardFlow(page);
+    assert.equal(await page.getByText("prod", { exact: true }).count(), 0,
+      "Local fixtures must not imply a production environment.");
+    await page.getByRole("link", { name: "See current lead review counts" }).waitFor();
+    assert.equal(await page.getByText("New today", { exact: true }).count(), 0,
+      "The shared sidebar must not project legacy acquisition metrics as evidence readiness.");
+    await captureWalkthrough("desktop-leads");
 
     stage = "desktop dossier";
     const dossierStart = performance.now();
@@ -954,6 +965,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     await assertReadOnlyOwnerSurface(page, "desktop dossier");
     await assertResponsive(page, "desktop dossier");
     await assertReducedMotion(page, "desktop dossier");
+    await captureWalkthrough("desktop-dossier");
 
     stage = "desktop quality lab";
     await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
@@ -1000,6 +1012,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     await page.getByText("Verified the exact checkpoint and restored this browser's draft.").waitFor();
     assert.equal(await page.getByRole("button", { name: /^Strong/ }).getAttribute("aria-pressed"), "true");
     assert.equal(await page.getByRole("checkbox", { name: "Good commercial fit" }).isChecked(), true);
+    await captureWalkthrough("desktop-review-restored");
 
     stage = "mobile leads";
     await page.setViewportSize({ width: 390, height: 844 });
@@ -1007,9 +1020,17 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     await page.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
     await page.getByRole("link", { name: /Open evidence dossier/i }).first().waitFor();
     await waitForOwnerContent(page);
+    // Measure the visible business heading, not a hidden retained route copy.
+    // Requiring exactly one visible match still catches real duplicate cards.
+    const mobileBusinessHeading = page.getByRole("heading", { level: 3, name: "Tri-City Roofing Fixture", exact: true }).filter({ visible: true });
+    assert.equal(await mobileBusinessHeading.count(), 1, "Exactly one business card must be visible.");
+    const firstMobileBusiness = await mobileBusinessHeading.boundingBox();
+    assert(firstMobileBusiness && firstMobileBusiness.y + firstMobileBusiness.height < 740,
+      "The first business name must appear above the mobile bottom navigation without scrolling.");
     await assertWcag(page, "mobile leads");
     await assertReadOnlyOwnerSurface(page, "mobile leads");
     const mobileWidth = await assertResponsive(page, "mobile leads");
+    await captureWalkthrough("mobile-leads");
 
     stage = "mobile dossier";
     await openMobileDossier(page);
@@ -1020,6 +1041,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     await assertResponsive(page, "mobile dossier");
     await assertReducedMotion(page, "mobile dossier");
     await assertMobileNavigationClear(page);
+    await captureWalkthrough("mobile-dossier");
 
     stage = "mobile quality lab";
     await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
@@ -1035,6 +1057,26 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     await assertWcag(page, "mobile quality lab");
     await assertResponsive(page, "mobile quality lab");
     await assertReducedMotion(page, "mobile quality lab");
+    // Native disclosure keeps the 50-business queue available without forcing
+    // owners past it to reach the selected business. Test the real disclosure.
+    const queueDisclosure = page.locator("aside[aria-label='Evaluation businesses'] details");
+    assert.equal(await queueDisclosure.getAttribute("open"), null);
+    await queueDisclosure.locator("summary").click();
+    await page.getByRole("list", { name: "Businesses in the fixed evaluation set" }).waitFor();
+    await queueDisclosure.locator("summary").click();
+    assert.equal(await queueDisclosure.getAttribute("open"), null);
+    const verdictShortcut = page.getByRole("link", { name: "Your verdict", exact: true });
+    await verdictShortcut.focus();
+    await page.keyboard.press("Enter");
+    assert.equal(await page.locator("#owner-verdict-heading").evaluate((element) => document.activeElement === element), true,
+      "Verdict shortcut must transfer keyboard focus, not just scroll visually.");
+    const verdictRectangle = await page.getByRole("button", { name: /^Strong/ }).boundingBox();
+    assert(verdictRectangle && verdictRectangle.y >= 64 && verdictRectangle.y + verdictRectangle.height < 760,
+      "One verdict shortcut must expose the actual choice above mobile navigation.");
+    if (walkthroughDirectory) await page.screenshot({ path: join(walkthroughDirectory, "mobile-verdict-controls.png") });
+    await page.getByRole("navigation", { name: "Review section shortcuts" }).getByRole("link", { name: "Inspect evidence", exact: true }).click();
+    assert.equal(await page.locator("#quality-proof-heading").evaluate((element) => document.activeElement === element), true);
+    await captureWalkthrough("mobile-review-restored");
 
     assert.deepEqual(externalRequests, [], "The owner acceptance browser attempted an external request.");
     assert.deepEqual(browserErrors, [], `Browser errors: ${browserErrors.join(" | ")}`);
@@ -1078,7 +1120,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
       authDatabase.prepare('DELETE FROM "RateLimitWindow"').run();
       await verifyOwnerMailSummaries({ context, baseUrl, database: authDatabase,
         adminEmail: FIXTURE_ADMIN_EMAIL, ownerEmail: FIXTURE_EMAIL, password: FIXTURE_PASSWORD,
-        outputDirectory });
+        outputDirectory: walkthroughDirectory ?? outputDirectory });
     } finally {
       authDatabase.close();
     }
@@ -1105,6 +1147,11 @@ async function run() {
   await mkdir(OUTPUT_ROOT, { recursive: true });
   const outputDirectory = join(OUTPUT_ROOT, `owner-ui-${process.pid}-${Date.now()}`);
   await mkdir(outputDirectory, { recursive: true });
+  // Keep only synthetic screenshots and the final acceptance summary. The
+  // disposable database, cookies and server logs are never copied here.
+  const walkthroughDirectory = process.argv.includes("--capture-walkthrough")
+    ? join(OUTPUT_ROOT, `owner-walkthrough-${process.pid}-${Date.now()}`) : undefined;
+  if (walkthroughDirectory) await mkdir(walkthroughDirectory, { recursive: true });
   const databasePath = join(outputDirectory, "owner-ui-fixture.db");
   const database = new Database(databasePath);
   const serverLogs: string[] = [];
@@ -1125,7 +1172,7 @@ async function run() {
     await rm(join(REPOSITORY_ROOT, ".next"), { recursive: true, force: true });
     server = await startNextServer(baseUrl, databasePath, serverLogs);
     await waitForServer(baseUrl, server);
-    result = await runBrowserAcceptance(baseUrl, outputDirectory, databasePath);
+    result = await runBrowserAcceptance(baseUrl, outputDirectory, databasePath, walkthroughDirectory);
     const verifiedDatabase = new Database(databasePath, { readonly: true });
     try {
       assert.deepEqual(verifiedDatabase.prepare('SELECT id, email, role FROM "User" ORDER BY id').all(),
@@ -1146,6 +1193,14 @@ async function run() {
     if (success) await rm(outputDirectory, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
   assert(result, "Owner UI acceptance completed without a result.");
+  if (walkthroughDirectory) {
+    await writeFile(join(walkthroughDirectory, "acceptance.json"), `${JSON.stringify({
+      capturedAt: new Date().toISOString(), syntheticDataOnly: true,
+      acceptancePassed: true, reviewPersistence: "browser-local draft after reimport",
+      databaseReviewSubmission: false, productionVerified: false, ...result,
+    }, null, 2)}\n`, "utf8");
+    console.log(`Synthetic owner walkthrough: ${walkthroughDirectory}`);
+  }
   console.log("Owner UI acceptance passed.");
   console.log(`Desktop list ready: ${result.desktopListReadyMs} ms (budget ${OWNER_LIST_BUDGET_MS} ms)`);
   console.log(`Desktop dossier ready: ${result.desktopDossierReadyMs} ms (budget ${OWNER_DOSSIER_BUDGET_MS} ms)`);

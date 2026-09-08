@@ -58,6 +58,10 @@ The owner-constraints/deployment-hold group is saved locally as `82a46a0`.
 This is an unpushed intermediate commit, not a newly verified release. The next
 group retains the provider-neutral guarded reply groundwork and complete saved/
 legacy/summary privacy path together; the full live-send policy remains unfinished.
+That integrated security group is now local commit `e9fac9a`. Mobile review and
+sidebar changes are being saved separately with their existing interaction tests
+and synthetic walkthrough. The dark HTML proposal remains a local design artifact,
+not owner approval and not an implemented replacement application.
 
 The actual reply POST no longer calls Gmail, refreshes tokens or selects the first
 user mailbox. It requires the shared current administrator/origin fence, accepts

@@ -1,7 +1,6 @@
 "use client";
 
-import * as React from "react";
-import { Activity, Crosshair, ShieldCheck, Workflow } from "lucide-react";
+import { ShieldCheck, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -20,56 +19,8 @@ import {
 import { APP_NAV_ITEMS } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
-type LeadStats = {
-  total: number;
-  todayLeads: number;
-  readyForTouch?: number;
-  followUp?: number;
-  replied?: number;
-};
-
 export function AppSidebar() {
   const pathname = usePathname();
-  const [stats, setStats] = React.useState<LeadStats | null>(null);
-
-  React.useEffect(() => {
-    let requestInFlight = false;
-    let disposed = false;
-
-    const fetchStats = async () => {
-      if (requestInFlight) return;
-      requestInFlight = true;
-      try {
-        const response = await fetch("/api/leads/stats");
-        if (!response.ok) throw new Error("stats_request_failed");
-        const data = await response.json() as Partial<LeadStats>;
-        if (disposed) return;
-        setStats({
-          total: data.total ?? 0,
-          todayLeads: data.todayLeads ?? 0,
-          readyForTouch: data.readyForTouch,
-          followUp: data.followUp,
-          replied: data.replied,
-        });
-      } catch {
-        if (!disposed) setStats((current) => current ?? { total: 0, todayLeads: 0 });
-      } finally {
-        requestInFlight = false;
-      }
-    };
-
-    // Fetch immediately on mount. We deliberately do NOT depend on `pathname`
-    // — the stats are global, not per-route, so refetching on every tab click
-    // just adds load and slows navigation. The 30s poll keeps things fresh.
-    fetchStats();
-
-    const interval = setInterval(fetchStats, 30_000);
-
-    return () => {
-      disposed = true;
-      clearInterval(interval);
-    };
-  }, []);
 
   return (
     <Sidebar className="v2-sidebar">
@@ -97,7 +48,6 @@ export function AppSidebar() {
             <SidebarMenu className="gap-1">
               {APP_NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.url || pathname?.startsWith(`${item.url}/`);
-                const badgeValue = item.badgeKey && stats ? stats[item.badgeKey] ?? 0 : 0;
                 const Icon = item.icon;
 
                 return (
@@ -125,19 +75,6 @@ export function AppSidebar() {
                           <span className="block truncate font-medium">{item.title}</span>
                           <span className="mt-0.5 block truncate text-[10.5px] font-normal text-zinc-600 group-hover:text-zinc-500">{item.description}</span>
                         </span>
-                        {badgeValue > 0 ? (
-                          <span
-                            aria-label={`${badgeValue} ${item.title} items`}
-                            className={cn(
-                              "rounded-md border px-1.5 py-0.5 font-mono text-[10px] tabular-nums",
-                              isActive
-                                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                                : "border-white/[0.09] bg-black/30 text-zinc-300",
-                            )}
-                          >
-                            {badgeValue > 99 ? "99+" : badgeValue}
-                          </span>
-                        ) : null}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -160,23 +97,10 @@ export function AppSidebar() {
                 <div className="text-xs font-semibold text-zinc-100">Owner workspace</div>
               </div>
             </div>
-            <span className="font-mono text-[10px] text-zinc-600">prod</span>
           </div>
-          <div className="grid grid-cols-2 divide-x divide-white/[0.06]">
-            <SidebarStat
-              icon={<Crosshair className="size-3.5" aria-hidden="true" />}
-              label="Ready"
-              value={stats ? String(stats.readyForTouch ?? 0) : "--"}
-              title="Leads ready for an owner decision"
-            />
-            <SidebarStat
-              icon={<Activity className="size-3.5" aria-hidden="true" />}
-              label="New today"
-              value={stats ? `+${stats.todayLeads}` : "--"}
-              accent
-              title="New leads captured today"
-            />
-          </div>
+          <Link href="/leads" className="v2-focus-ring block rounded px-3 py-3 text-xs text-zinc-300 hover:text-white">
+            See current lead review counts
+          </Link>
           <div
             className="flex items-center justify-between border-t border-white/[0.06] px-3 py-2 text-[11px]"
             role="status"
@@ -184,43 +108,12 @@ export function AppSidebar() {
           >
             <span className="flex items-center gap-1.5 text-zinc-300" title="Open System for verified health">
               <ShieldCheck className="size-3.5 text-amber-300" aria-hidden="true" />
-              Safety gated
+              System status
             </span>
             <Link href="/settings" className="v2-focus-ring rounded text-zinc-400 hover:text-white">View status</Link>
           </div>
         </div>
       </SidebarFooter>
     </Sidebar>
-  );
-}
-
-function SidebarStat({
-  icon,
-  label,
-  value,
-  accent = false,
-  title,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  accent?: boolean;
-  title?: string;
-}) {
-  return (
-    <div className="px-3 py-2.5" title={title}>
-      <div className="flex items-center gap-1.5 text-[9.5px] uppercase tracking-[0.16em] text-zinc-400">
-        {icon}
-        {label}
-      </div>
-      <div
-        className={cn(
-          "mt-1 font-mono text-sm font-semibold tabular-nums",
-          accent ? "text-emerald-300" : "text-white",
-        )}
-      >
-        {value}
-      </div>
-    </div>
   );
 }

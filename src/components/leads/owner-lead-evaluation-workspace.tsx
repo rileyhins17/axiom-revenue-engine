@@ -222,10 +222,17 @@ export function OwnerLeadEvaluationWorkspace() {
   };
 
   const totalReviewed = (workspace?.summary.reviewed ?? 0) + completedDrafts.length;
+  const focusReviewSection = (event: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    const section = document.getElementById(id);
+    if (!section) return;
+    event.preventDefault();
+    section.focus({ preventScroll: true });
+    section.scrollIntoView({ block: "start", behavior: "instant" });
+  };
 
   return (
     <div
-      className="mx-auto flex max-w-[1500px] flex-col gap-5"
+      className="owner-review-page mx-auto flex max-w-[1500px] flex-col gap-5"
       data-quality-lab-ready={clientReady ? "true" : "false"}
     >
       <PageHeader
@@ -302,7 +309,11 @@ export function OwnerLeadEvaluationWorkspace() {
         </section>
       ) : currentEntry ? (
         <div className="grid min-h-[640px] gap-4 xl:grid-cols-[310px_minmax(0,1fr)]">
-          <aside className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0e1014]" aria-label="Evaluation businesses">
+          <aside className="self-start overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0e1014]" aria-label="Evaluation businesses">
+            <details>
+              <summary className="v2-focus-ring cursor-pointer rounded-xl p-4 text-sm font-semibold text-zinc-200">
+                Browse 50 businesses · {totalReviewed} reviewed
+              </summary>
             <div className="border-b border-white/[0.07] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -346,9 +357,10 @@ export function OwnerLeadEvaluationWorkspace() {
                 );
               })}
             </ol>
+            </details>
           </aside>
 
-          <main className="min-w-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0e1014]" aria-labelledby="evaluation-business-name">
+          <main className="min-w-0 rounded-2xl border border-white/[0.08] bg-[#0e1014]" aria-labelledby="evaluation-business-name">
             <header className="border-b border-white/[0.07] px-4 py-5 sm:px-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -365,6 +377,11 @@ export function OwnerLeadEvaluationWorkspace() {
                 </div>
               </div>
             </header>
+
+            <nav aria-label="Review section shortcuts" className="sticky top-16 z-10 flex gap-2 border-b border-white/[0.08] bg-[#0e1014] p-3">
+              <a href="#quality-proof-heading" onClick={(event) => focusReviewSection(event, "quality-proof-heading")} className="v2-focus-ring inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-white/[0.12] px-3 text-sm font-semibold text-zinc-200">Inspect evidence</a>
+              <a href="#owner-verdict-heading" onClick={(event) => focusReviewSection(event, "owner-verdict-heading")} className="v2-focus-ring inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/[0.08] px-3 text-sm font-semibold text-emerald-100">Your verdict</a>
+            </nav>
 
             <div className="grid gap-6 p-4 sm:p-6 2xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
               <div className="min-w-0 space-y-6">
@@ -386,7 +403,7 @@ export function OwnerLeadEvaluationWorkspace() {
                 <section aria-labelledby="quality-proof-heading">
                   <div className="flex items-end justify-between gap-3">
                     <div>
-                      <h3 id="quality-proof-heading" className="text-sm font-semibold text-white">Proof behind the engine&apos;s verdict</h3>
+                      <h3 id="quality-proof-heading" tabIndex={-1} className="v2-focus-ring scroll-mt-36 rounded text-sm font-semibold text-white">Proof behind the engine&apos;s verdict</h3>
                       <p className="mt-1 text-xs leading-5 text-zinc-500">Inspect the actual observation before agreeing.</p>
                     </div>
                     <a href={currentEntry.sourceEvidenceUrl} target="_blank" rel="noreferrer" className="v2-focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-emerald-300 hover:text-emerald-200">Source record <ExternalLink className="size-3" aria-hidden="true" /></a>
@@ -414,7 +431,7 @@ export function OwnerLeadEvaluationWorkspace() {
               <section className="self-start rounded-2xl border border-white/[0.08] bg-[#090b0e] p-4 sm:p-5" aria-labelledby="owner-verdict-heading">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 id="owner-verdict-heading" className="text-base font-semibold text-white">Your verdict</h3>
+                    <h3 id="owner-verdict-heading" tabIndex={-1} className="v2-focus-ring scroll-mt-36 rounded text-base font-semibold text-white">Your verdict</h3>
                     <p className="mt-1 text-xs leading-5 text-zinc-500">Judge the opportunity, not whether an email exists.</p>
                   </div>
                   {currentEntry.ownerReview.label !== "UNREVIEWED" ? <LockKeyhole className="size-4 text-zinc-500" aria-label="Recorded review" /> : null}
