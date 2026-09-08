@@ -420,6 +420,7 @@ npm run cf:engine:dry-run
 - [`docs/GOTCHAS.md`](docs/GOTCHAS.md) — proven recurring traps and prevention.
 - [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md) — canonical threat model,
   current findings, strong controls, and release-blocking remediation order.
+
 - [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — safe operator and release procedures.
 - [`docs/CODEX_AGENT_PROTOCOL.md`](docs/CODEX_AGENT_PROTOCOL.md) — permanent
   Sol-orchestrated, Luna-worker execution and handoff contract.
@@ -427,6 +428,12 @@ npm run cf:engine:dry-run
 - [`docs/adr/`](docs/adr/) — versioned architecture decisions.
 
 ## Platform
+
+Public self-registration is disabled in the rebuild source, even for approved
+owner email addresses. Existing accounts retain sign-in. Account provisioning
+and recovery require the reviewed owner-security rollout; do not reopen signup
+as a workaround. This change is not deployed and the security audit still blocks
+production activation.
 
 The console remains Next.js on Cloudflare. New long-running work moves into a
 separate typed Worker using Cloudflare Queues and Workflows; D1 stores operational

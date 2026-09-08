@@ -1,20 +1,22 @@
 # Current status
 
-Last updated: 2026-09-06 (America/Toronto)
+Last updated: 2026-09-07 (America/Toronto)
 
 ## Plain-English status
 
-An extensive source-security audit is now the active rebuild milestone. The
-canonical snapshot identifies one critical pre-release issue: public signup can
-let somebody claim a not-yet-created approved owner address without proving
-mailbox control. Six high-risk legacy or release boundaries and several medium
-hardening gaps are also documented in `docs/SECURITY_AUDIT.md`. No production
-system was probed or changed, and all automation/providers remain off. Two first
-review drafts were rejected because they inspected the obsolete OneDrive copy;
-the project now machine-enforces an exact repository, branch, and commit
-attestation before any child agent may read code. The first remediation is to
-disable public registration and replace test self-registration with a synthetic
-local fixture.
+The security audit's critical public-registration path is now closed in the
+rebuild source: even an approved admin email cannot create an account through
+the public endpoint. The sign-up form and address-based admin promotion are
+removed; existing accounts retain sign-in. Synthetic browser checks exercise
+denied registration, no new account/session, and successful existing-account
+access. This fix has not been deployed. Six high-risk legacy or release
+boundaries and seven medium findings remain in `docs/SECURITY_AUDIT.md`;
+production activation and the eventual merge to main stay blocked. Secure owner
+enrollment, MFA, recovery, session revocation, and a review of existing accounts
+are still required. No production system was probed or changed, and no provider,
+mailbox, prospect contact, or spend was authorized. Agent role files require exact
+repository/branch/commit attestation; the policy test enforces the instruction's
+presence, not the execution of every child command.
 
 The real repository has been recovered into the local workspace, renamed to
 `rileyhins17/axiom-revenue-engine`, and made private. The foundation gate is green
@@ -180,6 +182,29 @@ through Git. ADR 0058 and `docs/REBUILD_MONITOR.md` define the workflow.
 
 ## Verified checkpoint
 
+- Verified predecessor: `ef535c3e9ba99e110c554076fa8e41d762713680`, the audit and
+  checkout-attestation baseline, has a complete exact-commit release receipt and
+  was pushed to the rebuild branch. It is the latest fully proven checkpoint
+  until this remediation passes `rebuild-monitor:prove-release` and is pushed.
+- Current bounded change: SEC-001 source lockdown. Better Auth disables signup
+  and automatic new-account login; a second server denial covers every address;
+  the signup promotion hook is removed. The old registration URL is informational
+  and sign-in no longer advertises public account creation.
+- Verification during implementation: two focused acceptance-helper tests,
+  all 590 repository tests, safety configuration, typecheck, and lint passed.
+  The first full browser run reached its final
+  database assertion after passing auth and owner UI checks, but the test had
+  omitted migration 0008's system user. The corrected assertion compares exact
+  before/after user roles and credential identities, preserving that fixture.
+  The corrected full browser gate passed: anonymous registration denial and
+  existing-account login, six WCAG-scanned owner pages, desktop 1440/mobile 390,
+  list 1,801 ms, dossier 501 ms, and zero external browser requests.
+  Final full-check results are recorded in the exact committed release receipt,
+  not inferred from this working-copy description.
+- Remaining blockers: SEC-002 through SEC-014 and deployment/account-security
+  evidence. No Riley decision is needed for this source fix. No account was
+  provisioned outside the disposable test database. Spend impact: C$0.
+
 - Security audit baseline: the authoritative audit started from canonical commit
   `f7a555a604f06b19623b727794fc505b3eebaaee`. The audit records scope,
   limitations, strong controls, one Critical, six High, seven Medium findings,
@@ -200,9 +225,7 @@ through Git. ADR 0058 and `docs/REBUILD_MONITOR.md` define the workflow.
   and the six-page owner browser acceptance gate (561 ms list, 894 ms dossier,
   desktop/mobile, WCAG, and zero external browser requests).
 - No deployment, migration, production database access, mailbox sync, provider
-  call, prospect contact, send, or spend occurred. The last fully release-proven
-  and pushed checkpoint remains `f7a555a604f06b19623b727794fc505b3eebaaee`
-  until this bounded security checkpoint passes the complete gate and is pushed.
+  call, prospect contact, send, or spend occurred during the audit checkpoint.
 - Current change: ADR 0058 adds the private local-only CEO rebuild monitor and
   makes meaningful monitor transitions part of the permanent Codex work cycle.
   The versioned schema rejects multiline dumps, common credential forms, and
@@ -2459,9 +2482,10 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
 
 ## Next three actions
 
-1. Close `SEC-001`: disable public registration at the server, remove public
-   signup navigation, replace owner-UI self-registration with a direct synthetic
-   fixture account, and prove that even an approved email cannot self-register.
+1. Complete SEC-002's verified owner-enrollment, MFA, recovery, and session
+   revocation implementation and synthetic tests. Keep real account changes and
+   staging activation behind their separate approval gate; retain SEC-001's
+   public-registration denial regression.
 2. Add one tested browser/request security boundary for custom mutation origin
    checks, private/no-store responses, framing/MIME/referrer/permissions headers,
    and CSP report-only staging preparation.

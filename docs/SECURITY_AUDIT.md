@@ -12,14 +12,15 @@ The defensible goal is to make compromise difficult, limit the damage of any
 single failure, detect important abuse, recover safely, and refuse release while
 a known severe path remains open.
 
-The rebuild has several unusually strong safety foundations, but it is **not
-ready for production activation**. One critical account-claiming path and six
-high-risk boundaries require remediation before a merge to `main` or any new
-deployment. Most of the automation-specific risks are currently dormant because
+The rebuild has tested fail-closed safety foundations, but it is **not
+ready for production activation**. The critical public account-claiming path
+has a source-level remediation in this checkpoint; it has not been deployed.
+Six high-risk boundaries still require remediation before a merge to `main` or
+any new deployment. Most automation-specific risks are currently dormant because
 intake, queues, follow-ups, sends, providers, and the new engine are off. The
-public registration weakness must still be treated as urgent because source
-configuration would allow an attacker who knows an approved owner email to
-claim a not-yet-created account without proving control of that mailbox.
+public registration weakness must still be treated as urgent in any environment
+running the original audit snapshot: that configuration permits claiming a
+not-yet-created approved account without proving control of its mailbox.
 
 The current security posture is therefore:
 
@@ -102,7 +103,8 @@ as fixed.
 
 ### SEC-001 — Critical — An approved email can claim a fresh owner/admin account
 
-**Status:** Open; immediate release blocker.
+**Status:** Remediated in this source checkpoint; not deployed. Secure owner
+enrollment, MFA, recovery, and existing-account review remain open under SEC-002.
 **Reachability:** Source path is public. Current deployed exposure was not probed.
 
 The public `/sign-up` page accepts a name, approved email, and attacker-chosen
@@ -128,6 +130,27 @@ short-lived, mailbox-verified invitation or an explicit offline bootstrap. Do
 not auto-sign in a new owner and do not derive administrator authority solely
 from a submitted address. Add a test that an approved address without an invite
 still receives a denial.
+
+**Remediation:** `src/lib/auth.ts` sets Better Auth's `disableSignUp: true` and
+`autoSignIn: false`, unconditionally denies `/sign-up/email` in the server hook,
+and removes the post-signup address-based administrator promotion. `/sign-up`
+is now an informational page with no form, and sign-in no longer links to
+registration. Existing password sign-in remains unchanged to avoid an
+unreviewed owner lockout. No production owner is created or modified.
+
+**Regression gate:** `scripts/verify-owner-ui-acceptance.ts` seeds one synthetic
+credential account directly into its freshly created disposable SQLite database.
+Against the real local auth route, it requires HTTP 403 for an unprovisioned
+allowlisted admin, a stranger, and an existing fixture address; no session
+cookie; failed login for the unprovisioned identity; no registration form;
+successful existing-account login; and unchanged user/credential counts and
+role. The exact commit's release receipt must include `test:owner-ui` before
+this checkpoint is considered verified. Historical evidence above refers to the
+audit's original snapshot, not current line numbers.
+
+This does not discover or repair accounts that may already have been claimed in
+another environment. The deployment gate must review account provenance and
+revoke unrecognized sessions; never infer deployment from this source fix.
 
 ### SEC-002 — High — Owner authentication lacks the activation-grade controls
 
@@ -560,8 +583,8 @@ layer is weak. Before activation Riley must:
 
 ## Next security checkpoints
 
-1. Close `SEC-001` with server-enforced no-public-signup and synthetic fixture
-   authentication.
+1. Complete `SEC-002` enrollment, MFA, recovery, and session-revocation proof;
+   retain the new `SEC-001` no-public-signup regression gate.
 2. Add the shared browser/request security boundary for `SEC-008`, `SEC-009`,
    and `SEC-013`.
 3. Retire or redesign the legacy MCP, agent, browser, and send paths before any

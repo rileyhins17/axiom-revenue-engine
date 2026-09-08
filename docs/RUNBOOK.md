@@ -13,6 +13,23 @@
 
 ## Safe work-cycle start
 
+### Operator accounts after the security lockdown
+
+Public registration is disabled at the server, including for allowlisted owner
+addresses. The old `/sign-up` URL only explains that access is private. Existing
+accounts can still sign in; this source change does not create, delete, verify,
+or reset any production account.
+
+Do not temporarily reopen signup to provision or recover an owner. Verified
+enrollment, MFA, recovery, and session revocation still require the SEC-002
+staging/release gate. Before rollout, review existing account provenance and
+unrecognized sessions with Riley. Keep deployment blocked until that review and
+the remaining security gates pass. The acceptance script's hardcoded fake
+credential is for its new disposable database only, never a bootstrap example
+for production.
+
+### Start a bounded milestone
+
 1. Read the files listed in `AGENTS.md`.
 2. Run `git status --short --branch` and inspect recent commits.
 3. Verify current production state read-only if the task touches production.

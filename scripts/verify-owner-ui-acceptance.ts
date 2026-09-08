@@ -7,6 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import Database from "better-sqlite3";
+import { hashPassword } from "better-auth/crypto";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 
 import {
@@ -38,6 +39,7 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
 const OUTPUT_ROOT = join(REPOSITORY_ROOT, "output", "playwright");
 const FIXTURE_EMAIL = "owner-acceptance@getaxiom.ca";
+const UNPROVISIONED_ADMIN_EMAIL = "unprovisioned-owner-acceptance@getaxiom.ca";
 const FIXTURE_PASSWORD = "owner-acceptance-only-password";
 const FIXTURE_BUSINESS_ID = "business:owner-acceptance-roofing";
 const TEST_AUTH_SECRET = "owner-ui-acceptance-only-secret-00000000000000000000";
@@ -121,6 +123,24 @@ async function applyMigrations(database: SqliteDatabase) {
   for (const migration of migrations) {
     database.exec(await readFile(join(migrationsDirectory, migration), "utf8"));
   }
+}
+
+// Synthetic account in the disposable acceptance database only. This is not
+// an operator provisioning command and must never target an existing database.
+async function seedOwnerAccount(database: SqliteDatabase) {
+  const now = new Date().toISOString();
+  const userId = "owner-acceptance-user";
+  const passwordHash = await hashPassword(FIXTURE_PASSWORD);
+  database.transaction(() => {
+    database.prepare(`INSERT INTO "User"
+      (id, name, email, emailVerified, role, createdAt, updatedAt)
+      VALUES (?, ?, ?, 1, 'user', ?, ?)`)
+      .run(userId, "Owner Acceptance", FIXTURE_EMAIL, now, now);
+    database.prepare(`INSERT INTO "Account"
+      (id, accountId, providerId, userId, password, createdAt, updatedAt)
+      VALUES (?, ?, 'credential', ?, ?, ?, ?)`)
+      .run("owner-acceptance-credential", userId, userId, passwordHash, now, now);
+  })();
 }
 
 function fixtureTimestamp(offsetMilliseconds: number) {
@@ -486,8 +506,8 @@ function startNextServer(baseUrl: string, databasePath: string, logLines: string
   Object.assign(childEnvironment, {
     APP_BASE_URL: baseUrl,
     AGENT_SHARED_SECRET: "",
-    AUTH_ALLOWED_EMAILS: FIXTURE_EMAIL,
-    AUTH_ADMIN_EMAILS: "",
+    AUTH_ALLOWED_EMAILS: `${FIXTURE_EMAIL},${UNPROVISIONED_ADMIN_EMAIL}`,
+    AUTH_ADMIN_EMAILS: UNPROVISIONED_ADMIN_EMAIL,
     AUTH_ALLOWED_ORIGINS: baseUrl,
     AUTONOMOUS_INTAKE_ENABLED: "false",
     AUTONOMOUS_QUEUE_ENABLED: "false",
@@ -558,12 +578,35 @@ async function stopServer(child: ChildProcess | null) {
 }
 
 async function authenticate(context: BrowserContext, baseUrl: string) {
-  const response = await context.request.post(`${baseUrl}/api/auth/sign-up/email`, {
-    data: { name: "Owner Acceptance", email: FIXTURE_EMAIL, password: FIXTURE_PASSWORD },
+  // Exercise the real anonymous endpoint, including the previously vulnerable
+  // approved-but-not-yet-provisioned admin identity. No test-only server bypass.
+  for (const email of [UNPROVISIONED_ADMIN_EMAIL, "stranger@axiomfixtures.ca", FIXTURE_EMAIL]) {
+    const denied = await context.request.post(`${baseUrl}/api/auth/sign-up/email`, {
+      data: { name: "Untrusted Registration", email, password: FIXTURE_PASSWORD, role: "admin" },
+      headers: { origin: baseUrl },
+    });
+    assert.equal(denied.status(), 403, "Public signup must deny every address, including approved admins.");
+    assert.equal((await context.cookies(baseUrl)).some((cookie) => cookie.name.includes("session")), false,
+      "Rejected registration must not establish a session.");
+  }
+  const deniedSignIn = await context.request.post(`${baseUrl}/api/auth/sign-in/email`, {
+    data: { email: UNPROVISIONED_ADMIN_EMAIL, password: FIXTURE_PASSWORD },
+    headers: { origin: baseUrl },
+  });
+  assert.equal(deniedSignIn.status(), 401, "A rejected signup must not create usable credentials.");
+
+  const registrationPage = await context.newPage();
+  await registrationPage.goto(`${baseUrl}/sign-up`, { waitUntil: "domcontentloaded" });
+  await registrationPage.getByRole("heading", { name: "Registration is closed", exact: true }).waitFor();
+  assert.equal(await registrationPage.locator("form, input").count(), 0, "Closed registration must expose no form.");
+  await registrationPage.close();
+
+  const response = await context.request.post(`${baseUrl}/api/auth/sign-in/email`, {
+    data: { email: FIXTURE_EMAIL, password: FIXTURE_PASSWORD },
     headers: { origin: baseUrl },
   });
   const body = await response.text();
-  assert.equal(response.ok(), true, `Fixture sign-up failed (${response.status()}): ${body.slice(0, 300)}`);
+  assert.equal(response.ok(), true, `Fixture sign-in failed (${response.status()}): ${body.slice(0, 300)}`);
   const cookies = await context.cookies(baseUrl);
   assert(cookies.some((cookie) => cookie.name.includes("session")), "Fixture authentication did not set a session cookie.");
 }
@@ -992,7 +1035,10 @@ async function run() {
   let result: AcceptanceResult | null = null;
   try {
     await applyMigrations(database);
+    await seedOwnerAccount(database);
     seedOwnerLead(database);
+    const originalUsers = database.prepare('SELECT id, email, role FROM "User" ORDER BY id').all();
+    const originalAccounts = database.prepare('SELECT id, accountId, providerId, userId FROM "Account" ORDER BY id').all();
     database.close();
     const port = await freeLoopbackPort();
     const baseUrl = `http://127.0.0.1:${port}`;
@@ -1003,6 +1049,15 @@ async function run() {
     server = startNextServer(baseUrl, databasePath, serverLogs);
     await waitForServer(baseUrl, server);
     result = await runBrowserAcceptance(baseUrl, outputDirectory);
+    const verifiedDatabase = new Database(databasePath, { readonly: true });
+    try {
+      assert.deepEqual(verifiedDatabase.prepare('SELECT id, email, role FROM "User" ORDER BY id').all(),
+        originalUsers, "Rejected signup must not create or promote any user.");
+      assert.deepEqual(verifiedDatabase.prepare('SELECT id, accountId, providerId, userId FROM "Account" ORDER BY id').all(),
+        originalAccounts, "Rejected signup must not create or change any credential account.");
+    } finally {
+      verifiedDatabase.close();
+    }
     success = true;
   } catch (error) {
     await writeFile(join(outputDirectory, "next-server.log"), `${serverLogs.join("\n")}\n`, "utf8");
