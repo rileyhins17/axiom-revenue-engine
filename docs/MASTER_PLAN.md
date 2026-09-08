@@ -68,6 +68,14 @@ audit version.
 
 ### Reachability and outreach
 
+**Owner requirement: no Google Workspace.** The Revenue Engine must not require
+Workspace seats or Gmail as its target transport. Keep mailbox integration
+provider-neutral and select a non-Google service only after verifying custom-domain
+mailboxes, allowed outreach use, authentication, sending, replies, suppression and
+total CAD cost within the existing ceiling. No replacement provider is selected
+yet. Existing Gmail code and Gmail-specific tests describe legacy compatibility,
+not the approved future email architecture.
+
 Route in order: verified relevant named email; approved verified role email;
 phone task; contact-form task; active social task; operator research. Only email
 may be automated. Catch-all, generic, stale, malformed, suppressed, or unverified
@@ -129,6 +137,16 @@ Stable adapters: `SourceAdapter`, `AuditAdapter`, `ContactAdapter`,
 
 ## Safe migration
 
+**Owner deployment hold (2026-09-08):** finish implementation and required local
+acceptance work before proposing any deployment. No hosted preview, staging or
+production publishing during the unfinished rebuild. Local prototypes, builds,
+tests and no-upload dry runs remain allowed. Earlier staged-release sequencing
+below is planning, not authorization. Follow the deployment boundary in
+`docs/OWNER_CONTEXT.md` and the release gate in `docs/RUNBOOK.md`; Riley must
+explicitly approve the exact release. Live operational and commercial pilot
+results cannot be proven locally and must remain labelled outstanding, not
+fabricated or silently removed from the completion criteria.
+
 Keep legacy production paused and read-only. Back it up before schema/resource
 work. Build v2 tables/resources beside legacy, import repeatably, reconcile every
 count and suppression, run shadow mode, and cut over only after acceptance gates.
@@ -141,7 +159,7 @@ rename/delete the legacy database in place.
 1. Durable repo context, naming, CI, characterization tests, staging foundation.
 2. Canonical identity, coverage memory, source adapter, audits, evidence, scoring,
    and the 50-lead evaluation set.
-3. All channel records, verification, consent evidence, Gmail sync, suppression,
+3. All channel records, verification, consent evidence, provider-neutral reply sync, suppression,
    evidence-grounded generation, and approval queues.
 4. Owner-first Today/Leads/Outreach/Revenue/System experience.
 5. Shadow run and controlled KW pilot: max 50 first touches/week, starting at five
@@ -153,10 +171,21 @@ Each phase's detailed current gate and next work live in `docs/STATUS.md`.
 
 ## Budget
 
-The enforced C$50/month target reserves approximately C$18.40 for two Google
-Workspace seats, C$7 Cloudflare, C$7 OpenAI, C$5 source API, C$5 verification,
-C$2 domain renewal, and C$5.60 tax/exchange/incident buffer. Alert at 70%, pause
-discretionary acquisition at 85%, and hard-stop nonessential jobs at 100%.
+The [non-Google email review](EMAIL_PROVIDER_DECISION.md) dated 2026-09-08
+supersedes any blanket claim that this ceiling already funds a verified complete
+outreach stack. Cheap ordinary mail is not campaign permission. Mailforge is a
+conditional research candidate, not selected; its minimum plus current non-mail
+allowances exceeds C$50 before extras. The guide's C$85 scenario is unapproved,
+not a checkout quote. Keep the existing ceiling and no-purchase/no-deploy gates;
+do not remove required functionality or verification to make the estimate fit.
+
+The runtime ceiling remains C$50/month. The prior C$18.40 Google Workspace
+allocation is withdrawn; it is an unassigned email/provider reserve, not a
+subscription commitment or verified quote. Other planning allowances remain
+C$7 Cloudflare, C$7 OpenAI, C$5 source API, C$5 verification, C$2 domain renewal
+and C$5.60 tax/exchange/incident buffer. Revalidate the full allocation after
+choosing a non-Google provider. Alert at 70%, pause discretionary acquisition
+at 85%, and hard-stop nonessential jobs at 100%.
 
 ## Complete means
 

@@ -12,7 +12,7 @@
     "build:cloudflare": "opennextjs-cloudflare build && node scripts/sanitize-cloudflare-bundle.mjs",
     "preview": "npm run build:cloudflare && wrangler dev",
     "deploy": "node scripts/production-deploy-guard.mjs",
-    "deploy:production": "wrangler deploy --env=\"\" --autoconfig false",
+    "deploy:production": "node scripts/production-deploy-guard.mjs",
     "check:safety": "node scripts/check-safety-config.mjs",
     "worker": "tsx scripts/local-scrape-worker.ts",
     "worker:local": "tsx scripts/local-scrape-worker.ts",

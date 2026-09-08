@@ -18,10 +18,10 @@ Revenue Engine. A chat transcript is never the source of truth.
 Read, in order:
 
 1. `docs/OWNER_CONTEXT.md`
-2. `docs/STATUS.md`
+2. the active brief at the top of `docs/STATUS.md` (older entries are history)
 3. `docs/MASTER_PLAN.md`
 4. `docs/GOTCHAS.md`
-5. the ADRs and runbook relevant to the change
+5. `docs/CODEX_AGENT_PROTOCOL.md`, then the ADRs and runbook relevant to the change
 
 Then verify `git status`, the current branch, the latest commit, and the tests
 that cover the area. Do not assume a previous agent's commentary still matches
@@ -41,6 +41,10 @@ paying-client proof.
 
 ## Safety rules
 
+- Google Workspace is excluded by the owner. Do not require, provision, recommend
+  purchasing, or assume Workspace seats for the rebuild. Keep the sending design
+  provider-neutral; existing Gmail code is legacy/reference until a non-Google
+  provider and its outreach policy, capabilities and total cost are verified.
 - On Riley's machine, use the non-synced checkout at
   `C:\Users\riley\Documents\ChatGPT\APE`. Do not use a OneDrive or Google Drive
   folder as the working repository. GitHub remains the remote source of truth.
@@ -52,6 +56,14 @@ paying-client proof.
   destructive database action may be used as a test.
 - Never deploy or migrate without a current backup, a rollback step, and an
   explicit release gate.
+- Owner deployment hold (2026-09-08): do not deploy or publish the unfinished
+  app anywhere, including hosted previews, staging, or production. Continue
+  local development, loopback-only previews, tests, builds and no-upload dry runs.
+  This supersedes earlier incremental staging instructions. Before requesting
+  release approval, demonstrate completed implementation and required local
+  acceptance gates, disclose any live-only validation still outstanding, and
+  obtain Riley's explicit approval for the exact release. Passing checks or
+  judging the app finished does not itself authorize deployment.
 - A send requires every applicable global, campaign, mailbox, contact, consent,
   verification, approval, and budget gate to pass.
 - Follow-ups remain disabled until their separate evidence gate is approved.
@@ -62,6 +74,16 @@ paying-client proof.
 ## Engineering rules
 
 - Work in one bounded milestone with an observable exit gate.
+- Before coding, apply the owner-outcome work contract in
+  `docs/CODEX_AGENT_PROTOCOL.md`: record the owner result, evidence, scope,
+  non-goals and unresolved decisions in the active STATUS brief. A helper module
+  is not a completed feature. A security milestone must close a specific risk
+  with a regression proof and name any remaining integration gap.
+- Keep one active delivery milestone. Inventory unfinished changes before adding
+  scope; preserve them, but do not let disconnected infrastructure accumulate.
+- Explicit owner corrections supersede older plans. Update OWNER_CONTEXT and the
+  affected plan before implementation; never treat a proposed provider, budget
+  allocation or architecture as an approved business decision.
 - Capture legacy behavior with tests before removing it.
 - Prefer typed adapters and small domain modules over adding to the legacy
   orchestration or scraper files.
@@ -154,10 +176,28 @@ npm run build:cloudflare
 npx wrangler deploy --env="" --dry-run --autoconfig false
 ```
 
+Do not repeat successful broad checks between small edits unless changed scope,
+a failure or an unresolved risk justifies them. Required checkpoint/release gates
+still apply in full. Documentation-only working-copy edits may be checked with
+relevant policy checks and diff/link review, but cannot be called a verified
+release or pushed without the existing exact-commit release process.
+
 Automated tests must use fakes or mail sinks and must never contact prospects.
 Run `npm run test:owner-ui` only after every Next/OpenNext/Cloudflare build or dry
 run has exited. Those commands share `.next`; running them concurrently can swap
 browser assets mid-request and produce a false intermittent `SyntaxError`.
+When changing the saved-email activity view or its reader, also run
+`npm run test:saved-email-ui` after builds/dry runs exit. This loopback-only fixture
+uses the real component, built CSS and saved-history handler with synthetic auth
+and storage; it is not proof of the full application sign-in or reply approval UI.
+When changing legacy email display boundaries, run `npm run test:legacy-email-ui`
+after builds/dry runs exit. It renders the actual client-page props, ClientProfile
+and shared message viewer against synthetic authentication and disposable storage.
+Do not treat it as proof of dashboard/automation summaries or full application login.
+When changing dashboard/automation mail summaries or saved mailbox status, run
+the summary privacy/D1 tests and `npm run test:owner-ui`. Its authenticated
+desktop/mobile summary-to-message checks are separate from the isolated viewer
+fixtures. Preserve the difference between shared business data and private mail.
 
 ## Documentation is part of the change
 

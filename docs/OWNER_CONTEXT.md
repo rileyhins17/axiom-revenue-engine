@@ -41,6 +41,14 @@ include it in public logs.
 ## Budget and communications
 
 - Runtime ceiling: **C$50/month**, excluding the existing ChatGPT/Codex plan.
+- **No Google Workspace.** Riley explicitly reaffirmed this requirement on
+  2026-09-08. Earlier Google Workspace budget/setup assumptions are superseded.
+  Domain email must use a suitable non-Google provider; verify provider policies,
+  sending/reply integration and complete CAD cost before selecting or purchasing.
+- The source-backed review at `docs/EMAIL_PROVIDER_DECISION.md` is a proposal,
+  not an owner decision: no replacement provider or C$85 scenario is approved.
+  Do not infer purchase authority from its shortlist or replace the requested
+  automated-email outcome with ordinary correspondence.
 - Launch with two real identities: `riley@getaxiom.ca` and
   `aidan@getaxiom.ca`. Aliases are for routing, not mailbox capacity.
 - Do not build a mailbox farm. Add capacity only after reply economics and owner
@@ -48,7 +56,28 @@ include it in public logs.
 - Use concise, calm, owner-friendly language. Avoid unexplained jargon, vanity
   metrics, and “healthy” claims that are not backed by real checks.
 
-## Owner success test
+## Deployment boundary (owner correction, 2026-09-08)
+
+Riley: "Only deploy when the app is completely finished." No unfinished hosted
+preview, staging release or production update is permitted. Local development
+and loopback-only testing/previews may continue. Present a plain-English readiness
+review with completed features, verified acceptance gates and remaining live-only
+checks, then wait for Riley's explicit approval of the exact release. Do not call
+the app complete based on a prototype, test count or disconnected helper modules.
+This restriction supersedes earlier plans to deploy incrementally during rebuild.
+
+## Visual direction (owner correction, 2026-09-08)
+
+Riley rejected the current UI because it looks too much like the old pipeline.
+Dark is explicitly confirmed; light is not the chosen direction. A redesign must
+change the layout and interaction structure, not just recolour the existing
+sidebar, stacked panels and score tiles. Prioritize readable type, prominent
+website evidence and the next business decision. The separate local prototype
+at `docs/design/dark-workspace.html` is a proposed direction, not owner-approved
+production UI. Its fictional businesses and website illustrations are never
+qualification or outreach evidence.
+
+## Owner interaction targets
 
 Riley can identify the next lead in 10 seconds, understand why in 15 seconds,
 approve/reject/correct outreach in 30 seconds, stop all sending in 5 seconds, and

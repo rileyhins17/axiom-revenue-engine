@@ -96,6 +96,7 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
 ]);
 
 const failures = [];
+const productionWorkflow = await readFile(new URL("../.github/workflows/deploy-production.yml", import.meta.url), "utf8");
 const ownerUiAcceptance = await readFile(new URL("./verify-owner-ui-acceptance.ts", import.meta.url), "utf8");
 const privateKwOwnerLabeling = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-labeling.ts", import.meta.url), "utf8");
 const privateKwShadowSliceProgress = await readFile(new URL("../src/lib/revenue-engine/private-kw-shadow-slice-progress.ts", import.meta.url), "utf8");
@@ -243,6 +244,9 @@ requireMatch("src/lib/env.ts", envSource, /AUTONOMOUS_QUEUE_ENABLED:\s*environme
 requireMatch("src/lib/env.ts", envSource, /AUTONOMOUS_SEND_ENABLED:\s*environmentBoolean\(false\)/, "send must default false");
 requireMatch("src/lib/env.ts", envSource, /AUTONOMOUS_DAILY_LEAD_INTAKE_CAP:\s*z\.coerce\.number\(\)\.int\(\)\.nonnegative\(\)\.default\(0\)/, "intake cap must accept and default to zero");
 requireMatch("package.json", packageJson, /"deploy"\s*:\s*"node scripts\/production-deploy-guard\.mjs"/, "plain npm run deploy must be guarded");
+requireMatch("package.json", packageJson, /"deploy:production"\s*:\s*"node scripts\/production-deploy-guard\.mjs"/, "the production alias must respect the owner deployment hold");
+requireMatch(".github/workflows/deploy-production.yml", productionWorkflow, /^  deploy:\r?\n(?:    #[^\n]*\r?\n)*    if: \$\{\{ false \}\}\s*$/m, "the production job must remain unconditionally disabled during the owner hold");
+forbidMatch(".github/workflows/deploy-production.yml", productionWorkflow, /secrets\./, "the held deployment workflow must not request provider credentials");
 requireMatch("package.json", packageJson, /"db:migrate:remote"\s*:\s*"node scripts\/production-migration-guard\.mjs"/, "plain remote migration must be guarded");
 requireMatch("package.json", packageJson, /"build:cloudflare"\s*:\s*"[^"]*sanitize-cloudflare-bundle\.mjs"/, "Cloudflare builds must remove local env values and scan for secrets");
 requireMatch("package.json", packageJson, /"cf:engine:typegen:check"\s*:\s*"[^"]*--env-file wrangler\.typegen\.env/, "engine binding generation must ignore local env files");

@@ -2,9 +2,588 @@
 
 Last updated: 2026-09-08 (America/Toronto)
 
+## Active owner brief
+
+This is the authoritative current queue. Older entries below Plain-English status
+are history, not current instructions. The full rebuild objective is unchanged.
+
+### Owner boundaries
+
+- **Do not deploy the unfinished app anywhere**, including hosted previews,
+  staging or production. Finish implementation/local acceptance, disclose live-only
+  checks, then request Riley's explicit exact-release approval. Local builds,
+  loopback tests and no-upload dry runs are allowed.
+- No Google Workspace and no Google/OneDrive working checkout. Use
+  `C:\Users\riley\Documents\ChatGPT\APE`.
+- C$50/month remains the unmodified runtime ceiling. No live sending, inbox sync,
+  prospect contact, paid provider work, production migration or deployment in this
+  cycle. Spend impact: **C$0**.
+
+### Verified checkpoint versus current work
+
+HEAD remains `93f498c4d5c399f2402b262c2b07c05e4074a2af`, on
+`RileyHinsperger/axiom-revenue-engine-rebuild`. The preceding cycle recorded that
+commit's full ten-check receipt and push. It does not cover the current dirty tree.
+No new commit, push, main merge or exact-commit release receipt is claimed.
+All prior unfinished source/UI/documentation changes are preserved. No production
+state was queried or changed.
+
+### Current result: partial manual-reply integration, not a finished email feature
+
+Active work card: turn the accumulated locally verified work into recoverable,
+dependency-complete Git checkpoints, separating security, owner restrictions and
+visual changes. Owner result: the next task can recover the actual work from Git,
+with an exact verification receipt rather than an uncommitted-work claim.
+Proof: dependency review, explicit commit scopes, complete ordered release checks,
+clean final tree and exact local/upstream/remote equality before a pushed claim.
+The release receipt must include the new saved/legacy email browser gates; the old
+ten-check receipt is insufficient for these changes. Scope is checkpoint integrity
+and existing work, not another feature. No history rewrite, discarded edits,
+provider activation, deployment or approval of the proposed dark design is allowed.
+No owner decision blocks local checkpoint preparation. Summary privacy passed in
+the previous cycle; the evidence below remains working-copy evidence until the
+exact final commit passes its own gate.
+
+Checkpoint preparation (2026-09-08): the prior turn was progress, with terminal
+browser success and inspected synthetic screenshots. Current inventory separates
+four dependency groups: owner corrections/deployment denial; integrated email
+security and its fixtures; existing mobile/sidebar interactions plus the explicitly
+unapproved dark proposal; and exact verification/CI documentation. No source is
+discarded or restored. Two new regressions demonstrated missing email browser gates
+in both the release receipt and Linux workflow. Release proof v2 now requires all
+twelve ordered checks; old ten-check v1 receipts cannot certify this candidate.
+Sixteen monitor/deployment-focused tests, safety, monitor check and diff checks pass.
+The final committed tree still needs the complete proof before any push claim.
+
+The actual reply POST no longer calls Gmail, refreshes tokens or selects the first
+user mailbox. It requires the shared current administrator/origin fence, accepts
+only a stable approved-intent reference, reloads stored approval content and binds
+owner, URL client, mailbox, mode, Message-ID and digest before invoking the
+guarded manual runtime. The real runtime deliberately returns unavailable, with no
+environment override or Gmail fallback.
+
+The local route now uses a same-statement claim fence for current actor/session,
+reviewer, exact stored approval, unarchived lead, global/emergency pauses and
+active suppression, together with the existing atomic budget reservation. The
+pre-patch revocation-after-lookup test returned 200 and sent fake mail; it now
+denies with no new intent, debit or provider call. A final recheck catches changes
+after reservation and leaves a non-resendable record. The normalized legacy `REPLY`
+marker stops sequences without forbidding owner replies; it is not consent or
+opt-out classification. Explicit opt-out/complaint/bounce/no-MX sources cannot
+expire into permission. Reviewer-found wrapper/encoded/`www.` suppression forms
+now share the existing email/domain interpretation; exact raw mappings are checked
+against every current suppression row in the write. Added/changed rows deny. This
+temporary compatibility read stops above 1,000 rows/128 KiB rather than omitting
+records; canonical suppression storage is still needed before scale.
+
+The local approval writer no longer depends on GmailConnection/OutreachMailbox.
+Source-only migration 0075 records immutable provider-neutral mailbox identities,
+mailbox-scoped client conversations and specific recipient/parent reply targets.
+Manual envelope v2 binds the target ID into the approved digest; v1 remains readable
+for legacy characterization but cannot create or load a new manual approval.
+The same identity predicate runs in approval INSERT/reload, claim and final check.
+Missing/disconnected/paused/retired identities deny. Retirement cannot be undone;
+correcting a conversation requires a new target and approval, not reassigning old
+permission. Changing the lead's general email does not invalidate the exact
+recorded recipient. No alias or case rewrite is performed after approval.
+
+The actual approval writer, handler, reader, claim and dispatcher pass on disposable
+SQLite and Miniflare D1. The fixtures now call the real approval writer instead of
+inserting approval receipts directly. Tests cover stops immediately before the D1
+write, identity retirement after lookup/claim and one fake send across concurrency.
+**Provider identity ingestion and health/consent/capacity policy remain synthetic.
+These tests do not prove the owner approval UI, live provider ownership, full atomic
+policy, inbox/CRM integration, inbound replies or opt-outs.**
+
+The manual runtime factory now owns mandatory guarded claim, final check, outcome
+persistence and historical reads; it accepts no claim/outcome/history override.
+Saved outcomes are read from the actual immutable approval and durable send record,
+not a synthetic Map or second history table. Reading requires the exact current
+admitted owner/session/client, including a second check after digest verification.
+Mailbox retirement, approval revocation/expiry or a lead archive no longer hide
+past acceptance. Current session expiry, impersonation, ban and role removal still
+deny. Recovery performs no writes, claims, debits, credentials or provider calls;
+uncertain/rejected states never become permission to resend. A failed historical
+read returns STATUS_UNAVAILABLE without falling through to dispatch. Accepted
+content can be reconstructed after reopening the reader. Acceptance is not delivery.
+
+The separate client email-history GET now reads saved owner-scoped activity only.
+It no longer imports Gmail, Prisma credential lookup or token refresh. Its actual
+route requires current administrator authentication, parses strict client/cursor
+inputs before opening storage, and emits private/no-store responses. The reader
+returns at most five validated messages, with a stable createdAt/id cursor and
+current admission checks before and after reading. It never returns HTML or an
+attempt token. Missing storage or invalid history is unavailable, not a false empty
+inbox. The current owner can still read their saved history after mailbox retirement.
+
+The old Gmail-shaped thread display/raw-envelope composer is replaced by a
+read-only Saved email activity panel. It shows each record's sender, recipient,
+plain-text content and accepted/uncertain/rejected state; acceptance is not delivery.
+Paging and refresh read local records only. Loading/failure clears stale content,
+and changing clients remounts the view and aborts old requests. No send/generate
+control remains on this incomplete interface. This is useful saved activity, not
+the finished approval/reply or inbound-mail journey. Legacy mail is explicitly not
+automatically imported. Its isolated desktop/mobile browser gate passed; the parent
+visually inspected both screenshots. This does not prove the full app shell/login
+or the unfinished reply approval journey.
+
+**SEC-006 stays open.** Full current-policy SQL, trusted provider ingestion/health,
+legacy CRM/inbound integration,
+durable approval/recovery UI, inbound/opt-out processing and the scheduler's second
+outbound caller remain unfinished. Existing Gmail-specific transport/credential
+helpers are reference work, not the target provider integration. Details:
+[ADR 0059](adr/0059-outbound-send-intent-and-ambiguous-delivery.md),
+[reply runbook](RUNBOOK.md#manual-reply-boundary-local-partial-integration),
+[security audit](SECURITY_AUDIT.md).
+
+### Current verification (dashboard and automation summary privacy)
+
+The two baseline reproductions failed on foreign-owner email before the patch.
+Both now pass through current owner/session fences and explicit metadata projections.
+The actual dashboard/automation page and overview/status API fixtures preserve
+owned mail/queue records, reject ordinary members and recheck expiry, impersonation,
+demotion, verification, ban and configured owner removal after reads. Reassigned
+mailboxes do not expose foreign sender metadata. Shared business/CRM information
+remains shared; this is message ownership, not a new per-owner business silo.
+
+Overview/status reads no longer synchronize Gmail mailboxes, create absent settings,
+recover stale sequences or run automatic ORM schema repair. Missing settings fail
+unavailable. The read-only model rejects writes before storage. Exact disposable
+application/schema snapshots remain unchanged; both readers also passed real local
+Miniflare D1 with an application-query allowlist and no outbound requests.
+
+- Nine new focused tests pass; the nearest overview/operator tests pass (42 before
+  adding the additional D1 test).
+- **736/736 full-suite tests passed.** Safety, typecheck, lint, sanitized Cloudflare
+  build and Wrangler no-upload dry run passed. Known generated duplicate-options
+  warnings remain; nothing was uploaded.
+- Post-build legacy and saved-email desktop/mobile browser gates passed again.
+- The final full-app owner browser gate passed after the Google-prompt and
+  same-day timestamp corrections: authenticated summary-to-detail flows at
+  1440px/390px, six existing WCAG views, and zero external browser requests.
+  Parent inspected the final desktop dashboard and mobile automation captures.
+  The timestamp regression failed at 0 versus 1 before its fix; SQLite, D1 and
+  the final dashboard capture now agree on 1. Local fixture list/dossier readiness
+  was 210/69 ms, not a production performance guarantee. Retained evidence:
+  `output/playwright/owner-walkthrough-32288-1788908892014/acceptance.json`.
+  These are existing-UI privacy proofs, not the finished dark redesign. Legacy
+  operational labels and capacity displays still need the owner-first redesign;
+  they must not be treated as permission or evidence of live sending readiness.
+- The reused Luna-max candidate reviewer attested the exact canonical root,
+  branch and HEAD and found no concrete surviving bypass or GET mutation in the
+  named boundary. This was one reused-context review, not a fresh-context audit.
+
+This remains a local working-copy candidate, not a new commit, pushed checkpoint,
+deployed fix or completion of SEC-006. The full trusted send policy, durable owner
+approval/composer and inbound processing remain unfinished. No owner decision
+blocks the next local step; spend C$0, all execution and deployment holds unchanged.
+
+### Previous verification (legacy client history and message viewers)
+
+- Actual client-page and metadata-GET reproductions both failed before the patch
+  because foreign-sender email crossed the boundary. They now pass. The email
+  list/detail GETs share the same explicit reader; guessing another sender's ID
+  returns 404. Business notes and owner-owned legacy history remain readable.
+- Nine disposable storage tests cover the actual page/API boundaries and real
+  Miniflare D1 reader, current admin/session revocation, malformed input before DB
+  access, strict queue-creator ownership, archive behavior, absent schema, explicit
+  oversized/HTML-only text and unchanged application data. Three viewer/contract
+  tests cover removal of HTML sinks, strict message shapes and UTC timestamps.
+- **727/727 tests passed.** Safety, typecheck, lint, final application Cloudflare build and
+  bundle sanitization passed. Wrangler's no-upload dry run exited successfully;
+  only the known generated duplicate-options warnings remain. No upload occurred.
+- The full ClientProfile and shared viewer browser fixture already passed desktop
+  and mobile privacy, keyboard disclosure, error clearing and no horizontal
+  overflow. It consumes the real server-page props and actual built styles, with
+  synthetic HTTP auth and in-memory storage. No external requests or application
+  writes occurred. Parent inspected desktop/mobile viewer screenshots. Both final
+  post-build/post-dry-run legacy and saved-history browser gates passed. Artifacts
+  are under `output/playwright/legacy-email-history/` and `saved-email-history/`.
+  This is not full app login, accessibility certification, incoming mail or the
+  approved reply composer. Saved-history WCAG AA, pagination, error and client-switch
+  coverage passed again. The broader owner-console regression initially stopped
+  before browser launch: the old exact Revenue schema checker rejected the new
+  mailbox tables from migration 0075. Two focused reproductions confirmed this.
+  The checker now accepts either exact 0054-0069 or that exact schema plus the
+  complete canonical 0075 extension. It still compares every table/index/trigger,
+  rejects partial/altered/unknown extensions, and modifies only an in-memory
+  reference. No actual database is migrated or schema object silently ignored.
+  Six focused compatibility/materialization tests pass. The final owner-console
+  gate now passes all six desktop/mobile WCAG views and existing synthetic
+  authentication/OAuth/mailbox safeguards with zero external requests. Warm list
+  and dossier checks were 217/107 ms, not a human usability or production benchmark.
+  Its mobile position assertion now requires exactly one visible business heading,
+  rather than also matching a hidden retained route copy; the first-business
+  above-navigation threshold is unchanged. No duplicate visible card is ignored.
+- Repairs during verification: removed unnecessary effect state resets (the modal
+  already remounts by message ID); supplied an empty synthetic environment for the
+  standalone Next Link browser fixture; replaced D1 total_changes assertions with
+  SELECT-only application-query checks and exact application-table snapshots;
+  fixed actual mobile grid overflow and UTC timestamp interpretation. No real
+  database, credentials, mailbox or provider was used to investigate them.
+- A reused Luna-max reviewer re-attested the canonical root/branch/HEAD and found
+  the dashboard/automation summary disclosure remained at that checkpoint. The
+  follow-through candidate and its current verification are recorded above.
+  This is locally tested partial remediation, **not closure of legacy email privacy
+  or SEC-006**, and not an exact-commit release receipt. No new commit/push, main
+  merge, deployment, production migration or spend; C$0. No owner decision blocks
+  the next local task. Active duration/usage is not reliably measured.
+
+### Previous verification (saved-history GET and read-only view)
+
+- Pre-patch actual-route reproduction made two simulated provider calls and one
+  credential write just by viewing history; the zero-provider expectation failed.
+  The replacement actual route imports only auth, database and saved-history handler.
+- Seven new route tests passed, plus the extended real Miniflare D1 reader proof.
+  They cover authentication/input rejection before DB access, owner/session/client
+  isolation, stable bounded paging, retirement/revocation/archive, policy/session
+  changes during reads, unavailable storage and no extra writes/sends. HTTP auth
+  and provider identity remain synthetic fixtures; storage/approval/runtime/reader
+  logic is real local code.
+- **715/715 full-suite tests passed.** Typecheck, lint, safety, Cloudflare build and
+  sanitizer, and no-upload Wrangler dry run passed (`--dry-run: exiting now.`).
+  Known generated duplicate-options warnings remain; no upload occurred.
+  The new desktop/mobile browser gate passed keyboard message disclosure, WCAG AA,
+  pagination, errors/malformed responses, loading/client switching and plain-text
+  image safety, with zero external requests or extra writes/sends. It uses the real
+  component, built CSS and reader/handler, but synthetic auth and disposable data;
+  this is not the full app sign-in or reply composer. Screenshots are in ignored
+  `output/playwright/saved-email-history/desktop.png` and `mobile.png`.
+  A fresh investigator could not spawn due the agent thread limit; the parent
+  performed the separate investigation and candidate review locally. The completed
+  Luna-max reviewer completed this additional read-only candidate review, re-attested
+  the canonical root/branch/HEAD, passed all seven focused route tests and found no
+  concrete provider bypass, owner/session/client leak, pagination race or false
+  outcome semantics in the bounded new reader/panel. The parent independently
+  traced the candidate and verified the adjacent concern below. No new candidate
+  code repair was required; final safety/typecheck/lint/diff checks also passed.
+
+- Adjacent unresolved path, now the next priority: `src/app/clients/[id]/page.tsx`
+  still requires only requireSession and serializes legacy OutreachEmail bodies
+  selected by leadId without sender ownership. `ClientProfile` separately renders
+  legacy bodyHtml in a sandboxed srcDoc iframe; a sandbox alone is not proof that
+  remote images cannot load. The sibling `/api/clients/[id]` also returns legacy
+  email metadata without sender scope. Parent source inspection confirmed these
+  paths; no live page/provider was used and no browser exploit is claimed. The new
+  GET/panel gate does NOT prove the whole client profile private or provider-free.
+
+### Preceding verified slice (guarded runtime and read-only recovery)
+
+- Pre-patch recovery regression failed after fake acceptance plus history failure:
+  retiring the mailbox and revoking approval hid the saved SENT outcome. It now
+  returns the saved receipt with no second provider attempt. Earlier identity,
+  revocation, stop and suppression regressions remain covered.
+- **24 focused tests and 708/708 full-suite tests passed.** SQLite tests cover all
+  four recorded states under retirement/revocation/archive/budget pause, unchanged
+  total_changes and debit/send counts, owner/session/client privacy, admission
+  changes during hashing, expiry, durable exact content and raw-claim injection
+  rejection. Real local Miniflare D1 also recovers SENT after retirement/revocation
+  with one fake send and zero external requests. Typecheck, lint, safety and the
+  Cloudflare build/sanitizer and no-upload Wrangler dry run passed (terminal
+  `--dry-run: exiting now.`). Generated duplicate-options warnings remain; no
+  upload occurred. Fresh Luna-max candidate review passed its own 24 focused tests
+  and found no concrete surviving bypass/regression in this bounded v2 candidate.
+- Previous owner-browser gate passed six desktop/mobile WCAG pages with zero
+  external requests. No UI changed this slice, and this does not prove the
+  unfinished reply approval/reload flow. It is not a new browser run.
+- Fresh pre-patch investigator attested the canonical checkout/branch/HEAD and
+  identified separate historical admission and the legacy Gmail-backed sibling GET.
+  Fresh Luna-max candidate review independently attested the same root/branch/HEAD.
+  The generic dispatcher remains a
+  low-level mechanism, not standalone authorization; the manual factory owns its
+  guarded composition. No owner decision or spend is needed for these local steps.
+- This remains uncommitted local partial integration, not an exact-commit release
+  checkpoint. Existing mixed UI/deployment/security changes were preserved, not
+  bundled into an unrelated atomic commit or described as pushed. No active-time
+  estimate, new browser proof or completed security finding is claimed.
+
+### Other retained progress and decisions
+
+- Both npm deploy aliases deny unconditionally; production job is disabled in
+  working source. Four guard tests passed previously and remain in the full suite.
+  This is not a machine-wide Wrangler block or a change to old GitHub workflows.
+- [Non-Google email guide](EMAIL_PROVIDER_DECISION.md): cheap ordinary mail is not
+  outreach permission. No complete permitted stack within C$50 is verified.
+  Mailforge is only a conditional candidate; policy/DNS/security/checkout questions
+  remain. The C$85 scenario is **not approved**. No provider was contacted or bought.
+- Riley rejected the old-pipeline look and chose **dark**.
+  [Dark workspace prototype](design/dark-workspace.html) is a local visual proposal,
+  not approved production UI; all businesses and illustrations are fictional.
+  Desktop/mobile interactions were previously inspected, with no external requests.
+- Existing lead/dossier/contact views render. Quality Lab labels survive reload
+  plus reimport in the same browser, but are browser drafts/export, not permanent
+  database-backed decisions. Captured screenshot previews remain unavailable.
+  See [owner walkthrough](OWNER_WALKTHROUGH.md).
+
+### Active work card and next three actions
+
+**Owner result:** complete one exact-approval/send-once/reply/opt-out journey, with
+useful lead evidence and honest status. **Proof:** actual handlers and owner
+controls against disposable local storage and fake transport, including retries,
+policy changes and interruption. **Scope:** complete existing integration, not
+another disconnected proof layer. **Non-goals:** no live provider, purchase,
+production database, deployment or weakening of the quality/compliance gates.
+No owner choice blocks the next local steps; live provider selection needs its
+separate policy/cost decision. Dark composition remains proposed, not approved.
+
+The sibling GET's legacy Gmail path is now replaced in local source. No live GET
+was called. This does not retire Gmail-specific code in other legacy entry points.
+
+**Completed bounded slice:** mandatory manual-runtime composition and read-only
+recorded-outcome recovery passed local checks and independent review. No finding
+closure or release is claimed.
+
+**Completed bounded slice:** replace the live-Gmail email-history GET
+with bounded, current-owner saved history and a truthful read-only presentation.
+Prove actual GET behavior with synthetic storage, owner/session/client isolation,
+pagination, retired-mailbox history and zero provider/token-refresh effects. Keep
+accepted, uncertain and rejected outcomes distinct; do not present acceptance as
+delivery or a partial saved page as an entire inbox. The old reply composer remains
+unavailable until its separate durable approval journey exists. No live provider,
+new schema, migration, deployment or purchase is authorized. A fresh investigator
+could not start because the agent thread limit was reached; parent performs the
+ same separate boundary/compatibility investigation locally.
+
+**Locally verified partial slice:** close the client-profile
+legacy mail copies in the server page, metadata GET, timeline and HTML display,
+plus the equivalent legacy email list/detail endpoints and shared message viewer.
+Preserve sender-owned legacy mail as explicitly historical plain text; exclude raw
+HTML, provider errors and foreign-owner sequence data before serialization. Keep
+business records and CRM activity intact. Proof must exercise actual page/API with
+disposable storage and the full ClientProfile component, not just its new panel.
+No live provider, database, migration, deployment or spending is authorized.
+
+Both baseline page/API tests reproduced foreign-sender disclosure. The candidate
+now shares a SELECT-only current-owner/admin/session reader across those four
+server boundaries, uses durable sender/sequence-creator IDs, returns explicit
+plain-text metadata, and omits HTML, Gmail IDs, private provider errors and unused
+sequence bodies. No saved records are deleted or promoted into send approval.
+Actual-boundary and viewer contract tests pass; current verification is above.
+Dashboard/automation overview follow-through now has explicit owner/session
+admission, metadata-only projections and no read-time maintenance; see current
+verification above. The overall send-policy/composer/inbound SEC-006 work remains
+open. The reused Luna-max reviewer completed the bounded candidate review;
+fresh-agent creation previously reached its limit.
+
+1. Organize the locally verified integrated security work into coherent exact-commit checkpoints;
+   do not bundle unrelated visual/design/deployment edits or claim unpushed work
+   as remote truth. Do not redo the now-tested client/history/viewer paths.
+2. Complete remaining consent, verification, capacity and message-policy facts in
+   the existing claim, keeping replies distinct from cold outreach. Connect exact
+   owner approval and a retained intent to the actual composer;
+   prove retry/reload/cancel and all response states in desktop/mobile browser
+   fixtures. Never restore its old raw-envelope/Gmail bypass.
+3. Complete local inbound deduplication and opt-out suppression, and bring the
+   scheduler's second outbound caller through the same guarded boundary before
+   closing SEC-006. Then resume durable lead review and the approved visual rebuild.
+
 ## Plain-English status
 
-### Current milestone: retire legacy browser execution (SEC-004)
+### Owner correction: no Google Workspace
+
+Riley reaffirmed on 2026-09-08 that Google Workspace must NOT be part of the
+rebuild. The assistant's repeated Gmail/Workspace launch explanation was wrong for
+this requirement. The prior Workspace budget allocation and setup assumption are
+superseded. AGENTS, owner context, master plan and README now record the exclusion.
+No replacement mail provider is selected, no subscription purchased and no live
+email/domain configuration changed. The C$50 monthly ceiling remains unchanged.
+
+Stop expanding Gmail-specific runtime integration. Retain generic durable intent,
+approval/revocation and exact-message safety work. Existing Gmail schema/transport
+tests remain legacy evidence; new mailbox and approval code currently depends on
+GmailConnection and must be refactored behind a provider-neutral contract before
+it can satisfy the corrected target. No code migration is claimed in this update.
+
+Next three actions under this correction:
+1. Verify suitable non-Google provider policies, custom-domain mailbox/reply API
+   capabilities and complete CAD costs; do not choose on mailbox price alone.
+2. Remove Gmail-specific types/schema assumptions from new outbound interfaces
+   and approval/provenance lookups while preserving current no-send defaults.
+3. Continue complete send-policy integration and verification using the selected
+   provider adapter; retain independent review and owner-approved rollout gates.
+
+### Current milestone: shared outbound reply safety (SEC-006)
+
+Latest working-copy continuation:
+- Added source-only migration 0074 and the database-backed exact-envelope approval
+  store. Approval creation checks a current verified, unbanned, allowlisted admin
+  session inside the INSERT, exact sender/mailbox/connection provenance and a live
+  unarchived lead. Approval captures the complete immutable intent/envelope with
+  explicit expiry; exact replay is read-only. Revocation is administrator-gated,
+  idempotent, and cannot restore or renew an old approval.
+  Loading checks current owner/reviewer admission, expiry and exact content; a
+  second read after hashing catches intervening revocation, role or policy changes.
+  Seven focused tests pass, including composition with database mailbox resolution
+  and the dispatcher (one fake send when approved, none after revocation). The first
+  fixture failed because it used updatedAt instead of the actual legacy Lead
+  lastUpdated column; corrected against the real schema. Type-check, scoped lint
+  and safety checks pass. The complete suite passed all 670 tests for this candidate.
+  No API/owner UI is wired to this store. MFA, full policy/consent/health and atomic
+  approval-to-claim composition remain required; approval alone never grants send
+  authority. Independent review and the complete release gate remain incomplete.
+- Local Cloudflare D1 now independently exercises the exact mailbox resolver,
+  using actual table/index definitions with disposable storage and blocked
+  external requests. The fixture inserts another mailbox for the same owner first
+  and proves that no first-connection fallback occurs. It also proves expiry,
+  post-decryption pause/token-change denial, and connection deletion/nulling.
+  The targeted D1 test, full 663-test suite, type-check and scoped lint pass. This verifies local D1
+  compatibility, not deployed state or complete send authorization. The interrupted
+  independent code review remains incomplete; this test does not replace it.
+- Added the real-schema exact mailbox resolver. Both mailbox/Google connection
+  must match owner, ID and address; paused/disconnected states, missing send scope,
+  malformed expiry and tokens within five minutes of expiry stop before decryption.
+  It selects no refresh token and makes no network or mutation calls. After local
+  decryption a second database read rejects changed identity/state/ciphertext or
+  expired credentials. Errors omit private token/diagnostic values.
+  Six focused tests pass against real 0005/0006 schema in disposable SQLite,
+  including composition with the envelope adapter and durable dispatcher: one fake
+  send across active replay, zero for a paused mailbox. All 662 tests, type-check,
+  scoped lint and safety checks pass. The independent candidate mailbox review
+  did not complete: the child returned a Codex usage-limit error. Do not count
+  that review as passed or this working copy as release-verified. Source work can
+  continue without paid providers; review remains required before the checkpoint.
+  Complete policy/health/consent and stored approval loading,
+  token refresh lifecycle and actual route integration remain unfinished.
+- Implemented exact-envelope transport: the versioned content digest binds both
+  bodies, final subject, recipient, sender, thread references, owner, mailbox,
+  connection, lead and policy. Changed content blocks before credential lookup;
+  a mismatched mailbox blocks sending. Headers cannot be silently sanitized after
+  approval, and stored-object mutation cannot alter the checked snapshot. A wrong
+  provider reply thread remains uncertain, never a safe automatic retry.
+  Tests use the real Gmail formatter with fake delivery and compose the adapter
+  with the durable dispatcher. All 656 tests pass, including 23 focused envelope/
+  ledger/dispatcher tests. Type-check, scoped lint, safety and diff checks pass.
+  Independent candidate review found no scoped envelope defect, but initially
+  looked for the dispatcher at the wrong relative path and explicitly corrected
+  that omission; its report is not end-to-end integration evidence. Parent tests
+  exercise the actual dispatcher composition. Real approval/connection loaders and existing
+  route/scheduler wiring remain absent. No release, live send or spend is implied.
+- Scoped independent dispatcher review found no duplicate-provider path under
+  its trusted-dependency contract, but identified that confirmed rejections had
+  no explicit transport result. The dispatcher now persists an explicit trusted
+  rejection before reporting REJECTED. Exceptions remain uncertain; contradictory
+  acceptance/rejection results fail closed. Lost rejection receipts cannot enable
+  another attempt, and rejected attempts retain their budget reservation.
+  All 16 combined ledger/dispatcher tests, the full 649-test suite, safety check,
+  type-check, scoped lint and diff checks pass. The full release build/browser
+  gate has not run for this uncommitted candidate. Gmail status classification
+  and durable history repair scheduling remain
+  unwired; no provider status is newly treated as definitive by this change.
+  This is unfinished SEC-006 work, not a verified release or production change.
+- Added shared dispatch lifecycle code over mandatory injected authorization,
+  exact-intent transport and history-projection dependencies. Thirteen combined
+  ledger/dispatcher tests pass, covering one provider attempt across concurrent
+  calls, policy rejection, ambiguous delivery with failed outcome storage,
+  history-only retry after acceptance, and lost acceptance acknowledgement.
+  This code has no Gmail/binding import or runtime caller. Fixture authorization
+  is synthetic; passing the ledger's claim method alone is NOT production policy.
+  Real actor/mailbox/contact/approval gates and exact-envelope transport are still
+  required before either old caller can be replaced. SEC-006 remains open.
+- Added an atomic budget reservation to the source-only send ledger. The monthly
+  CAD ceiling cannot exceed 5000 cents; no billing row is seeded by the migration
+  and new rows default paused. Missing/stale/paused/exhausted budget blocks the
+  intent insertion. Replay does not debit again; committed spend cannot reset.
+  Nine focused tests pass, including three separate processes racing different
+  one-cent intents against one cent remaining: one succeeds and two roll back.
+  Full suite: 642/642 pass, type-check, scoped lint and diff checks pass. This
+  proposes UTC billing months and requires a reviewed accounting import and
+  authoritative cost quote before integration. It does not prove the global C$50
+  limit across other providers or existing subscriptions; no real budget was set.
+  Independent budget review found no scoped atomicity/double-charge/last-cent race
+  defect, but flagged overcommitted state and inconsistent outcome errors. The
+  revised schema allows already-incurred excess costs to be recorded only while
+  paused and prevents unpausing above the ceiling; it does not hide real overspend
+  by rejecting its accounting record. Missing/wrong attempt tokens now return a
+  stable outcome-conflict error. All nine focused tests and type-check pass after
+  these revisions; the 642-test full run predates these final review adjustments.
+- Reproduced and tightened invalid/future/incoherent approval-date handling.
+  Explicit null expiry, SQLite UTC timestamps and ISO offsets remain supported.
+- Independent review found latest-approval selection could prefer old approval
+  over new pending records. A real-0055-table fixture reproduces the old mixed-format
+  and same-second selection, and verifies normalized time plus rowid ordering.
+  Malformed/future creation dates block instead of falling back to older approval.
+- Gmail transport can now carry a validated stable RFC Message-ID through both
+  email/reply helpers. This is optional compatibility plumbing until dispatcher
+  integration, not provider idempotency. Malformed successful-response JSON/IDs
+  now produce a bounded uncertain-result error instead of empty successful IDs.
+  Header-injection/trailing-newline and ordinary threading tests pass without mail.
+- Inventory confirms contact/verification records are shadow-only and forbid send
+  authority; cost telemetry has no outbound budget reservation. They cannot be
+  relabelled as consent or spending authorization. Explicit consent, complaint/
+  unsubscribe semantics, health failures and atomic budget enforcement remain.
+- Latest targeted checks pass; type-check passed. The new ordering fixture first
+  failed because referenced fixture identities were missing; it now creates those
+  disposable parent rows and passes with foreign keys intact. Full suite: 640/640
+  tests pass; scoped lint and diff checks pass.
+  These source changes remain uncommitted and not release-verified.
+
+Verified source checkpoint: `93f498c4d5c399f2402b262c2b07c05e4074a2af`.
+Its immutable release receipt proves all ten checks passed at
+2026-09-08T11:38:29.114Z. The preceding cycle verified its branch push and
+local/upstream/GitHub equality. No deployment is implied.
+
+The current real-route synthetic reproduction proves that repeated manual reply
+requests cause repeated provider effects. It also proves that provider acceptance
+followed by a CRM recording failure returns 500 and a retry sends again. Existing
+recipient/thread tests and Gmail formatting controls passed. The reproduction is
+pre-remediation evidence, not a passing security regression or a completed fix.
+
+Parent inspection and a separately attested read-only Luna investigation identify
+the shared Gmail transport boundary as the repair location for both manual replies
+and scheduled outreach. Preserve manual replies; do not retire a core sales feature
+or confuse the autonomous-send switch with all manual authorization. ADR 0059
+records the proposed durable intent, exact mailbox, current policy, budget claim,
+single attempt, uncertain-delivery recovery and UI requirements. Its implementation
+gates remain open. No existing production caller has changed in this investigation.
+
+The working copy now includes source migration 0073 and a typed injected SQL
+intent store. INSERT RETURNING identifies the unique claimant; retries return
+the existing record, changed intent identity conflicts, and interrupted attempts
+cannot be reclaimed. SQL guards preserve identity and permit only forward outcome
+transitions. Exact acceptance is replayable, including after a lost database
+acknowledgement. This is a persistence primitive, not send permission: atomic
+policy/budget composition and route/scheduler/UI integration are still required.
+0073 was executed only in disposable in-memory SQLite; no persistent or live
+database was migrated.
+
+Checks so far: eight targeted checks passed before adding an additional lost-ack
+test; all five current store tests pass. Safety, type-check and scoped lint passed;
+the first type-check found one test-only unknown-result access, which was corrected.
+The full suite passed 633 tests before the additional lost-ack test was added.
+Independent review identified missing claim-winner fencing, SQL/runtime validation
+differences, and a concurrency-test overstatement. The store now issues a random
+attempt token only to the INSERT winner and requires it for outcome writes;
+existing-claim responses and public rows omit the token. Wrong-token writes are
+rejected in the focused tests. Digest and timestamp SQL constraints were tightened.
+The next continuation closes the storage review gaps: SQL now mirrors printable
+ASCII identity/RFC message-ID checks and rejects hidden NULs, BLOBs, invalid
+digests and unsafe timestamps. It also blocks INSERT OR REPLACE against retained
+intent identities. Seven current store tests pass, including three distinct
+processes released from a barrier against independent SQLite connections and a
+fourth process reopening the database after the racers exit. Exactly one row and
+one claim winner were observed; the reopened process could not reclaim it. This
+uses only a task-created temporary database, removed after owned processes exit;
+it is not live D1 proof. Type-check passes after correcting the fixture's narrow
+child-environment type assertion; it intentionally passes no application bindings
+or inherited credentials. Privileged reconciliation and policy/budget/caller/UI
+integration remain unfinished. The fresh full suite passed all 636 tests for
+this revision, including the multi-process case. Scoped lint and diff checks pass.
+Full exact-commit release checks have not run for this unfinished working copy.
+No commit or push is claimed for this milestone.
+No external mailbox, persistent database, migration, provider or prospect was used.
+Execution stays off, spend impact C$0. No owner decision blocks source implementation.
+
+Next three actions:
+1. Add authoritative accounting/quote integration, and
+   compose current actor/mailbox/contact/approval policy with the budget-backed
+   intent claim; keep live resources off and preserve process/reopen regressions.
+2. Integrate both outbound callers, exact mailbox/thread checks, recovery and the
+   reply UI's stable intent; replace vulnerable characterization expectations with
+   regression checks.
+3. Independently review the integrated boundary, run the full release gate, then
+   commit/push only a verified checkpoint on the rebuild branch.
+
+### Previous checkpoint: retire legacy browser execution (SEC-004)
 
 Verified predecessor: `9519cb06cc0fd4ea1de9f24ce9c4bf910ad6130d`.
 All ten release checks and branch push passed for SEC-005, including 626 tests,

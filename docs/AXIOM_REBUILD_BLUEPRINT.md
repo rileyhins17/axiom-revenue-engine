@@ -2,6 +2,11 @@
 
 Status: execution plan, grounded in the production D1 snapshot from 2026-08-16.
 
+Historical baseline, not current setup instructions: Riley's 2026-09-08 correction
+excludes Google Workspace. Any Workspace recovery/renewal requirement below is
+superseded by `MASTER_PLAN.md` and `OWNER_CONTEXT.md`; preserve historical incident
+facts without treating them as permission to buy or reconnect Workspace.
+
 ## The new narrative
 
 > Axiom is an evidence-to-revenue operating system for finding local-service businesses with provable website conversion gaps, reaching the right operator with a truthful and useful observation, and learning from every outcome until those conversations become customers.

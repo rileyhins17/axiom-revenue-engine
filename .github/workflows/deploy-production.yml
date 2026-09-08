@@ -1,4 +1,4 @@
-name: Protected production deployment
+name: Production deployment (owner hold)
 
 on:
   workflow_dispatch:
@@ -25,14 +25,14 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main' && inputs.approval_phrase == 'DEPLOY AXIOM REVENUE ENGINE'
+    # Owner hold: finished app plus fresh exact-release approval required.
+    # Removing this hold requires a reviewed source change, not dispatch inputs.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
     env:
       BETTER_AUTH_SECRET: ci-only-secret-that-is-longer-than-thirty-two-characters
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
