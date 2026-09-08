@@ -33,9 +33,42 @@ each authorization request. Old signed cache cookies cannot restore deleted or
 expired sessions or a removed administrator role. The disposable browser gate
 tests the existing revoke-all-sessions endpoint; this is not yet an owner-facing
 session-management UI or proof of deployed behavior. A request already in flight
-and data already viewed cannot be recalled. The custom admin ban action and
-allowlist-removal lifecycle still need their separate SEC-002 fix; do not treat
-them as verified emergency session-revocation controls.
+and data already viewed cannot be recalled. Allowlist removal still needs its
+separate SEC-002 fix.
+
+### Ban lifecycle rollout (source-only; not permission to migrate)
+
+The candidate ban control requires migration 0071 and the pinned Better Auth
+1.6.29 patch together. The migration removes sessions of already-banned users,
+revokes sessions in the same database statement as a new ban, and blocks late
+session writes for banned users. A permanent UI ban clears old expiry metadata;
+unban permits a fresh login but never restores old cookies. The dependency
+patch preserves temporary bans without letting an old expiry check overwrite
+a newer ban, including edits preserving the deadline. `npm ci` must successfully
+apply the patch before verification. The app checks the exact installed guard
+definitions at runtime: missing, altered or unreadable guards suspend access.
+Do not remove this check to get a mismatched deployment running.
+
+The login library's built-in administrative mutation shortcuts are disabled,
+including account creation, password reset and impersonation. The custom
+fenced ban/unban/role controls and read-only admin inspection remain. There is
+no current app caller of those shortcuts. Future enrollment/recovery work must
+provide a reviewed replacement; do not reopen them as an access workaround.
+
+Before any rollout, approve the exact release SHA, a current restorable backup,
+an explicit schema inventory and migration sequence, and the remaining security
+gates. Do not run a bulk migration command: unrelated 0070 remains unapproved.
+Rehearse the 0071 guards and all ban/browser tests in an explicitly authorized
+isolated environment before production. This work cycle only uses disposable
+test databases, not persistent local, staging, or production data.
+
+Rollback must keep the console inaccessible and outbound work off while the
+approved application/schema pair is restored. Do not remove the guards or
+restore old sessions as an emergency access workaround. Session deletion is
+intentional; affected users must sign in again after an explicit unban. Restoring
+a backup containing old sessions requires separately invalidating those sessions
+before the console can reopen. MFA, secure recovery/enrollment, allowlist
+enforcement, and remaining audit blockers still prevent production activation.
 
 ### Start a bounded milestone
 

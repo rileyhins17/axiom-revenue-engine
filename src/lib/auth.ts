@@ -4,10 +4,11 @@ import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 
 import { writeAuditEvent } from "@/lib/audit";
-import { getClientIp, getCloudflareBindings } from "@/lib/cloudflare";
+import { getClientIp, getCloudflareBindings, getDatabase } from "@/lib/cloudflare";
 import { getServerEnv, getTrustedOrigins } from "@/lib/env";
 import { ensureLocalDatabaseDirectory, getLocalDatabasePath } from "@/lib/local-sqlite";
 import { assertRateLimit } from "@/lib/rate-limit";
+import { isBlockedAdminAuthPath, operatorBanSchemaReady } from "@/lib/operator-ban-schema";
 
 const globalForAuth = globalThis as typeof globalThis & {
   // better-auth's plugin-augmented return type is not stable through ReturnType<typeof betterAuth>.
@@ -77,6 +78,16 @@ export function getAuth() {
           // Keep this denial in addition to Better Auth's disableSignUp option.
           throw new APIError("FORBIDDEN", {
             message: "Public registration is disabled. Contact your workspace administrator.",
+          });
+        }
+        if (!await operatorBanSchemaReady(getDatabase())) {
+          throw new APIError("SERVICE_UNAVAILABLE", {
+            message: "Operator access is temporarily unavailable. Contact your administrator.",
+          });
+        }
+        if (isBlockedAdminAuthPath(ctx.path)) {
+          throw new APIError("FORBIDDEN", {
+            message: "This administrative operation is disabled. Use the reviewed operator controls.",
           });
         }
       }),

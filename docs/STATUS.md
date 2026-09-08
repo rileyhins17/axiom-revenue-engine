@@ -4,6 +4,15 @@ Last updated: 2026-09-07 (America/Toronto)
 
 ## Plain-English status
 
+Account banning is the current source-level security milestone. The local
+attack test reproduced a banned account retaining its login. The candidate now
+revokes all target sessions atomically, blocks a login arriving after a ban,
+and requires a fresh login after unbanning. It also prevents an expired
+temporary-ban check from overwriting a newer ban. This requires the reviewed
+source-only migration 0071 and pinned login-library patch together; neither has
+been deployed or applied to any live database. MFA, secure enrollment/recovery,
+allowlist removal, other audit findings, and production proof remain open.
+
 The next source-level security fix removes stale login-cookie authorization.
 A local attack test proved that a saved admin cookie retained access after a
 database demotion. The app now asks the database for the current session and
@@ -189,6 +198,59 @@ file; tracked code, the safe seed, and this status document remain recoverable
 through Git. ADR 0058 and `docs/REBUILD_MONITOR.md` define the workflow.
 
 ## Verified checkpoint
+
+- Latest fully release-proven and pushed predecessor:
+  `4a945473645951443e6a0785452f35277103dfe1` (current-database session authority).
+  Its exact release gate passed all 590 tests and the saved-cookie browser
+  regressions, with six owner pages scanned and no external requests.
+- Current bounded change: account-ban containment within SEC-002. Migration
+  0071 deletes existing banned-account sessions, makes future bans revoke
+  sessions in the same statement, and denies session creation/update for banned
+  users. The custom admin mutation rechecks the acting administrator's current
+  session/role in its write; permanent bans clear obsolete expiry metadata.
+  A version-pinned Better Auth patch conditionally clears expired bans instead
+  of overwriting a newer ban read during a concurrent login.
+- Evidence: the pre-fix local browser test at `4a94547` failed with one active
+  session after a successful ban (expected zero). The corrected browser run
+  passed ban/read/write denial, fresh-login denial, repeated ban, unban without
+  session resurrection, and legitimate new login. Six WCAG owner pages passed
+  at desktop 1440/mobile 390; list 970 ms, dossier 1,002 ms, external requests 0.
+- Focused verification: 15 new regressions passed across in-memory SQLite,
+  actual Better Auth hooks/adapters, and local D1/Miniflare. Coverage includes
+  expiry races, late insert/replace/reassignment/refresh, atomic rollback,
+  mutation-time actor demotion/revocation/expiry, self/missing targets, and normal
+  ban/unban/role changes. D1 included trigger deletions in its changed-row count;
+  the implementation now uses the guarded UPDATE's returned target identity.
+  All 603 repository tests, safety checks, typecheck, and lint passed during
+  implementation. Independent candidate review precedes the final release gate.
+  Full exact-commit results are recorded only by the release receipt after the
+  required gate, not inferred from these working-copy results.
+- The extended rendered-page test initially failed on a Next dev JSON manifest
+  error after the API denials passed. The fixture now warms denied/no-op
+  handlers and closes the measured page before switching identities, so it
+  cannot keep refetching sessions during the security test. The rerun passed
+  both banned and post-unban page replays, required sign-in content, and the
+  complete owner gate: list 919 ms, dossier 537 ms, six pages, zero external
+  requests. Cloudflare build and default dry run also passed during work.
+- Independent review identified a same-deadline ban edit, unfenced built-in
+  admin mutation routes, and the missing-migration deployment case. Parent
+  confirmed those boundaries and strengthened the candidate: expiry clearance
+  also compares the reason and update time; unreviewed admin mutation shortcuts
+  are denied while read-only inspection/custom fenced controls remain; every
+  auth request and custom operator write verifies the exact installed ban
+  guards. Missing, changed, or unreadable guards deny access instead of trusting
+  a rollout checklist. The strengthened browser gate passed all eleven shortcut
+  denials and missing-schema auth/read/write denial, alongside normal lifecycle
+  and owner UI checks: list 834 ms, dossier 553 ms, six pages, zero external
+  requests. All 605 tests, typecheck and lint passed after the review changes.
+  The final exact-commit release gate must include these cases.
+- Blockers/owner decisions: no Riley action needed for this source-only patch.
+  Deployment requires a separately approved backup, explicit migration plan
+  that does not accidentally apply unrelated 0070, rollback, and the remaining
+  security gates. Source controls remain off. No production/staging database,
+  account, mailbox, provider, or prospect was touched; runtime spend impact C$0.
+
+### Earlier security checkpoints (historical)
 
 - Latest fully release-proven and pushed predecessor:
   `f9ffebecb6b5b2ddd0f599466ae4e0100dec5e81` (public-registration lockdown).
@@ -2515,7 +2577,7 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
 
 ## Next three actions
 
-1. Complete SEC-002's ban and allowlist-removal enforcement, then verified
+1. Complete SEC-002's allowlist-removal enforcement, then verified
    owner-enrollment, MFA, recovery, and owner-facing session controls with
    synthetic tests. Retain the registration-denial and stale-cache regressions;
    keep real account changes and staging activation separately approval-gated.

@@ -155,7 +155,8 @@ endpoint is private/no-store and read-only.
 
 The Leads list and dossier now share an automated owner acceptance gate. It
 starts the real Next.js application against an isolated synthetic database with
-all migrations, creates a real local operator session, and checks the two owner
+the reviewed test schema (including 0071, excluding the unrelated 0070 design),
+creates a real local operator session, and checks the two owner
 flows in Chromium at desktop and mobile sizes. The gate covers WCAG 2.2 AA
 labels and contrast, keyboard/skip-link focus, reduced motion, 24-pixel target
 minimums, horizontal overflow, mobile navigation clearance, distinct page
@@ -434,6 +435,15 @@ owner email addresses. Existing accounts retain sign-in. Account provisioning
 and recovery require the reviewed owner-security rollout; do not reopen signup
 as a workaround. This change is not deployed and the security audit still blocks
 production activation.
+
+The source ban control now revokes existing sessions and prevents late logins;
+unbanning requires a fresh login. It depends on source-only migration 0071 and
+the pinned Better Auth patch, both tested on disposable SQLite/local D1 and in
+the actual local browser. Missing or altered guards stop authentication; the
+library's unreviewed admin mutation shortcuts are disabled. Neither the schema
+nor application changes have been deployed. Follow the ban rollout
+section in `docs/RUNBOOK.md`; do not bulk-apply migrations or treat this as a
+complete MFA, recovery, or production-security release.
 
 The console remains Next.js on Cloudflare. New long-running work moves into a
 separate typed Worker using Cloudflare Queues and Workflows; D1 stores operational

@@ -35,11 +35,13 @@ import { buildCompleteOwnerLabelingPacketFixture } from "../src/lib/revenue-engi
 import { auditWebsiteDeterministically } from "../src/lib/revenue-engine/website-audit";
 import { executePrivateKwContactPersistenceForLocalDatabase } from "./private-kw-contact-persistence-executor";
 import { verifyOwnerSessionRevocation } from "./owner-session-acceptance";
+import { verifyOwnerBanLifecycle } from "./owner-ban-acceptance";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
 const OUTPUT_ROOT = join(REPOSITORY_ROOT, "output", "playwright");
 const FIXTURE_EMAIL = "owner-acceptance@getaxiom.ca";
+const FIXTURE_ADMIN_EMAIL = "admin-owner-acceptance@getaxiom.ca";
 const UNPROVISIONED_ADMIN_EMAIL = "unprovisioned-owner-acceptance@getaxiom.ca";
 const FIXTURE_PASSWORD = "owner-acceptance-only-password";
 const FIXTURE_BUSINESS_ID = "business:owner-acceptance-roofing";
@@ -115,11 +117,11 @@ async function applyMigrations(database: SqliteDatabase) {
   const migrations = (await readdir(migrationsDirectory))
     .filter((name) => /^\d{4}_.+\.sql$/.test(name) && !name.startsWith("0070_"))
     .sort((left, right) => left.localeCompare(right));
-  assert(migrations.length >= 60, "The owner fixture must use the complete pre-0070 migration history.");
+  assert(migrations.length >= 60, "The owner fixture must include the legacy schema and operator ban guards.");
 
-  // Owner UI acceptance exercises the complete pre-0070 local schema. The
-  // source-only 0070 design remains deliberately unapplied until its own
-  // release gate is approved.
+  // Disposable acceptance includes 0071's source-only security guards. The
+  // unrelated 0070 outbox design remains deliberately excluded. Neither
+  // migration is authorized for any live database by this local test.
   database.pragma("foreign_keys = ON");
   for (const migration of migrations) {
     database.exec(await readFile(join(migrationsDirectory, migration), "utf8"));
@@ -133,14 +135,19 @@ async function seedOwnerAccount(database: SqliteDatabase) {
   const userId = "owner-acceptance-user";
   const passwordHash = await hashPassword(FIXTURE_PASSWORD);
   database.transaction(() => {
-    database.prepare(`INSERT INTO "User"
-      (id, name, email, emailVerified, role, createdAt, updatedAt)
-      VALUES (?, ?, ?, 1, 'user', ?, ?)`)
-      .run(userId, "Owner Acceptance", FIXTURE_EMAIL, now, now);
-    database.prepare(`INSERT INTO "Account"
-      (id, accountId, providerId, userId, password, createdAt, updatedAt)
-      VALUES (?, ?, 'credential', ?, ?, ?, ?)`)
-      .run("owner-acceptance-credential", userId, userId, passwordHash, now, now);
+    for (const account of [
+      { id: userId, email: FIXTURE_EMAIL, role: "user" },
+      { id: "owner-acceptance-admin", email: FIXTURE_ADMIN_EMAIL, role: "admin" },
+    ]) {
+      database.prepare(`INSERT INTO "User"
+        (id, name, email, emailVerified, role, createdAt, updatedAt)
+        VALUES (?, ?, ?, 1, ?, ?, ?)`)
+        .run(account.id, "Owner Acceptance", account.email, account.role, now, now);
+      database.prepare(`INSERT INTO "Account"
+        (id, accountId, providerId, userId, password, createdAt, updatedAt)
+        VALUES (?, ?, 'credential', ?, ?, ?, ?)`)
+        .run(`${account.id}-credential`, account.id, account.id, passwordHash, now, now);
+    }
   })();
 }
 
@@ -507,7 +514,7 @@ function startNextServer(baseUrl: string, databasePath: string, logLines: string
   Object.assign(childEnvironment, {
     APP_BASE_URL: baseUrl,
     AGENT_SHARED_SECRET: "",
-    AUTH_ALLOWED_EMAILS: `${FIXTURE_EMAIL},${UNPROVISIONED_ADMIN_EMAIL}`,
+    AUTH_ALLOWED_EMAILS: `${FIXTURE_EMAIL},${FIXTURE_ADMIN_EMAIL},${UNPROVISIONED_ADMIN_EMAIL}`,
     AUTH_ADMIN_EMAILS: UNPROVISIONED_ADMIN_EMAIL,
     AUTH_ALLOWED_ORIGINS: baseUrl,
     AUTONOMOUS_INTAKE_ENABLED: "false",
@@ -862,6 +869,13 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     });
     await authenticate(context, baseUrl);
 
+    // Compile mutation handlers with denied/no-op requests before measured
+    // pages exist. On-demand compilation must not replace their asset manifests.
+    assert.equal((await context.request.get("/api/admin/users")).status(), 403);
+    assert.equal((await context.request.patch("/api/user/profile", {
+      data: {}, headers: { origin: baseUrl },
+    })).status(), 400);
+
     // Next dev compiles route chunks on demand. Compile every owner acceptance
     // route in a disposable page before attaching the measured/error-audited
     // page so route prefetch cannot replace a chunk during the real run.
@@ -1006,12 +1020,22 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, da
     assert.deepEqual(externalRequests, [], "The owner acceptance browser attempted an external request.");
     assert.deepEqual(browserErrors, [], `Browser errors: ${browserErrors.join(" | ")}`);
     assert.deepEqual(badResponses, [], `Local server failures: ${badResponses.join(" | ")}`);
+    // Lifecycle tests switch identities deliberately. An old rendered page must
+    // not keep fetching/refetching sessions while those cookie jars are changed.
+    await page.close();
+    page = null;
     stage = "owner session revocation";
     const authDatabase = new Database(databasePath, { fileMustExist: true });
     try {
       await verifyOwnerSessionRevocation({
         context, baseUrl, database: authDatabase, fixtureSecret: TEST_AUTH_SECRET,
         credentials: { email: FIXTURE_EMAIL, password: FIXTURE_PASSWORD },
+      });
+      stage = "owner ban lifecycle";
+      await verifyOwnerBanLifecycle({
+        context, baseUrl, database: authDatabase,
+        owner: { email: FIXTURE_EMAIL, password: FIXTURE_PASSWORD },
+        administrator: { email: FIXTURE_ADMIN_EMAIL, password: FIXTURE_PASSWORD },
       });
     } finally {
       authDatabase.close();

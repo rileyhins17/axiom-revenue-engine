@@ -732,6 +732,23 @@ Retire entries when the architecture makes them impossible.
 - **Verifying commit:** branch HEAD containing ADR 0056; immutable SHA recorded
   in `docs/STATUS.md` after the atomic push.
 
+## DB-003 — D1 update counts include trigger side effects
+
+- **Symptom:** the ban operation succeeded and revoked the session in local D1,
+  but a `meta.changes === 1` success check returned a failure result.
+- **Root cause:** D1 counted the target update and the trigger's session deletion;
+  the better-sqlite3 adapter reported only the direct update. Passing SQLite
+  tests did not prove identical metadata behavior in D1.
+- **Proven fix:** use `UPDATE ... RETURNING id` and verify the returned target
+  identity instead of relying on a backend-specific affected-row count.
+- **Prevention/test:** `scripts/operator-ban-d1.test.ts` runs the real guard SQL
+  and helper through disposable Miniflare D1, including trigger rollback;
+  `src/lib/operator-access.test.ts` retains SQLite compatibility coverage.
+- **Affected area:** guarded writes with trigger side effects, especially auth
+  changes that also revoke sessions. Miniflare proof is not live D1 verification.
+- **Verifying commit:** the atomic ban-lifecycle checkpoint containing this entry;
+  its exact SHA is recorded by the release receipt and rebuild monitor after push.
+
 ## AGENT-001 — A reviewer inspected the obsolete OneDrive checkout
 
 - **Symptom:** two security reviews reported an old commit and one explicitly

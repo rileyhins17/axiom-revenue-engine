@@ -201,12 +201,63 @@ endpoint, old-cookie replay against application/auth APIs and a rendered page,
 The pre-patch HTTP 200 reproduction is recorded against source commit `f9ffebe`.
 The exact candidate's release receipt must include this browser gate.
 
+**Partial remediation — ban lifecycle:** a subsequent browser reproduction at
+`4a94547` showed that the custom ban endpoint returned success while the target
+still had one active session (expected zero). Source migration
+`0071_operator_ban_session_guards.sql` now removes existing banned sessions,
+revokes sessions atomically whenever a ban is written, and rejects inserts or
+updates that would give a banned user a session. This shared database boundary
+covers custom routes, Better Auth admin routes, and a login finishing after its
+ban precheck. Explicit unban permits a new login; it cannot recreate old sessions.
+
+The custom route uses `src/lib/operator-access.ts` to fence the write against
+the acting administrator's current session, expiry, role, and ban status.
+Permanent bans clear stale expiry metadata. A successful mutation returns the
+same action vocabulary; an account/authority change returns 409 instead of
+claiming an update that did not happen. Self-modification stays prohibited.
+
+Installed Better Auth 1.6.29 also unconditionally cleared an expired ban read
+before a newer ban. `patches/better-auth+1.6.29.patch`, applied by the existing
+postinstall workflow, makes expiry clearance conditional on the same user,
+banned state, expiry, reason and update time, then rechecks a failed update. This
+also covers a same-deadline ban edit identified during independent review. Session triggers
+cover the remaining clearance-to-insert gap. Do not upgrade the dependency or
+drop this patch without rerunning the actual hook/adapter race regressions.
+This app has no user-update hooks or secondary auth cache to synchronize;
+adding those features requires reviewing the conditional adapter update.
+
+The review also identified two alternate boundaries. Built-in `/api/auth/admin/*`
+mutation shortcuts do not carry the custom route's mutation-time actor fence;
+they are now denied in the shared auth before-hook. Read-only get/list/session
+inspection and permission checks remain enabled. No app admin-client plugin or
+production UI caller of the blocked shortcuts exists in the inspected source.
+The custom ban/unban/role API retains its fenced controls. Re-enabling creation,
+password reset, impersonation or other admin shortcuts requires a reviewed
+replacement, not removal of this denial.
+
+`src/lib/operator-ban-schema.ts` verifies the exact three installed guard
+definitions before every auth request and before custom operator writes. Missing,
+altered or unreadable schema fails closed. This prevents application-first or
+partial migration rollout from restoring the original existing-session bypass.
+Public registration retains its unconditional denial. The synthetic browser
+gate removes/restores a guard to verify auth/read/mutation denial, and attempts
+all eleven blocked administrative shortcuts with a valid administrator.
+
+Fifteen focused tests cover real SQLite and local D1/Miniflare plus the
+installed Better Auth adapter. The full local browser gate additionally tests
+saved cookies against reads, profile writes and auth lookup; denied new login;
+repeated ban; and successful new login only after unban. Source migration 0071
+is applied only to disposable test databases. No live session or production
+account was accessed, and no deployment or persistent migration was performed.
+The fix requires both the schema guards and application/dependency patch in a
+separately approved release. Do not bulk-apply the unrelated 0070 design.
+
 SEC-002 remains **open**: MFA, verified enrollment, recovery, allowlist removal,
-and the ban lifecycle are not implemented by this fix. In particular the legacy
-custom admin `ban` action only updates the user flag; its session revocation and
-consistent enforcement across all routes require follow-up. Do not mistake
-cache removal for a complete identity-security rollout. No live session or
-production account was accessed or changed.
+owner-facing session controls, and staging/production evidence remain missing.
+Already-running requests and information already downloaded cannot be recalled
+by revocation. The custom admin write has a transaction-time actor fence and
+alternative admin writes are disabled; this does not claim equivalent in-flight
+fencing for every non-admin legacy mutation.
 
 ### SEC-003 — High — One MCP token carries broad read and mutation authority
 
