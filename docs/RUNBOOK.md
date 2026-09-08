@@ -648,6 +648,29 @@ owner flows, then enforce strict CSP. HSTS requires verified HTTPS and a rollbac
 plan; start with an approved host-only policy, not unverified includeSubDomains
 or preload. SEC-009 is not fully closed before these gates pass.
 
+## Mailbox connection transaction release gate (SEC-010)
+
+Source migration `0072_gmail_oauth_transactions.sql` is additive. A future
+approved deployment needs a current backup, explicit migration approval and
+rollback plan. Do not blanket-apply pending migrations: 0070 remains a separate
+unapproved design. Missing 0072 stops connection rather than using legacy state.
+
+Each attempt is tied to its current administrator, session, exact callback and
+normalized intended mailbox. It expires after ten minutes and is consumed before
+the provider exchange; a cancellation, timeout or provider failure requires a
+fresh attempt. Existing configured mailbox links supply the required target.
+Start from Settings inside the console: initiation requires same-origin browser
+Fetch Metadata and the shared trusted-origin/host fence. External/bookmarked
+connection URLs and clients without that browser metadata cannot create state.
+No raw session ID, provider error or expected/actual address is returned in error
+URLs. Never log state, authorization codes or tokens. This follows the one-time
+session-bound state guidance in [OAuth Security BCP](https://www.rfc-editor.org/info/rfc9700/).
+
+Local D1 and browser fixtures prove state fencing without contacting Google.
+Successful Google consent/token storage still needs a separately authorized
+staging test before release; review provider configuration, callback registration
+and PKCE support then. Keep mailbox operations and sending off throughout.
+
 ## Resume/handoff
 
 Before stopping, update `docs/STATUS.md` with the verified commit, production and

@@ -9,6 +9,12 @@ channel, preparing specific outreach, and learning which work becomes revenue.
 
 ## Current state
 
+Mailbox connection hardening now uses signed, short-lived, one-time server
+transactions instead of exposing session IDs in connection links. Fresh admin
+access and the intended mailbox are checked. This source change requires the
+reviewed 0072 migration at a separately approved release; it does not connect an
+inbox or enable outreach. Old in-flight connection links must be restarted.
+
 The source now includes browser framing and privacy protections for application
 responses and static assets. The stricter script policy is report-only until
 compatibility is verified; this is not a claim that XSS is impossible. HTTPS-only

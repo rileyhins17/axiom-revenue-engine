@@ -527,7 +527,7 @@ Next-compatible policy without silently permitting arbitrary scripts.
 
 ### SEC-010 — Medium — Gmail OAuth state is session text, not a one-time signed transaction
 
-**Status:** Open; mailbox connection is not authorized yet.
+**Status:** Source remediation; acceptance requires the exact-commit release receipt. Mailbox connection and migration remain unauthorized.
 **Reachability:** Dormant without Google credentials.
 
 OAuth state contains the session ID and optional target address but no separate
@@ -550,6 +550,20 @@ query.
 transaction bound to user, session, exact redirect, and intended mailbox; sign
 or encrypt opaque state, consume it atomically, remove legacy fallback, and map
 internal failures to a generic error ID.
+
+**Source remediation:** migration 0072 and `gmail-oauth-transaction.ts` use a
+signed 256-bit random state identifier, server-owned identity/target/callback,
+ten-minute database-clock expiry and atomic consumed-at update with current
+approved admin/session predicates. Callback authorization is admin-only and
+rechecked after provider round trips. Legacy parsing is removed; generic errors
+do not expose provider text, internal exception messages or account addresses.
+Independent review identified that GET initiation also needs a mutation fence;
+the candidate now requires same-origin Fetch Metadata and the shared configured
+origin/host check before creating state. HEAD requests cannot create or consume
+transactions. Local D1 concurrency, local callback regression and isolated actual
+Settings-link checks pass. The fresh full browser gate also passes; exact-commit
+release proof remains required before push.
+No live Google exchange, deployment or migration has been performed.
 
 ### SEC-011 — Medium — Mailbox PATCH permits broad record mutation
 

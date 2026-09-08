@@ -4,7 +4,41 @@ Last updated: 2026-09-07 (America/Toronto)
 
 ## Plain-English status
 
-### Current checkpoint: browser protection (SEC-009)
+### Current checkpoint: one-time mailbox connection (SEC-010)
+
+Verified predecessor: `a37e9a572e8e99a5143ebefefbfbc6b26abc77d0`
+(all ten release checks and branch push passed). The current candidate replaces
+readable/replayable session state with signed random, server-stored transactions.
+Each expires after ten database-clock minutes and can be consumed only once by
+the same current approved administrator/session at the exact callback. The
+intended mailbox remains server-owned. Legacy state and duplicate callback
+parameters fail closed; provider/internal details no longer appear in errors.
+Source-only migration 0072 is required; no live migration is authorized.
+
+Local D1 tests pass for signature/identity/redirect/expiry/replay/concurrency and
+admin revocation gates. The real callback passes disposable browser checks for
+non-admin denial, cancellation, replay, duplicate parameters, fresh consumption,
+generic unavailable-provider errors, six WCAG pages and zero outside requests.
+List/dossier readiness before the initiation follow-up: 219/101 ms. Independent
+review identified cross-site GET initiation as a new state-write risk. Initiation
+now requires same-origin Fetch Metadata plus the shared origin/host fence;
+foreign, missing and direct-navigation metadata are denied. HEAD cannot create
+or consume state. An isolated browser test verifies the actual Settings link;
+test cleanup now waits for the intercepted response navigation and clears the
+page before closing (the earlier immediate close stalled Chromium). The fresh
+full browser run passed at 222/102 ms list/dossier readiness, six WCAG pages and
+zero outside requests, including HEAD rejection and real Settings navigation.
+The exact-commit release gate must finish before push; its receipt is authoritative.
+No inbox/provider/production resource was used;
+C$0 spend impact. No owner decision is needed for this source-only checkpoint.
+
+Next three actions:
+1. Complete review, exact-commit release verification, and branch push.
+2. Restrict SEC-011 mailbox edits to explicit validated owner-editable fields.
+3. Complete remaining owner MFA/enrollment/recovery and authorized release proof;
+   migration 0072 and live OAuth remain approval-gated, not implicitly enabled.
+
+### Previous checkpoint: browser protection (SEC-009)
 
 Verified predecessor: `c569fec3b4385f218590c26e2f95ae8cabf2dc24`
 (SEC-008, exact release receipt and branch push verified). The current candidate

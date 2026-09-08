@@ -5,6 +5,23 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## TEST-002 — Closing an intercepted JSON navigation stalled the browser fixture
+
+- **Symptom:** OAuth HTTP and Settings-link assertions passed, but the test
+  stayed alive indefinitely at `page.close()` after its JSON error navigation.
+- **Root cause:** immediate cleanup raced the intercepted response navigation;
+  the pending Chromium close acknowledgement was not bounded by normal locator
+  timeouts. The application flow passed independently against the same server.
+- **Proven fix:** wait for the destination DOM, navigate the owned test page to
+  `about:blank`, then close it. The isolated helper completed in approximately
+  four seconds after this change. Preserve request/navigation timeout bounds.
+- **Prevention/test:** `owner-oauth-acceptance.ts` exercises the real Settings link
+  and settles/clears its page before cleanup. Diagnose helper-only changes against
+  the existing disposable server before rebuilding; never use a live service.
+- **Affected area:** standalone Playwright lifecycle/cleanup, not OAuth policy.
+- **Verifying commit:** SEC-010 checkpoint following `a37e9a5`; exact SHA and
+  release proof recorded in the ignored release receipt and rebuild monitor.
+
 ## AUTH-002 — Same-site cookies and JSON parsing were not a mutation-origin guard
 
 - **Symptom:** Chromium archived a disposable lead from a different same-site

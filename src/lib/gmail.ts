@@ -88,37 +88,8 @@ export function getOAuthRedirectUri(): string {
 /**
  * Build the Google OAuth2 consent URL.
  */
-export type GmailOAuthState = {
-  sessionId: string;
-  targetEmail?: string;
-};
-
 export function normalizeGmailAddress(email: string | null | undefined) {
   return (email || "").trim().toLowerCase();
-}
-
-export function buildGmailOAuthState(state: GmailOAuthState): string {
-  return new URLSearchParams({
-    sessionId: state.sessionId,
-    ...(state.targetEmail ? { targetEmail: normalizeGmailAddress(state.targetEmail) } : {}),
-  }).toString();
-}
-
-export function parseGmailOAuthState(rawState: string | null): GmailOAuthState | null {
-  if (!rawState) return null;
-
-  const params = new URLSearchParams(rawState);
-  const sessionId = params.get("sessionId");
-
-  if (sessionId) {
-    return {
-      sessionId,
-      targetEmail: normalizeGmailAddress(params.get("targetEmail")),
-    };
-  }
-
-  // Backward compatibility with the previous state shape, which was just the session id.
-  return { sessionId: rawState };
 }
 
 export function buildOAuthUrl(
