@@ -28,6 +28,15 @@ the remaining security gates pass. The acceptance script's hardcoded fake
 credential is for its new disposable database only, never a bootstrap example
 for production.
 
+The rebuild checks sessions and administrator roles against the database on
+each authorization request. Old signed cache cookies cannot restore deleted or
+expired sessions or a removed administrator role. The disposable browser gate
+tests the existing revoke-all-sessions endpoint; this is not yet an owner-facing
+session-management UI or proof of deployed behavior. A request already in flight
+and data already viewed cannot be recalled. The custom admin ban action and
+allowlist-removal lifecycle still need their separate SEC-002 fix; do not treat
+them as verified emergency session-revocation controls.
+
 ### Start a bounded milestone
 
 1. Read the files listed in `AGENTS.md`.

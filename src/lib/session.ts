@@ -13,6 +13,7 @@ type ApiSessionResult =
 export async function getSession() {
   return getAuth().api.getSession({
     headers: await headers(),
+    query: { disableCookieCache: true },
   });
 }
 
@@ -35,6 +36,7 @@ export async function requireAdminSession() {
 export async function getApiSession(request: Request) {
   return getAuth().api.getSession({
     headers: request.headers,
+    query: { disableCookieCache: true },
   });
 }
 

@@ -160,8 +160,9 @@ revoke unrecognized sessions; never infer deployment from this source fix.
 The console currently relies on password authentication without verified email
 or an application MFA/WebAuthn policy. Sessions last seven days and the sign-in
 UI explicitly requests a remembered session. There is no proven Cloudflare
-Access layer, recovery procedure, active-session inventory, or forced session
-revocation test in this audit.
+Access layer, recovery procedure, or owner-facing active-session inventory.
+The initial audit had no forced session-revocation proof; the follow-up below
+adds a regression for the concrete stale-cache authorization path.
 
 **Evidence:**
 
@@ -177,6 +178,35 @@ phishing-resistant MFA or a proven Cloudflare Access identity layer, recovery
 codes/admin recovery, session listing and revocation, and reauthentication for
 security-sensitive actions. Test demotion, allow-list removal, password reset,
 lost-device recovery, and stolen-session containment.
+
+**Partial remediation — current database authorization:** the pre-patch local
+browser test reproduced a saved administrator cookie obtaining HTTP 200 from
+`/api/admin/users` after its user's database role was changed to `user` (expected
+403). Better Auth's compact cookie cache returned the signed old user/role for
+up to five minutes without reading the stored session. This was an application
+configuration/guard failure; the installed Better Auth admin plugin already uses
+an authoritative lookup for its own sensitive admin routes.
+
+`src/lib/auth.ts` now disables cookie caching globally. Both application session
+lookups in `src/lib/session.ts` also explicitly request `disableCookieCache: true`.
+No request query can opt them back into the cache. Current database session
+existence, expiry, and role are authoritative at each authorization check. This
+does not cancel already-running requests or erase information already viewed.
+
+`scripts/owner-session-acceptance.ts`, called by the full owner browser gate,
+constructs a valid legacy cache using only the disposable fixture's fake key.
+It exercises demotion, ordinary access after demotion, the existing revoke-all
+endpoint, old-cookie replay against application/auth APIs and a rendered page,
+`disableCookieCache=false`, a new legitimate login, and server-side expiry.
+The pre-patch HTTP 200 reproduction is recorded against source commit `f9ffebe`.
+The exact candidate's release receipt must include this browser gate.
+
+SEC-002 remains **open**: MFA, verified enrollment, recovery, allowlist removal,
+and the ban lifecycle are not implemented by this fix. In particular the legacy
+custom admin `ban` action only updates the user flag; its session revocation and
+consistent enforcement across all routes require follow-up. Do not mistake
+cache removal for a complete identity-security rollout. No live session or
+production account was accessed or changed.
 
 ### SEC-003 — High — One MCP token carries broad read and mutation authority
 

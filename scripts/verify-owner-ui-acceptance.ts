@@ -34,6 +34,7 @@ import { qualifyRevenueLead } from "../src/lib/revenue-engine/qualification";
 import { buildCompleteOwnerLabelingPacketFixture } from "../src/lib/revenue-engine/test-support/owner-labeling-fixture";
 import { auditWebsiteDeterministically } from "../src/lib/revenue-engine/website-audit";
 import { executePrivateKwContactPersistenceForLocalDatabase } from "./private-kw-contact-persistence-executor";
+import { verifyOwnerSessionRevocation } from "./owner-session-acceptance";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
@@ -833,7 +834,7 @@ async function openMobileDossier(page: Page) {
   ]);
 }
 
-async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
+async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, databasePath: string) {
   let browser: Browser | null = null;
   let page: Page | null = null;
   const externalRequests: string[] = [];
@@ -1005,6 +1006,17 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     assert.deepEqual(externalRequests, [], "The owner acceptance browser attempted an external request.");
     assert.deepEqual(browserErrors, [], `Browser errors: ${browserErrors.join(" | ")}`);
     assert.deepEqual(badResponses, [], `Local server failures: ${badResponses.join(" | ")}`);
+    stage = "owner session revocation";
+    const authDatabase = new Database(databasePath, { fileMustExist: true });
+    try {
+      await verifyOwnerSessionRevocation({
+        context, baseUrl, database: authDatabase, fixtureSecret: TEST_AUTH_SECRET,
+        credentials: { email: FIXTURE_EMAIL, password: FIXTURE_PASSWORD },
+      });
+    } finally {
+      authDatabase.close();
+    }
+    assert.deepEqual(externalRequests, [], "Session acceptance must not contact any external origin.");
     await context.close();
     return {
       desktopListReadyMs,
@@ -1048,7 +1060,7 @@ async function run() {
     await rm(join(REPOSITORY_ROOT, ".next"), { recursive: true, force: true });
     server = startNextServer(baseUrl, databasePath, serverLogs);
     await waitForServer(baseUrl, server);
-    result = await runBrowserAcceptance(baseUrl, outputDirectory);
+    result = await runBrowserAcceptance(baseUrl, outputDirectory, databasePath);
     const verifiedDatabase = new Database(databasePath, { readonly: true });
     try {
       assert.deepEqual(verifiedDatabase.prepare('SELECT id, email, role FROM "User" ORDER BY id').all(),

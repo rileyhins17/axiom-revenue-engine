@@ -54,10 +54,9 @@ export function getAuth() {
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 6,
       cookieCache: {
-        enabled: true,
-        maxAge: 300,
-        refreshCache: false,
-        strategy: "compact",
+        // Authorization must observe session revocation and role changes in
+        // the database, including when a browser replays an older signed cache.
+        enabled: false,
       },
     },
     hooks: {

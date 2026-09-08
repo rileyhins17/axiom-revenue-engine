@@ -4,6 +4,14 @@ Last updated: 2026-09-07 (America/Toronto)
 
 ## Plain-English status
 
+The next source-level security fix removes stale login-cookie authorization.
+A local attack test proved that a saved admin cookie retained access after a
+database demotion. The app now asks the database for the current session and
+role instead of trusting that cached identity. Regression checks cover old
+signed cookies, demotion, revocation, expiry, and normal sign-in. This does not
+yet complete MFA, recovery, account banning, or allowlist removal, and it has
+not been deployed. No production account, session, mailbox, or provider is used.
+
 The security audit's critical public-registration path is now closed in the
 rebuild source: even an approved admin email cannot create an account through
 the public endpoint. The sign-up form and address-based admin promotion are
@@ -181,6 +189,31 @@ file; tracked code, the safe seed, and this status document remain recoverable
 through Git. ADR 0058 and `docs/REBUILD_MONITOR.md` define the workflow.
 
 ## Verified checkpoint
+
+- Latest fully release-proven and pushed predecessor:
+  `f9ffebecb6b5b2ddd0f599466ae4e0100dec5e81` (public-registration lockdown).
+- Current bounded change: close stale-cookie authorization within SEC-002.
+  Disable Better Auth cookie caching and explicitly bypass it in both shared
+  application session lookups. A separate synthetic acceptance helper tests the
+  real local app and auth routes, not a mocked authorization function.
+- Reproduction: before the source fix, the admin API returned 200 after database
+  demotion when sent a still-valid legacy signed cache (expected 403). The first
+  patched test then rejected demotion/revocation correctly but assumed page
+  redirects always use HTTP 307. Next's documented streamed redirect uses 200;
+  the corrected test follows the actual browser to sign-in and checks that no
+  protected owner content is rendered.
+- Verification: targeted helper tests, all 590 repository tests, safety checks,
+  and typecheck/lint passed during work.
+  The corrected full browser gate passed the saved-cookie lifecycle regression
+  and six WCAG-scanned owner pages (desktop 1440/mobile 390, list 1,961 ms,
+  dossier 593 ms, zero external requests).
+  Final exact-commit results must be read from the release receipt after the
+  complete gate; do not infer production readiness from a working-copy pass.
+- Scope and blockers: no owner decision needed for this source fix. MFA,
+  verified enrollment/recovery, ban and allowlist enforcement, the other open
+  findings, and staging/production proof remain release blockers. Current
+  spend impact C$0; no external prospect contact, deployment, migration, provider,
+  mailbox, or production-account action occurred.
 
 - Verified predecessor: `ef535c3e9ba99e110c554076fa8e41d762713680`, the audit and
   checkout-attestation baseline, has a complete exact-commit release receipt and
@@ -2482,10 +2515,10 @@ runtime subscription or approved C$50 operating budget and incurred C$0.
 
 ## Next three actions
 
-1. Complete SEC-002's verified owner-enrollment, MFA, recovery, and session
-   revocation implementation and synthetic tests. Keep real account changes and
-   staging activation behind their separate approval gate; retain SEC-001's
-   public-registration denial regression.
+1. Complete SEC-002's ban and allowlist-removal enforcement, then verified
+   owner-enrollment, MFA, recovery, and owner-facing session controls with
+   synthetic tests. Retain the registration-denial and stale-cache regressions;
+   keep real account changes and staging activation separately approval-gated.
 2. Add one tested browser/request security boundary for custom mutation origin
    checks, private/no-store responses, framing/MIME/referrer/permissions headers,
    and CSP report-only staging preparation.
