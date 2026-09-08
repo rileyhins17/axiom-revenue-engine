@@ -4,7 +4,49 @@ Last updated: 2026-09-08 (America/Toronto)
 
 ## Plain-English status
 
-### Current milestone: retire external legacy agents (SEC-005)
+### Current milestone: retire legacy browser execution (SEC-004)
+
+Verified predecessor: `9519cb06cc0fd4ea1de9f24ce9c4bf910ad6130d`.
+All ten release checks and branch push passed for SEC-005, including 626 tests,
+six accessibility pages, 212 ms lead-list and 103 ms dossier readiness, and zero
+outside requests. The monitor proved local/upstream/GitHub equality.
+
+A synthetic pre-removal reproduction confirmed that the legacy discovery
+collector handed loopback, private-network and metadata-service URLs directly to
+navigation; its resource filter allowed private document requests. No real
+browser, DNS or network was used. Existing ordinary legacy extraction and v2
+capture checks also passed before editing. Independent compatibility inspection
+confirmed that owner read/history routes and the v2 evidence workflow do not
+depend on this legacy executor.
+
+The candidate deletes legacy browser/provider launch, local fallback, navigation,
+AI execution and job-runner side effects. Explicit retired shims retain the old
+entrypoint names but cannot inspect input/context, bindings, environment or jobs.
+The cloud runner returns unclaimed before any work. Pure Maps parsing, dedupe
+helpers, historical data readers, and independent v2 capture remain unchanged.
+All 21 focused checks, 628 full tests, type-checking, lint and safety pass. New
+regression checks exercise injected unreadable inputs/bindings and forbid
+operational imports. Owner browser acceptance passed six accessibility pages,
+desktop/mobile layouts, 371 ms list readiness, 82 ms dossier readiness and zero
+outside requests. Independent candidate review found no concrete surviving
+legacy-browser authority or v2/owner-console regression. The exact-commit release
+gate remains; its immutable receipt and verified branch checkpoint are recorded
+by the monitor only after all checks and the push pass.
+
+This removes the legacy browser authority only. V2 URL checks and fixture tests
+do not prove DNS pinning, rebinding resistance or platform egress. Live capture
+still requires separate network isolation, provider budget and release approval.
+No provider resource, credential, database record, deployment, migration, mailbox
+or prospect was touched. Spend impact C$0; all execution remains off. No owner
+decision is required for the approved source retirement. Deleted source remains
+recoverable in Git; no historical business data was deleted.
+
+Next three actions:
+1. Run the exact-commit release gate and push only this branch if it passes.
+2. Record its immutable receipt and verify local/upstream/GitHub equality.
+3. Continue outbound-email and owner-account security; keep live capture gated.
+
+### Previous checkpoint: retire external legacy agents (SEC-005)
 
 Verified predecessor: `98c3df8eb7e5cf0e3e079565daef0b15e09fa750`.
 All ten release checks and branch push passed for SEC-003, including 625 tests,

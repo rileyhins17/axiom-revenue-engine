@@ -703,6 +703,22 @@ and PKCE support then. Keep mailbox operations and sending off throughout.
 
 ## Resume/handoff
 
+### Retired legacy browser execution (SEC-004, source only)
+
+The old scraper and website/search collectors reject work with a fixed retirement
+error. `runCloudScrapeWorker` returns `claimed: false` before reading bindings,
+environment, settings or jobs. There is no legacy Cloudflare browser launch,
+local Playwright fallback, navigation, AI call or job heartbeat/retry loop.
+Do not restore these paths by supplying bindings or enabling old switches.
+
+Read-only scrape history and pure Maps parser helpers remain available; a parsed
+or normalized URL is never authorization to contact that destination. The new
+evidence-capture contracts remain separate. Before live capture, prove DNS/private
+address enforcement, redirect and rebinding protection, platform egress isolation,
+bounded requests and costs, and the approved provider/release configuration.
+Fixture tests alone cannot prove these network properties. This checkpoint
+does not deploy, change stored jobs/leads, migrate, activate or revoke resources.
+
 ### Retired external legacy agents (SEC-005, source only)
 
 The six `/api/agent/jobs` endpoints (claim, results, heartbeat, logs, complete,

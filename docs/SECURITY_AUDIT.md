@@ -356,7 +356,8 @@ paths remain separate findings, not implicitly fixed by this retirement.
 
 ### SEC-004 — High — Legacy website browsing can reach attacker-selected hosts
 
-**Status:** Open in legacy code; retire or harden before Browser activation.
+**Status:** Legacy-browser retirement reviewed; exact-commit release proof required.
+V2 live DNS/egress validation remains a separate activation requirement.
 **Reachability:** Dormant while discovery/browser bindings and intake remain off.
 
 The legacy path normalizes arbitrary HTTP(S) website values and later navigates
@@ -379,10 +380,26 @@ resolve and reject private/reserved IP ranges, validate every redirect hop,
 defend against DNS rebinding, cap bytes/time/pages, and use platform egress
 controls. Prefer deleting the legacy browser path after characterization tests.
 
+**Candidate evidence (2026-09-08):** synthetic page/context instrumentation
+confirmed private, loopback and metadata URLs reached `goto`, and the request
+filter continued a private document request. Existing normal extraction/capture
+tests passed before removal. The candidate deletes legacy navigation, browser
+loaders/local fallback, AI execution and cloud job orchestration. Retired shims
+reject without reading inputs or bindings; the cloud entrypoint returns
+unclaimed before database/environment/timer activity. Pure historical parsers
+remain, explicitly not a network URL policy. All 21 focused checks, 628 full tests,
+type-check, lint and safety pass. Browser acceptance passed six desktop/mobile
+accessibility pages with zero outside requests. V2 capture is independent and unchanged: its synthetic
+URL/redirect/size/time tests do not establish live DNS pinning or platform egress.
+No production or provider operation occurred. Historical line references above
+describe the pre-retirement source. Independent candidate review found no concrete
+surviving legacy browser authority or v2/owner-console regression in this scope.
+
 ### SEC-005 — High — Agent requests can be replayed across instances and alter server-owned lead fields
 
-**Status:** External-agent source retirement reviewed; exact-commit release
-receipt required. No production route or credential changed.
+**Status:** External-agent source retirement verified at
+`9519cb06cc0fd4ea1de9f24ce9c4bf910ad6130d`; all ten release checks and branch
+push passed. No production route or credential changed.
 **Reachability:** Dormant if `AGENT_SHARED_SECRET` is absent and agent work is off.
 
 The HMAC is a good base, but the claimed agent name is not part of the signed

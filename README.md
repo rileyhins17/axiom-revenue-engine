@@ -9,6 +9,11 @@ channel, preparing specific outreach, and learning which work becomes revenue.
 
 ## Current state
 
+Legacy browser scraping is being retired in source. The old runner cannot launch
+a browser, navigate a website, call AI, or claim a job. Historical parsing helpers
+and the owner console remain, as does the separate new evidence-capture workflow.
+Live capture still needs proven network isolation and an approved release.
+
 The external legacy agent interface is being retired in source. Its six job
 endpoints return fixed HTTP 410 responses without accepting credentials, lead
 records or job updates. Internal lead processing and the owner console remain
