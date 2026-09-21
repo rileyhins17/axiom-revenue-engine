@@ -58,9 +58,11 @@ include it in public logs.
   adapter only after the account, key, domain, webhook, legal and suppression
   gates pass. Cloudflare forwarding cannot itself send replies from the custom
   domain; M4 must prove either the app's human-triggered Resend reply flow or a
-  separately reviewed free owner-only send-as route. Do not build a mailbox
-  farm or buy Workspace seats unless a later owner decision proves reply
-  economics and handling capacity require them.
+  separately reviewed free owner-only send-as route. If those zero-cost routes
+  cannot satisfy reply ownership or privacy gates, mail activation remains
+  blocked. Do not build a mailbox farm or buy Workspace seats; paid mailboxes
+  and Workspace are out of scope unless Riley explicitly reverses the
+  zero-paid-mailbox decision.
 - Riley confirmed on 2026-09-20 that no OpenAI API keys are available. OpenAI
   source/model configuration is not a provisioned service. Jev, OpenAI, mailbox,
   source and verification account readiness must be recorded separately from code.

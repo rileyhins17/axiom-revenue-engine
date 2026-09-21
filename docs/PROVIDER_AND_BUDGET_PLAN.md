@@ -61,9 +61,10 @@ Cloudflare's current official pricing documents inbound routing as available on
 Workers Free/Paid and unlimited, while destination verification and active rules
 remain account gates. Resend is the separate outbound/reply adapter candidate;
 its published Free plan is a conditional $0 option, not proof of an account,
-quota or verified sender. A paid mailbox is a fallback only if the owner cannot
-meet reply ownership/privacy requirements through forwarding plus the reviewed
-Resend or owner-only send-as route. ([Cloudflare Email Routing pricing](https://developers.cloudflare.com/email-service/platform/pricing/),
+quota or verified sender. If forwarding plus the reviewed Resend or free
+owner-only send-as route cannot meet reply ownership/privacy requirements, mail
+activation remains blocked. Paid mailboxes and Workspace seats are out of scope
+unless Riley explicitly reverses the zero-paid-mailbox decision. ([Cloudflare Email Routing pricing](https://developers.cloudflare.com/email-service/platform/pricing/),
 [Cloudflare routing addresses](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/),
 [Resend pricing](https://resend.com/pricing?product=transactional),
 [Resend domain verification](https://resend.com/docs/add-a-domain))

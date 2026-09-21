@@ -109,8 +109,11 @@ evidence that any commitment is active or that a small line buys verification.
 With no OpenAI API key, OpenAI usage is currently C$0 and no API budget should
 be assumed. Jev remains optional and its maximum C$1 allocation must sit inside
 the existing AI envelope, never be added on top. Keep at least C$5 monthly
-uncommitted until real bills and taxes are observed. A paid mailbox is a
-conditional fallback for reply ownership/privacy, not the default route.
+uncommitted until real bills and taxes are observed. Paid mailboxes and
+Workspace seats are out of scope. If the zero-cost Cloudflare plus gated
+Resend or separately reviewed free owner-only send-as route cannot meet reply
+ownership/privacy requirements, mail activation remains blocked until Riley
+explicitly reverses the zero-paid-mailbox decision.
 
 ## Managed all-in-one comparison
 

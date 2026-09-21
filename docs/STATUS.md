@@ -96,7 +96,12 @@ or send readiness. No DNS/provider/account mutation or mail operation occurred.
 
 ## Owner decisions and blockers
 
-No new owner decision is requested to retain this local synthetic checkpoint.
+Owner decision recorded: the mail architecture has zero paid mailbox seats.
+Cloudflare Email Routing remains the inbound route and gated Resend Free or a
+separately reviewed free owner-only send-as route are the only outbound/reply
+options in scope. If those zero-cost routes cannot satisfy reply ownership or
+privacy gates, mail activation remains blocked; paid mailboxes and Workspace
+are out of scope unless Riley explicitly reverses this decision.
 Before any real-source work, the owner must separately decide the source and
 privacy scope, accounts and rights, backup/rollback plan, and the exact release
 gate. M2 is blocked by the absence of an authorized real-source evidence packet,
