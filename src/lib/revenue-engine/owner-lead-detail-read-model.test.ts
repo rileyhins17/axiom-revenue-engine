@@ -177,6 +177,7 @@ function fakeDatabase(resultSets: unknown[][]) {
           return statement;
         },
         async all<T>() {
+          if (/^\s*PRAGMA\s+table_info/i.test(query)) return { results: [{ name: "id", type: "TEXT", notnull: 1, dflt_value: null }] as T[] };
           assert(values.length > 0);
           const rows = resultSets[index] ?? [];
           index += 1;
@@ -232,8 +233,8 @@ test("detail reader returns exact evidence, all current routes, and honest v2 hi
     providerOperationsAuthorized: 0,
     costAuthorizedUsd: 0,
   });
-  assert.equal(fake.queries.length, 4);
-  assert(fake.queries.every((query) => /^\s*SELECT\b/i.test(query)));
+  assert.equal(fake.queries.length, 11);
+  assert(fake.queries.slice(7).every((query) => /^\s*SELECT\b/i.test(query)));
   assert.deepEqual(fake.bindings[0], ["business:one"]);
   assert.deepEqual(fake.bindings[2], ["business:one"]);
   assert.deepEqual(fake.bindings[3], [
@@ -251,7 +252,7 @@ test("detail reader returns null for an exact business with no current v2 dossie
   const result = await readOwnerLeadDetail(fake.database, "business:missing", GENERATED_AT);
 
   assert.equal(result, null);
-  assert.equal(fake.queries.length, 1);
+  assert.equal(fake.queries.length, 8);
 });
 
 test("detail reader fails closed when snapshot columns drift from the audit receipt", async () => {
@@ -262,7 +263,7 @@ test("detail reader fails closed when snapshot columns drift from the audit rece
     () => readOwnerLeadDetail(fake.database, "business:one", GENERATED_AT),
     /does not match its deterministic audit receipt/i,
   );
-  assert.equal(fake.queries.length, 2);
+  assert.equal(fake.queries.length, 9);
 });
 
 test("detail reader validates identity before querying and keeps every query bounded and SELECT-only", async () => {

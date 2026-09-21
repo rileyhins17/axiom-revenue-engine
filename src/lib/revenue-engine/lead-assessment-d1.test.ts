@@ -106,14 +106,14 @@ function request(receiptId: string, overrides: Partial<RevenueLeadAssessmentRequ
   };
 }
 
-function freshDatabase() {
+function freshDatabase(lastMigration = 61) {
   const database = new Database(":memory:");
   database.pragma("foreign_keys = ON");
   const migrationRoot = new URL("../../../migrations/", import.meta.url);
   const migrationFiles = readdirSync(migrationRoot)
-    .filter((name) => /^(0054|0055|0056|0057|0058|0059|0060|0061)_.*\.sql$/.test(name))
+    .filter((name) => /^\d{4}_.*\.sql$/.test(name) && Number(name.slice(0, 4)) >= 54 && Number(name.slice(0, 4)) <= lastMigration)
     .sort();
-  assert.equal(migrationFiles.length, 8);
+  assert.equal(migrationFiles.length, lastMigration - 53);
   for (const migrationFile of migrationFiles) {
     database.exec(readFileSync(new URL(migrationFile, migrationRoot), "utf8"));
   }
@@ -249,6 +249,64 @@ test("atomically commits and exactly replays one owner-readable shadow assessmen
   } finally {
     database.close();
   }
+});
+
+test("legacy assessment commit and replay work on both 0068 and 0069 schemas", async () => {
+  for (const migration of [68, 69]) {
+    const database = freshDatabase(migration);
+    try {
+      const source = seedSealedSource(database);
+      const boundary = createBoundary(database);
+      const first = await executePrivateRevenueLeadAssessmentD1(boundary, request(source.receiptId));
+      const replay = await executePrivateRevenueLeadAssessmentD1(boundary, request(source.receiptId));
+      const reload = await loadPrivateRevenueLeadAssessmentD1(boundary, {
+        assessmentId: first.assessment.assessmentId, assessmentDigest: first.assessment.assessmentDigest,
+      });
+      assert.equal(replay.executionPath, "EXACT_REPLAY");
+      assert.equal(reload.exactSourceRebuilt, true);
+      if (migration === 69) {
+        assert.equal(database.prepare('SELECT assessmentKind FROM RevenueLeadAssessmentReceipt').pluck().get(), "LEGACY");
+      }
+    } finally { database.close(); }
+  }
+});
+
+test("legacy assessment replay and reload reject M2 rows at colliding identities", async () => {
+  for (const [table, column, value, trigger] of [
+    ["RevenueWebsiteSnapshot", "evidenceMode", "M2_HTML_ONLY", "RevenueWebsiteSnapshot_assessment_immutable_update"],
+    ["RevenueEvidenceClaim", "evidenceMode", "M2_HTML_ONLY", "RevenueEvidenceClaim_assessment_immutable_update"],
+    ["RevenueQualificationSnapshot", "evidenceMode", "M2_HTML_ONLY", "RevenueQualificationSnapshot_assessment_immutable_update"],
+    ["RevenueLeadAssessmentReceipt", "assessmentKind", "WEBSITE_FIT_EVIDENCE", "RevenueLeadAssessmentReceipt_immutable_update"],
+  ]) {
+    const database = freshDatabase(69);
+    try {
+      const source = seedSealedSource(database);
+      const boundary = createBoundary(database);
+      const first = await executePrivateRevenueLeadAssessmentD1(boundary, request(source.receiptId));
+      const guard = database.prepare('SELECT sql FROM sqlite_master WHERE name = ?').pluck().get(trigger) as string;
+      // Deliberately corrupt only this in-memory fixture, restoring its guard before reload.
+      database.exec(`DROP TRIGGER "${trigger}"`);
+      database.prepare(`UPDATE "${table}" SET "${column}" = ?`).run(value);
+      database.exec(guard);
+      const before = database.serialize();
+      await assert.rejects(() => executePrivateRevenueLeadAssessmentD1(boundary, request(source.receiptId)), /conflict/i);
+      await assert.rejects(() => loadPrivateRevenueLeadAssessmentD1(boundary, {
+        assessmentId: first.assessment.assessmentId, assessmentDigest: first.assessment.assessmentDigest,
+      }));
+      assert.deepEqual(database.serialize(), before);
+    } finally { database.close(); }
+  }
+});
+
+test("partial partition migration stops legacy assessment before any writes", async () => {
+  const database = freshDatabase();
+  try {
+    const source = seedSealedSource(database);
+    database.exec("ALTER TABLE RevenueWebsiteSnapshot ADD COLUMN evidenceMode TEXT NOT NULL DEFAULT 'LEGACY'");
+    const before = database.serialize();
+    await assert.rejects(() => executePrivateRevenueLeadAssessmentD1(createBoundary(database), request(source.receiptId)), /partial|mixed/i);
+    assert.deepEqual(database.serialize(), before);
+  } finally { database.close(); }
 });
 
 test("durable reload fails closed on missing guards, incomplete sets, drift, and database-clock expiry", async () => {

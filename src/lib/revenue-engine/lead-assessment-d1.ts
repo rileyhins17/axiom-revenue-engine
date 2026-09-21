@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { classifyRevenueEvidencePartitions } from "@/lib/revenue-engine/revenue-evidence-partition";
 
 import {
   PersistedSealedWebsiteReceiptSchema,
@@ -201,8 +202,9 @@ function selectColumns(expected: Record<string, SqlValue>) {
   return Object.keys(expected).map((column) => `"${column}"`).join(", ");
 }
 
-function buildRecordPlans(assessment: RevenueLeadAssessment): RecordPlan[] {
+function buildRecordPlans(assessment: RevenueLeadAssessment, partitioned: boolean): RecordPlan[] {
   const website = {
+    ...(partitioned ? { evidenceMode: "LEGACY" } : {}),
     id: assessment.websiteSnapshotId,
     businessId: assessment.business.id,
     url: assessment.websiteUrl,
@@ -230,6 +232,7 @@ function buildRecordPlans(assessment: RevenueLeadAssessment): RecordPlan[] {
 
   for (const claim of assessment.audit.claims) {
     const evidence = {
+      ...(partitioned ? { evidenceMode: "LEGACY" } : {}),
       id: claim.claimId,
       businessId: assessment.business.id,
       websiteSnapshotId: assessment.websiteSnapshotId,
@@ -257,6 +260,7 @@ function buildRecordPlans(assessment: RevenueLeadAssessment): RecordPlan[] {
   }
 
   const qualification = {
+    ...(partitioned ? { evidenceMode: "LEGACY" } : {}),
     id: assessment.qualificationSnapshotId,
     snapshotKey: assessment.qualificationSnapshotKey,
     businessId: assessment.business.id,
@@ -289,6 +293,7 @@ function buildRecordPlans(assessment: RevenueLeadAssessment): RecordPlan[] {
   });
 
   const receipt = {
+    ...(partitioned ? { assessmentKind: "LEGACY" } : {}),
     id: assessment.assessmentId,
     assessmentVersion: assessment.assessmentVersion,
     assessmentKey: assessment.assessmentKey,
@@ -387,10 +392,10 @@ const EVIDENCE_CLAIM_COLUMNS = [
   "capturedAt",
 ] as const;
 
-function durableAssessmentReceiptStatement(assessmentId: string, assessmentDigest: string) {
+function durableAssessmentReceiptStatement(assessmentId: string, assessmentDigest: string, partitioned: boolean) {
   return statement(
     "read:durable_assessment_receipt",
-    `SELECT ${ASSESSMENT_RECEIPT_COLUMNS.map((column) => `"${column}"`).join(", ")}
+    `SELECT ${partitioned ? '"assessmentKind", ' : ""}${ASSESSMENT_RECEIPT_COLUMNS.map((column) => `"${column}"`).join(", ")}
      FROM "RevenueLeadAssessmentReceipt"
      WHERE "id" = ? AND "assessmentDigest" = ?
      ORDER BY "id"`,
@@ -398,10 +403,10 @@ function durableAssessmentReceiptStatement(assessmentId: string, assessmentDiges
   );
 }
 
-function completeAssessmentEvidenceStatement(assessment: RevenueLeadAssessment) {
+function completeAssessmentEvidenceStatement(assessment: RevenueLeadAssessment, partitioned: boolean) {
   return statement(
     "read:complete_assessment_evidence_claims",
-    `SELECT ${EVIDENCE_CLAIM_COLUMNS.map((column) => `"${column}"`).join(", ")}
+    `SELECT ${partitioned ? '"evidenceMode", ' : ""}${EVIDENCE_CLAIM_COLUMNS.map((column) => `"${column}"`).join(", ")}
      FROM "RevenueEvidenceClaim"
      WHERE "businessId" = ? AND "websiteSnapshotId" = ?
      ORDER BY "id"`,
@@ -436,8 +441,10 @@ function assessmentFreshnessState(assessment: RevenueLeadAssessment, databaseNow
   return "CURRENT" as const;
 }
 
-function assessmentFromDurableReceiptRow(raw: SqlRow) {
-  const row = AssessmentReceiptRowSchema.parse(raw);
+function assessmentFromDurableReceiptRow(raw: SqlRow, partitioned: boolean) {
+  const row = partitioned
+    ? AssessmentReceiptRowSchema.extend({ assessmentKind: z.literal("LEGACY") }).strict().parse(raw)
+    : AssessmentReceiptRowSchema.parse(raw);
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(row.assessmentJson) as unknown;
@@ -445,7 +452,7 @@ function assessmentFromDurableReceiptRow(raw: SqlRow) {
     throw new Error("The durable assessment receipt JSON is invalid.");
   }
   const assessment = RevenueLeadAssessmentSchema.parse(parsedJson);
-  const receiptPlan = buildRecordPlans(assessment).find((plan) => plan.entity === "ASSESSMENT_RECEIPT");
+  const receiptPlan = buildRecordPlans(assessment, partitioned).find((plan) => plan.entity === "ASSESSMENT_RECEIPT");
   if (
     !receiptPlan
     || !rowMatches(row, receiptPlan.expected)
@@ -501,6 +508,21 @@ function durableAssessmentResult(input: {
 function parseBatchResults(raw: readonly unknown[], expectedCount: number) {
   if (raw.length !== expectedCount) throw new Error("D1 returned an unexpected assessment batch result count.");
   return raw.map((result) => BatchResultSchema.parse(result));
+}
+
+async function readAssessmentPartition(boundary: RevenueLeadAssessmentD1Boundary) {
+  const tables = [
+    ["RevenueWebsiteSnapshot", "evidenceMode"],
+    ["RevenueEvidenceClaim", "evidenceMode"],
+    ["RevenueQualificationSnapshot", "evidenceMode"],
+    ["RevenueLeadAssessmentReceipt", "assessmentKind"],
+  ] as const;
+  const results = parseBatchResults(await boundary.batch(tables.map(([table]) => statement(
+    `read:assessment_partition:${table}`, `PRAGMA table_info("${table}")`, [],
+  ))), tables.length);
+  return classifyRevenueEvidencePartitions(tables.map(([table, column], index) => ({
+    table, column, rows: results[index].results,
+  })));
 }
 
 function comparableRow(row: SqlRow, expected: Record<string, SqlValue>) {
@@ -564,6 +586,7 @@ export async function executePrivateRevenueLeadAssessmentD1(
   value: RevenueLeadAssessmentRequest,
 ): Promise<RevenueLeadAssessmentD1Execution> {
   const request = RevenueLeadAssessmentRequestSchema.parse(value);
+  const partitioned = await readAssessmentPartition(boundary);
   const [sourceResult] = parseBatchResults(
     await boundary.batch([SEALED_RECEIPT_STATEMENT(request.workflowReceiptId)]),
     1,
@@ -582,7 +605,7 @@ export async function executePrivateRevenueLeadAssessmentD1(
   if (businessResult.results.length !== 1) throw new Error("The workflow business is missing or ambiguous.");
   const business = BusinessRowSchema.parse(businessResult.results[0]);
   const assessment = buildRevenueLeadAssessment({ request, business, sealedReceipt });
-  const plans = buildRecordPlans(assessment);
+  const plans = buildRecordPlans(assessment, partitioned);
 
   const preflightResults = parseBatchResults(await boundary.batch(plans.map((plan) => plan.select)), plans.length);
   const states = plans.map((plan, index) => classifyPreflight(plan, preflightResults[index].results));
@@ -657,11 +680,12 @@ export async function loadPrivateRevenueLeadAssessmentD1(
     assessmentId: z.string().regex(/^assessment:[a-f0-9]{64}$/),
     assessmentDigest: Sha256Schema,
   }).strict().parse(identityValue);
+  const partitioned = await readAssessmentPartition(boundary);
 
   const [guardResult, timeResult, receiptResult] = parseBatchResults(await boundary.batch([
     ASSESSMENT_TRIGGER_STATEMENT,
     DATABASE_TIME_STATEMENT,
-    durableAssessmentReceiptStatement(identity.assessmentId, identity.assessmentDigest),
+    durableAssessmentReceiptStatement(identity.assessmentId, identity.assessmentDigest, partitioned),
   ]), 3);
   assertAssessmentWriterGuards(guardResult);
   if (timeResult.results.length !== 1) {
@@ -671,7 +695,7 @@ export async function loadPrivateRevenueLeadAssessmentD1(
   if (receiptResult.results.length !== 1) {
     throw new Error("The exact durable assessment receipt is missing or ambiguous.");
   }
-  const { row, assessment } = assessmentFromDurableReceiptRow(receiptResult.results[0]);
+  const { row, assessment } = assessmentFromDurableReceiptRow(receiptResult.results[0], partitioned);
   if (
     assessment.assessmentId !== identity.assessmentId
     || assessment.assessmentDigest !== identity.assessmentDigest
@@ -679,11 +703,11 @@ export async function loadPrivateRevenueLeadAssessmentD1(
     throw new Error("The durable assessment identity does not match the requested assessment.");
   }
 
-  const plans = buildRecordPlans(assessment);
+  const plans = buildRecordPlans(assessment, partitioned);
   const [sealedResult, businessResult, completeEvidenceResult, ...rowResults] = parseBatchResults(await boundary.batch([
     SEALED_RECEIPT_STATEMENT(assessment.workflow.workflowReceiptId),
     BUSINESS_STATEMENT(assessment.business.id),
-    completeAssessmentEvidenceStatement(assessment),
+    completeAssessmentEvidenceStatement(assessment, partitioned),
     ...plans.map((plan) => plan.select),
   ]), plans.length + 3);
   if (sealedResult.results.length !== 1) {

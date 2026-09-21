@@ -192,6 +192,15 @@ export async function createPrivateKwAssessmentProgressProofFixture(options: {
     "RevenueLeadAssessmentReceipt_immutable_delete",
   ].sort((left, right) => left.localeCompare(right, "en-CA"));
   const rowByStatementId = new Map<string, readonly Record<string, string | number | null>[]>([
+    ...[
+      ["RevenueWebsiteSnapshot", websiteRow],
+      ["RevenueEvidenceClaim", evidenceRows[0]],
+      ["RevenueQualificationSnapshot", qualificationRow],
+      ["RevenueLeadAssessmentReceipt", receiptRow],
+    ].map(([table, row]) => [
+      `read:assessment_partition:${table}`,
+      Object.keys(row ?? { id: null }).map((name) => ({ name })),
+    ] as const),
     ["read:assessment_writer_guards", triggerNames.map((name) => ({
       name,
       sql: `CREATE TRIGGER ${name} REVENUE_LEAD_ASSESSMENT_APPEND_ONLY`,

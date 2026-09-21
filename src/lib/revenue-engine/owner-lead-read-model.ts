@@ -13,6 +13,7 @@ import {
 } from "@/lib/revenue-engine/owner-lead-projection";
 import { normalizePublicWebsiteUrl } from "@/lib/revenue-engine/public-website-url";
 import { DeterministicWebsiteAuditResultSchema } from "@/lib/revenue-engine/website-audit";
+import { legacyPartitionPredicates, readRevenueEvidencePartition, type RevenueEvidencePartition } from "@/lib/revenue-engine/revenue-evidence-partition";
 
 export const OWNER_LEAD_READ_MODEL_VERSION = "owner-lead-read-model-v1";
 export const OWNER_LEAD_DEFAULT_LIMIT = 50;
@@ -109,7 +110,9 @@ export const OwnerLeadListResponseSchema = z.object({
 
 export type OwnerLeadListResponse = z.infer<typeof OwnerLeadListResponseSchema>;
 
-export const OWNER_LEAD_CANDIDATE_QUERY = `
+export function ownerLeadCandidateQuery(partition: RevenueEvidencePartition) {
+  const predicates = legacyPartitionPredicates(partition);
+  return `
 SELECT
   business."id" AS "businessId",
   business."canonicalName" AS "canonicalName",
@@ -157,29 +160,33 @@ JOIN "RevenueSourceRecord" sourceRecord ON sourceRecord."id" = (
 JOIN "RevenueWebsiteSnapshot" website ON website."id" = (
   SELECT candidateWebsite."id"
   FROM "RevenueWebsiteSnapshot" candidateWebsite
-  WHERE candidateWebsite."businessId" = business."id"
+  WHERE candidateWebsite."businessId" = business."id"${predicates.websiteCandidate}
   ORDER BY candidateWebsite."capturedAt" DESC, candidateWebsite."id" DESC
   LIMIT 1
-)
+)${predicates.websiteOuter}
 JOIN "RevenueQualificationSnapshot" qualification ON qualification."id" = (
   SELECT candidateQualification."id"
   FROM "RevenueQualificationSnapshot" candidateQualification
-  WHERE candidateQualification."businessId" = business."id"
+  WHERE candidateQualification."businessId" = business."id"${predicates.qualificationCandidate}
   ORDER BY candidateQualification."createdAt" DESC, candidateQualification."id" DESC
   LIMIT 1
-)
+)${predicates.qualificationOuter}
 WHERE location."country" = 'CA'
   AND location."region" = 'ON'
   AND location."city" IN ('KITCHENER', 'WATERLOO', 'CAMBRIDGE')
-  AND qualification."shadowOnly" = 1
+  AND qualification."shadowOnly" = 1${predicates.qualificationOuter}
 ORDER BY qualification."totalScore" DESC, qualification."createdAt" DESC, business."id" ASC
 LIMIT ?`;
+}
 
-export function ownerLeadContactQuery(businessCount: number) {
+export const OWNER_LEAD_CANDIDATE_QUERY = ownerLeadCandidateQuery("LEGACY");
+
+export function ownerLeadContactQuery(businessCount: number, partition: RevenueEvidencePartition = "LEGACY") {
   if (!Number.isInteger(businessCount) || businessCount < 1 || businessCount > OWNER_LEAD_MAX_LIMIT) {
     throw new Error("Owner lead contact query requires one to 100 exact business IDs.");
   }
   const placeholders = Array.from({ length: businessCount }, () => "?").join(", ");
+  const predicates = legacyPartitionPredicates(partition);
   return `
 SELECT
   contact."id" AS "contactPointId",
@@ -201,11 +208,11 @@ FROM "RevenueContactPoint" contact
 LEFT JOIN "RevenueVerificationResult" verification ON verification."id" = (
   SELECT candidateVerification."id"
   FROM "RevenueVerificationResult" candidateVerification
-  WHERE candidateVerification."contactPointId" = contact."id"
+  WHERE candidateVerification."contactPointId" = contact."id"${predicates.verificationCandidate}
   ORDER BY candidateVerification."verifiedAt" DESC, candidateVerification."id" DESC
   LIMIT 1
 )
-WHERE contact."businessId" IN (${placeholders})
+WHERE contact."businessId" IN (${placeholders})${predicates.contactOuter}
   AND (
     contact."candidateId" IS NULL
     OR contact."id" = (
@@ -213,6 +220,7 @@ WHERE contact."businessId" IN (${placeholders})
       FROM "RevenueContactPoint" latestContact
       WHERE latestContact."businessId" = contact."businessId"
         AND latestContact."candidateId" = contact."candidateId"
+        ${predicates.contactCandidate}
       ORDER BY latestContact."sourceCapturedAt" DESC, latestContact."createdAt" DESC, latestContact."id" DESC
       LIMIT 1
     )
@@ -343,7 +351,8 @@ export async function readOwnerLeadList(
 ): Promise<OwnerLeadListResponse> {
   TimestampSchema.parse(generatedAt);
   const limit = boundedLimit(requestedLimit);
-  const candidateResult = await database.prepare(OWNER_LEAD_CANDIDATE_QUERY).bind(limit).all<unknown>();
+  const partition = await readRevenueEvidencePartition(database);
+  const candidateResult = await database.prepare(ownerLeadCandidateQuery(partition)).bind(limit).all<unknown>();
   const candidateRows = candidateResult.results ?? [];
   const candidateIdentities = candidateRows.map((value) => OwnerLeadCandidateRowSchema.safeParse(value))
     .filter((result) => result.success)
@@ -354,7 +363,7 @@ export async function readOwnerLeadList(
   let ignoredContactRows = 0;
   if (uniqueBusinessIds.length > 0) {
     const contactResult = await database
-      .prepare(ownerLeadContactQuery(uniqueBusinessIds.length))
+      .prepare(ownerLeadContactQuery(uniqueBusinessIds.length, partition))
       .bind(...uniqueBusinessIds)
       .all<unknown>();
     for (const rawContact of contactResult.results ?? []) {

@@ -1,11 +1,80 @@
 # Current status — Axiom Revenue Engine
 
-**Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Task 8
-transactional setup and approved recovery. The verified code checkpoint is
-`d19e344` (`feat(revenue): add transactional local setup and recovery`), based on
-`33fe02d`. This following status update is documentation only.
+**Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Task 5 legacy/M2
+reader compatibility, based on `0e5558d`. The previous verified setup code
+checkpoint remains `d19e344`. Current checkpoint verification is recorded below.
 
-## M2 local setup runner checkpoint
+## M2 assessment partition compatibility checkpoint
+
+Ordinary owner readers now inspect the actual schema before selecting evidence.
+Pre-0069 databases retain their existing behavior. On 0069, website and
+qualification selection, contact routes, verification, history and contact
+review use explicit legacy partitions. Partial or malformed metadata and
+introspection failures stop the read; there is no error-to-legacy fallback.
+
+The legacy assessment writer/reloader now includes partition values in exact
+row comparisons and explicitly writes `LEGACY` on 0069. Collision queries
+remain broad: an M2 row with a matching ID or alternate key is a conflict, not
+a missing record. Regression tests first reproduced acceptance of mislabeled
+rows and partial schema; both now reject without writes. Tests retain old
+0061 fixtures and exercise both 0068 and 0069 commit/replay/reload.
+
+Root implemented the assessment boundary and reviewed Luna's bounded owner-reader
+changes. The first reader patch was rejected for unqualified SQL aliases and
+missing real-database coverage. Luna corrected the predicates; root added the
+complete in-memory SQLite integration regression. It proves an existing dossier
+is unchanged after newer HTML website, qualification, contact and verification
+rows arrive; HTML-only businesses are excluded; history remains unchanged;
+metadata errors propagate; and reads leave the database bytes unchanged.
+These constructed projection fixtures do not claim an implemented M2 writer.
+
+[ADR 0043](adr/0043-separate-setup-baseline-from-assessment-state.md) resolves
+the Task 5 design conflict between initial setup hashes and legitimate writes.
+The initial verifier remains strict. The planned successor verifier will compare
+the full database against the verified backup, exact migration and authenticated
+deterministic assessment plans. This is an accepted design, not an implemented
+successor runner. Task 5's local design F6 now reflects that distinction.
+
+| Check | Result |
+|---|---|
+| Targeted assessment and reader regressions | PASS, including actual 0068/0069 SQLite reader execution |
+| `npm run check:safety` | PASS |
+| `npm test` | PASS, 627 total, 624 passed, 0 failed, 3 Windows symlink-privilege skips |
+| `npm run typecheck` | PASS |
+| `npm run lint` | PASS |
+| `npm run build:cloudflare` | PASS, 2,018 files scanned, 0 local secret values |
+| Wrangler deployment dry run | PASS, no upload |
+| `npm run test:owner-ui` | Isolated repeat PASS, list 377 ms, dossier 484 ms, widths 1440/390, 6 WCAG pages, 0 external requests |
+
+The initial full suite had 13 failures because the older assessment-progress
+fake boundary returned no schema metadata. That fixture now explicitly describes
+its legacy columns; all 13 affected tests pass. No production fallback was added.
+
+The first UI attempt recorded one `SyntaxError: Invalid or unexpected token`
+during `/leads` warmup, with no script URL or stack. Its server requests returned
+200 and both builds had already exited, so build overlap is not established as
+the cause. Failure evidence remains in
+`output/playwright/owner-ui-4512-1790031568836`. One isolated repeat after the full
+suite exited passed without browser errors. No UI code or acceptance assertion
+was weakened. The intermittent warmup error is unresolved; if it recurs, capture
+the failing asset before claiming a cause. It is not evidence of a live release.
+
+No real setup release, migration, prospect request, provider action, deployment,
+email or paid spend occurred. Production/staging were not inspected or changed;
+automation remains off or unverified. C$50/month and zero paid mailboxes remain
+the limits. The retained M1 fresh4 database/checkpoint/report hashes still match.
+
+The next three concrete actions are:
+
+1. Implement Task 5's real HTML assessment plan/writer with double source reload
+   and the accepted baseline/successor checks; verify first write, replay,
+   second business, restart and unauthorized drift.
+2. Complete the dedicated HTML owner projection and exact-ten orchestration
+   against synthetic receipt-backed fixtures.
+3. Prepare the exact real candidate/owner packet and setup release for the
+   supervised one-then-ten gate. M2 remains incomplete; M3 has not started.
+
+## Prior M2 local setup runner checkpoint (`d19e344`)
 
 The local runner now applies exactly migration 0069 in one immediate transaction,
 compares the complete result with an independently migrated in-memory backup,

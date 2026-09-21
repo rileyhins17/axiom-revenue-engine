@@ -124,6 +124,7 @@ function fakeDatabase(candidateRows: unknown[], contactRows: unknown[]) {
           return statement;
         },
         async all<T>() {
+          if (/^\s*PRAGMA\s+table_info/i.test(query)) return { results: [{ name: "id", type: "TEXT", notnull: 1, dflt_value: null }] as T[] };
           assert(bindings.length > 0);
           const rows = query.includes('FROM "RevenueBusiness"') ? candidateRows : contactRows;
           return { results: rows as T[] };
@@ -158,8 +159,8 @@ test("the D1 reader returns an authenticated-API-safe, read-only owner list", as
     providerOperationsAuthorized: 0,
     costAuthorizedUsd: 0,
   });
-  assert.equal(fake.queries.length, 2);
-  assert(fake.queries.every((query) => /^\s*SELECT\b/i.test(query)));
+  assert.equal(fake.queries.length, 9);
+  assert(fake.queries.slice(7).every((query) => /^\s*SELECT\b/i.test(query)));
 });
 
 test("malformed businesses are explicit and malformed contacts cannot authorize a route", async () => {

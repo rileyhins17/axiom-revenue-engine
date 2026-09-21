@@ -23,6 +23,7 @@ import {
 } from "@/lib/revenue-engine/private-kw-contact-invocation";
 import { normalizePublicWebsiteUrl } from "@/lib/revenue-engine/public-website-url";
 import { DeterministicWebsiteAuditResultSchema } from "@/lib/revenue-engine/website-audit";
+import { legacyPartitionPredicates, readRevenueEvidencePartition, type RevenueEvidencePartition } from "@/lib/revenue-engine/revenue-evidence-partition";
 
 export const OWNER_LEAD_DETAIL_READ_MODEL_VERSION = "owner-lead-detail-read-model-v2";
 export const OWNER_LEAD_HISTORY_LIMIT = 100;
@@ -234,7 +235,9 @@ export const OwnerLeadDetailResponseSchema = z.object({
 
 export type OwnerLeadDetailResponse = z.infer<typeof OwnerLeadDetailResponseSchema>;
 
-export const OWNER_LEAD_CONTACT_REVIEW_QUERY = `
+export function ownerLeadContactReviewQuery(partition: RevenueEvidencePartition) {
+  const predicates = legacyPartitionPredicates(partition);
+  return `
 SELECT
   receipt."id" AS "invocationId",
   receipt."invocationVersion" AS "invocationVersion",
@@ -270,10 +273,16 @@ SELECT
   receipt."costAuthorizedUsd" AS "costAuthorizedUsd"
 FROM "RevenuePrivateKwContactInvocationReceipt" receipt
 WHERE receipt."businessId" = ?
+  ${predicates.assessment}
 ORDER BY receipt."recordedAt" DESC, receipt."id" DESC
 LIMIT 1`;
+}
 
-export const OWNER_LEAD_DETAIL_QUERY = `
+export const OWNER_LEAD_CONTACT_REVIEW_QUERY = ownerLeadContactReviewQuery("LEGACY");
+
+export function ownerLeadDetailQuery(partition: RevenueEvidencePartition) {
+  const predicates = legacyPartitionPredicates(partition);
+  return `
 SELECT
   business."id" AS "businessId",
   business."canonicalName" AS "canonicalName",
@@ -336,25 +345,30 @@ JOIN "RevenueSourceRun" sourceRun ON sourceRun."id" = sourceRecord."sourceRunId"
 JOIN "RevenueWebsiteSnapshot" website ON website."id" = (
   SELECT candidateWebsite."id"
   FROM "RevenueWebsiteSnapshot" candidateWebsite
-  WHERE candidateWebsite."businessId" = business."id"
+  WHERE candidateWebsite."businessId" = business."id"${predicates.websiteCandidate}
   ORDER BY candidateWebsite."capturedAt" DESC, candidateWebsite."id" DESC
   LIMIT 1
-)
+)${predicates.websiteOuter}
 JOIN "RevenueQualificationSnapshot" qualification ON qualification."id" = (
   SELECT candidateQualification."id"
   FROM "RevenueQualificationSnapshot" candidateQualification
-  WHERE candidateQualification."businessId" = business."id"
+  WHERE candidateQualification."businessId" = business."id"${predicates.qualificationCandidate}
   ORDER BY candidateQualification."createdAt" DESC, candidateQualification."id" DESC
   LIMIT 1
-)
+)${predicates.qualificationOuter}
 WHERE business."id" = ?
   AND location."country" = 'CA'
   AND location."region" = 'ON'
   AND location."city" IN ('KITCHENER', 'WATERLOO', 'CAMBRIDGE')
-  AND qualification."shadowOnly" = 1
+  AND qualification."shadowOnly" = 1${predicates.qualificationOuter}
 LIMIT 1`;
+}
 
-export const OWNER_LEAD_HISTORY_QUERY = `
+export const OWNER_LEAD_DETAIL_QUERY = ownerLeadDetailQuery("LEGACY");
+
+export function ownerLeadHistoryQuery(partition: RevenueEvidencePartition) {
+  const predicates = legacyPartitionPredicates(partition);
+  return `
 SELECT
   timeline."eventType" AS "eventType",
   timeline."eventId" AS "eventId",
@@ -384,7 +398,7 @@ FROM (
     website."auditVersion",
     website."finalUrl"
   FROM "RevenueWebsiteSnapshot" website
-  WHERE website."businessId" = ?
+  WHERE website."businessId" = ?${predicates.historyWebsite}
 
   UNION ALL
 
@@ -398,6 +412,7 @@ FROM (
   FROM "RevenueQualificationSnapshot" qualification
   WHERE qualification."businessId" = ?
     AND qualification."shadowOnly" = 1
+    ${predicates.historyQualification}
 
   UNION ALL
 
@@ -409,7 +424,7 @@ FROM (
     contact."status",
     contact."sourceUrl"
   FROM "RevenueContactPoint" contact
-  WHERE contact."businessId" = ?
+  WHERE contact."businessId" = ?${predicates.historyContact}
     AND contact."sourceCapturedAt" IS NOT NULL
 
   UNION ALL
@@ -423,10 +438,13 @@ FROM (
     contact."sourceUrl"
   FROM "RevenueVerificationResult" verification
   JOIN "RevenueContactPoint" contact ON contact."id" = verification."contactPointId"
-  WHERE contact."businessId" = ?
+  WHERE contact."businessId" = ?${predicates.historyVerification}
 ) timeline
 ORDER BY timeline."occurredAt" DESC, timeline."eventType" ASC, timeline."eventId" ASC
 LIMIT ?`;
+}
+
+export const OWNER_LEAD_HISTORY_QUERY = ownerLeadHistoryQuery("LEGACY");
 
 function currentTimestamp(value: string, generatedAtMs: number, maxAgeMs: number) {
   const valueMs = Date.parse(value);
@@ -659,9 +677,10 @@ export async function readOwnerLeadDetail(
 ): Promise<OwnerLeadDetailResponse | null> {
   const exactBusinessId = OwnerLeadBusinessIdSchema.parse(businessId);
   TimestampSchema.parse(generatedAt);
+  const partition = await readRevenueEvidencePartition(database);
 
   const candidateResult = await database
-    .prepare(OWNER_LEAD_DETAIL_QUERY)
+    .prepare(ownerLeadDetailQuery(partition))
     .bind(exactBusinessId)
     .all<unknown>();
   const rawCandidate = candidateResult.results?.[0];
@@ -675,7 +694,7 @@ export async function readOwnerLeadDetail(
   }
 
   const contactResult = await database
-    .prepare(ownerLeadContactQuery(1))
+    .prepare(ownerLeadContactQuery(1, partition))
     .bind(exactBusinessId)
     .all<unknown>();
   const contacts: Array<z.infer<typeof OwnerLeadContactPointSchema>> = [];
@@ -713,7 +732,7 @@ export async function readOwnerLeadDetail(
     });
 
   const contactReviewResult = await database
-    .prepare(OWNER_LEAD_CONTACT_REVIEW_QUERY)
+    .prepare(ownerLeadContactReviewQuery(partition))
     .bind(exactBusinessId)
     .all<unknown>();
   if ((contactReviewResult.results?.length ?? 0) > 1) {
@@ -729,7 +748,7 @@ export async function readOwnerLeadDetail(
   );
 
   const historyResult = await database
-    .prepare(OWNER_LEAD_HISTORY_QUERY)
+    .prepare(ownerLeadHistoryQuery(partition))
     .bind(
       exactBusinessId,
       exactBusinessId,
