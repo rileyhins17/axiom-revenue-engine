@@ -7,6 +7,7 @@ import { loadPrivateKwM2SetupReleaseEnvelope, type PrivateKwM2SetupReleaseEnvelo
 const REPOSITORY_ROOT = path.resolve(fileURLToPath(new URL("../", import.meta.url)));
 const DATA_ROOT = path.join(REPOSITORY_ROOT, "data", "kw-evaluation");
 const LOCK_PATH = path.join(DATA_ROOT, ".m2-0069-setup.lock");
+export const PRIVATE_KW_M2_SETUP_LOCK_PATH = LOCK_PATH;
 
 async function assertCanonicalDirectory(directory: string) {
   const stats = await lstat(directory, { bigint: true });
