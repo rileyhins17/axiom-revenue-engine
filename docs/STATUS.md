@@ -1,7 +1,58 @@
 # Current status — Axiom Revenue Engine
 
-**Updated:** 2026-09-21 (America/Toronto). **Work cycle:** Task 5 M1 final
-exact-commit verification recorded on `fe921824439cda6b485cf11966977d30829d7133`.
+**Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Tasks 1-3
+verified foundations recorded on `65cb2d5`.
+
+## M2 foundation checkpoint
+
+The verified M2 foundation checkpoint is the exact committed tree at
+`65cb2d5` (`fix(revenue): reconcile M2 policy receipts`). The three bounded
+foundation gates are approved:
+
+| Foundation | Result |
+|---|---|
+| Task 1 authorization chain | **APPROVED** — canonical Task 1 authorization and owner-envelope binding are required before publication. |
+| Task 2 address-pinned transport and robots policy | **APPROVED** — DNS classification, direct-IP transport, Host/SNI binding, redirect and body limits, robots policy, abort disposal, and immutable receipts are enforced. |
+| Task 3 conditional evidence store | **APPROVED** — publication is conditional on the canonical authorization, source-policy decision, complete receipt chain, and verified filesystem identity. |
+
+The complete checkpoint verification sequence was:
+
+| Check | Result |
+|---|---|
+| `npm run check:safety` | PASS |
+| `npm test` | PASS — 565 total, 563 passed, 0 failed, 2 skipped; both skips are Windows symlink-privilege cases |
+| `npm run typecheck` | PASS |
+| `npm run lint` | PASS |
+| `npm run build:cloudflare` | PASS — 2018 files sanitized, 0 local secret values |
+| `npx wrangler deploy --env="" --dry-run --autoconfig false` | PASS — no upload; generated duplicate-options warnings were nonblocking |
+| `npm run test:owner-ui` | PASS — desktop list 382 ms, dossier 568 ms, widths 1440/390, WCAG pages 6, external requests 0 |
+
+Current production, staging, and automation state is unchanged and off. This
+checkpoint performed no network, provider, DNS, database, migration,
+deployment, send, or spend action. Authority, cost, network, provider,
+outreach, and send remain zero/off as applicable, and
+`contactReview.status` remains `NOT_RECORDED`.
+
+The zero-cost mailbox decision remains a hard gate: there are **zero paid
+mailbox seats**. The only in-scope mail paths are Cloudflare Email Routing for
+inbound forwarding and a separately gated Resend Free or separately reviewed
+free owner-only send-as path for outbound/reply. If those free paths cannot
+satisfy reply ownership and privacy gates, mail activation remains blocked.
+Paid mailboxes and Workspace are out of scope unless Riley explicitly reverses
+that decision.
+
+The completed gate covers local M2 foundations only; it does not authorize or
+perform real-business capture. Remaining blockers are approval and
+implementation of Task 4 composition, a real exact-ten research packet with
+rights and owner approval, a local database receipt, and supervised
+one-then-ten business execution. The Task 4 composition design review remains
+unresolved until its design is approved and finalized for implementation.
+
+The next three actions are:
+
+1. Approve and finalize the Task 4 design, then implement it.
+2. Implement Tasks 5-6 composition and orchestrator work.
+3. Prepare the Task 7 packet for owner approval.
 
 ## Owner-facing state
 
