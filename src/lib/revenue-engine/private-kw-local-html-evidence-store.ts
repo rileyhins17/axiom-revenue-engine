@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
+import {
+  PrivateKwM2ExecutionAuthorizationSchema,
+  type PrivateKwM2ExecutionAuthorization,
+} from "@/lib/revenue-engine/private-kw-m2-authorization";
+
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const PRIVATE_KW_EVIDENCE_PARENT = path.resolve(REPOSITORY_ROOT, "data", "kw-evaluation");
 export const PRIVATE_KW_EVIDENCE_ROOT = path.join(PRIVATE_KW_EVIDENCE_PARENT, "m2-evidence");
@@ -49,6 +54,7 @@ export interface PrivateKwEvidenceMetadataInput {
   parentReceiptDigest: string;
   authorizationDigest: string;
   authorizationExpiresAt: string;
+  authorization: PrivateKwM2ExecutionAuthorization;
   retentionDecision?: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED";
   retainUntil?: string;
   reviewAt?: string;
@@ -212,12 +218,26 @@ function samePath(left: string, right: string) {
     : normalizedLeft === normalizedRight;
 }
 
+async function assertSafeArtifactAncestors(root: string, file: string) {
+  const relative = path.relative(root, file);
+  if (!relative || path.isAbsolute(relative) || relative === ".." || relative.startsWith(`..${path.sep}`)) {
+    throw new Error("UNSAFE_PATH: evidence artifact must remain below the approved root.");
+  }
+  const segments = relative.split(path.sep).slice(0, -1);
+  let current = root;
+  await assertDirectory(current, current);
+  for (const segment of segments) {
+    current = path.join(current, segment);
+    await assertDirectory(current, current);
+  }
+}
+
 function assertDigest(value: string, label: string) {
   if (!HASH.test(value)) throw new Error(`${label} must be a lowercase SHA-256 digest.`);
 }
 
 function assertBranchInput(input: PrivateKwEvidenceMetadataInput & { outcome: string }, nowMs = Date.now()) {
-  const parsed = z.object({
+  const common = {
     businessId: z.string().trim().min(1).max(200),
     sourceId: z.string().trim().min(1).max(200),
     requestedUrl: UrlSchema,
@@ -233,12 +253,17 @@ function assertBranchInput(input: PrivateKwEvidenceMetadataInput & { outcome: st
     parentReceiptDigest: DigestSchema,
     authorizationDigest: DigestSchema,
     authorizationExpiresAt: IsoDateSchema,
+    authorization: z.unknown(),
     retentionDecision: z.enum(["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY", "BLOCKED"]),
     retainUntil: IsoDateSchema.optional(),
     reviewAt: IsoDateSchema.optional(),
     legalHold: z.boolean().optional(),
-    outcome: z.string(),
-  }).passthrough().parse(input);
+  };
+  const parsed = z.discriminatedUnion("outcome", [
+    z.object({ ...common, outcome: z.literal("RAW_HTML_ALLOWED"), contentType: z.literal("text/html"), bytes: z.instanceof(Uint8Array) }).strict(),
+    z.object({ ...common, outcome: z.literal("DERIVED_FACTS_ONLY"), captureBytes: z.instanceof(Uint8Array), facts: FactsSchema, rawArtifactRef: z.null() }).strict(),
+    z.object({ ...common, outcome: z.literal("BLOCKED"), blockCode: z.string().regex(/^[A-Z0-9_:-]{1,120}$/) }).strict(),
+  ]).parse(input);
   if (parsed.retentionDecision !== parsed.outcome) {
     throw new Error("Retention decision must exactly match the evidence outcome.");
   }
@@ -247,6 +272,21 @@ function assertBranchInput(input: PrivateKwEvidenceMetadataInput & { outcome: st
   }
   assertDigest(parsed.parentReceiptDigest, "parentReceiptDigest");
   assertDigest(parsed.authorizationDigest, "authorizationDigest");
+  const authorization = PrivateKwM2ExecutionAuthorizationSchema.parse(parsed.authorization);
+  const decision = authorization.sourceDecisions.find((candidate) => candidate.businessId === parsed.businessId);
+  if (!decision || authorization.businessIds.indexOf(parsed.businessId) < 0) throw new Error("Evidence business is absent from the exact execution authorization.");
+  if (decision.evidenceRetention !== parsed.outcome) throw new Error("Evidence outcome does not match the exact authorized retention decision.");
+  if (parsed.authorizationDigest !== authorization.authorizationDigest || parsed.authorizationExpiresAt !== authorization.expiresAt) {
+    throw new Error("Evidence authorization identity must match the exact execution authorization.");
+  }
+  if (parsed.sourcePolicyVersion !== authorization.websitePolicyVersion) throw new Error("Evidence source policy must match the exact execution authorization policy.");
+  if (decision.websiteUrl !== null && parsed.requestedUrl !== decision.websiteUrl) throw new Error("Evidence URL does not match the exact authorized website.");
+  if (parsed.outcome === "RAW_HTML_ALLOWED" && (decision.sourceRights !== "PUBLIC_SOURCE_REVIEWED" || decision.termsDecision !== "TERMS_REVIEWED_FOR_FACTS" || decision.robotsDecision !== "ROBOTS_REVIEWED_PUBLIC_ONLY")) {
+    throw new Error("RAW_HTML_ALLOWED requires the exact reviewed public-source policy decision.");
+  }
+  if (authorization.authority.liveSourceAuthorized || authorization.authority.artifactStorageAuthorized || authorization.authority.providerOperationsAuthorized !== 0 || authorization.authority.costAuthorizedUsd !== 0) {
+    throw new Error("Evidence authorization contains disallowed authority.");
+  }
   return parsed;
 }
 
@@ -301,7 +341,8 @@ function assertRegularIdentity(pathStats: { isFile(): boolean; isSymbolicLink():
   if (pathStats.dev !== handleStats.dev || pathStats.ino !== handleStats.ino) throw new Error("IDENTITY_CHANGED: evidence file identity changed.");
 }
 
-async function readVerifiedFile(file: string, expectedDigest?: string, expectedLength?: number, maxLength?: number) {
+async function readVerifiedFile(file: string, expectedDigest?: string, expectedLength?: number, maxLength?: number, root?: string) {
+  if (root) await assertSafeArtifactAncestors(root, file);
   const handle = await open(file, "r");
   try {
     const handleStats = await handle.stat({ bigint: true });
@@ -312,6 +353,7 @@ async function readVerifiedFile(file: string, expectedDigest?: string, expectedL
     const bytes = await handle.readFile();
     const after = await lstat(file, { bigint: true });
     assertRegularIdentity(after, handleStats);
+    if (root) await assertSafeArtifactAncestors(root, file);
     if (after.size !== BigInt(bytes.byteLength)) throw new Error("LENGTH_MISMATCH: evidence length changed during read.");
     if (expectedDigest !== undefined && sha256(bytes) !== expectedDigest) throw new Error("DIGEST_MISMATCH: evidence bytes do not match their content reference.");
     return bytes;
@@ -320,28 +362,38 @@ async function readVerifiedFile(file: string, expectedDigest?: string, expectedL
   }
 }
 
-async function publishExclusive(file: string, bytes: Uint8Array, digest: string, maxBytes: number) {
+async function publishExclusive(root: string, file: string, bytes: Uint8Array, digest: string, maxBytes: number) {
   if (bytes.byteLength <= 0 || bytes.byteLength > maxBytes) throw new Error("Evidence bytes exceed the bounded store limit.");
   const directory = path.dirname(file);
+  await assertSafeArtifactAncestors(root, file);
   const temp = path.join(directory, `.tmp-${process.pid}-${randomUUID()}.part`);
   const handle = await open(temp, "wx");
   try {
     await handle.writeFile(bytes);
     await handle.sync();
+    const tempHandleStats = await handle.stat({ bigint: true });
+    const tempPathStats = await lstat(temp, { bigint: true });
+    assertRegularIdentity(tempPathStats, tempHandleStats);
+    if (tempHandleStats.size !== BigInt(bytes.byteLength) || sha256(bytes) !== digest) throw new Error("DIGEST_MISMATCH: temporary bytes do not match their content reference.");
+    await assertSafeArtifactAncestors(root, file);
+    try {
+      await link(temp, file);
+      const finalPathStats = await lstat(file, { bigint: true });
+      assertRegularIdentity(finalPathStats, tempHandleStats);
+      await assertSafeArtifactAncestors(root, file);
+      const published = await readVerifiedFile(file, digest, bytes.byteLength, undefined, root);
+      if (!published.equals(Buffer.from(bytes))) throw new Error("EXISTING_OBJECT_MISMATCH: published object differs.");
+      await unlink(temp);
+      return "CREATED" as const;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const existing = await readVerifiedFile(file, digest, bytes.byteLength, undefined, root);
+      if (!existing.equals(Buffer.from(bytes))) throw new Error("EXISTING_OBJECT_MISMATCH: immutable object differs.");
+      await unlink(temp);
+      return "REUSED" as const;
+    }
   } finally {
     await handle.close();
-  }
-  await readVerifiedFile(temp, digest, bytes.byteLength);
-  try {
-    await link(temp, file);
-    await unlink(temp);
-    return "CREATED" as const;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    const existing = await readVerifiedFile(file, digest, bytes.byteLength);
-    if (!existing.equals(Buffer.from(bytes))) throw new Error("EXISTING_OBJECT_MISMATCH: immutable object differs.");
-    await unlink(temp);
-    return "REUSED" as const;
   }
 }
 
@@ -404,7 +456,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     const metadataDirectory = await ensureShardDirectory(root, "metadata", ref.slice(-64));
     const file = path.join(metadataDirectory, `${ref.slice(-64)}.json`);
     const bytes = Buffer.from(`${JSON.stringify({ ...core, metadataRef: ref }, null, 2)}\n`, "utf8");
-    const operation = await publishExclusive(file, bytes, sha256(bytes), MAX_JSON_BYTES);
+    const operation = await publishExclusive(root, file, bytes, sha256(bytes), MAX_JSON_BYTES);
     return { file, operation };
   }
 
@@ -422,10 +474,11 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     const metadataPath = path.join(metadataDirectory, `${metadataDigest}.json`);
     const existingContent = await optionalFileExists(contentPath);
     const existingMetadata = await optionalFileExists(metadataPath);
+    if (!existingContent && existingMetadata) throw new Error("INCOMPLETE_EXISTING: raw metadata exists without its content object.");
     if (existingContent && !existingMetadata && !(await hasMetadataForContent(contentRef(digest)))) {
       throw new Error("INCOMPLETE_EXISTING: raw content exists without a complete metadata pair.");
     }
-    const contentOperation = await publishExclusive(contentPath, bytes, digest, MAX_HTML_BYTES);
+    const contentOperation = await publishExclusive(root, contentPath, bytes, digest, MAX_HTML_BYTES);
     const metadata = await writeMetadata(parsedCore, metadataRef(metadataDigest));
     return {
       outcome: "RAW_HTML_ALLOWED" as const,
@@ -449,7 +502,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
         if (stats.isDirectory()) {
           await walk(full);
         } else if (path.extname(child).toLowerCase() === ".json") {
-          const bytes = await readVerifiedFile(full, undefined, undefined, MAX_JSON_BYTES);
+          const bytes = await readVerifiedFile(full, undefined, undefined, MAX_JSON_BYTES, root);
           const metadata = StoredMetadataSchema.parse(JSON.parse(bytes.toString("utf8")));
           if (metadata.contentRef === ref) found.value = true;
         }
@@ -487,7 +540,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     if (existingMetadata !== existingFacts) throw new Error("INCOMPLETE_EXISTING: derived facts pair is incomplete.");
     const metadata = await writeMetadata(parsedCore, metadataRef(metadataDigest));
     const factsBytes = Buffer.from(`${JSON.stringify({ ...factsCore, factsRef: factsRef(factsDigest) }, null, 2)}\n`);
-    const facts = await publishExclusive(factsFile, factsBytes, sha256(factsBytes), MAX_JSON_BYTES);
+    const facts = await publishExclusive(root, factsFile, factsBytes, sha256(factsBytes), MAX_JSON_BYTES);
     void factsJson;
     return {
       outcome: "DERIVED_FACTS_ONLY" as const,
@@ -518,7 +571,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     const directory = await ensureShardDirectory(root, "receipts", digest);
     const file = path.join(directory, `${digest}.json`);
     const bytes = Buffer.from(`${JSON.stringify({ ...receiptCore, receiptRef: ref }, null, 2)}\n`);
-    const operation = await publishExclusive(file, bytes, sha256(bytes), MAX_JSON_BYTES);
+    const operation = await publishExclusive(root, file, bytes, sha256(bytes), MAX_JSON_BYTES);
     return { outcome: "BLOCKED" as const, receiptRef: ref, receiptPath: file, blockCode: input.blockCode, executionPath: operation === "REUSED" ? "EXACT_REPLAY" as const : "CREATED" as const };
   }
 
@@ -543,7 +596,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
       const digest = parsed.receiptRef.slice(-64);
       const expectedReceiptPath = expectedArtifactPath(root, "receipts", digest, "json");
       assertExpectedArtifactPath(parsed.receiptPath, expectedReceiptPath, "Blocked receipt");
-      const bytes = await readVerifiedFile(expectedReceiptPath, undefined, undefined, MAX_JSON_BYTES);
+      const bytes = await readVerifiedFile(expectedReceiptPath, undefined, undefined, MAX_JSON_BYTES, root);
       const receipt = StoredReceiptSchema.parse(JSON.parse(bytes.toString("utf8")));
       const { receiptRef: storedReceiptRef, ...receiptCore } = receipt;
       if (storedReceiptRef !== parsed.receiptRef || receipt.blockCode !== parsed.blockCode || receiptRef(digest) !== parsed.receiptRef || sha256(canonicalize(receiptCore)) !== digest) throw new Error("BLOCKED receipt identity mismatch.");
@@ -552,7 +605,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     const metadataDigest = parsed.metadataRef.slice(-64);
     const expectedMetadataPath = expectedArtifactPath(root, "metadata", metadataDigest, "json");
     assertExpectedArtifactPath(parsed.metadataPath, expectedMetadataPath, "Metadata");
-    const metadataBytes = await readVerifiedFile(expectedMetadataPath, undefined, undefined, MAX_JSON_BYTES);
+    const metadataBytes = await readVerifiedFile(expectedMetadataPath, undefined, undefined, MAX_JSON_BYTES, root);
     const metadata = StoredMetadataSchema.parse(JSON.parse(metadataBytes.toString("utf8")));
     const { metadataRef: storedMetadataRef, ...metadataCoreValue } = metadata;
     if (storedMetadataRef !== parsed.metadataRef || sha256(canonicalize(metadataCoreValue)) !== metadataDigest) throw new Error("MALFORMED_METADATA: metadata digest mismatch.");
@@ -561,7 +614,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     if (parsed.outcome === "RAW_HTML_ALLOWED") {
       const expectedContentPath = expectedArtifactPath(root, "objects", contentDigest, "html");
       assertExpectedArtifactPath(parsed.contentPath, expectedContentPath, "Raw content");
-      const bytes = await readVerifiedFile(expectedContentPath, contentDigest, metadata.contentByteLength);
+      const bytes = await readVerifiedFile(expectedContentPath, contentDigest, metadata.contentByteLength, undefined, root);
       if (metadata.outcome !== "RAW_HTML_ALLOWED") throw new Error("Metadata outcome mismatch.");
       return { outcome: "RAW_HTML_ALLOWED", bytes, metadata };
     }
@@ -569,7 +622,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     const factsDigest = parsed.factsRef.slice(-64);
     const expectedFactsPath = expectedArtifactPath(root, "facts", factsDigest, "json");
     assertExpectedArtifactPath(parsed.factsPath, expectedFactsPath, "Facts");
-    const factsBytes = await readVerifiedFile(expectedFactsPath, undefined, undefined, MAX_JSON_BYTES);
+    const factsBytes = await readVerifiedFile(expectedFactsPath, undefined, undefined, MAX_JSON_BYTES, root);
     const facts = StoredFactsSchema.parse(JSON.parse(factsBytes.toString("utf8")));
     const { factsRef: storedFactsRef, ...factsCoreValue } = facts;
     if (storedFactsRef !== parsed.factsRef || facts.contentRef !== parsed.contentRef || facts.metadataRef !== parsed.metadataRef || sha256(canonicalize(factsCoreValue)) !== factsDigest) throw new Error("Facts identity mismatch.");

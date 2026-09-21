@@ -96,6 +96,8 @@ const privateKwM1WebsiteCheckpoint = await readFile(new URL("./execute-private-k
 const privateKwM1Dossier = await readFile(new URL("./execute-private-kw-m1-dossier.ts", import.meta.url), "utf8");
 const privateKwM2Authorization = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-authorization.ts", import.meta.url), "utf8");
 const privateKwM2AuthorizationCli = await readFile(new URL("./prepare-private-kw-m2-authorization.ts", import.meta.url), "utf8");
+const privateKwLocalHtmlEvidenceStore = await readFile(new URL("../src/lib/revenue-engine/private-kw-local-html-evidence-store.ts", import.meta.url), "utf8");
+const privateKwLocalHtmlEvidenceStoreTest = await readFile(new URL("../src/lib/revenue-engine/private-kw-local-html-evidence-store.test.ts", import.meta.url), "utf8");
 const privateKwLocalPlanExecutor = await readFile(new URL("./private-kw-local-plan-executor.ts", import.meta.url), "utf8");
 const privateKwAssessmentProgressProof = await readFile(new URL("../src/lib/revenue-engine/private-kw-assessment-progress-proof.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
@@ -218,6 +220,17 @@ requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM
 requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /costAuthorizedUsd:\s*z\.literal\(0\)/, "M2 authorization contracts must authorize zero cost");
 requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /fixtureOnly:\s*z\.literal\(true\)/, "M2 mapping policy must remain explicitly fixture-only");
 requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /productionAssessmentApprovalAuthorized:\s*z\.literal\(false\)/, "Task 1 must not authorize a production assessment approval");
+requireMatch("src/lib/revenue-engine/private-kw-local-html-evidence-store.ts", privateKwLocalHtmlEvidenceStore, /data\/kw-evaluation\/m2-evidence/, "M2 evidence must stay under the fixed ignored direct-child root");
+requireMatch("src/lib/revenue-engine/private-kw-local-html-evidence-store.ts", privateKwLocalHtmlEvidenceStore, /open\(temp,\s*["']wx["']\)/, "M2 evidence publication must use exclusive temporary files");
+requireMatch("src/lib/revenue-engine/private-kw-local-html-evidence-store.ts", privateKwLocalHtmlEvidenceStore, /await link\(temp,\s*file\)/, "M2 evidence publication must use no-replace hard-link publication");
+requireMatch("src/lib/revenue-engine/private-kw-local-html-evidence-store.ts", privateKwLocalHtmlEvidenceStore, /assertSafeArtifactAncestors/, "M2 evidence publication must revalidate every fixed ancestor");
+requireMatch("src/lib/revenue-engine/private-kw-local-html-evidence-store.ts", privateKwLocalHtmlEvidenceStore, /assertRegularIdentity/, "M2 evidence reload/publication must prove opened-handle identity");
+requireMatch("src/lib/revenue-engine/private-kw-local-html-evidence-store.ts", privateKwLocalHtmlEvidenceStore, /PrivateKwM2ExecutionAuthorizationSchema\.parse/, "M2 raw evidence must consume the exact Task 1 authorization schema");
+requireMatch("src/lib/revenue-engine/private-kw-local-html-evidence-store.ts", privateKwLocalHtmlEvidenceStore, /\.strict\(\)/, "M2 evidence input and stored schemas must reject unknown fields");
+requireMatch("src/lib/revenue-engine/private-kw-local-html-evidence-store.test.ts", privateKwLocalHtmlEvidenceStoreTest, /metadata object left without its content pair/, "M2 evidence tests must cover metadata-only crash state");
+requireMatch("src/lib/revenue-engine/private-kw-local-html-evidence-store.test.ts", privateKwLocalHtmlEvidenceStoreTest, /exact authorized retention decision/, "M2 evidence tests must cover copied or changed authorization decisions");
+forbidMatch("src/lib/revenue-engine/private-kw-local-html-evidence-store.ts", privateKwLocalHtmlEvidenceStore, /rename\s*\(|copyFile\s*\(|globalThis\.fetch|\bfetch\s*\(|D1Database|R2Bucket|@cloudflare|process\.env/i, "M2 local evidence must not use overwrite-capable publication, network, provider, database, or runtime authority");
+forbidMatch("src/lib/revenue-engine/private-kw-local-html-evidence-store.ts", privateKwLocalHtmlEvidenceStore, /\.passthrough\(\)|rawArtifactRef:\s*z\.string|body:\s*z\.|html:\s*z\.|headers:\s*z\.|cookies:\s*z\./i, "M2 evidence input must not permit passthrough or body-bearing derived-facts fields");
 requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /migrationRange:\s*z\.literal\(PRIVATE_KW_M2_DATABASE_MIGRATION_RANGE\)/, "M2 database receipt must bind the canonical migration range");
 requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /localOnly:\s*z\.literal\(true\)/, "M2 database receipt must remain local-only");
 for (const moduleName of ["node:http", "node:https", "node:dns/promises", "node:net"]) {
