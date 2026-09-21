@@ -90,6 +90,7 @@ const privateKwOwnerLabelingRecordCli = await readFile(new URL("./record-private
 const privateKwWebsiteEvidenceEligibilityD1 = await readFile(new URL("../src/lib/revenue-engine/private-kw-current-website-evidence-eligibility-d1.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceProgress = await readFile(new URL("../src/lib/revenue-engine/private-kw-current-website-evidence-progress.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceProgressAppend = await readFile(new URL("../src/lib/revenue-engine/private-kw-current-website-evidence-progress-append.ts", import.meta.url), "utf8");
+const privateKwM1WebsiteCheckpoint = await readFile(new URL("./execute-private-kw-m1-website-checkpoint.ts", import.meta.url), "utf8");
 const privateKwAssessmentProgressProof = await readFile(new URL("../src/lib/revenue-engine/private-kw-assessment-progress-proof.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
 const ownerLabelingWorkspace = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-workspace.ts", import.meta.url), "utf8");
@@ -235,6 +236,14 @@ requireMatch("src/lib/revenue-engine/private-kw-source-workflow-progress.ts", pr
 requireMatch("src/lib/revenue-engine/private-kw-source-workflow-progress.ts", privateKwSourceWorkflowProgress, /closure\.expected\.terminalReceiptId !== plan\.workflowReceiptId/, "the source/workflow adapter must prove the workflow receipt is terminal");
 requireMatch("src/lib/revenue-engine/private-kw-source-workflow-progress.ts", privateKwSourceWorkflowProgress, /privateKwShadowSliceProgressAuthority\(\)/, "the source/workflow adapter must use the central zero-authority progress contract");
 forbidMatch("src/lib/revenue-engine/private-kw-source-workflow-progress.ts", privateKwSourceWorkflowProgress, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "source/workflow progress normalization must not access providers, runtime bindings, databases, network, or writes");
+requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /createPrivateKwCurrentWebsiteEvidenceFixture/, "the M1 website checkpoint must use the committed fixture evidence workflow");
+requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /createPrivateKwLocalD1Adapter/, "the M1 website checkpoint must use the supplied local SQLite D1 adapter");
+requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /executePrivateKwSourceWorkflowPlanForLocalDatabase/, "the M1 website checkpoint must execute the real local source materialization writer");
+requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /writeOrVerifyPrivateKwJson/, "the M1 website checkpoint must use the exact replay-safe JSON boundary");
+for (const field of ["workerRuntimeConnected: false", "networkOperationsPerformed: 0", "providerOperationsAuthorized: 0", "contactDiscoveryExecutionAuthorized: false", "contactVerificationExecutionAuthorized: false", "consentDecisionAuthorized: false", "qualificationExecutionAuthorized: false", "outreachAuthorized: false", "sendAuthorized: false", "costAuthorizedUsd: 0"]) {
+  requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, new RegExp(field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `the M1 website checkpoint must retain ${field}`);
+}
+forbidMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /wrangler|@cloudflare|fetch\s*\(|D1Database|R2Bucket|executePrivateRevenueLeadAssessmentD1|readOwnerLeadDetail|\.send\s*\(|\.delete\s*\(/i, "the M1 website checkpoint must remain local, offline, and before assessment or owner-dossier execution");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-shadow-slice/, "the inert engine must not wire the shadow-slice planner to runtime");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-shadow-slice-progress|record-private-kw-shadow-progress/, "the inert engine must not wire shadow progress recording to runtime");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-source-workflow-progress|prepare-private-kw-source-workflow-progress/, "the inert engine must not wire local progress proof preparation to runtime");
