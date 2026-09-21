@@ -38,6 +38,8 @@ function lastRowId(value: number | bigint) {
   return typeof value === "bigint" ? value.toString() : value;
 }
 
+let savepointCounter = 0;
+
 function executeBatchStatement(
   database: Database.Database,
   statement: PrivateKwLocalD1Statement,
@@ -131,10 +133,21 @@ export function createPrivateKwLocalD1Adapter(database: Database.Database): Priv
     },
     async batch(statements) {
       assertOpen(database);
-      const transaction = database.transaction((items: readonly PrivateKwLocalD1Statement[]) => (
-        items.map((statement) => executeBatchStatement(database, statement))
-      ));
-      return transaction(statements);
+      const execute = () => statements.map((statement) => executeBatchStatement(database, statement));
+      if (!database.inTransaction) {
+        return database.transaction(execute).immediate();
+      }
+      const savepoint = `private_kw_d1_batch_${++savepointCounter}`;
+      database.exec(`SAVEPOINT "${savepoint}"`);
+      try {
+        const result = execute();
+        database.exec(`RELEASE SAVEPOINT "${savepoint}"`);
+        return result;
+      } catch (error) {
+        database.exec(`ROLLBACK TO SAVEPOINT "${savepoint}"`);
+        database.exec(`RELEASE SAVEPOINT "${savepoint}"`);
+        throw error;
+      }
     },
   };
 }

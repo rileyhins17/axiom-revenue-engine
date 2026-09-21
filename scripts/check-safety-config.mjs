@@ -91,6 +91,7 @@ const privateKwWebsiteEvidenceEligibilityD1 = await readFile(new URL("../src/lib
 const privateKwWebsiteEvidenceProgress = await readFile(new URL("../src/lib/revenue-engine/private-kw-current-website-evidence-progress.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceProgressAppend = await readFile(new URL("../src/lib/revenue-engine/private-kw-current-website-evidence-progress-append.ts", import.meta.url), "utf8");
 const privateKwM1WebsiteCheckpoint = await readFile(new URL("./execute-private-kw-m1-website-checkpoint.ts", import.meta.url), "utf8");
+const privateKwLocalPlanExecutor = await readFile(new URL("./private-kw-local-plan-executor.ts", import.meta.url), "utf8");
 const privateKwAssessmentProgressProof = await readFile(new URL("../src/lib/revenue-engine/private-kw-assessment-progress-proof.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
 const ownerLabelingWorkspace = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-workspace.ts", import.meta.url), "utf8");
@@ -240,10 +241,17 @@ requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1W
 requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /createPrivateKwLocalD1Adapter/, "the M1 website checkpoint must use the supplied local SQLite D1 adapter");
 requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /executePrivateKwSourceWorkflowPlanForLocalDatabase/, "the M1 website checkpoint must execute the real local source materialization writer");
 requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /writeOrVerifyPrivateKwJson/, "the M1 website checkpoint must use the exact replay-safe JSON boundary");
+requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /runPrivateKwLocalAsyncWriteUnit/, "the M1 website checkpoint must own one outer local atomic unit");
+requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /afterCompleteness/, "the M1 website checkpoint must retain the deterministic rollback seam");
+requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /SYNTHETIC_R2_HEAD_SHAPED_FIXTURE/, "synthetic provider-shaped receipts must remain visibly labelled");
 for (const field of ["workerRuntimeConnected: false", "networkOperationsPerformed: 0", "providerOperationsAuthorized: 0", "contactDiscoveryExecutionAuthorized: false", "contactVerificationExecutionAuthorized: false", "consentDecisionAuthorized: false", "qualificationExecutionAuthorized: false", "outreachAuthorized: false", "sendAuthorized: false", "costAuthorizedUsd: 0"]) {
   requireMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, new RegExp(field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `the M1 website checkpoint must retain ${field}`);
 }
 forbidMatch("scripts/execute-private-kw-m1-website-checkpoint.ts", privateKwM1WebsiteCheckpoint, /wrangler|@cloudflare|fetch\s*\(|D1Database|R2Bucket|executePrivateRevenueLeadAssessmentD1|readOwnerLeadDetail|\.send\s*\(|\.delete\s*\(/i, "the M1 website checkpoint must remain local, offline, and before assessment or owner-dossier execution");
+requireMatch("scripts/private-kw-local-plan-executor.ts", privateKwLocalPlanExecutor, /verifyDurableEvidencePreflight/, "local durable seeding must use the planner's exact verifier");
+requireMatch("scripts/private-kw-local-plan-executor.ts", privateKwLocalPlanExecutor, /verifyFencedEvidenceResumePreflight/, "local fenced seeding must use the planner's exact verifier");
+requireMatch("scripts/private-kw-local-plan-executor.ts", privateKwLocalPlanExecutor, /SAVEPOINT/, "nested local D1 batches must use explicit savepoints");
+forbidMatch("scripts/private-kw-local-plan-executor.ts", privateKwLocalPlanExecutor, /INSERT\s+OR\s+IGNORE\s+INTO\s+\"RevenueArtifactManifestAvailabilityReceipt\"/i, "availability seeding must fail closed on collisions instead of ignoring them");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-shadow-slice/, "the inert engine must not wire the shadow-slice planner to runtime");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-shadow-slice-progress|record-private-kw-shadow-progress/, "the inert engine must not wire shadow progress recording to runtime");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-source-workflow-progress|prepare-private-kw-source-workflow-progress/, "the inert engine must not wire local progress proof preparation to runtime");

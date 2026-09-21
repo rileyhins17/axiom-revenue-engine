@@ -86,6 +86,13 @@ import {
   writeOrVerifyPrivateKwJson,
 } from "./private-kw-files";
 import { createPrivateKwLocalD1Adapter } from "./private-kw-local-d1";
+import {
+  executePrivateKwLocalAvailabilityReceipt,
+  executePrivateKwLocalDurableEvidencePlan,
+  executePrivateKwLocalFencedEvidenceResumePlan,
+  runPrivateKwLocalAsyncWriteUnit,
+  sqlTables,
+} from "./private-kw-local-plan-executor";
 import { executePrivateKwSourceWorkflowPlanForLocalDatabase } from "./materialize-private-kw-source-workflow";
 
 const SOURCE_CLOCK_OFFSET_MS = 3.8 * 60_000;
@@ -99,6 +106,21 @@ const REQUIRED_TABLES = [
   "RevenuePrivateKwMaterializationReceipt", "RevenueArtifactManifest", "RevenueArtifactManifestItem",
   "RevenueArtifactManifestAvailabilityReceipt", "RevenueArtifactReferenceCompletenessReceipt",
   "RevenueArtifactReferenceSourceSetProof", "RevenueCurrentWebsiteEvidenceEligibilityReceipt",
+] as const;
+const SERVICE_MUTATED_TABLES = [
+  "RevenueSourceRun", "RevenueBusiness", "RevenueLocation", "RevenueSourceRecord",
+  "RevenuePrivateKwMaterializationReceipt", "RevenueWorkflowDefinition", "RevenueWorkflowRun",
+  "RevenueWorkflowDelivery", "RevenueWorkflowAttempt", "RevenueWorkflowLease", "RevenueWorkflowReceiptRevision",
+  "RevenueWorkflowAttemptClosure", "RevenueWorkflowStepReceipt", "RevenueWorkflowCheckpointPayload",
+  "RevenueWorkflowCheckpoint", "RevenueWorkflowCheckpointStateReceipt", "RevenueWorkflowCheckpointDependency",
+  "RevenueArtifactRecoveryPlan", "RevenueArtifactRecoveryReceipt", "RevenueWebsitePageSelection",
+  "RevenueWebsiteSelectedPage", "RevenueWebsitePageCandidate", "RevenueWebsiteAuditAssembly",
+  "RevenueArtifactManifest", "RevenueArtifactManifestItem", "RevenueArtifactEvidenceUse",
+  "RevenueArtifactEvidenceUseEnd", "RevenueArtifactPromotionReceipt", "RevenueArtifactPromotionUse",
+  "RevenueArtifactManifestEvidenceUse", "RevenueArtifactReleaseRecord", "RevenueArtifactReleaseUse",
+  "RevenueArtifactManifestAvailabilityReceipt", "RevenueArtifactReferenceSnapshotAttempt",
+  "RevenueArtifactReferenceCompletenessReceipt", "RevenueArtifactReferenceSourceSetProof",
+  "RevenueCurrentWebsiteEvidenceEligibilityReceipt",
 ] as const;
 
 const OperationSchema = z.object({
@@ -148,6 +170,7 @@ const ResultSchema = z.object({
   websiteEvidence: z.object({
     workflowExecutionPath: z.literal("FIXTURE"),
     synthetic: z.literal(true),
+    availabilityReceiptKind: z.literal("SYNTHETIC_R2_HEAD_SHAPED_FIXTURE"),
     networkOperationsPerformed: z.literal(0),
     providerOperationsAuthorized: z.literal(0),
     costAuthorizedUsd: z.literal(0),
@@ -164,6 +187,9 @@ const ResultSchema = z.object({
 
 export type PrivateKwM1WebsiteCheckpointOperation = z.infer<typeof OperationSchema>;
 export type PrivateKwM1WebsiteCheckpointResult = z.infer<typeof ResultSchema>;
+export type PrivateKwM1WebsiteCheckpointTestHooks = Readonly<{
+  afterCompleteness?: () => void;
+}>;
 
 function deepFreeze<T>(value: T): T {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
@@ -194,13 +220,6 @@ function parseOperation(value: unknown) {
   return { operation, files, now: new Date(operation.now) };
 }
 
-function applyLocalMutations(database: Database.Database, mutations: readonly { sql: string; bindings: readonly (string | number | null)[] }[]) {
-  const run = database.transaction(() => {
-    for (const mutation of mutations) database.prepare(mutation.sql).run(...mutation.bindings);
-  });
-  run();
-}
-
 function availabilityObjects(manifest: { items: readonly { kind: string; artifactRef: string; objectKey: string; byteLength: number; sha256: string; etag: string }[] }) {
   return manifest.items.map((item): ArtifactManifestObjectAvailability => ({
     kind: item.kind as ArtifactManifestObjectAvailability["kind"],
@@ -222,7 +241,7 @@ function seedWebsiteEvidenceRows(database: Database.Database, fixture: Awaited<R
     persistencePlanVersion: DURABLE_EVIDENCE_PERSISTENCE_PLAN_VERSION,
     targetSchemaVersion: DURABLE_EVIDENCE_TARGET_SCHEMA_VERSION,
   });
-  applyLocalMutations(database, durable.mutations);
+  const durableExecution = executePrivateKwLocalDurableEvidencePlan(database, durable);
 
   const definition = currentFixtureWebsiteEvidenceDefinition();
   const requestDigest = fixtureWebsiteEvidenceRequestDigest(fixture.workflowRequest);
@@ -297,8 +316,9 @@ function seedWebsiteEvidenceRows(database: Database.Database, fixture: Awaited<R
       artifactRecoveries: [],
     },
   });
-  applyLocalMutations(database, resume.mutations);
+  const resumeExecution = executePrivateKwLocalFencedEvidenceResumePlan(database, resume);
 
+  const availabilityExecutions = [] as Array<{ executionPath: "FRESH_COMMIT" | "EXACT_REPLAY"; insertedRows: number }>;
   for (const [index, manifest] of fixture.workflowReceipt.artifactManifests.entries()) {
     const availability = createArtifactManifestAvailabilityReceipt({
       receiptId: stableUuid(`website-availability:${fixture.workflowRequest.idempotencyKey}:${index}`),
@@ -309,29 +329,15 @@ function seedWebsiteEvidenceRows(database: Database.Database, fixture: Awaited<R
       checkerKind: "R2_HEAD",
       objects: availabilityObjects(manifest),
     });
-    database.prepare(`INSERT OR IGNORE INTO "RevenueArtifactManifestAvailabilityReceipt" (
-      "id", "availabilityVersion", "manifestId", "state", "checkedAt", "validThrough", "expiresAt", "checkerKind",
-      "objectSetDigest", "receiptDigest", "receiptJson", "providerReadPerformed", "providerOperationsAuthorized",
-      "releaseAuthorized", "deletionAuthorized", "costUsd"
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0)`).run(
-      availability.receiptId, availability.availabilityVersion, availability.manifestId, availability.state,
-      availability.checkedAt, availability.validThrough, availability.expiresAt, availability.checkerKind,
-      availability.objectSetDigest, availability.receiptDigest, artifactReferenceCanonicalJson(availability),
-      availability.providerReadPerformed ? 1 : 0,
-    );
+    availabilityExecutions.push(executePrivateKwLocalAvailabilityReceipt(database, availability));
   }
+  return { durable, resume, availabilityReceipts: fixture.workflowReceipt.artifactManifests.map((_, index) => index), durableExecution, resumeExecution, availabilityExecutions };
 }
 
-function counts(database: Database.Database) {
-  const tables = [
-    "RevenueSourceRun", "RevenueBusiness", "RevenueLocation", "RevenueSourceRecord",
-    "RevenueWorkflowDefinition", "RevenueWorkflowRun", "RevenueWorkflowDelivery", "RevenueWorkflowAttempt",
-    "RevenueWorkflowReceiptRevision", "RevenueWorkflowAttemptClosure", "RevenuePrivateKwMaterializationReceipt",
-    "RevenueArtifactManifest", "RevenueArtifactManifestItem", "RevenueArtifactManifestAvailabilityReceipt",
-    "RevenueArtifactReferenceCompletenessReceipt", "RevenueArtifactReferenceSourceSetProof",
-    "RevenueCurrentWebsiteEvidenceEligibilityReceipt",
-  ];
-  return Object.fromEntries(tables.map((table) => [table, (database.prepare(`SELECT COUNT(*) AS "count" FROM "${table}"`).get() as { count: number }).count]));
+function counts(database: Database.Database, tables: Iterable<string>) {
+  const existing = new Set((database.prepare(`SELECT "name" FROM "sqlite_master" WHERE "type" = 'table'`).all() as Array<{ name: string }>).map((row) => row.name));
+  const sortedTables = [...new Set(tables)].filter((table) => existing.has(table)).sort((left, right) => left.localeCompare(right, "en-CA"));
+  return Object.fromEntries(sortedTables.map((table) => [table, (database.prepare(`SELECT COUNT(*) AS "count" FROM "${table}"`).get() as { count: number }).count]));
 }
 
 function existingEligibility(database: Database.Database, businessId: string) {
@@ -345,7 +351,10 @@ function existingEligibility(database: Database.Database, businessId: string) {
  * fixture or the supplied SQLite handle; this module has no Worker/runtime,
  * network, provider, contact, qualification, outreach, send, or cost path.
  */
-export async function executePrivateKwM1WebsiteCheckpoint(value: unknown): Promise<PrivateKwM1WebsiteCheckpointResult> {
+export async function executePrivateKwM1WebsiteCheckpoint(
+  value: unknown,
+  hooks: PrivateKwM1WebsiteCheckpointTestHooks = {},
+): Promise<PrivateKwM1WebsiteCheckpointResult> {
   const { operation, files, now } = parseOperation(value);
   const [sourceRead, materializationRead, manifestRead] = await Promise.all([
     readPrivateKwJson(files.sourcePlan, MAX_JSON_BYTES),
@@ -402,59 +411,57 @@ export async function executePrivateKwM1WebsiteCheckpoint(value: unknown): Promi
       availabilityReceiptValues: fixture.availabilityReceipts,
       preparedAt: fixture.preparedAt,
     });
-    seedWebsiteEvidenceRows(database, fixture, now);
-    const adapter = createPrivateKwLocalD1Adapter(database);
-    const atomicExecutions = [] as Awaited<ReturnType<typeof executeArtifactReferenceD1Snapshot>>[];
-    for (const [index, artifact] of fixture.workflowReceipt.artifactManifests.entries()) {
-      const requestedAt = fixture.workflowRequest.requestedAt;
-      atomicExecutions.push(await executeArtifactReferenceD1Snapshot(adapter, buildArtifactReferenceAtomicPlan({
-        attemptId: stableUuid(`website-snapshot:${fixture.workflowRequest.idempotencyKey}:${index}`),
-        workflowRunId: fixture.workflowRequest.workflowId,
-        businessId: fixture.workflowRequest.businessId,
-        lineageRootManifestId: artifact.manifestId,
-        attemptNumber: 1,
-        fencingToken: 1,
-        ownerId: "task-4b1-fixture",
-        requestedAt,
-        acquiredAt: new Date(Date.parse(requestedAt) + 1_000).toISOString(),
-        expiresAt: new Date(Date.parse(requestedAt) + 4 * 60_000).toISOString(),
-        mode: "SHADOW",
-        maxCostUsd: 0,
-      })));
-    }
-
-    const oldEligibility = existingEligibility(database, plan.businessId);
-    let eligibilityResult;
+    let eligibilityResult: Awaited<ReturnType<typeof loadPrivateKwWebsiteEvidenceEligibilityD1>>;
     let eligibilityPath: "FRESH_COMMIT" | "EXACT_REPLAY";
-    if (!oldEligibility) {
-      const freshExecutions = atomicExecutions as ArtifactReferenceFreshMaterializedD1Execution[];
-      const minimumEvaluationAt = Math.max(
-        now.getTime() - EVALUATION_OFFSET_MS,
-        ...freshExecutions.map((item) => Date.parse(item.receipt.recordedAt)),
-      );
-      const eligibilityReceipt = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({
-        websiteEvidenceProofValue: evidence,
-        trustedExecutionValues: freshExecutions,
-        evaluatedAt: new Date(minimumEvaluationAt).toISOString(),
-      });
-      await persistPrivateKwWebsiteEvidenceEligibilityD1(adapter, eligibilityReceipt);
-      eligibilityResult = await loadPrivateKwWebsiteEvidenceEligibilityD1(adapter, {
-        receiptId: eligibilityReceipt.receiptId,
-        receiptDigest: eligibilityReceipt.receiptDigest,
-      });
-      eligibilityPath = "FRESH_COMMIT";
-    } else {
-      eligibilityResult = await loadPrivateKwWebsiteEvidenceEligibilityD1(adapter, {
-        receiptId: oldEligibility.id,
-        receiptDigest: oldEligibility.receiptDigest,
-      });
-      if (
-        eligibilityResult.receipt.businessId !== plan.businessId
-        || eligibilityResult.receipt.websiteEvidence.proofId !== evidence.proofId
-        || eligibilityResult.receipt.websiteEvidence.proofDigest !== evidence.proofDigest
-      ) throw new Error("Durable eligibility reload does not match the exact validated fixture evidence.");
-      eligibilityPath = "EXACT_REPLAY";
-    }
+    const websiteTables = new Set<string>(SERVICE_MUTATED_TABLES);
+    const materializationTables = plan.records.flatMap((record) => [...sqlTables(record.selectSql)]);
+    const atomicPlans = fixture.workflowReceipt.artifactManifests.map((artifact, index) => buildArtifactReferenceAtomicPlan({
+      attemptId: stableUuid(`website-snapshot:${fixture.workflowRequest.idempotencyKey}:${index}`),
+      workflowRunId: fixture.workflowRequest.workflowId,
+      businessId: fixture.workflowRequest.businessId,
+      lineageRootManifestId: artifact.manifestId,
+      attemptNumber: 1,
+      fencingToken: 1,
+      ownerId: "task-4b1-fixture",
+      requestedAt: fixture.workflowRequest.requestedAt,
+      acquiredAt: new Date(Date.parse(fixture.workflowRequest.requestedAt) + 1_000).toISOString(),
+      expiresAt: new Date(Date.parse(fixture.workflowRequest.requestedAt) + 4 * 60_000).toISOString(),
+      mode: "SHADOW",
+      maxCostUsd: 0,
+    }));
+    for (const atomicPlan of atomicPlans) for (const statement of atomicPlan.statements) for (const table of sqlTables(statement.sql)) websiteTables.add(table);
+    for (const record of buildDurableEvidencePersistencePlan({ ...fixture.durableEvidenceRequest, persistencePlanVersion: DURABLE_EVIDENCE_PERSISTENCE_PLAN_VERSION, targetSchemaVersion: DURABLE_EVIDENCE_TARGET_SCHEMA_VERSION }).preflights) for (const table of sqlTables(record.selectSql)) websiteTables.add(table);
+    const seeded = await runPrivateKwLocalAsyncWriteUnit(database, async () => {
+      const seed = seedWebsiteEvidenceRows(database, fixture, now);
+      const adapter = createPrivateKwLocalD1Adapter(database);
+      const atomicExecutions = [] as Awaited<ReturnType<typeof executeArtifactReferenceD1Snapshot>>[];
+      for (const atomicPlan of atomicPlans) atomicExecutions.push(await executeArtifactReferenceD1Snapshot(adapter, atomicPlan));
+      if (hooks.afterCompleteness) hooks.afterCompleteness();
+      const oldEligibility = existingEligibility(database, plan.businessId);
+      if (!oldEligibility) {
+        if (atomicExecutions.some((item) => item.executionPath !== "FRESH_COMMIT" || item.decodedSnapshot === null)) {
+          throw new Error("Existing completeness rows without durable eligibility are an unsafe partial state; fresh eligibility requires every snapshot to be a fresh commit.");
+        }
+        const freshExecutions = atomicExecutions.filter((item): item is ArtifactReferenceFreshMaterializedD1Execution => item.executionPath === "FRESH_COMMIT" && item.decodedSnapshot !== null);
+        const minimumEvaluationAt = Math.max(now.getTime() - EVALUATION_OFFSET_MS, ...freshExecutions.map((item) => Date.parse(item.receipt.recordedAt)));
+        const eligibilityReceipt = buildPrivateKwCurrentWebsiteEvidenceEligibilityReceipt({ websiteEvidenceProofValue: evidence, trustedExecutionValues: freshExecutions, evaluatedAt: new Date(minimumEvaluationAt).toISOString() });
+        await persistPrivateKwWebsiteEvidenceEligibilityD1(adapter, eligibilityReceipt);
+        eligibilityResult = await loadPrivateKwWebsiteEvidenceEligibilityD1(adapter, { receiptId: eligibilityReceipt.receiptId, receiptDigest: eligibilityReceipt.receiptDigest });
+        eligibilityPath = "FRESH_COMMIT";
+      } else {
+        eligibilityResult = await loadPrivateKwWebsiteEvidenceEligibilityD1(adapter, { receiptId: oldEligibility.id, receiptDigest: oldEligibility.receiptDigest });
+        if (eligibilityResult.receipt.businessId !== plan.businessId || eligibilityResult.receipt.websiteEvidence.proofId !== evidence.proofId || eligibilityResult.receipt.websiteEvidence.proofDigest !== evidence.proofDigest) throw new Error("Durable eligibility reload does not match the exact validated fixture evidence.");
+        eligibilityPath = "EXACT_REPLAY";
+      }
+      return { seed, atomicExecutions, eligibilityResult, eligibilityPath };
+    });
+    eligibilityResult = seeded.eligibilityResult;
+    eligibilityPath = seeded.eligibilityPath;
+    for (const record of seeded.seed.durable.preflights) for (const table of sqlTables(record.selectSql)) websiteTables.add(table);
+    for (const record of seeded.seed.durable.mutations) for (const table of sqlTables(record.sql)) websiteTables.add(table);
+    for (const record of seeded.seed.resume.preflights) for (const table of sqlTables(record.selectSql)) websiteTables.add(table);
+    for (const record of seeded.seed.resume.mutations) for (const table of sqlTables(record.sql)) websiteTables.add(table);
+    for (const table of materializationTables) websiteTables.add(table);
     const websiteInput = buildPrivateKwCurrentWebsiteEvidenceProgressInput({
       manifestValue: manifest,
       previousProgressValue: sourceProgress,
@@ -490,11 +497,12 @@ export async function executePrivateKwM1WebsiteCheckpoint(value: unknown): Promi
       websiteEvidence: {
         workflowExecutionPath: "FIXTURE",
         synthetic: true,
+        availabilityReceiptKind: "SYNTHETIC_R2_HEAD_SHAPED_FIXTURE",
         networkOperationsPerformed: 0,
         providerOperationsAuthorized: 0,
         costAuthorizedUsd: 0,
       },
-      rowCounts: counts(database),
+      rowCounts: counts(database, websiteTables),
       checkpoint: {
         checkpointId: checkpoint.checkpointId,
         checkpointDigest: checkpoint.checkpointDigest,

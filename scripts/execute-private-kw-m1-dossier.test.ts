@@ -48,16 +48,68 @@ test("executes one bounded synthetic business through the durable offline websit
     now: now.toISOString(),
   };
   try {
+    await assert.rejects(
+      executePrivateKwM1WebsiteCheckpoint(operation, { afterCompleteness: () => { throw new Error("injected completeness crash"); } }),
+      /injected completeness crash/,
+    );
+    const rolledBack = new Database(fileURLToPath(files.database), { fileMustExist: true });
+    try {
+      for (const table of [
+        "RevenueArtifactReferenceSnapshotAttempt",
+        "RevenueArtifactReferenceCompletenessReceipt",
+        "RevenueArtifactReferenceSourceSetProof",
+        "RevenueCurrentWebsiteEvidenceEligibilityReceipt",
+      ]) {
+        assert.equal((rolledBack.prepare(`SELECT COUNT(*) AS "count" FROM "${table}"`).get() as { count: number }).count, 0, `${table} must roll back after injected crash`);
+      }
+    } finally {
+      rolledBack.close();
+    }
+    await rm(files.database, { force: true });
+    const cleanRetryDatabase = new Database(fileURLToPath(files.database));
+    try {
+      cleanRetryDatabase.pragma("foreign_keys = ON");
+      applyCanonicalPrivateKwMigrations(cleanRetryDatabase);
+    } finally {
+      cleanRetryDatabase.close();
+    }
+    const trackedTables = [
+      "RevenueSourceRun", "RevenueBusiness", "RevenueLocation", "RevenueSourceRecord", "RevenuePrivateKwMaterializationReceipt",
+      "RevenueWorkflowDefinition", "RevenueWorkflowRun", "RevenueWorkflowDelivery", "RevenueWorkflowAttempt", "RevenueWorkflowLease",
+      "RevenueWorkflowReceiptRevision", "RevenueWorkflowAttemptClosure", "RevenueWorkflowStepReceipt", "RevenueWorkflowCheckpointPayload",
+      "RevenueWorkflowCheckpoint", "RevenueWorkflowCheckpointStateReceipt", "RevenueWorkflowCheckpointDependency", "RevenueArtifactRecoveryPlan",
+      "RevenueArtifactRecoveryReceipt", "RevenueWebsitePageSelection", "RevenueWebsiteSelectedPage", "RevenueWebsitePageCandidate", "RevenueWebsiteAuditAssembly",
+      "RevenueArtifactManifest", "RevenueArtifactManifestItem", "RevenueArtifactEvidenceUse", "RevenueArtifactEvidenceUseEnd", "RevenueArtifactPromotionReceipt",
+      "RevenueArtifactPromotionUse", "RevenueArtifactManifestEvidenceUse", "RevenueArtifactReleaseRecord", "RevenueArtifactReleaseUse",
+      "RevenueArtifactManifestAvailabilityReceipt", "RevenueArtifactReferenceSnapshotAttempt", "RevenueArtifactReferenceCompletenessReceipt",
+      "RevenueArtifactReferenceSourceSetProof", "RevenueCurrentWebsiteEvidenceEligibilityReceipt",
+    ];
+    const countMap = (file: URL, tables: readonly string[]) => {
+      const instance = new Database(fileURLToPath(file), { fileMustExist: true });
+      try {
+        return Object.fromEntries(tables.map((table) => [table, (instance.prepare(`SELECT COUNT(*) AS "count" FROM "${table}"`).get() as { count: number }).count]));
+      } finally {
+        instance.close();
+      }
+    };
+    const preFirstCounts = countMap(files.database, trackedTables);
+    assert.ok(Object.values(preFirstCounts).every((count) => count === 0));
     const first = await executePrivateKwM1WebsiteCheckpoint(operation);
     const firstBytes = await readFile(files.output);
+    const postFirstCounts = countMap(files.database, trackedTables);
+    const preReplayCounts = countMap(files.database, trackedTables);
     const second = await executePrivateKwM1WebsiteCheckpoint(operation);
     const secondBytes = await readFile(files.output);
+    const postReplayCounts = countMap(files.database, trackedTables);
     assert.equal(first.checkpoint.outputExecutionPath, "FRESH_WRITE");
     assert.equal(second.checkpoint.outputExecutionPath, "EXACT_REPLAY");
     assert.deepEqual(secondBytes, firstBytes);
     assert.equal(first.checkpoint.checkpointId, second.checkpoint.checkpointId);
     assert.equal(first.checkpoint.checkpointDigest, second.checkpoint.checkpointDigest);
     assert.deepEqual(first.rowCounts, second.rowCounts);
+    assert.deepEqual(postFirstCounts, preReplayCounts);
+    assert.deepEqual(preReplayCounts, postReplayCounts);
+    for (const [table, count] of Object.entries(postFirstCounts)) assert.equal(first.rowCounts[table], count);
     assert.equal(first.source.executionPath, "FRESH_COMMIT");
     assert.equal(second.source.executionPath, "EXACT_REPLAY");
     assert.equal(first.source.workflowReceiptDigest, first.source.workflowReceiptId.slice("workflow-receipt:".length));
@@ -81,6 +133,15 @@ test("executes one bounded synthetic business through the durable offline websit
     assert.equal(first.authority.providerOperationsAuthorized, 0);
     assert.equal(first.authority.networkOperationsPerformed, 0);
     assert.equal(first.authority.costAuthorizedUsd, 0);
+    for (const table of [
+      "RevenueArtifactReferenceSnapshotAttempt",
+      "RevenueArtifactReferenceCompletenessReceipt",
+      "RevenueArtifactReferenceSourceSetProof",
+      "RevenueCurrentWebsiteEvidenceEligibilityReceipt",
+      "RevenueWorkflowLease",
+      "RevenueArtifactManifestAvailabilityReceipt",
+      "RevenuePrivateKwMaterializationReceipt",
+    ]) assert.equal(typeof first.rowCounts[table], "number", `rowCounts must include ${table}`);
   } finally {
     await Promise.all(Object.values(files).map((file) => rm(file, { force: true })));
   }
