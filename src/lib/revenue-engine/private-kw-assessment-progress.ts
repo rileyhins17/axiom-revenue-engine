@@ -114,6 +114,9 @@ function buildPrivateKwAssessmentProgressInputInternal(
     input.currentAssessmentResultValue,
   );
   const assessment = durable.assessment;
+  const deterministicPreparedAt = input.currentWebsiteEligibilityResultValue === undefined
+    ? durable.databaseNow
+    : durable.assessmentReceiptRecordedAt;
 
   if (
     previousProgress.manifestId !== manifest.manifestId
@@ -198,7 +201,8 @@ function buildPrivateKwAssessmentProgressInputInternal(
     || proof.assessment.assessmentId !== assessment.assessmentId
     || proof.assessment.assessmentDigest !== assessment.assessmentDigest
     || proof.persistence.executionPath !== "DURABLE_RELOAD"
-    || proof.persistence.databaseNow !== durable.databaseNow
+    || proof.persistence.reconstructionClock.value !== deterministicPreparedAt
+    || proof.persistence.reconstructionClock.kind !== (input.currentWebsiteEligibilityResultValue === undefined ? "DURABLE_DATABASE_NOW" : "ASSESSMENT_RECEIPT_RECORDED_AT")
     || proof.persistence.freshnessState !== "CURRENT"
   ) {
     throw new Error(
@@ -209,7 +213,7 @@ function buildPrivateKwAssessmentProgressInputInternal(
   if (
     Date.parse(durable.assessmentReceiptRecordedAt) < Date.parse(assessment.assessedAt)
     || Date.parse(durable.databaseNow) < Date.parse(durable.assessmentReceiptRecordedAt)
-    || Date.parse(durable.databaseNow) !== Date.parse(proof.preparedAt)
+    || Date.parse(deterministicPreparedAt) !== Date.parse(proof.preparedAt)
     || Date.parse(durable.databaseNow) >= Date.parse(assessment.refreshAfter)
     || Date.parse(durable.databaseNow) >= Date.parse(websiteEvidence.evidenceFreshThrough)
     || Date.parse(assessment.assessedAt) < Date.parse(predecessor.recordedAt)
@@ -241,7 +245,9 @@ function buildPrivateKwAssessmentProgressInputInternal(
       phaseReceiptDigest: predecessor.phaseReceiptDigest,
     },
     recordedBy: "CODEX_INTEGRATION_OWNER",
-    recordedAt: durable.databaseNow,
+    recordedAt: input.currentWebsiteEligibilityResultValue === undefined
+      ? durable.databaseNow
+      : durable.assessmentReceiptRecordedAt,
     authority: privateKwShadowSliceProgressAuthority(),
   });
   const trusted = deepFreeze(phaseInput);

@@ -35,7 +35,8 @@ test("builds one deterministic assessment proof bound to current evidence and im
   assert.equal(first.assessment.assessmentDigest, fixture.assessment.assessmentDigest);
   assert.equal(first.persistence.executionPath, "DURABLE_RELOAD");
   assert.equal(first.persistence.freshnessState, "CURRENT");
-  assert.equal(first.persistence.databaseNow, fixture.assessmentDurableReload.databaseNow);
+  assert.equal(first.persistence.reconstructionClock.kind, "DURABLE_DATABASE_NOW");
+  assert.equal(first.persistence.reconstructionClock.value, fixture.assessmentDurableReload.databaseNow);
   assert.equal(first.persistence.exactSourceRebuilt, true);
   assert.equal(first.persistence.immutableWriterGuardsVerified, true);
   assert.equal(first.persistence.committedAndReloaded, true);

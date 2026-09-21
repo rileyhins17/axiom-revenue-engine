@@ -48,6 +48,7 @@ import {
 } from "../src/lib/revenue-engine/private-kw-current-website-evidence-eligibility-d1";
 import {
   buildPrivateKwCurrentWebsiteEvidenceProgressInput,
+  buildPrivateKwCurrentWebsiteEvidenceProgressInputForPersistedCheckpoint,
 } from "../src/lib/revenue-engine/private-kw-current-website-evidence-progress";
 import {
   appendPrivateKwCurrentWebsiteEvidenceProgress,
@@ -462,13 +463,28 @@ export async function executePrivateKwM1WebsiteCheckpoint(
     for (const record of seeded.seed.resume.preflights) for (const table of sqlTables(record.selectSql)) websiteTables.add(table);
     for (const record of seeded.seed.resume.mutations) for (const table of sqlTables(record.sql)) websiteTables.add(table);
     for (const table of materializationTables) websiteTables.add(table);
-    const websiteInput = buildPrivateKwCurrentWebsiteEvidenceProgressInput({
-      manifestValue: manifest,
-      previousProgressValue: sourceProgress,
-      websiteEvidenceProofValue: evidence,
-      currentEligibilityResultValue: eligibilityResult,
-      recordedAt: operation.now,
-    });
+    let persistedCheckpoint: unknown;
+    try {
+      persistedCheckpoint = (await readPrivateKwJson(operation.output, MAX_JSON_BYTES)).value;
+    } catch (error) {
+      if (!(error instanceof Error) || !/ENOENT|no such file|cannot find/i.test(error.message)) throw error;
+    }
+    const websiteInput = persistedCheckpoint === undefined
+      ? buildPrivateKwCurrentWebsiteEvidenceProgressInput({
+        manifestValue: manifest,
+        previousProgressValue: sourceProgress,
+        websiteEvidenceProofValue: evidence,
+        currentEligibilityResultValue: eligibilityResult,
+        recordedAt: operation.now,
+      })
+      : buildPrivateKwCurrentWebsiteEvidenceProgressInputForPersistedCheckpoint({
+        manifestValue: manifest,
+        previousProgressValue: sourceProgress,
+        websiteEvidenceProofValue: evidence,
+        currentEligibilityResultValue: eligibilityResult,
+        persistedCheckpointValue: persistedCheckpoint,
+        canonicalRecordedAt: operation.now,
+      });
     const checkpoint = appendPrivateKwCurrentWebsiteEvidenceProgress({
       manifestValue: manifest,
       previousProgressValue: sourceProgress,

@@ -99,7 +99,10 @@ const AssessmentProgressProofCoreSchema = z.object({
       assessmentReceipts: z.literal(1),
     }).strict(),
     assessmentReceiptRecordedAt: TimestampSchema,
-    databaseNow: TimestampSchema,
+    reconstructionClock: z.object({
+      kind: z.enum(["DURABLE_DATABASE_NOW", "ASSESSMENT_RECEIPT_RECORDED_AT"]),
+      value: TimestampSchema,
+    }).strict(),
     freshnessState: z.literal("CURRENT"),
     exactSourceRebuilt: z.literal(true),
     immutableWriterGuardsVerified: z.literal(true),
@@ -203,12 +206,13 @@ type AssessmentProgressProofInput = {
 function buildPrivateKwAssessmentProgressProofInternal(
   input: AssessmentProgressProofInput,
   expectedPreviousCompletionAt: string,
+  preparedAtOverride?: string,
 ): PrivateKwAssessmentProgressProof {
   const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifestValue);
   const previous = PrivateKwShadowSlicePhaseReceiptSchema.parse(input.previousPhaseReceiptValue);
   const evidence = PrivateKwCurrentWebsiteEvidenceProofSchema.parse(input.currentWebsiteEvidenceProofValue);
   const execution = requireCurrentRevenueLeadAssessmentD1DurableReload(input.assessmentDurableReloadValue);
-  const preparedAt = execution.databaseNow;
+  const preparedAt = preparedAtOverride ?? execution.databaseNow;
   const assessment = execution.assessment;
 
   if (
@@ -331,7 +335,10 @@ function buildPrivateKwAssessmentProgressProofInternal(
       transactionApi: execution.transactionApi,
       reloadedRows: execution.reloadedRows,
       assessmentReceiptRecordedAt: execution.assessmentReceiptRecordedAt,
-      databaseNow: execution.databaseNow,
+      reconstructionClock: {
+        kind: preparedAtOverride === undefined ? "DURABLE_DATABASE_NOW" : "ASSESSMENT_RECEIPT_RECORDED_AT",
+        value: preparedAt,
+      },
       freshnessState: execution.freshnessState,
       exactSourceRebuilt: execution.exactSourceRebuilt,
       immutableWriterGuardsVerified: execution.immutableWriterGuardsVerified,
@@ -368,6 +375,7 @@ export function buildPrivateKwAssessmentProgressProofForPersistedWebsiteCheckpoi
   const previous = PrivateKwShadowSlicePhaseReceiptSchema.parse(input.previousPhaseReceiptValue);
   const evidence = PrivateKwCurrentWebsiteEvidenceProofSchema.parse(input.currentWebsiteEvidenceProofValue);
   const eligibility = requireCurrentPrivateKwWebsiteEvidenceEligibilityD1Result(input.currentWebsiteEligibilityResultValue);
+  const execution = requireCurrentRevenueLeadAssessmentD1DurableReload(input.assessmentDurableReloadValue);
   const supportingEligibility = previous.proof.supportingReceipts[0];
   if (
     eligibility.executionPath !== "DURABLE_RELOAD"
@@ -386,5 +394,9 @@ export function buildPrivateKwAssessmentProgressProofForPersistedWebsiteCheckpoi
   ) {
     throw new Error("Persisted website checkpoint completion must come from its exact durable eligibility reload.");
   }
-  return buildPrivateKwAssessmentProgressProofInternal(input, TimestampSchema.parse(eligibility.receiptRecordedAt));
+  return buildPrivateKwAssessmentProgressProofInternal(
+    input,
+    TimestampSchema.parse(eligibility.receiptRecordedAt),
+    TimestampSchema.parse(execution.assessmentReceiptRecordedAt),
+  );
 }

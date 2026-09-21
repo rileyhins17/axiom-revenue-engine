@@ -15,17 +15,17 @@ import { buildPrivateKwAssessmentProgressInputForPersistedWebsiteCheckpoint } fr
 import { appendPrivateKwAssessmentProgress } from "../src/lib/revenue-engine/private-kw-assessment-progress-append";
 import { buildPrivateKwCurrentWebsiteEvidenceProof } from "../src/lib/revenue-engine/private-kw-current-website-evidence";
 import { loadPrivateKwWebsiteEvidenceEligibilityD1 } from "../src/lib/revenue-engine/private-kw-current-website-evidence-eligibility-d1";
-import { buildPrivateKwCurrentWebsiteEvidenceProgressInput } from "../src/lib/revenue-engine/private-kw-current-website-evidence-progress";
+import {
+  buildPrivateKwCurrentWebsiteEvidenceProgressInput,
+  buildPrivateKwCurrentWebsiteEvidenceProgressInputForPersistedCheckpoint,
+} from "../src/lib/revenue-engine/private-kw-current-website-evidence-progress";
 import { appendPrivateKwCurrentWebsiteEvidenceProgress } from "../src/lib/revenue-engine/private-kw-current-website-evidence-progress-append";
 import { PrivateKwShadowSliceManifestSchema } from "../src/lib/revenue-engine/private-kw-shadow-slice";
 import {
-  PRIVATE_KW_SHADOW_PHASE_RECEIPT_VERSION,
   PrivateKwShadowSliceProgressCheckpointSchema,
-  PrivateKwShadowSlicePhaseReceiptInputSchema,
   appendPrivateKwShadowSliceProgress,
   buildInitialPrivateKwShadowSliceProgress,
   buildPrivateKwShadowSlicePhaseReceipt,
-  privateKwShadowSliceProgressAuthority,
 } from "../src/lib/revenue-engine/private-kw-shadow-slice-progress";
 import { createPrivateKwCurrentWebsiteEvidenceFixture } from "../src/lib/revenue-engine/test-support/private-kw-current-website-evidence-fixture";
 import { buildPrivateKwSourceWorkflowProgressReceiptInput } from "../src/lib/revenue-engine/private-kw-source-workflow-progress";
@@ -66,6 +66,12 @@ const REQUIRED_TABLES = [
   "RevenueArtifactReferenceSourceSetProof", "RevenueCurrentWebsiteEvidenceEligibilityReceipt",
   "RevenueWebsiteSnapshot", "RevenueEvidenceClaim", "RevenueQualificationSnapshot", "RevenueLeadAssessmentReceipt",
 ] as const;
+const ASSESSMENT_INSERTED_TABLES = {
+  websiteSnapshots: "RevenueWebsiteSnapshot",
+  evidenceClaims: "RevenueEvidenceClaim",
+  qualificationSnapshots: "RevenueQualificationSnapshot",
+  assessmentReceipts: "RevenueLeadAssessmentReceipt",
+} as const;
 
 const OperationSchema = z.object({
   sourcePlan: z.string().min(1),
@@ -98,17 +104,18 @@ const AuthoritySchema = z.object({
 
 const RowCountsSchema = z.record(z.string().regex(/^Revenue[A-Za-z]+$/), z.number().int().nonnegative()).readonly();
 const ExecutionPathSchema = z.enum(["FRESH_COMMIT", "EXACT_REPLAY"]);
+const AssessmentInsertedRowsSchema = z.object({
+  websiteSnapshots: z.number().int().nonnegative(),
+  evidenceClaims: z.number().int().nonnegative(),
+  qualificationSnapshots: z.number().int().nonnegative(),
+  assessmentReceipts: z.number().int().nonnegative(),
+}).strict();
 
 const ReportCoreSchema = z.object({
   version: z.literal("private-kw-m1-dossier-v1"),
   businessId: z.string().min(1),
   evaluationCandidateId: z.string().min(1),
   synthetic: z.literal(true),
-  stageExecutionPaths: z.object({
-    websiteSource: ExecutionPathSchema,
-    websiteEligibility: ExecutionPathSchema,
-    assessment: ExecutionPathSchema,
-  }).strict(),
   source: z.object({
     materializationId: z.string(),
     materializationDigest: z.string().regex(/^[a-f0-9]{64}$/),
@@ -129,10 +136,7 @@ const ReportCoreSchema = z.object({
     checkpointId: z.string().regex(/^kw-shadow-progress:[a-f0-9]{64}$/),
     checkpointDigest: z.string().regex(/^[a-f0-9]{64}$/),
   }).strict(),
-  rowCounts: z.object({
-    beforeAssessment: RowCountsSchema,
-    afterAssessment: RowCountsSchema,
-  }).strict(),
+  rowCounts: RowCountsSchema,
   ownerDossier: OwnerLeadDetailResponseSchema,
   contactReview: z.object({ state: z.literal("NOT_RECORDED") }).strict(),
   authority: AuthoritySchema,
@@ -160,6 +164,8 @@ export const PrivateKwM1DossierResultSchema = z.object({
     websiteCheckpointOutput: z.enum(["FRESH_WRITE", "EXACT_REPLAY"]),
     assessmentCheckpointOutput: z.enum(["FRESH_WRITE", "EXACT_REPLAY"]),
     reportOutput: z.enum(["FRESH_WRITE", "EXACT_REPLAY"]),
+    assessmentInsertedRows: AssessmentInsertedRowsSchema,
+    rowCounts: z.object({ beforeAssessment: RowCountsSchema, afterAssessment: RowCountsSchema }).strict(),
   }).strict(),
 }).strict();
 
@@ -237,6 +243,30 @@ function rowCounts(database: Database.Database) {
   return Object.fromEntries(tables.map((table) => [table, (database.prepare(`SELECT COUNT(*) AS "count" FROM "${table}"`).get() as { count: number }).count]));
 }
 
+function assertAssessmentMutationEvidence(
+  executionPath: "FRESH_COMMIT" | "EXACT_REPLAY",
+  insertedRows: z.infer<typeof AssessmentInsertedRowsSchema>,
+  before: z.infer<typeof RowCountsSchema>,
+  after: z.infer<typeof RowCountsSchema>,
+) {
+  const tableNames = new Set([...Object.keys(before), ...Object.keys(after)]);
+  if (executionPath === "EXACT_REPLAY") {
+    if (Object.values(insertedRows).some((count) => count !== 0)) {
+      throw new Error("Exact assessment replay must report zero inserted rows.");
+    }
+    for (const table of tableNames) {
+      if (before[table] !== after[table]) throw new Error(`Exact assessment replay changed ${table}.`);
+    }
+    return;
+  }
+  for (const table of tableNames) {
+    const delta = (after[table] ?? 0) - (before[table] ?? 0);
+    const expected = (Object.entries(ASSESSMENT_INSERTED_TABLES).find(([, name]) => name === table)?.[0] as keyof typeof ASSESSMENT_INSERTED_TABLES | undefined);
+    const expectedDelta = expected ? insertedRows[expected] : 0;
+    if (delta !== expectedDelta) throw new Error(`Fresh assessment mutation delta for ${table} does not match insertedRows.`);
+  }
+}
+
 async function readPrivateKwRowCounts(path: string) {
   const databaseFile = await inspectPrivateKwDatabase(path, MAX_DATABASE_BYTES);
   const database = new Database(databaseFile, { fileMustExist: true, timeout: 0 });
@@ -293,7 +323,7 @@ async function rebuildWebsiteCheckpoint(
   materialization: z.infer<typeof PrivateKwSourceWorkflowMaterializationInputSchema>,
   manifest: z.infer<typeof PrivateKwShadowSliceManifestSchema>,
   storedCheckpoint: unknown,
-  replayExistingCheckpoint: boolean,
+  isWebsiteReplay: boolean,
 ): Promise<WebsiteRebuild> {
   const databaseFile = await inspectPrivateKwDatabase(files.database, MAX_DATABASE_BYTES);
   const database = new Database(databaseFile, { fileMustExist: true, timeout: 0 });
@@ -345,54 +375,26 @@ async function rebuildWebsiteCheckpoint(
       { receiptId: eligibilityRows[0]!.id, receiptDigest: eligibilityRows[0]!.receiptDigest },
     );
     const parsedStored = PrivateKwShadowSliceProgressCheckpointSchema.parse(storedCheckpoint);
-    const selectedSourceRecord = sourceProgress.records.find((record) => record.businessId === plan.businessId);
-    const selectedStoredRecord = parsedStored.records.find((record) => record.businessId === plan.businessId);
-    const selectedSourcePhase = selectedSourceRecord?.phaseReceipts.at(-1);
-    const selectedStoredPhase = selectedStoredRecord?.phaseReceipts.at(-1);
-    if (!selectedSourceRecord || !selectedStoredRecord || !selectedSourcePhase || !selectedStoredPhase) {
-      throw new Error("The stored website checkpoint is missing its exact selected business phase lineage.");
-    }
-    const rebuilt = replayExistingCheckpoint
-      ? appendPrivateKwShadowSliceProgress(
-        manifest,
-        sourceProgress,
-        PrivateKwShadowSlicePhaseReceiptInputSchema.parse({
-          receiptVersion: PRIVATE_KW_SHADOW_PHASE_RECEIPT_VERSION,
-          manifestId: manifest.manifestId,
-          manifestDigest: manifest.manifestDigest,
-          businessId: selectedStoredRecord.businessId,
-          evaluationCandidateId: selectedStoredRecord.evaluationCandidateId,
-          phase: "CURRENT_WEBSITE_EVIDENCE",
-          completedAt: eligibility.receiptRecordedAt,
-          proof: {
-            proofKind: "CURRENT_WEBSITE_EVIDENCE",
-            primaryReceiptId: websiteEvidenceProof.proofId,
-            primaryReceiptDigest: websiteEvidenceProof.proofDigest,
-            supportingReceipts: [{
-              receiptId: eligibility.receipt.receiptId,
-              receiptDigest: eligibility.receipt.receiptDigest,
-            }],
-          },
-          previousPhaseReceipt: {
-            phaseReceiptId: selectedSourcePhase.phaseReceiptId,
-            phaseReceiptDigest: selectedSourcePhase.phaseReceiptDigest,
-          },
-          recordedBy: "CODEX_INTEGRATION_OWNER",
-          recordedAt: selectedStoredPhase.recordedAt,
-          authority: privateKwShadowSliceProgressAuthority(),
-        }),
-      )
-      : appendPrivateKwCurrentWebsiteEvidenceProgress({
-        manifestValue: manifest,
-        previousProgressValue: sourceProgress,
-        phaseInputValue: buildPrivateKwCurrentWebsiteEvidenceProgressInput({
+    const rebuilt = appendPrivateKwCurrentWebsiteEvidenceProgress({
+      manifestValue: manifest,
+      previousProgressValue: sourceProgress,
+      phaseInputValue: isWebsiteReplay
+        ? buildPrivateKwCurrentWebsiteEvidenceProgressInputForPersistedCheckpoint({
+          manifestValue: manifest,
+          previousProgressValue: sourceProgress,
+          websiteEvidenceProofValue: websiteEvidenceProof,
+          currentEligibilityResultValue: eligibility,
+          persistedCheckpointValue: parsedStored,
+          canonicalRecordedAt: now.toISOString(),
+        })
+        : buildPrivateKwCurrentWebsiteEvidenceProgressInput({
           manifestValue: manifest,
           previousProgressValue: sourceProgress,
           websiteEvidenceProofValue: websiteEvidenceProof,
           currentEligibilityResultValue: eligibility,
           recordedAt: now.toISOString(),
         }),
-      });
+    });
     if (
       artifactReferenceCanonicalJson(rebuilt) !== artifactReferenceCanonicalJson(parsedStored)
       || rebuilt.checkpointId !== parsedStored.checkpointId
@@ -457,30 +459,23 @@ export async function executePrivateKwM1Dossier(value: unknown): Promise<Private
     throw new Error("The selected business and evaluation candidate must match the exact manifest.");
   }
   const initialNow = operationNow(sourceNowFromPlan(source)).toISOString();
-  let websiteStage: Pick<PrivateKwM1WebsiteCheckpointResult, "source" | "eligibility" | "checkpoint">;
-  let websiteCheckpointReplay = false;
-  try {
-    await readPrivateKwJson(files.websiteCheckpoint, MAX_JSON_BYTES);
-    websiteCheckpointReplay = true;
-    websiteStage = {
-      source: { executionPath: "EXACT_REPLAY" },
-      eligibility: { executionPath: "EXACT_REPLAY" },
-      checkpoint: { outputExecutionPath: "EXACT_REPLAY" },
-    } as Pick<PrivateKwM1WebsiteCheckpointResult, "source" | "eligibility" | "checkpoint">;
-  } catch (error) {
-    if (!(error instanceof Error) || !/ENOENT|no such file|cannot find/i.test(error.message)) throw error;
-    const freshWebsiteStage = await executePrivateKwM1WebsiteCheckpoint({
-      sourcePlan: files.sourcePlan,
-      materialization: files.materialization,
-      manifest: files.manifest,
-      database: files.database,
-      output: files.websiteCheckpoint,
-      now: initialNow,
-    });
-    websiteStage = freshWebsiteStage;
-  }
+  const websiteStage: Pick<PrivateKwM1WebsiteCheckpointResult, "source" | "eligibility" | "checkpoint"> = await executePrivateKwM1WebsiteCheckpoint({
+    sourcePlan: files.sourcePlan,
+    materialization: files.materialization,
+    manifest: files.manifest,
+    database: files.database,
+    output: files.websiteCheckpoint,
+    now: initialNow,
+  });
   const storedWebsiteCheckpoint = (await readPrivateKwJson(files.websiteCheckpoint, MAX_JSON_BYTES)).value;
-  const website = await rebuildWebsiteCheckpoint(files, source, materialization, manifest, storedWebsiteCheckpoint, websiteCheckpointReplay);
+  const website = await rebuildWebsiteCheckpoint(
+    files,
+    source,
+    materialization,
+    manifest,
+    storedWebsiteCheckpoint,
+    websiteStage.checkpoint.outputExecutionPath === "EXACT_REPLAY",
+  );
   const beforeAssessment = await readPrivateKwRowCounts(files.database);
   const assessmentStage = await executePrivateKwAssessmentFile(createAssessmentArgs(files));
   const databaseFile = await inspectPrivateKwDatabase(files.database, MAX_DATABASE_BYTES);
@@ -501,7 +496,18 @@ export async function executePrivateKwM1Dossier(value: unknown): Promise<Private
       { assessmentId: assessmentStage.assessmentId, assessmentDigest },
     );
     const currentAssessment = requireCurrentRevenueLeadAssessmentD1DurableReload(assessmentReload);
-    let storedAssessmentCheckpoint: z.infer<typeof PrivateKwShadowSliceProgressCheckpointSchema>;
+    const assessmentInput = buildPrivateKwAssessmentProgressInputForPersistedWebsiteCheckpoint({
+      manifestValue: manifest,
+      previousProgressValue: website.checkpoint,
+      currentWebsiteEvidenceProofValue: website.websiteEvidenceProof,
+      currentAssessmentResultValue: currentAssessment,
+      currentWebsiteEligibilityResultValue: website.eligibilityResult,
+    });
+    const rebuiltAssessmentCheckpoint = PrivateKwShadowSliceProgressCheckpointSchema.parse(appendPrivateKwAssessmentProgress({
+      manifestValue: manifest,
+      previousProgressValue: website.checkpoint,
+      phaseInputValue: assessmentInput,
+    }));
     let persistedAssessmentCheckpoint: unknown;
     try {
       persistedAssessmentCheckpoint = (await readPrivateKwJson(files.assessmentCheckpoint, MAX_JSON_BYTES)).value;
@@ -509,36 +515,19 @@ export async function executePrivateKwM1Dossier(value: unknown): Promise<Private
       if (!(error instanceof Error) || !/ENOENT|no such file|cannot find/i.test(error.message)) throw error;
     }
     if (persistedAssessmentCheckpoint !== undefined) {
-      storedAssessmentCheckpoint = PrivateKwShadowSliceProgressCheckpointSchema.parse(persistedAssessmentCheckpoint);
+      const parsedPersistedAssessmentCheckpoint = PrivateKwShadowSliceProgressCheckpointSchema.parse(persistedAssessmentCheckpoint);
       if (
-        storedAssessmentCheckpoint.parentCheckpoint?.checkpointId !== website.checkpoint.checkpointId
-        || storedAssessmentCheckpoint.parentCheckpoint.checkpointDigest !== website.checkpoint.checkpointDigest
-      ) throw new Error("The persisted assessment checkpoint is not bound to the exact website checkpoint.");
-      const selectedAssessmentRecord = storedAssessmentCheckpoint.records.find((record) => record.businessId === operation.businessId);
-      const selectedAssessmentPhase = selectedAssessmentRecord?.phaseReceipts.at(-1);
-      if (
-        !selectedAssessmentRecord
-        || !selectedAssessmentPhase
-        || selectedAssessmentPhase.phase !== "ASSESSMENT"
-        || selectedAssessmentPhase.proof.primaryReceiptId !== currentAssessment.assessment.assessmentId
-        || selectedAssessmentPhase.proof.primaryReceiptDigest !== currentAssessment.assessment.assessmentDigest
-      ) throw new Error("The persisted assessment checkpoint does not match the exact durable assessment reload.");
-    } else {
-      const assessmentInput = buildPrivateKwAssessmentProgressInputForPersistedWebsiteCheckpoint({
-        manifestValue: manifest,
-        previousProgressValue: website.checkpoint,
-        currentWebsiteEvidenceProofValue: website.websiteEvidenceProof,
-        currentAssessmentResultValue: currentAssessment,
-        currentWebsiteEligibilityResultValue: website.eligibilityResult,
-      });
-      storedAssessmentCheckpoint = PrivateKwShadowSliceProgressCheckpointSchema.parse(appendPrivateKwAssessmentProgress({
-        manifestValue: manifest,
-        previousProgressValue: website.checkpoint,
-        phaseInputValue: assessmentInput,
-      }));
+        artifactReferenceCanonicalJson(parsedPersistedAssessmentCheckpoint) !== artifactReferenceCanonicalJson(rebuiltAssessmentCheckpoint)
+        || parsedPersistedAssessmentCheckpoint.checkpointId !== rebuiltAssessmentCheckpoint.checkpointId
+        || parsedPersistedAssessmentCheckpoint.checkpointDigest !== rebuiltAssessmentCheckpoint.checkpointDigest
+      ) throw new Error("The stored assessment checkpoint does not match the canonical durable rebuild.");
     }
-    assessmentCheckpointOutput = (await writeOrVerifyPrivateKwJson(files.assessmentCheckpoint, storedAssessmentCheckpoint)).executionPath;
+    assessmentCheckpointOutput = (await writeOrVerifyPrivateKwJson(files.assessmentCheckpoint, rebuiltAssessmentCheckpoint)).executionPath;
     const afterAssessment = rowCounts(database);
+    const insertedRows = AssessmentInsertedRowsSchema.parse(assessmentStage.insertedRows);
+    const beforeAssessmentRows = RowCountsSchema.parse(beforeAssessment);
+    const afterAssessmentRows = RowCountsSchema.parse(afterAssessment);
+    assertAssessmentMutationEvidence(assessmentStage.executionPath, insertedRows, beforeAssessmentRows, afterAssessmentRows);
     const ownerDossier = await readOwnerLeadDetail(
       createPrivateKwLocalD1Adapter(database),
       operation.businessId,
@@ -553,11 +542,6 @@ export async function executePrivateKwM1Dossier(value: unknown): Promise<Private
       businessId: operation.businessId,
       evaluationCandidateId: operation.evaluationCandidateId,
       synthetic: true as const,
-      stageExecutionPaths: existingReport?.stageExecutionPaths ?? {
-        websiteSource: websiteStage.source.executionPath,
-        websiteEligibility: websiteStage.eligibility.executionPath,
-        assessment: assessmentStage.executionPath,
-      },
       source: {
         materializationId: website.materializationId,
         materializationDigest: website.materializationDigest,
@@ -575,10 +559,10 @@ export async function executePrivateKwM1Dossier(value: unknown): Promise<Private
       assessment: {
         assessmentId: currentAssessment.assessment.assessmentId,
         assessmentDigest: currentAssessment.assessment.assessmentDigest,
-        checkpointId: storedAssessmentCheckpoint.checkpointId,
-        checkpointDigest: storedAssessmentCheckpoint.checkpointDigest,
+        checkpointId: rebuiltAssessmentCheckpoint.checkpointId,
+        checkpointDigest: rebuiltAssessmentCheckpoint.checkpointDigest,
       },
-      rowCounts: existingReport?.rowCounts ?? { beforeAssessment, afterAssessment },
+      rowCounts: afterAssessmentRows,
       ownerDossier: detail,
       contactReview: { state: "NOT_RECORDED" as const },
       authority: {
@@ -611,6 +595,8 @@ export async function executePrivateKwM1Dossier(value: unknown): Promise<Private
         websiteCheckpointOutput: websiteStage.checkpoint.outputExecutionPath,
         assessmentCheckpointOutput,
         reportOutput,
+        assessmentInsertedRows: insertedRows,
+        rowCounts: { beforeAssessment: beforeAssessmentRows, afterAssessment: afterAssessmentRows },
       },
     });
   } finally {

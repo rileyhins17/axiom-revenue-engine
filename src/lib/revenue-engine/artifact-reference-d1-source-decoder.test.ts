@@ -85,6 +85,7 @@ import {
 } from "@/lib/revenue-engine/private-kw-current-website-evidence-eligibility-d1";
 import {
   buildPrivateKwCurrentWebsiteEvidenceProgressInput,
+  buildPrivateKwCurrentWebsiteEvidenceProgressInputForPersistedCheckpoint,
   requireInProcessPrivateKwCurrentWebsiteEvidenceProgressInput,
 } from "@/lib/revenue-engine/private-kw-current-website-evidence-progress";
 import {
@@ -1370,6 +1371,18 @@ test("current website evidence progress rejects commit responses, copied trust, 
       ),
       /chronology.*current evidence window/i,
     );
+    const staleRecordedAt = new Date(Date.parse(fixture.reloaded.databaseNow) - 1).toISOString();
+    assert.throws(
+      () => buildPrivateKwCurrentWebsiteEvidenceProgressInput({
+        manifestValue: fixture.manifest,
+        previousProgressValue: fixture.sourceProgress,
+        websiteEvidenceProofValue: fixture.evidence,
+        currentEligibilityResultValue: fixture.reloaded,
+        recordedAt: staleRecordedAt,
+        allowHistoricalReplay: true,
+      } as unknown as Parameters<typeof buildPrivateKwCurrentWebsiteEvidenceProgressInput>[0]),
+      /chronology.*current evidence window/i,
+    );
     assert.throws(
       () => build(fixture.reloaded, fixture.receipt.evidenceFreshThrough),
       /chronology.*current evidence window/i,
@@ -1396,6 +1409,57 @@ test("current website evidence progress rejects commit responses, copied trust, 
     });
     assert.equal(stale.freshnessState, "STALE");
     assert.throws(() => build(stale), /not current at the database clock/i);
+  } finally {
+    fixture.database.close();
+  }
+});
+
+test("persisted website replay requires the independently reconstructed timestamp and durable reload", async () => {
+  const fixture = await durableEligibilityProgressFixture();
+  try {
+    const ordinaryInput = buildPrivateKwCurrentWebsiteEvidenceProgressInput({
+      manifestValue: fixture.manifest,
+      previousProgressValue: fixture.sourceProgress,
+      websiteEvidenceProofValue: fixture.evidence,
+      currentEligibilityResultValue: fixture.reloaded,
+      recordedAt: fixture.recordedAt,
+    });
+    const persistedCheckpoint = appendPrivateKwCurrentWebsiteEvidenceProgress({
+      manifestValue: fixture.manifest,
+      previousProgressValue: fixture.sourceProgress,
+      phaseInputValue: ordinaryInput,
+    });
+    const rebuilt = buildPrivateKwCurrentWebsiteEvidenceProgressInputForPersistedCheckpoint({
+      manifestValue: fixture.manifest,
+      previousProgressValue: fixture.sourceProgress,
+      websiteEvidenceProofValue: fixture.evidence,
+      currentEligibilityResultValue: fixture.reloaded,
+      persistedCheckpointValue: persistedCheckpoint,
+      canonicalRecordedAt: fixture.recordedAt,
+    });
+    assert.deepEqual(rebuilt, ordinaryInput);
+    assert.throws(
+      () => buildPrivateKwCurrentWebsiteEvidenceProgressInputForPersistedCheckpoint({
+        manifestValue: fixture.manifest,
+        previousProgressValue: fixture.sourceProgress,
+        websiteEvidenceProofValue: fixture.evidence,
+        currentEligibilityResultValue: structuredClone(fixture.reloaded),
+        persistedCheckpointValue: persistedCheckpoint,
+        canonicalRecordedAt: fixture.recordedAt,
+      }),
+      /exact in-process result/i,
+    );
+    assert.throws(
+      () => buildPrivateKwCurrentWebsiteEvidenceProgressInputForPersistedCheckpoint({
+        manifestValue: fixture.manifest,
+        previousProgressValue: fixture.sourceProgress,
+        websiteEvidenceProofValue: fixture.evidence,
+        currentEligibilityResultValue: fixture.reloaded,
+        persistedCheckpointValue: persistedCheckpoint,
+        canonicalRecordedAt: new Date(Date.parse(fixture.recordedAt) + 1).toISOString(),
+      }),
+      /independently reconstructed durable timestamp/i,
+    );
   } finally {
     fixture.database.close();
   }

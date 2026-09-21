@@ -85,17 +85,81 @@ export function requireInProcessPrivateKwCurrentWebsiteEvidenceProgressInputForP
   return trusted;
 }
 
-/**
- * Derives one validation-only CURRENT_WEBSITE_EVIDENCE phase input from an
- * exact current durable reload. It does not call the progress appender, create
- * a phase receipt/checkpoint, read D1/R2, or authorize any execution.
- */
 export function buildPrivateKwCurrentWebsiteEvidenceProgressInput(input: {
   manifestValue: unknown;
   previousProgressValue: unknown;
   websiteEvidenceProofValue: unknown;
   currentEligibilityResultValue: unknown;
   recordedAt: string;
+}): PrivateKwShadowSlicePhaseReceiptInput {
+  return buildPrivateKwCurrentWebsiteEvidenceProgressInputInternal({
+    manifestValue: input.manifestValue,
+    previousProgressValue: input.previousProgressValue,
+    websiteEvidenceProofValue: input.websiteEvidenceProofValue,
+    currentEligibilityResultValue: input.currentEligibilityResultValue,
+    recordedAt: input.recordedAt,
+  });
+}
+
+/**
+ * Reconstructs a previously persisted website phase for a restart. The
+ * persisted checkpoint may supply the historical phase shape, but its
+ * recording timestamp must equal the independently reconstructed canonical
+ * timestamp supplied by the caller. The caller must append this trusted input
+ * and compare the complete rebuilt checkpoint before accepting it.
+ */
+export function buildPrivateKwCurrentWebsiteEvidenceProgressInputForPersistedCheckpoint(input: {
+  manifestValue: unknown;
+  previousProgressValue: unknown;
+  websiteEvidenceProofValue: unknown;
+  currentEligibilityResultValue: unknown;
+  persistedCheckpointValue: unknown;
+  canonicalRecordedAt: string;
+}): PrivateKwShadowSlicePhaseReceiptInput {
+  const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifestValue);
+  const previousProgress = PrivateKwShadowSliceProgressCheckpointSchema.parse(input.previousProgressValue);
+  const websiteEvidence = PrivateKwCurrentWebsiteEvidenceProofSchema.parse(input.websiteEvidenceProofValue);
+  const persisted = PrivateKwShadowSliceProgressCheckpointSchema.parse(input.persistedCheckpointValue);
+  if (
+    persisted.parentCheckpoint?.checkpointId !== previousProgress.checkpointId
+    || persisted.parentCheckpoint.checkpointDigest !== previousProgress.checkpointDigest
+  ) throw new Error("Persisted website checkpoint must bind the exact source progress parent.");
+  const canonicalRecordedAt = TimestampSchema.parse(input.canonicalRecordedAt);
+  const record = persisted.records.find((candidate) => candidate.businessId === websiteEvidence.businessId);
+  const phase = record?.phaseReceipts.at(-1);
+  if (
+    !record
+    || record.phaseReceipts.length !== 2
+    || !phase
+    || phase.phase !== "CURRENT_WEBSITE_EVIDENCE"
+    || phase.proof.primaryReceiptId !== websiteEvidence.proofId
+    || phase.proof.primaryReceiptDigest !== websiteEvidence.proofDigest
+  ) throw new Error("Persisted website checkpoint must retain the exact current evidence phase lineage.");
+  if (phase.recordedAt !== canonicalRecordedAt) {
+    throw new Error("Persisted website checkpoint recordedAt must match the independently reconstructed durable timestamp.");
+  }
+  return buildPrivateKwCurrentWebsiteEvidenceProgressInputInternal({
+    manifestValue: manifest,
+    previousProgressValue: previousProgress,
+    websiteEvidenceProofValue: websiteEvidence,
+    currentEligibilityResultValue: input.currentEligibilityResultValue,
+    recordedAt: phase.recordedAt,
+    historicalRecordedAt: phase.recordedAt,
+  });
+}
+
+/**
+ * Derives one validation-only CURRENT_WEBSITE_EVIDENCE phase input from an
+ * exact current durable reload. It does not call the progress appender, create
+ * a phase receipt/checkpoint, read D1/R2, or authorize any execution.
+ */
+function buildPrivateKwCurrentWebsiteEvidenceProgressInputInternal(input: {
+  manifestValue: unknown;
+  previousProgressValue: unknown;
+  websiteEvidenceProofValue: unknown;
+  currentEligibilityResultValue: unknown;
+  recordedAt: string;
+  historicalRecordedAt?: string;
 }): PrivateKwShadowSlicePhaseReceiptInput {
   const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifestValue);
   const previousProgress = PrivateKwShadowSliceProgressCheckpointSchema.parse(
@@ -107,7 +171,10 @@ export function buildPrivateKwCurrentWebsiteEvidenceProgressInput(input: {
   const eligibility = requireCurrentPrivateKwWebsiteEvidenceEligibilityD1Result(
     input.currentEligibilityResultValue,
   );
-  const recordedAt = TimestampSchema.parse(input.recordedAt);
+  const historicalRecordedAt = input.historicalRecordedAt === undefined
+    ? undefined
+    : TimestampSchema.parse(input.historicalRecordedAt);
+  const recordedAt = TimestampSchema.parse(historicalRecordedAt ?? input.recordedAt);
 
   if (eligibility.executionPath !== "DURABLE_RELOAD") {
     throw new Error(
@@ -190,7 +257,7 @@ export function buildPrivateKwCurrentWebsiteEvidenceProgressInput(input: {
   if (
     Date.parse(eligibility.receiptRecordedAt) < Date.parse(receipt.evaluatedAt)
     || Date.parse(eligibility.databaseNow) < Date.parse(eligibility.receiptRecordedAt)
-    || Date.parse(recordedAt) < Date.parse(eligibility.databaseNow)
+    || (historicalRecordedAt === undefined && Date.parse(recordedAt) < Date.parse(eligibility.databaseNow))
     || Date.parse(recordedAt) >= Date.parse(receipt.evidenceFreshThrough)
     || Date.parse(receipt.evaluatedAt) < Date.parse(websiteEvidence.preparedAt)
     || Date.parse(websiteEvidence.workflow.requestedAt) < Date.parse(predecessor.completedAt)
