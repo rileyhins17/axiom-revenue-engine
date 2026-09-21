@@ -68,6 +68,81 @@ type AcceptanceResult = {
   externalRequests: number;
 };
 
+export type BrowserDiagnostic = {
+  capturedAt: string;
+  stage: string;
+  kind: "console-error" | "page-error" | "request-failed" | "http-error";
+  url: string;
+  message: string;
+  name?: string;
+  stack?: string | null;
+  status?: number;
+};
+
+export function attachBrowserDiagnostics(
+  page: Page,
+  getStage: () => string,
+  diagnostics: BrowserDiagnostic[],
+  baseUrl: string,
+) {
+  const baseOrigin = new URL(baseUrl).origin;
+  const record = (diagnostic: Omit<BrowserDiagnostic, "capturedAt" | "stage">) => {
+    diagnostics.push({
+      capturedAt: new Date().toISOString(),
+      stage: getStage(),
+      ...diagnostic,
+    });
+  };
+
+  page.on("console", (message) => {
+    if (message.type() !== "error") return;
+    record({
+      kind: "console-error",
+      url: message.location().url || page.url(),
+      message: message.text(),
+    });
+  });
+  page.on("pageerror", (error) => {
+    record({
+      kind: "page-error",
+      url: page.url(),
+      message: error.message,
+      name: error.name,
+      stack: error.stack ?? null,
+    });
+  });
+  page.on("requestfailed", (request) => {
+    record({
+      kind: "request-failed",
+      url: request.url(),
+      message: request.failure()?.errorText ?? "Request failed",
+    });
+  });
+  page.on("response", (response) => {
+    const status = response.status();
+    if (status < 500 || new URL(response.url()).origin !== baseOrigin) return;
+    record({
+      kind: "http-error",
+      url: response.url(),
+      message: `HTTP ${status}`,
+      status,
+    });
+  });
+}
+
+export async function writeBrowserDiagnostics(
+  outputDirectory: string,
+  diagnostics: BrowserDiagnostic[],
+  failedStage: string,
+  failedUrl: string | null,
+) {
+  await writeFile(
+    join(outputDirectory, "owner-ui-browser-diagnostics.json"),
+    `${JSON.stringify({ diagnostics, failedStage, failedUrl }, null, 2)}\n`,
+    "utf8",
+  );
+}
+
 export function isAllowedOwnerAcceptanceUrl(rawUrl: string, baseUrl: string) {
   const value = new URL(rawUrl);
   if (value.protocol === "data:" || value.protocol === "about:") return true;
@@ -790,9 +865,9 @@ async function openMobileDossier(page: Page) {
 async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
   let browser: Browser | null = null;
   let page: Page | null = null;
+  let warmupPage: Page | null = null;
   const externalRequests: string[] = [];
-  const browserErrors: string[] = [];
-  const badResponses: string[] = [];
+  const diagnostics: BrowserDiagnostic[] = [];
   const ownerLabelingPacket = buildCompleteOwnerLabelingPacketFixture();
   const firstEvaluationBusiness = ownerLabelingPacket.entries[0]!.businessName;
   let stage = "startup";
@@ -819,7 +894,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     // route in a disposable page before attaching the measured/error-audited
     // page so route prefetch cannot replace a chunk during the real run.
     stage = "owner route warmup";
-    const warmupPage = await context.newPage();
+    warmupPage = await context.newPage();
+    attachBrowserDiagnostics(warmupPage, () => stage, diagnostics, baseUrl);
     await warmupPage.goto("/leads", { waitUntil: "domcontentloaded" });
     await warmupPage.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
     await warmupPage.goto(`/leads/${FIXTURE_BUSINESS_ID}`, { waitUntil: "domcontentloaded" });
@@ -830,17 +906,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await warmupPage.close();
 
     page = await context.newPage();
-    page.on("console", (message) => {
-      if (message.type() === "error") browserErrors.push(`${stage} console: ${message.text()}`);
-    });
-    page.on("pageerror", (error) => browserErrors.push(`${stage} pageerror: ${JSON.stringify({
-      name: error.name,
-      message: error.message,
-      stack: error.stack ?? null,
-    })}`));
-    page.on("response", (response) => {
-      if (response.url().startsWith(baseUrl) && response.status() >= 500) badResponses.push(`${response.status()} ${response.url()}`);
-    });
+    attachBrowserDiagnostics(page, () => stage, diagnostics, baseUrl);
 
     stage = "desktop leads";
     const listStart = performance.now();
@@ -957,8 +1023,10 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await assertReducedMotion(page, "mobile quality lab");
 
     assert.deepEqual(externalRequests, [], "The owner acceptance browser attempted an external request.");
-    assert.deepEqual(browserErrors, [], `Browser errors: ${browserErrors.join(" | ")}`);
-    assert.deepEqual(badResponses, [], `Local server failures: ${badResponses.join(" | ")}`);
+    const browserErrors = diagnostics.filter((diagnostic) => diagnostic.kind === "console-error" || diagnostic.kind === "page-error");
+    const badResponses = diagnostics.filter((diagnostic) => diagnostic.kind === "http-error");
+    assert.deepEqual(browserErrors, [], `Browser errors: ${browserErrors.map((diagnostic) => `${diagnostic.stage} ${diagnostic.kind}: ${diagnostic.message}`).join(" | ")}`);
+    assert.deepEqual(badResponses, [], `Local server failures: ${badResponses.map((diagnostic) => `${diagnostic.status} ${diagnostic.url}`).join(" | ")}`);
     await context.close();
     return {
       desktopListReadyMs,
@@ -970,6 +1038,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     } satisfies AcceptanceResult;
   } catch (error) {
     if (page) await page.screenshot({ path: join(outputDirectory, "owner-ui-failure.png"), fullPage: true }).catch(() => undefined);
+    await writeBrowserDiagnostics(outputDirectory, diagnostics, stage, page?.url() ?? warmupPage?.url() ?? null).catch(() => undefined);
     if (error instanceof Error) error.message = `${stage} at ${page?.url() ?? "no page"}: ${error.message}`;
     throw error;
   } finally {
