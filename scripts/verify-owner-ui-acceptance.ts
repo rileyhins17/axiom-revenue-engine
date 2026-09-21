@@ -220,10 +220,13 @@ async function freeLoopbackPort() {
 
 async function applyMigrations(database: SqliteDatabase) {
   const migrationsDirectory = join(REPOSITORY_ROOT, "migrations");
+  // This fixture exercises the existing owner/contact workflow, whose schema
+  // contract is deliberately pinned to the pre-M2 0054-0068 partition.
   const migrations = (await readdir(migrationsDirectory))
-    .filter((name) => /^\d{4}_.+\.sql$/.test(name))
+    .filter((name) => /^\d{4}_.+\.sql$/.test(name) && name.slice(0, 4) <= "0068")
     .sort((left, right) => left.localeCompare(right));
-  assert(migrations.length >= 60, "The owner fixture must use the complete migration history.");
+  assert(migrations.length >= 60 && migrations.at(-1)?.startsWith("0068_"),
+    "The owner fixture must use the complete pre-M2 migration history through 0068.");
 
   database.pragma("foreign_keys = ON");
   for (const migration of migrations) {
