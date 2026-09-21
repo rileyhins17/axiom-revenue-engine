@@ -155,6 +155,39 @@ test("rejects a tampered transport receipt digest", async () => {
   }), /digest/i);
 });
 
+test("cancels an oversized robots stream and aborts its transport exactly once", async () => {
+  let aborts = 0;
+  const transport = createOversizedRobotsTransport(() => { aborts += 1; });
+  const decision = await evaluatePrivateKwRobotsPolicy({
+    approvedSourceUrl: "https://example.com/",
+    auditUserAgent: "AxiomAudit/1.0",
+    termsDecision: "TERMS_REVIEWED_FOR_FACTS",
+    transport,
+    maxRobotsBytes: 8,
+    now: () => NOW,
+  });
+  assert.equal(decision.allowed, false);
+  assert.match(decision.reason, /too large/i);
+  assert.equal(aborts, 1);
+});
+
+function createOversizedRobotsTransport(onAbort: () => void) {
+  return createPrivateKwPublicHttpTransport({
+    resolveDns: async () => [{ address: "93.184.216.34", family: 4 as const }],
+    executeConnection: async () => ({
+      statusCode: 200,
+      headers: { "content-type": "text/plain" },
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("User-agent: *\nDisallow: /\n"));
+        },
+      }),
+      abort: onAbort,
+    }),
+    now: () => NOW,
+  });
+}
+
 test("requires explicit terms approval and fails closed on unavailable or malformed robots", async () => {
   for (const [robots, status] of [["User-agent: *\nDisallow: /private\n", 200], ["not a directive", 200], ["", 503]] as const) {
     const { transport } = transportFor(robots, status);

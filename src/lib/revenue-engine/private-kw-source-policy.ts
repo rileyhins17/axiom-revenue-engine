@@ -62,10 +62,13 @@ async function boundedText(response: Response, maxBytes: number) {
       if (bytes > maxBytes) throw new Error("robots body too large");
       chunks.push(next.value);
     }
+    return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))));
+  } catch (error) {
+    await reader.cancel("robots_body_limit").catch(() => undefined);
+    throw error;
   } finally {
     reader.releaseLock();
   }
-  return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))));
 }
 
 function parseRobots(text: string): Group[] {
