@@ -432,12 +432,30 @@ binding. Together they authorize no database mutation, provider or network
 operation, acquisition, qualification change, consent
 decision, outreach, sending, deployment, remote database, or spend.
 
-## M2 local setup backup boundary
+## M2 local database setup and recovery
 
-The local setup CLI currently performs recorded-release preflight and lock
-validation only. It does not apply migration 0069 or publish a setup receipt.
-The internal backup function requires the actual live preflight session; a JSON
-object or a copied session does not grant execution authority.
+The setup command requires an already recorded owner release naming an existing
+canonical 0054-0068 database, exact repository commit and migration manifest,
+backup, setup receipt and quarantine paths. All paths are direct children of
+`data/kw-evaluation`. The command does not create an approval, create a blank
+database, apply remote migrations, or enable runtime operations.
+
+With the reviewed release recorded, these are the separate operating modes:
+
+```powershell
+npm run kw:prepare-m2-database -- data/kw-evaluation/recorded-setup-release.json
+npm run kw:prepare-m2-database -- data/kw-evaluation/recorded-setup-release.json --apply
+npm run kw:prepare-m2-database -- data/kw-evaluation/recorded-setup-release.json --verify
+```
+
+The first command performs preflight only. `--apply` validates backup/restore,
+applies exactly 0069 in one transaction, verifies the complete expected result
+after reopen, repeats the restore drill and publishes the setup receipt last.
+An existing exact receipt is verified and replayed without database writes.
+`--verify` independently reloads the receipt and current database/backup proof.
+It verifies the unchanged setup baseline. It is not a future application health
+check after authorized assessment writes; Task 5 must separately prove those
+successor states before its runtime route is enabled.
 
 For the synthetic test path, the backup function opens the source read-only,
 publishes a verified backup without overwriting a conflicting destination, and
@@ -450,9 +468,30 @@ An incomplete temporary output or cleanup failure invalidates the session.
 Release its lock before obtaining a fresh preflight. Preserve unexpected files
 for inspection; never recursively delete `data/kw-evaluation` or remove another
 process's lock. The lock assumes cooperative processes in an owner-only local
-directory. A successful restore drill proves a usable copy, not an applied
-migration or an actual rollback. The mutation, receipt, and rollback runner
-remain separate unfinished Task 8 work.
+directory. A successful restore drill proves a usable copy; the separate setup
+receipt records an applied migration.
+
+If failure occurs after commit and before a valid receipt, stop. Keep the
+database, backup and temporary evidence; do not infer completion or edit a
+receipt. Prepare a separate rollback release for owner review using the current
+suspect identity, backup identity/logical digest, quarantine and rollback-receipt
+paths. Its required confirmation is `RESTORE_M2_LOCAL_DATABASE_FROM_BACKUP`.
+Only after that decision is recorded:
+
+```powershell
+npm run kw:prepare-m2-database -- data/kw-evaluation/recorded-setup-release.json --rollback data/kw-evaluation/recorded-rollback-release.json
+```
+
+Rollback preserves the suspect in quarantine before publishing the validated
+restore. Repeating the same approved operation can recover interruption after
+quarantine, after source removal, or before receipt publication; it revalidates
+the surviving evidence first. Changed or missing backup/quarantine evidence
+requires manual investigation. The old setup receipt remains immutable and
+fails verification against the restored database. See
+[ADR 0042](adr/0042-transactional-local-setup-and-approved-recovery.md).
+
+The runner has been exercised only on synthetic fixtures. Real database setup
+and downstream M2 execution still require their recorded release gates.
 
 ## Weekly owner review (30 minutes)
 

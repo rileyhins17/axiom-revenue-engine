@@ -108,7 +108,7 @@ describe("private KW M2 snapshot helpers", () => {
       try {
         symlinkSync(target, temp.file);
         assert.throws(() => readSetupFile(temp.file), /regular canonical/);
-        assert.throws(() => removeSetupTemp(temp, { fileIdentity: readSetupFile(target).identity, schemaDigest: "x", contentDigest: "x", rowCounts: {} }), /regular canonical|identity/);
+        assert.throws(() => removeSetupTemp(temp, { fileIdentity: readSetupFile(target).identity }), /regular canonical|identity/);
         assert.equal(readFileSync(target, "utf8"), "target");
         assert.equal(lstatSync(temp.file).isSymbolicLink(), true);
       } catch (error) {

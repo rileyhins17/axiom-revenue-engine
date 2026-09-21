@@ -1,11 +1,84 @@
 # Current status — Axiom Revenue Engine
 
 **Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Task 8
-local backup and restore drill. The fully verified code checkpoint is `42eebd3`
-(`feat(revenue): verify local backup and restore snapshots`), built from base
-`4ec69fd`. This following status update is documentation only.
+transactional setup and approved recovery, verified from base `33fe02d`.
+All required checkpoint checks below passed; the code commit is recorded in the
+following documentation checkpoint.
 
-## M2 backup and restore-drill checkpoint
+## M2 local setup runner checkpoint
+
+The local runner now applies exactly migration 0069 in one immediate transaction,
+compares the complete result with an independently migrated in-memory backup,
+reopens the database, repeats the restore drill and publishes the v2 setup
+receipt last. The receipt includes typed logical preservation proof and exact
+physical identities. Verification and replay reload current artifacts rather
+than trusting a caller-supplied success object.
+
+`npm run kw:prepare-m2-database` defaults to preflight. `--apply` requires the
+recorded current setup release. `--verify` reloads the exact setup proof.
+`--rollback` requires a separate recorded owner decision for the inspected
+suspect, backup, quarantine and rollback receipt. No command grants itself
+approval. See the [runbook](RUNBOOK.md#m2-local-database-setup-and-recovery) and
+[ADR 0042](adr/0042-transactional-local-setup-and-approved-recovery.md).
+
+Root implemented and integrated the runner. Luna implemented only the bounded
+receipt/rollback contract and its tests; another Luna reviewed the combined
+diff. Root strengthened recovery after the review identified a missing-source
+interruption. Tests force failures after quarantine publication, after source
+removal and before rollback receipt publication; each resumes from verified
+evidence under the separately approved rollback. The original required-source
+preflight failed the missing-path regression before the recovery rule passed.
+
+A failure before commit verifies the original source bytes and rows. A failure
+after commit intentionally remains unreceipted, keeps source and backup, and
+requires the separate recovery decision. It never infers setup success or
+automatically restores without approval. The recovery review's concern about
+unverified restored contents was checked against `buildReceipt`: it compares
+the complete restored logical snapshot to the approved backup and verifies
+quarantine identity before publication. No extra authority follows from merely
+finding a quarantine file.
+
+| Check | Result |
+|---|---|
+| Focused integration suite | PASS — 21 passed, 1 Windows symlink skip |
+| Added recovery/post-commit cases | PASS — 4 passed; missing-source regression also observed failing before recovery fix |
+| `npm run check:safety` | PASS |
+| `npm test` | PASS — 619 total, 616 passed, 0 failed, 3 Windows symlink-privilege skips |
+| `npm run typecheck` | PASS |
+| `npm run lint` | PASS — no warnings |
+| `npm run build:cloudflare` | PASS — 2,018 files scanned, 0 local secret values |
+| `npx wrangler deploy --env="" --dry-run --autoconfig false` | PASS — no upload; generated duplicate-options warnings nonblocking |
+| `npm run test:owner-ui` | PASS — list 400 ms, dossier 881 ms; widths 1440/390; 6 WCAG pages; 0 external requests |
+
+The real CLI is exercised by the synthetic setup/replay test. No deploy, build
+or dry run was active when the owner UI test started. M1 fresh4 database,
+website-checkpoint and report hashes still match the retained verification.
+
+All execution in this cycle used synthetic local fixtures. No real owner setup
+release or persistent real M2 setup receipt was created; no real migration,
+prospect request, provider action, deployment, email or paid spend occurred.
+Production and staging were not inspected. Automation remains off or unverified.
+Runtime remains capped at C$50/month, paid mailboxes and Workspace remain out
+of scope, and the rebuilt M1 fresh4 checkpoint remains the retained M1 evidence.
+
+The next three concrete actions are:
+
+1. Correct Task 5's setup-baseline/write-replay interface, then implement its
+   double source-materialization preflight and legacy/M2 reader compatibility.
+2. Complete the HTML-only assessment writer/replay and Task 6's exact-ten
+   orchestration against synthetic receipt-backed fixtures.
+3. Prepare the exact real candidate/owner packet and setup release for the
+   separate supervised one-then-ten gate. M2 is not complete; M3 has not started.
+
+The handoff audit found a concrete Task 5 plan defect: its current design checks
+the immutable setup file SHA before and after legitimate assessment writes,
+which necessarily change that file. Its domain-row replay rules do not resolve
+the conflict. The unchanged setup baseline must remain a strict initial gate;
+later authorized writes need their own independently verified durable-state
+checks. Resolve this interface before Task 5 execution rather than weakening
+the setup verifier or treating legitimate writes as forgery.
+
+## Prior M2 backup and restore-drill checkpoint (`42eebd3`)
 
 The bounded backup function now requires a live canonical preflight session
 and holds the cooperative lock handle for its entire operation. It rereads

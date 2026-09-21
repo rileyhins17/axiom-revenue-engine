@@ -10,6 +10,7 @@ import Database from "better-sqlite3";
 
 import { privateKwM2SetupDigest } from "../src/lib/revenue-engine/private-kw-m2-setup-release";
 import { assertCanonicalPrivateKwRevenueSchema, assertPrivateKwSingleDatabase } from "./private-kw-database";
+import { assertCanonicalPrivateKwM2RevenueSchema } from "./private-kw-m2-database";
 
 export type SetupFileIdentity = Readonly<{
   device: string; inode: string; byteLength: number; modificationMarker: string; sha256: string;
@@ -90,14 +91,13 @@ function encodedCell(value: unknown): unknown {
 }
 
 /** Logical snapshot covers ALL tables and schema, including data outside the Revenue partition. */
-export function inspectSetupSqlite(database: Database.Database, schema: "PRE_0069") {
-  void schema;
+export function inspectSetupSqlite(database: Database.Database, schema: "PRE_0069" | "POST_0069") {
   database.pragma("foreign_keys = ON");
-  database.pragma("query_only = ON");
   assertPrivateKwSingleDatabase(database);
   if (database.pragma("integrity_check", { simple: true }) !== "ok"
     || (database.pragma("foreign_key_check") as unknown[]).length !== 0) throw new Error("M2 setup SQLite integrity check failed.");
-  assertCanonicalPrivateKwRevenueSchema(database);
+  if (schema === "PRE_0069") assertCanonicalPrivateKwRevenueSchema(database);
+  else assertCanonicalPrivateKwM2RevenueSchema(database);
   const schemaRows = database.prepare('SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name, tbl_name').all() as {
     type: string; name: string; tbl_name: string; sql: string | null;
   }[];
@@ -123,14 +123,14 @@ export function inspectSetupSqlite(database: Database.Database, schema: "PRE_006
   };
 }
 
-export function inspectSetupSnapshot(file: string): SetupSnapshot {
+export function inspectSetupSnapshot(file: string, schema: "PRE_0069" | "POST_0069" = "PRE_0069"): SetupSnapshot {
   assertSetupSidecarsAbsent(file);
   const before = readSetupFile(file);
   const database = new Database(file, { readonly: true, fileMustExist: true, timeout: 0 });
   let proof;
   try {
     database.exec("BEGIN");
-    proof = inspectSetupSqlite(database, "PRE_0069");
+    proof = inspectSetupSqlite(database, schema);
   } finally { database.close(); }
   assertSetupSidecarsAbsent(file);
   assertSetupFileUnchanged(file, before.identity);
@@ -155,7 +155,7 @@ export function assertSetupTemp(temp: SetupTemp) {
 }
 
 /** Never recursively delete. On drift/partial backup, preserve files for inspection and fail. */
-export function removeSetupTemp(temp: SetupTemp, proof: SetupSnapshot) {
+export function removeSetupTemp(temp: SetupTemp, proof: Pick<SetupSnapshot, "fileIdentity">) {
   assertSetupTemp(temp);
   assertSetupSidecarsAbsent(temp.file);
   assertSetupFileUnchanged(temp.file, proof.fileIdentity);

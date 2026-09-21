@@ -111,11 +111,24 @@ const BackupRestoreSchema = z.object({
   backupPath: RelativeDataPathSchema,
   backupFileIdentity: FileIdentitySchema,
   backupSha256: Sha256Schema,
+  logicalSnapshotDigest: Sha256Schema,
   restoreDrillFileIdentity: FileIdentitySchema,
   restoreDrillSha256: Sha256Schema,
   restoreDrillVerified: z.literal(true),
   evidenceDigest: Sha256Schema,
-}).strict();
+}).strict().superRefine((evidence, context) => {
+  if (evidence.backupSha256 !== evidence.backupFileIdentity.sha256) {
+    context.addIssue({ code: "custom", path: ["backupSha256"], message: "Backup SHA-256 must match backupFileIdentity.sha256." });
+  }
+  if (evidence.restoreDrillSha256 !== evidence.restoreDrillFileIdentity.sha256) {
+    context.addIssue({ code: "custom", path: ["restoreDrillSha256"], message: "Restore-drill SHA-256 must match restoreDrillFileIdentity.sha256." });
+  }
+  const { evidenceDigest: _evidenceDigest, ...withoutDigest } = evidence;
+  void _evidenceDigest;
+  if (evidence.evidenceDigest !== privateKwM2SetupDigest(withoutDigest)) {
+    context.addIssue({ code: "custom", path: ["evidenceDigest"], message: "Backup/restore evidenceDigest must bind every backup/restore field." });
+  }
+});
 
 export const PrivateKwM2DatabaseSetupReceiptSchema = z.object({
   receiptVersion: z.literal(PRIVATE_KW_M2_DATABASE_RECEIPT_V2),
@@ -150,9 +163,19 @@ export const PrivateKwM2DatabaseSetupReceiptSchema = z.object({
   if (receipt.authority.setupReleaseEnvelopeDigest !== receipt.setupReleaseEnvelopeDigest) {
     context.addIssue({ code: "custom", path: ["authority", "setupReleaseEnvelopeDigest"], message: "Receipt authority must bind the exact release envelope digest." });
   }
+  if (receipt.backupRestore.backupPath === receipt.databasePath) {
+    context.addIssue({ code: "custom", path: ["backupRestore", "backupPath"], message: "Backup path must differ from the database path." });
+  }
 });
 
 export type PrivateKwM2DatabaseSetupReceipt = z.infer<typeof PrivateKwM2DatabaseSetupReceiptSchema>;
+export type PrivateKwM2BackupRestoreEvidence = PrivateKwM2DatabaseSetupReceipt["backupRestore"];
+
+export function privateKwM2BackupRestoreEvidenceDigest(
+  evidence: Omit<PrivateKwM2BackupRestoreEvidence, "evidenceDigest">,
+) {
+  return privateKwM2SetupDigest(evidence);
+}
 
 export function privateKwM2SetupReleaseEnvelopeDigest(core: Omit<PrivateKwM2SetupReleaseEnvelope, "envelopeId" | "envelopeDigest">) {
   return privateKwM2SetupDigest(core);
@@ -217,20 +240,102 @@ async function readStableJson(file: string) {
   }
 }
 
-export async function loadPrivateKwM2SetupReleaseEnvelope(file: string, options: LoaderOptions) {
+function canonicalSetupJsonPath(file: string) {
   if (!/^data[\\/]kw-evaluation[\\/][A-Za-z0-9._-]+\.json$/.test(file)) throw new Error("M2 setup release must be a direct-child data/kw-evaluation JSON file.");
   const absolute = path.resolve(CANONICAL_REPOSITORY_ROOT, file);
   const expectedRoot = path.join(CANONICAL_REPOSITORY_ROOT, "data", "kw-evaluation");
   if (path.dirname(absolute) !== expectedRoot) throw new Error("M2 setup release must reside under the canonical repository data/kw-evaluation root.");
-  const parent = await lstat(expectedRoot, { bigint: true });
+  const parent = lstat(expectedRoot, { bigint: true });
+  return { absolute, expectedRoot, parent };
+}
+
+export async function readPrivateKwM2SetupJson(file: string): Promise<unknown> {
+  const { absolute, expectedRoot, parent } = canonicalSetupJsonPath(file);
+  const parentStats = await parent;
   const parentReal = await realpath(expectedRoot);
-  if (!parent.isDirectory() || parentReal !== expectedRoot) throw new Error("The setup release root must be a canonical directory.");
-  const parsed = PrivateKwM2SetupReleaseEnvelopeSchema.parse(await readStableJson(absolute));
+  if (!parentStats.isDirectory() || parentReal !== expectedRoot) throw new Error("The setup release root must be a canonical directory.");
+  return readStableJson(absolute);
+}
+
+export async function loadPrivateKwM2SetupReleaseEnvelope(file: string, options: LoaderOptions) {
+  const parsed = PrivateKwM2SetupReleaseEnvelopeSchema.parse(await readPrivateKwM2SetupJson(file));
   const now = options.now ?? new Date();
   const current = currentRepositoryManifest();
   if (Date.parse(parsed.reviewedAt) > now.getTime()) throw new Error("The M2 setup release envelope is dated in the future.");
   if (Date.parse(parsed.expiresAt) <= now.getTime()) throw new Error("The M2 setup release envelope has expired.");
   if (parsed.repositoryCommit !== current.repositoryCommit) throw new Error("The M2 setup release commit does not match the current repository.");
   if (JSON.stringify(parsed.migrationManifest) !== JSON.stringify(current.migrationManifest)) throw new Error("The M2 setup release migration manifest does not match the current repository.");
+  return deepFreeze(parsed);
+}
+
+const PRIVATE_KW_M2_ROLLBACK_RELEASE_VERSION = "kw-m2-local-rollback-v1" as const;
+
+const RollbackCoreSchema = z.object({
+  envelopeVersion: z.literal(PRIVATE_KW_M2_ROLLBACK_RELEASE_VERSION),
+  status: z.literal("APPROVED"),
+  setupReleaseEnvelopeId: z.string().regex(/^kw-m2-local-0069-release:[a-f0-9]{64}$/),
+  setupReleaseEnvelopeDigest: Sha256Schema,
+  databasePath: RelativeDataPathSchema.refine((value) => value.endsWith(".sqlite")),
+  backupPath: RelativeDataPathSchema.refine((value) => value.endsWith(".sqlite")),
+  quarantinePath: RelativeDataPathSchema.refine((value) => value.endsWith(".sqlite")),
+  rollbackReceiptPath: RelativeDataPathSchema.refine((value) => value.endsWith(".json")),
+  suspectFileIdentity: FileIdentitySchema,
+  backupFileIdentity: FileIdentitySchema,
+  logicalSnapshotDigest: Sha256Schema,
+  approvedBy: z.enum(["RILEY", "AIDAN"]),
+  reviewedAt: TimestampSchema,
+  expiresAt: TimestampSchema,
+  rationale: z.string().trim().min(10).max(1000),
+  confirmation: z.literal("RESTORE_M2_LOCAL_DATABASE_FROM_BACKUP"),
+}).strict().superRefine((envelope, context) => {
+  const paths = [envelope.databasePath, envelope.backupPath, envelope.quarantinePath, envelope.rollbackReceiptPath];
+  if (new Set(paths).size !== paths.length) {
+    context.addIssue({ code: "custom", path: ["databasePath"], message: "Rollback database, backup, quarantine, and receipt paths must be distinct." });
+  }
+  if (Date.parse(envelope.expiresAt) <= Date.parse(envelope.reviewedAt)) {
+    context.addIssue({ code: "custom", path: ["expiresAt"], message: "The rollback release envelope must expire after review." });
+  }
+});
+
+export const PrivateKwM2RollbackReleaseEnvelopeSchema = RollbackCoreSchema.extend({
+  envelopeId: z.string().regex(/^kw-m2-local-rollback:[a-f0-9]{64}$/),
+  envelopeDigest: Sha256Schema,
+}).strict().superRefine((envelope, context) => {
+  const { envelopeId: _id, envelopeDigest: _digest, ...core } = envelope;
+  void _id;
+  void _digest;
+  const expected = privateKwM2SetupDigest(core);
+  if (envelope.envelopeDigest !== expected || envelope.envelopeId !== `kw-m2-local-rollback:${expected}`) {
+    context.addIssue({ code: "custom", path: ["envelopeDigest"], message: "The rollback release envelope identity must bind its exact contents." });
+  }
+});
+
+export type PrivateKwM2RollbackReleaseEnvelope = z.infer<typeof PrivateKwM2RollbackReleaseEnvelopeSchema>;
+
+export function privateKwM2RollbackReleaseEnvelopeDigest(core: Omit<PrivateKwM2RollbackReleaseEnvelope, "envelopeId" | "envelopeDigest">) {
+  return privateKwM2SetupDigest(core);
+}
+
+export async function loadPrivateKwM2RollbackReleaseEnvelope(
+  file: string,
+  setupEnvelope: PrivateKwM2SetupReleaseEnvelope,
+  options: LoaderOptions = {},
+) {
+  const parsed = PrivateKwM2RollbackReleaseEnvelopeSchema.parse(await readPrivateKwM2SetupJson(file));
+  const now = options.now ?? new Date();
+  if (Date.parse(parsed.reviewedAt) > now.getTime()) throw new Error("The rollback release envelope is dated in the future.");
+  if (Date.parse(parsed.expiresAt) <= now.getTime()) throw new Error("The rollback release envelope has expired.");
+  if (parsed.setupReleaseEnvelopeId !== setupEnvelope.envelopeId
+    || parsed.setupReleaseEnvelopeDigest !== setupEnvelope.envelopeDigest) {
+    throw new Error("The rollback release envelope does not match the setup release envelope.");
+  }
+  if (parsed.databasePath !== setupEnvelope.databasePath
+    || parsed.backupPath !== setupEnvelope.backupPath
+    || parsed.quarantinePath !== setupEnvelope.quarantinePath) {
+    throw new Error("The rollback release envelope paths do not match the setup release envelope.");
+  }
+  if (parsed.rollbackReceiptPath === setupEnvelope.receiptPath) {
+    throw new Error("The rollback receipt path must differ from the setup receipt path.");
+  }
   return deepFreeze(parsed);
 }

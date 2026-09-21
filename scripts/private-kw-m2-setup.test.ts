@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import fs from "node:fs";
 import { lstat, mkdir, readFile, readdir, rmdir, symlink, unlink, writeFile } from "node:fs/promises";
 import { describe, it, mock } from "node:test";
 import path from "node:path";
@@ -8,8 +9,9 @@ import Database from "better-sqlite3";
 
 import { PRIVATE_KW_M2_MIGRATION_FILES } from "./private-kw-m2-database";
 import { applyCanonicalPrivateKwMigrations } from "./private-kw-database";
-import { privateKwM2SetupReleaseEnvelopeDigest } from "../src/lib/revenue-engine/private-kw-m2-setup-release";
-import { backupPrivateKwM2Database, PRIVATE_KW_M2_SETUP_LOCK_PATH, preflightPrivateKwM2Setup } from "./private-kw-m2-setup";
+import { privateKwM2SetupDigest, privateKwM2SetupReleaseEnvelopeDigest } from "../src/lib/revenue-engine/private-kw-m2-setup-release";
+import { applyPrivateKwM2Setup, backupPrivateKwM2Database, PRIVATE_KW_M2_SETUP_LOCK_PATH, preflightPrivateKwM2Setup, preflightPrivateKwM2Rollback, rollbackPrivateKwM2Setup, verifyPrivateKwM2Setup } from "./private-kw-m2-setup";
+import { inspectSetupSnapshot, readSetupFile } from "./private-kw-m2-snapshot";
 
 const root = path.resolve("data/kw-evaluation");
 const token = `${process.pid}-${Date.now()}`;
@@ -27,6 +29,8 @@ const backupFixtureReceiptPath = path.join(root, `m2-backup-receipt-${token}.jso
 const backupFixtureQuarantinePath = path.join(root, `m2-backup-quarantine-${token}.sqlite`);
 const backupFixtureSidecarPath = `${backupFixtureDatabasePath}-wal`;
 const backupFixtureShmPath = `${backupFixtureDatabasePath}-shm`;
+const rollbackEnvelopePath = `data/kw-evaluation/m2-rollback-envelope-${token}.json`;
+const rollbackReceiptPath = `data/kw-evaluation/m2-rollback-receipt-${token}.json`;
 const sha = (bytes: Buffer | string) => createHash("sha256").update(bytes).digest("hex");
 const manifest = PRIVATE_KW_M2_MIGRATION_FILES.map((filename) => ({ filename, sha256: sha(execFileSync("git", ["show", `HEAD:migrations/${filename}`])) }));
 const createdIdentities = new Map<string, { dev: bigint; ino: bigint }>();
@@ -57,7 +61,7 @@ async function prepare() {
 }
 
 async function cleanupFixture() {
-  for (const file of [envelopePath, databasePath, backupPath, receiptPath, quarantinePath, sidecarPath, backupFixtureEnvelopePath, backupFixtureDatabasePath, backupFixturePath, backupFixtureReceiptPath, backupFixtureQuarantinePath, backupFixtureSidecarPath, backupFixtureShmPath]) {
+  for (const file of [envelopePath, databasePath, backupPath, receiptPath, quarantinePath, sidecarPath, backupFixtureEnvelopePath, backupFixtureDatabasePath, backupFixturePath, backupFixtureReceiptPath, backupFixtureQuarantinePath, backupFixtureSidecarPath, backupFixtureShmPath, rollbackEnvelopePath, rollbackReceiptPath]) {
     try {
       const opened = await lstat(file, { bigint: true });
       const owned = createdIdentities.get(file);
@@ -95,7 +99,232 @@ async function prepareBackupFixture() {
   }
 }
 
+async function prepareRollbackRelease(session: Awaited<ReturnType<typeof preflightPrivateKwM2Setup>>, receipt: Awaited<ReturnType<typeof applyPrivateKwM2Setup>>["receipt"]) {
+  const core = {
+    envelopeVersion: "kw-m2-local-rollback-v1", status: "APPROVED",
+    setupReleaseEnvelopeId: session.envelope.envelopeId, setupReleaseEnvelopeDigest: session.envelope.envelopeDigest,
+    databasePath: session.envelope.databasePath, backupPath: session.envelope.backupPath,
+    quarantinePath: session.envelope.quarantinePath, rollbackReceiptPath,
+    suspectFileIdentity: receipt.fileIdentity, backupFileIdentity: receipt.backupRestore.backupFileIdentity,
+    logicalSnapshotDigest: receipt.backupRestore.logicalSnapshotDigest,
+    approvedBy: "RILEY", reviewedAt: new Date(Date.now() - 1_000).toISOString(), expiresAt: new Date(Date.now() + 600_000).toISOString(),
+    rationale: "Synthetic rollback acceptance fixture only.", confirmation: "RESTORE_M2_LOCAL_DATABASE_FROM_BACKUP",
+  };
+  const envelopeDigest = privateKwM2SetupDigest(core);
+  await writeFile(rollbackEnvelopePath, JSON.stringify({ ...core, envelopeId: `kw-m2-local-rollback:${envelopeDigest}`, envelopeDigest }), { flag: "wx" });
+  await rememberCreated(rollbackEnvelopePath);
+  return core;
+}
+
 describe("private KW M2 setup preflight", () => {
+  it("requires separate rollback approval, quarantines the migrated file, restores and replays", async () => {
+    await prepareBackupFixture();
+    try {
+      const session = await preflightPrivateKwM2Setup(backupFixtureEnvelopeRelative);
+      try {
+        const setup = await applyPrivateKwM2Setup(session);
+        await rememberCreated(backupFixturePath); await rememberCreated(backupFixtureReceiptPath);
+        await assert.rejects(rollbackPrivateKwM2Setup(session, rollbackEnvelopePath), /ENOENT/);
+        const core = await prepareRollbackRelease(session, setup.receipt);
+        const result = await rollbackPrivateKwM2Setup(session, rollbackEnvelopePath);
+        await rememberCreated(backupFixtureDatabasePath); await rememberCreated(backupFixtureQuarantinePath); await rememberCreated(rollbackReceiptPath);
+        assert.equal(result.status, "RESTORED");
+        assert.equal(readSetupFile(backupFixtureQuarantinePath).identity.sha256, setup.receipt.fileIdentity.sha256);
+        assert.equal(inspectSetupSnapshot(backupFixtureDatabasePath).contentDigest, core.logicalSnapshotDigest);
+        const restored = await readFile(backupFixtureDatabasePath);
+        assert.equal((await rollbackPrivateKwM2Setup(session, rollbackEnvelopePath)).status, "REPLAYED");
+        assert.deepEqual(await readFile(backupFixtureDatabasePath), restored);
+        await unlink(rollbackReceiptPath);
+        assert.equal((await rollbackPrivateKwM2Setup(session, rollbackEnvelopePath)).status, "RECOVERED");
+        await rememberCreated(rollbackReceiptPath);
+        assert.deepEqual(await readFile(backupFixtureDatabasePath), restored);
+        await assert.rejects(verifyPrivateKwM2Setup(session), /identity or contents changed/);
+      } finally { await session.releaseLock(); }
+    } finally { await cleanupFixture(); }
+  });
+
+  for (const failurePoint of ["quarantine", "restore", "receipt"] as const) {
+    it(`resumes an approved rollback interrupted at ${failurePoint} publication`, async () => {
+      await prepareBackupFixture();
+      const retained = new Map<string, { dev: bigint; ino: bigint; files: Map<string, { dev: bigint; ino: bigint }> }>();
+      let injected: ReturnType<typeof mock.method<typeof fs, "linkSync">> | undefined;
+      let stopObservingBackup = () => {};
+      const rememberTemp = (sourcePath: string) => {
+        const directory = path.dirname(sourcePath);
+        if (path.dirname(directory) !== root || !path.basename(directory).startsWith(".m2-setup-")) return;
+        const dirStats = fs.lstatSync(directory, { bigint: true });
+        const owned = retained.get(directory) ?? { dev: dirStats.dev, ino: dirStats.ino, files: new Map() };
+        const fileStats = fs.lstatSync(sourcePath, { bigint: true });
+        owned.files.set(sourcePath, { dev: fileStats.dev, ino: fileStats.ino }); retained.set(directory, owned);
+      };
+      try {
+        const session = await preflightPrivateKwM2Setup(backupFixtureEnvelopeRelative);
+        let logicalDigest: string;
+        try {
+          const setup = await applyPrivateKwM2Setup(session);
+          await rememberCreated(backupFixturePath); await rememberCreated(backupFixtureReceiptPath);
+          logicalDigest = (await prepareRollbackRelease(session, setup.receipt)).logicalSnapshotDigest;
+          const originalBackup = Database.prototype.backup;
+          const observed = mock.method(Database.prototype, "backup", async function (this: Database.Database, destination: string) {
+            const result = await originalBackup.call(this, destination);
+            rememberTemp(destination);
+            return result;
+          });
+          stopObservingBackup = () => observed.mock.restore();
+          const originalLink = fs.linkSync;
+          injected = mock.method(fs, "linkSync", (source, destination) => {
+            const sourcePath = source.toString(), destinationPath = destination.toString();
+            rememberTemp(sourcePath);
+            if ((failurePoint === "restore" && destinationPath === backupFixtureDatabasePath)
+              || (failurePoint === "receipt" && destinationPath === path.resolve(rollbackReceiptPath))) throw new Error("Injected rollback publication failure");
+            originalLink(source, destination);
+            if (failurePoint === "quarantine" && destinationPath === backupFixtureQuarantinePath) throw new Error("Injected rollback publication failure");
+          });
+          await assert.rejects(rollbackPrivateKwM2Setup(session, rollbackEnvelopePath), /Injected rollback publication failure/);
+          await rememberCreated(backupFixtureQuarantinePath);
+          await assert.rejects(readFile(rollbackReceiptPath), { code: "ENOENT" });
+          if (failurePoint === "restore") await assert.rejects(readFile(backupFixtureDatabasePath), { code: "ENOENT" });
+        } finally { injected?.mock.restore(); await session.releaseLock(); }
+        const recovery = await preflightPrivateKwM2Rollback(backupFixtureEnvelopeRelative, rollbackEnvelopePath);
+        try {
+          await assert.rejects(applyPrivateKwM2Setup(recovery), /rollback-only/);
+          const result = await rollbackPrivateKwM2Setup(recovery, rollbackEnvelopePath);
+          await rememberCreated(backupFixtureDatabasePath); await rememberCreated(rollbackReceiptPath);
+          assert.ok(result.status === "RESTORED" || result.status === "RECOVERED");
+          assert.equal(inspectSetupSnapshot(backupFixtureDatabasePath).contentDigest, logicalDigest);
+        } finally { await recovery.releaseLock(); }
+      } finally {
+        injected?.mock.restore();
+        stopObservingBackup();
+        for (const [directory, owned] of retained) {
+          try {
+            const current = await lstat(directory, { bigint: true });
+            assert.ok(current.isDirectory() && !current.isSymbolicLink());
+            assert.equal(current.dev, owned.dev); assert.equal(current.ino, owned.ino);
+            for (const [file, identity] of owned.files) {
+              try {
+                const stat = await lstat(file, { bigint: true });
+                assert.equal(stat.dev, identity.dev); assert.equal(stat.ino, identity.ino);
+                await unlink(file);
+              } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+            }
+            await rmdir(directory);
+          } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+        }
+        await cleanupFixture();
+      }
+    });
+  }
+
+  it("applies 0069 transactionally, publishes the verified receipt last, and replays without writes", async () => {
+    await prepareBackupFixture();
+    try {
+      const firstRun = JSON.parse(execFileSync(process.execPath, ["node_modules/tsx/dist/cli.mjs", "scripts/private-kw-m2-setup.ts", backupFixtureEnvelopeRelative, "--apply"], { encoding: "utf8" }));
+      await rememberCreated(backupFixturePath);
+      await rememberCreated(backupFixtureReceiptPath);
+      const session = await preflightPrivateKwM2Setup(backupFixtureEnvelopeRelative);
+      try {
+        const result = firstRun;
+        assert.equal(result.status, "APPLIED");
+        assert.equal(result.receipt.migrationRange, "0054-0069");
+        assert.equal(result.receipt.authority.runtimeSendAuthorized, false);
+        const after = await readFile(backupFixtureDatabasePath);
+        const receiptBytes = await readFile(backupFixtureReceiptPath);
+        assert.deepEqual(await verifyPrivateKwM2Setup(session), result.receipt);
+        assert.equal((await applyPrivateKwM2Setup(session)).status, "REPLAYED");
+        assert.deepEqual(await readFile(backupFixtureDatabasePath), after);
+        assert.deepEqual(await readFile(backupFixtureReceiptPath), receiptBytes);
+        const database = new Database(backupFixtureDatabasePath, { readonly: true });
+        try {
+          assert.equal((database.prepare('SELECT count(*) AS count FROM "BackupProbe"').get() as { count: number }).count, 2);
+          assert.equal((database.prepare('SELECT count(*) AS count FROM "RevenuePrivateKwM2HtmlAssessmentLineage"').get() as { count: number }).count, 0);
+        } finally { database.close(); }
+        await unlink(backupFixtureReceiptPath);
+        await assert.rejects(applyPrivateKwM2Setup(session), /schema differs/);
+        assert.deepEqual(await readFile(backupFixtureDatabasePath), after);
+        await assert.rejects(readFile(backupFixtureReceiptPath), { code: "ENOENT" });
+        await writeFile(backupFixtureReceiptPath, receiptBytes, { flag: "wx" }); await rememberCreated(backupFixtureReceiptPath);
+        const edited = new Database(backupFixtureDatabasePath);
+        try { edited.prepare('UPDATE "BackupProbe" SET note = ? WHERE id = 2').run("post-setup drift"); } finally { edited.close(); }
+        await assert.rejects(verifyPrivateKwM2Setup(session), /identity or contents changed/);
+      } finally { await session.releaseLock(); }
+    } finally { await cleanupFixture(); }
+  });
+
+  it("rolls back an injected migration failure without issuing a receipt or losing source rows", async () => {
+    await prepareBackupFixture();
+    const originalExec = Database.prototype.exec;
+    const injected = mock.method(Database.prototype, "exec", function (this: Database.Database, sql: string) {
+      if (this.name === backupFixtureDatabasePath && sql.includes('ALTER TABLE "RevenueWebsiteSnapshot"')) {
+        originalExec.call(this, sql.slice(0, sql.indexOf(";") + 1));
+        throw new Error("Injected failure after first schema mutation");
+      }
+      return originalExec.call(this, sql);
+    });
+    try {
+      const before = await readFile(backupFixtureDatabasePath);
+      const session = await preflightPrivateKwM2Setup(backupFixtureEnvelopeRelative);
+      try {
+        await assert.rejects(applyPrivateKwM2Setup(session), /Injected failure/);
+        await rememberCreated(backupFixturePath);
+        assert.deepEqual(await readFile(backupFixtureDatabasePath), before);
+        assert.equal(inspectSetupSnapshot(backupFixtureDatabasePath).rowCounts.BackupProbe, 2);
+        await assert.rejects(readFile(backupFixtureReceiptPath), { code: "ENOENT" });
+        await assert.rejects(applyPrivateKwM2Setup(session), /fresh preflight/);
+      } finally { await session.releaseLock(); }
+    } finally { injected.mock.restore(); await cleanupFixture(); }
+  });
+
+  it("rejects a conflicting receipt before modifying the source or publishing a backup", async () => {
+    await prepareBackupFixture();
+    try {
+      await writeFile(backupFixtureReceiptPath, "conflicting receipt", { flag: "wx" }); await rememberCreated(backupFixtureReceiptPath);
+      const before = await readFile(backupFixtureDatabasePath);
+      const session = await preflightPrivateKwM2Setup(backupFixtureEnvelopeRelative);
+      try { await assert.rejects(applyPrivateKwM2Setup(session), /JSON|Unexpected token/); }
+      finally { await session.releaseLock(); }
+      assert.deepEqual(await readFile(backupFixtureDatabasePath), before);
+      await assert.rejects(readFile(backupFixturePath), { code: "ENOENT" });
+    } finally { await cleanupFixture(); }
+  });
+
+  it("preserves a post-commit failure for separately approved recovery and issues no setup receipt", async () => {
+    await prepareBackupFixture();
+    const originalBackup = Database.prototype.backup;
+    let calls = 0;
+    let retainedDirectory: { path: string; dev: bigint; ino: bigint } | undefined;
+    const injected = mock.method(Database.prototype, "backup", async function (this: Database.Database, destination: string) {
+      if (++calls === 3) {
+        const directory = path.dirname(destination);
+        assert.equal(path.dirname(directory), root);
+        const stat = await lstat(directory, { bigint: true });
+        retainedDirectory = { path: directory, dev: stat.dev, ino: stat.ino };
+        throw new Error("Injected post-commit restore-drill failure");
+      }
+      return originalBackup.call(this, destination);
+    });
+    try {
+      const session = await preflightPrivateKwM2Setup(backupFixtureEnvelopeRelative);
+      try {
+        await assert.rejects(applyPrivateKwM2Setup(session), /Injected post-commit/);
+        await rememberCreated(backupFixturePath);
+        assert.equal(inspectSetupSnapshot(backupFixtureDatabasePath, "POST_0069").rowCounts.BackupProbe, 2);
+        assert.equal(inspectSetupSnapshot(backupFixturePath).rowCounts.BackupProbe, 2);
+        await assert.rejects(readFile(backupFixtureReceiptPath), { code: "ENOENT" });
+        await assert.rejects(applyPrivateKwM2Setup(session), /fresh preflight/);
+      } finally { await session.releaseLock(); }
+    } finally {
+      injected.mock.restore();
+      if (retainedDirectory) {
+        const stat = await lstat(retainedDirectory.path, { bigint: true });
+        assert.ok(stat.isDirectory() && !stat.isSymbolicLink());
+        assert.equal(stat.dev, retainedDirectory.dev); assert.equal(stat.ino, retainedDirectory.ino);
+        await rmdir(retainedDirectory.path);
+      }
+      await cleanupFixture();
+    }
+  });
+
   it("loads the envelope, acquires/releases the lock, and performs no database write", async () => {
     await prepare();
     try {

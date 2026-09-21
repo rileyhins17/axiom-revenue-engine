@@ -56,7 +56,8 @@ before trying again.
 ## Delivery boundary
 
 The backup/restore function is callable only through an actual held preflight
-session. The setup CLI remains preflight-only. Applying 0069, publishing the
-database setup receipt, validating that receipt for Task 5, and performing an
-owner-approved rollback are subsequent Task 8 work. Tests use synthetic local
-databases and do not grant a real owner release.
+session. At this initial checkpoint the setup CLI was preflight-only. Subsequent
+[ADR 0042](0042-transactional-local-setup-and-approved-recovery.md) defines explicit
+setup, verification and separately approved rollback modes; preflight remains
+the default. Tests use synthetic local databases and do not grant a real owner
+release. Task 5's assessment consumption remains separate work.
