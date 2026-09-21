@@ -31,7 +31,7 @@ function envelope(overrides: Record<string, unknown> = {}) {
 
 async function prepare() {
   await mkdir(root, { recursive: true });
-  await writeFile(databasePath, Buffer.from("synthetic preflight database", { encoding: "utf8" }), { flag: "wx" });
+  await writeFile(databasePath, Buffer.from("synthetic preflight database", "utf8"), { flag: "wx" });
   await writeFile(envelopePath, JSON.stringify(envelope()), { flag: "wx" });
 }
 

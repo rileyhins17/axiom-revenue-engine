@@ -28,17 +28,25 @@ async function acquireSetupLock() {
   await mkdir(DATA_ROOT, { recursive: true });
   await assertCanonicalDirectory(DATA_ROOT);
   let handle;
+  let created = false;
+  let failure: unknown;
   try {
     handle = await open(LOCK_PATH, "wx");
+    created = true;
     await handle.writeFile(`${process.pid}\n`, "utf8");
   } catch (error) {
+    failure = error;
     if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error("M2 local setup is already locked by another process.");
     throw error;
   } finally {
     await handle?.close();
   }
+  if (failure && created) { try { await unlink(LOCK_PATH); } catch { /* preserve the original failure */ } }
+  if (failure) throw failure;
+  const identity = await lstat(LOCK_PATH, { bigint: true });
   return async () => {
-    await assertRegularTarget(LOCK_PATH, true);
+    const current = await lstat(LOCK_PATH, { bigint: true });
+    if (current.dev !== identity.dev || current.ino !== identity.ino || current.isSymbolicLink()) throw new Error("M2 setup lock identity changed before release.");
     await unlink(LOCK_PATH);
   };
 }
@@ -64,6 +72,16 @@ export async function preflightPrivateKwM2Setup(envelopePath: string, now = new 
     assertRegularTarget(paths[3], false),
   ]);
   const releaseLock = await acquireSetupLock();
+  await Promise.all([
+    assertRegularTarget(paths[0], true),
+    assertRegularTarget(paths[1], false),
+    assertRegularTarget(paths[2], false),
+    assertRegularTarget(paths[3], false),
+  ]);
+  for (const sidecar of [`${paths[0]}-wal`, `${paths[0]}-shm`]) {
+    try { await lstat(sidecar); throw new Error("M2 setup database sidecars must be absent."); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  }
   return { envelope, databasePath: paths[0], backupPath: paths[1], receiptPath: paths[2], quarantinePath: paths[3], releaseLock };
 }
 
