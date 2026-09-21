@@ -47,12 +47,22 @@ that a production cohort fits; instrument usage before enabling live bindings.
 
 ## Mail, verification, and public offer
 
-Google's Canadian Business Starter page currently shows **C$11/user/month** on
-flexible billing, or C$9.20/user/month on annual commitment, with 30 GB pooled
-storage and custom email. The pricing page says prices exclude tax. Two real
-mailboxes therefore cost C$22/month before Ontario HST on flexible billing, or
-C$18.40 before tax with a one-year commitment; the latter is a commitment, not
-a free monthly price. ([Google Workspace Canada pricing](https://workspace.google.com/intl/en_ca/business/))
+The zero-paid-mailbox target is Cloudflare Email Routing from the root
+`getaxiom.ca` MX to verified existing owner destinations for inbound mail. Its
+published pricing says Email Routing is available on Workers Free/Paid and
+inbound routing is unlimited; destination verification and active rule state
+remain account gates. Resend is a separate outbound/reply adapter candidate.
+Its current published Free plan is a conditional $0 option with a 3,000/month
+and 100/day allowance, three domains, 30-day retention and one webhook endpoint;
+these are plan facts, not proof that Axiom has an account, key, quota or
+verified sender. Public DNS observed on 2026-09-21 shows Cloudflare root
+MX/SPF, DMARC quarantine and a Resend verification token, but not active
+forwarding, sender verification, complete DKIM or send readiness. Two
+`resend._domainkey` TXT values require dashboard reconciliation. ([Cloudflare
+Email Routing pricing](https://developers.cloudflare.com/email-service/platform/pricing/),
+[Cloudflare routing addresses](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/),
+[Resend pricing](https://resend.com/pricing?product=transactional),
+[Resend domain verification](https://resend.com/docs/add-a-domain))
 
 For the initial low-volume pilot, Hunter is the only verifier budgeted: its
 official Free plan is $0, requires no card, renews monthly, and gives 50 shared
@@ -85,31 +95,30 @@ pricing](https://getaxiom.ca/pricing/))
 Use **US$1 = C$1.38** only as a planning conversion; it is not a live FX quote.
 Assume 13% Ontario HST for headroom, while noting that provider tax treatment
 and account tax status must be confirmed at checkout. Existing actual spend,
-domain renewal, source API, and mailbox state are unknown.
+domain renewal, source API, destination-rule state, Resend account/key state
+and mailbox state are unknown.
 
 | Scenario | Monthly recurring | Prepaid / usage | Feasibility |
 |---|---:|---:|---|
 | Local operator-assisted, no provider keys | C$0 incremental | C$0; fixtures/manual review | Feasible; safest evaluation gate |
-| Two Workspace mailboxes + Workers Paid | C$22 + C$6.90 = C$28.90 before tax; about C$32.66 with 13% planning tax | D1/R2/Queues/Workflows within included caps; Browser included if <=10 h/month | Feasible; leaves about C$17.34 before domain/source/AI |
-| Above plus domain C$2, source C$5, Jev reserve C$1 | C$36.90 before tax; about C$40.66 if HST applies to Workspace/Cloudflare | Hunter Free verification; no prepaid order | Monthly feasible for 5–10 verified candidates/week, subject to shared credits |
+| Zero paid mailbox seats: Cloudflare Routing + Resend Free candidate + Workers Paid | C$0 + C$0 + C$6.90 = C$6.90 before tax; about C$7.80 with 13% planning tax | Cloudflare destination/rule, Resend account/domain/key/quota and webhook state all require owner verification | Lowest-cost target; no mailbox purchase or entitlement assumed |
+| Above plus domain C$2, source C$5, Jev reserve C$1 | C$14.90 before tax; about C$16.84 with 13% planning tax | Hunter Free verification; no prepaid order; Resend remains conditional | Monthly feasible for 5–10 reviewed candidates/week, subject to actual account/quota state |
 
-The current plan's approximate C$50 allocation (C$18.40 Workspace, C$7
-Cloudflare, C$7 OpenAI, C$5 source, C$5 verification, C$2 domain, C$5.60
-buffer) is a planning envelope, not evidence that those commitments are
-active or that C$5 buys verification. With no OpenAI API key, OpenAI usage is
-currently C$0 and no API budget should be assumed. Jev remains optional and its
-maximum C$1 allocation must sit inside the existing AI envelope, never be added
-on top. Keep at least C$5 monthly uncommitted until real bills and taxes are
-observed; if one flexible Workspace seat is not needed, defer it rather than
-building a mailbox farm.
+The current plan's approximate C$50 allocation is a planning envelope, not
+evidence that any commitment is active or that a small line buys verification.
+With no OpenAI API key, OpenAI usage is currently C$0 and no API budget should
+be assumed. Jev remains optional and its maximum C$1 allocation must sit inside
+the existing AI envelope, never be added on top. Keep at least C$5 monthly
+uncommitted until real bills and taxes are observed. A paid mailbox is a
+conditional fallback for reply ownership/privacy, not the default route.
 
 ## Managed all-in-one comparison
 
 HubSpot Sales Hub is a verifiable category benchmark: Free supports up to two
 users, while Starter is listed at US$7/seat/month annually or US$20/seat/month
 monthly. Two monthly Starter seats are about C$55.20 before tax, already above
-the whole envelope, and still do not replace Workspace mailboxes, evidence
-capture, or verification. Brevo is cheaper (Free, or Starter from US$9/month)
+the whole envelope, and still do not replace inbound routing, evidence capture,
+or verification. Brevo is cheaper (Free, or Starter from US$9/month)
 but is a marketing/CRM sending platform with volume/contact tiers, not a drop-in
 replacement for this evidence and approval system. Neither is the recommended
 primary architecture. ([HubSpot Sales pricing](https://www.hubspot.com/pricing/sales?tier=starter),
@@ -129,9 +138,8 @@ delivery, or client work. The existing 50-lead labelled set is an evaluation
 sample, not a weekly send quota. Expand only after two healthy review periods,
 measured positive replies, bounce/complaint gates, and observed spend support it.
 
-Cloudflare plus local pilot is economically feasible. Two paid mailboxes plus
-Cloudflare is also feasible near C$33/month before tax, with Hunter Free covering
-5–10 verified candidates/week if its shared quota is protected. The honest next
-step is to prove the local workflow and measure real mailbox, source, browser,
-verification, and review consumption before committing to a larger cloud or
-managed stack.
+Cloudflare plus a local pilot is economically feasible with zero paid mailbox
+seats. Resend Free is a conditional outbound candidate, not a verified
+entitlement. The honest next step is to prove the local workflow and measure
+destination forwarding, provider, source, browser, verification and review
+consumption before any account activation or larger cloud/managed commitment.

@@ -85,6 +85,15 @@ does not establish real-business evidence, production or staging readiness, or
 M2 readiness. The runtime ceiling remains C$50/month and this checkpoint spent
 zero dollars.
 
+Public DNS was inspected read-only on 2026-09-21. `getaxiom.ca` publishes the
+Cloudflare Email Routing MX set (`route1/2/3.mx.cloudflare.net`), Cloudflare SPF,
+DMARC quarantine, and a Resend domain-verification token. This supports the
+zero-paid-mailbox target of Cloudflare inbound forwarding to existing owner
+destinations plus a separately gated Resend outbound/reply adapter. It does not
+prove active Cloudflare destinations/rules, a Resend account or API key, sender
+verification, complete DKIM (two `resend._domainkey` TXT values are ambiguous),
+or send readiness. No DNS/provider/account mutation or mail operation occurred.
+
 ## Owner decisions and blockers
 
 No new owner decision is requested to retain this local synthetic checkpoint.
@@ -93,6 +102,12 @@ privacy scope, accounts and rights, backup/rollback plan, and the exact release
 gate. M2 is blocked by the absence of an authorized real-source evidence packet,
 verified provider and mailbox readiness, live runtime proof, an owner-approved
 ten-business research cohort, and the separate contact/consent/reply gates.
+M4 also remains blocked on verified Cloudflare destination ownership/rules,
+Resend domain/key/webhook readiness or a separately reviewed free owner-only
+send-as route, legal sender identity, suppression/unsubscribe handling, and
+sink-tested human-triggered replies. Cloudflare forwarding cannot itself send
+replies from the custom domain; legacy Gmail OAuth/send/sync remains quarantined
+from the v2 target.
 
 ## M1 verification result
 

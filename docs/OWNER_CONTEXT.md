@@ -47,10 +47,20 @@ include it in public logs.
 ## Budget and communications
 
 - Runtime ceiling: **C$50/month**, excluding the existing ChatGPT/Codex plan.
-- Launch with two real identities: `riley@getaxiom.ca` and
-  `aidan@getaxiom.ca`. Aliases are for routing, not mailbox capacity.
-- Do not build a mailbox farm. Add capacity only after reply economics and owner
-  handling capacity prove it is needed.
+- Target the first pilot around two named identities: `riley@getaxiom.ca` and
+  `aidan@getaxiom.ca`. Public DNS currently shows Cloudflare Email Routing at
+  the root (MX/SPF) and a published Resend verification token, but DNS does not
+  prove active forwarding destinations, a Resend account/key, sender
+  verification, complete DKIM, or send readiness. Treat these addresses as
+  planned sender/routing identities, not proof of paid mailbox capacity.
+- The zero-paid-mailbox target is Cloudflare forwarding to each owner's existing
+  verified destination inbox for inbound mail, with a typed Resend outbound/reply
+  adapter only after the account, key, domain, webhook, legal and suppression
+  gates pass. Cloudflare forwarding cannot itself send replies from the custom
+  domain; M4 must prove either the app's human-triggered Resend reply flow or a
+  separately reviewed free owner-only send-as route. Do not build a mailbox
+  farm or buy Workspace seats unless a later owner decision proves reply
+  economics and handling capacity require them.
 - Riley confirmed on 2026-09-20 that no OpenAI API keys are available. OpenAI
   source/model configuration is not a provisioned service. Jev, OpenAI, mailbox,
   source and verification account readiness must be recorded separately from code.

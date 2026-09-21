@@ -16,9 +16,13 @@ service.
 
 The configured console D1 and Browser bindings are **connected in configuration**
 but their current remote deployment, billing state, data, and usage are
-unverified. No R2 bucket, Queue, mailbox, Hunter account, OpenAI account/key,
-Jev key, Vercel account, paid source, or verification purchase is established
-by this inventory. The shadow Workflow is deliberately inert: no route,
+unverified. No R2 bucket, Queue, mailbox, Cloudflare Email Routing destination,
+Resend account/API key, Hunter account, OpenAI account/key, Jev key, Vercel
+account, paid source, or verification purchase is established by this inventory.
+Public DNS observed on 2026-09-21 shows Cloudflare root MX/SPF, DMARC quarantine,
+and a Resend verification token; it does not prove active forwarding, a provider
+account/key, sender verification, complete DKIM, or send readiness. The shadow
+Workflow is deliberately inert: no route,
 schedule, queue producer/consumer, provider credential, or execution path is
 present.
 
@@ -51,10 +55,18 @@ guarantee. ([Workers pricing](https://developers.cloudflare.com/workers/platform
 [Workflows](https://developers.cloudflare.com/workflows/reference/pricing/),
 [Browser Run](https://developers.cloudflare.com/browser-run/pricing/))
 
-Google Workspace Business Starter is the selected mailbox category: the Canada
-page shows C$11/user/month flexible or C$9.20/user/month annual, before tax,
-for custom business email. Two named mailboxes are a proposed future
-commitment, not connected capacity. ([Google Canada pricing](https://workspace.google.com/intl/en_ca/business/))
+The selected first-pilot mail route has **zero paid mailbox seats**. Cloudflare
+Email Routing is the inbound route to verified existing owner destinations;
+Cloudflare's current official pricing documents inbound routing as available on
+Workers Free/Paid and unlimited, while destination verification and active rules
+remain account gates. Resend is the separate outbound/reply adapter candidate;
+its published Free plan is a conditional $0 option, not proof of an account,
+quota or verified sender. A paid mailbox is a fallback only if the owner cannot
+meet reply ownership/privacy requirements through forwarding plus the reviewed
+Resend or owner-only send-as route. ([Cloudflare Email Routing pricing](https://developers.cloudflare.com/email-service/platform/pricing/),
+[Cloudflare routing addresses](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/),
+[Resend pricing](https://resend.com/pricing?product=transactional),
+[Resend domain verification](https://resend.com/docs/add-a-domain))
 
 Hunter Free is the proposed low-volume verifier: $0, no card, 50 shared monthly
 credits across finding and verification, and 0.5 credit per verification on
@@ -91,18 +103,19 @@ actual provider tax/account treatment must be confirmed at checkout.
 
 | Item | Monthly planning amount |
 |---|---:|
-| Two flexible Workspace seats | C$22.00 |
+| Cloudflare Email Routing inbound | C$0.00 published route price; account/destination state unverified |
+| Resend Free outbound candidate | C$0.00 published plan price; account/domain/key/quota state unverified |
 | Workers Paid: US$5 × 1.38 | C$6.90 |
 | Domain renewal reserve | C$2.00 |
 | Paid source | C$0.00 |
 | Optional Jev reserve inside AI envelope | C$1.00 |
 | Verification | C$0.00 (Hunter Free) |
-| **Taxable subtotal assumption** | **C$31.90** |
-| 13% planning tax: C$31.90 × 0.13 | C$4.147 |
-| **Planning total: C$31.90 × 1.13** | **C$36.047 ≈ C$36.05** |
-| **Remaining ceiling: C$50.00 − C$36.047** | **C$13.953 ≈ C$13.95** |
+| **Taxable subtotal assumption** | **C$9.90** |
+| 13% planning tax: C$9.90 × 0.13 | C$1.287 |
+| **Planning total: C$9.90 × 1.13** | **C$11.187 ≈ C$11.19** |
+| **Remaining ceiling: C$50.00 − C$11.187** | **C$38.813 ≈ C$38.81** |
 
-This is a scenario, not an active budget. The C$13.95 is contingency for
+This is a scenario, not an active budget. The C$38.81 is contingency for
 observed tax/FX, small usage, or owner-approved source/AI changes; it is not
 permission to spend. A minimum prepaid order is separate from monthly accrued
 use: OpenRouter's US$5 credit purchase is about C$6.90 before fees/tax and
@@ -113,8 +126,9 @@ provider tax stop activation rather than receive invented allocations.
 Reserve essential reply ingestion, suppression, and stop-control capacity before
 optional discovery or AI. Preserve these operations within the reserved envelope;
 this is not permission to exceed C$50. If provider quota, service availability or
-remaining budget prevents them, stop new outreach and fall back to owner mailbox
-monitoring and a durable local incident record. Never silently discard suppression.
+remaining budget prevents them, stop new outreach and fall back to owner
+destination monitoring and a durable local incident record. Never silently
+discard suppression.
 
 ## Caps and stop levels
 
@@ -136,7 +150,7 @@ overage stop; a published free allowance is not proof of a free actual run.
   and manual tasks; request an owner decision before resuming.
 - **C$50 (100%)**: hard-stop nonessential cloud jobs, AI, source, Queue/Workflow
   fan-out, and any new outreach; retain only essential stop controls, reply and
-  suppression ingestion, and records needed to close safely. Fixed mailbox,
+  suppression ingestion, and records needed to close safely. Fixed provider,
   domain, or annual commitments cannot be retroactively stopped by software.
 
 Proposed internal operational caps are 5–10 first touches/week total, 50 Hunter
@@ -151,11 +165,12 @@ minutes/week, excluding replies, sales, and delivery.
 The local operator-assisted pilot remains the zero-new-commitment alternative.
 Managed CRM/outbound tools are not selected: even HubSpot Sales Starter at
 US$20/seat/month monthly would cost about C$55.20 for two seats before tax,
-without replacing evidence storage, mailboxes, or verification. ([HubSpot pricing](https://www.hubspot.com/pricing/sales?tier=starter))
+without replacing evidence storage, inbound routing, or verification. ([HubSpot pricing](https://www.hubspot.com/pricing/sales?tier=starter))
 
 Before any activation, recheck: current plan/currency/tax; account ownership
 and recovery; provider terms, retention, and region; exact model/version and
 price; prepaid minimum and refund/expiry rules; actual Cloudflare bindings and
-usage; mailbox deliverability/reply/suppression readiness; source licence and
-price; Hunter shared-credit state; and a current ledger receipt. Then obtain an
+usage; Cloudflare destination/routing and Resend deliverability/reply/suppression
+readiness; source licence and price; Hunter shared-credit state; and a current
+ledger receipt. Then obtain an
 explicit owner approval for the exact account, cap, cohort, and cash outlay.

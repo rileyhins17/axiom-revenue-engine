@@ -39,11 +39,33 @@ Express consent is not time-limited until withdrawn. Common implied-consent peri
 
 **Forms and social.** A contact form is a manual route, not permission to submit. Use it only when an owner approves the specific form, observes its purpose/terms, and records the result; never test-submit a prospect form. A one-way general social broadcast is generally outside CASL, while direct messages through a closed two-way system can be CEMs and must be assessed case by case: https://crtc.gc.ca/eng/com500/faq500.htm. Keep social DMs manual and subject to platform rules, identity, relevance, suppression, and no bulk automation.
 
-## Gmail reply operations
+## Mail route and legacy Gmail fallback
+
+The selected first-pilot route has zero paid mailbox seats: public DNS observed
+on 2026-09-21 supports Cloudflare Email Routing at the root, so inbound
+`riley@getaxiom.ca` and `aidan@getaxiom.ca` can forward to verified existing
+owner destinations. A separate typed Resend outbound/reply adapter is
+conditional on an owner-approved account, API key, verified sending domain,
+legal identity, webhook, suppression and reply gates. The Resend verification
+TXT token does not prove account/key/domain readiness; two `resend._domainkey`
+TXT values require dashboard reconciliation. Cloudflare forwarding cannot send
+custom-domain replies itself, so M4 must prove a human-triggered Resend reply
+flow or a separately reviewed free owner-only send-as route. Keep the root MX
+on Cloudflare; Resend custom receiving belongs on a separately reviewed
+subdomain, if ever needed. ([Cloudflare routing](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/),
+[Cloudflare Postmaster](https://developers.cloudflare.com/email-service/reference/postmaster/),
+[Resend pricing](https://resend.com/pricing?product=transactional),
+[Resend domain verification](https://resend.com/docs/add-a-domain))
+
+The following Gmail material is a **conditional legacy fallback**, not the v2
+mailbox architecture. Keep OAuth/send/inbox-sync code quarantined from new v2
+records until a separately approved reconciliation and provider decision.
+
+### Gmail reply operations
 
 Use OAuth with the narrowest scopes. `gmail.readonly` is a restricted scope; `https://mail.google.com/` is broader restricted access and should be avoided. `gmail.send` is sensitive, while add-on-specific compose/message scopes are narrower where an add-on architecture genuinely fits: https://developers.google.com/workspace/gmail/api/auth/scopes. A public/external app using restricted scopes needs OAuth verification; if restricted data is stored or transmitted through a server, Google requires an independent security assessment unless an exception applies. An internal-use exception applies only when the app is used by people in the same Google Workspace or Cloud Identity organization, the Cloud project is owned by that organization, and the OAuth consent screen is configured for Internal use: https://support.google.com/cloud/answer/13464323. This is a launch dependency, not a reason to request broad access early. If testing uses an External consent screen in Testing status with Gmail scopes, refresh tokens expire after seven days; use a separate staging project and plan reauthorization, or move the approved production client to In Production: https://developers.google.com/identity/protocols/oauth2.
 
-For a two-mailbox reply console, begin with manual reply handling and then use server-side OAuth offline access, protecting refresh tokens as secrets: https://developers.google.com/workspace/gmail/api/auth/web-server. Prefer polling incremental sync first (target freshness <=15 minutes) to avoid Pub/Sub/watch complexity at two mailboxes. First sync is full (`messages.list`, then batched `messages.get`); store only the minimum message/thread metadata and necessary body excerpts. Store the latest `historyId`, then use `history.list(startHistoryId=...)` for incremental changes. Gmail history is typically available at least a week but can be shorter; HTTP 404 means discard the cursor and full-sync: https://developers.google.com/workspace/gmail/api/guides/sync.
+If a two-owner Gmail reply console is separately approved as a legacy fallback, begin with manual reply handling and then use server-side OAuth offline access, protecting refresh tokens as secrets: https://developers.google.com/workspace/gmail/api/auth/web-server. Prefer polling incremental sync first (target freshness <=15 minutes) to avoid Pub/Sub/watch complexity. First sync is full (`messages.list`, then batched `messages.get`); store only the minimum message/thread metadata and necessary body excerpts. Store the latest `historyId`, then use `history.list(startHistoryId=...)` for incremental changes. Gmail history is typically available at least a week but can be shorter; HTTP 404 means discard the cursor and full-sync: https://developers.google.com/workspace/gmail/api/guides/sync.
 
 If polling later proves insufficient, push notifications require Pub/Sub and `users.watch`; the response includes an expiration, and the watch must be renewed at least every seven days (Google recommends daily): https://developers.google.com/workspace/gmail/api/guides/push. Treat Pub/Sub notifications as triggers, not complete events: fetch history, deduplicate by message/history IDs, and make processing resumable and idempotent. On token revocation or invalid grant, stop sync, alert the owner, and require explicit reauthorization.
 
@@ -57,9 +79,9 @@ Expand to **50 businesses** only after the 10-row review shows the workflow is u
 
 ## Verified versus unknown
 
-**Verified:** the official CASL consent/evidence and expiry rules above; CRTC phone/DNCL distinctions; Google Places field-mask, SKU billing, attribution, `place_id`, and the 30-day lat/lng-only exception; Cambridge’s licence statement; Waterloo’s API surface; OSM attribution and Nominatim restrictions; Gmail scope categories, internal-use exception, verification/security-assessment requirements, testing refresh-token behavior, history-based sync, watch renewal, and current quota table.
+**Verified:** the official CASL consent/evidence and expiry rules above; CRTC phone/DNCL distinctions; Google Places field-mask, SKU billing, attribution, `place_id`, and the 30-day lat/lng-only exception; Cambridge’s licence statement; Waterloo’s API surface; OSM attribution and Nominatim restrictions; Cloudflare root-routing constraints and reply limitation; Resend’s published free-plan facts, domain/key requirements, send API, event types and webhook behavior; and Gmail scope categories, internal-use exception, verification/security-assessment requirements, testing refresh-token behavior, history-based sync, watch renewal, and current quota table.
 
-**Unknown or requiring a live access check:** which Waterloo collections are commercially reusable and current; whether a particular municipal layer covers roofing/HVAC/landscaping operators; actual Google Places SKU price at the chosen fields and any credits; whether Axiom’s eventual OAuth app is truly same-organization Internal use; mailbox history volume, token state, and polling freshness. Pub/Sub/watch configuration is deferred unless polling fails. No source here proves business qualification, email consent, deliverability, or current website quality for any prospect.
+**Unknown or requiring a live access check:** which Waterloo collections are commercially reusable and current; whether a particular municipal layer covers roofing/HVAC/landscaping operators; actual Google Places SKU price at the chosen fields and any credits; whether Axiom’s eventual OAuth app is truly same-organization Internal use; Cloudflare destination/rule state; Resend account/key/domain/webhook state and the ambiguous DKIM records; owner destination/reply setup; mailbox history volume, token state, and polling freshness. Pub/Sub/watch configuration is deferred unless a separately approved Gmail fallback is needed. No source here proves business qualification, email consent, deliverability, or current website quality for any prospect.
 
 ## Primary sources
 
