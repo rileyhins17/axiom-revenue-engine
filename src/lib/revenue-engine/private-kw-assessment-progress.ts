@@ -3,6 +3,7 @@ import {
 } from "@/lib/revenue-engine/lead-assessment-d1";
 import {
   buildPrivateKwAssessmentProgressProof,
+  buildPrivateKwAssessmentProgressProofForPersistedWebsiteCheckpoint,
 } from "@/lib/revenue-engine/private-kw-assessment-progress-proof";
 import {
   PrivateKwCurrentWebsiteEvidenceProofSchema,
@@ -91,12 +92,17 @@ export function requireInProcessPrivateKwAssessmentProgressInputForParent(
  * does not append progress, create a phase receipt/checkpoint, read D1/R2, or
  * authorize any execution.
  */
-export function buildPrivateKwAssessmentProgressInput(input: {
+type PrivateKwAssessmentProgressInputBuild = {
   manifestValue: unknown;
   previousProgressValue: unknown;
   currentWebsiteEvidenceProofValue: unknown;
   currentAssessmentResultValue: unknown;
-}): PrivateKwShadowSlicePhaseReceiptInput {
+  currentWebsiteEligibilityResultValue?: unknown;
+};
+
+function buildPrivateKwAssessmentProgressInputInternal(
+  input: PrivateKwAssessmentProgressInputBuild,
+): PrivateKwShadowSlicePhaseReceiptInput {
   const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifestValue);
   const previousProgress = PrivateKwShadowSliceProgressCheckpointSchema.parse(
     input.previousProgressValue,
@@ -165,12 +171,20 @@ export function buildPrivateKwAssessmentProgressInput(input: {
     );
   }
 
-  const proof = buildPrivateKwAssessmentProgressProof({
-    manifestValue: manifest,
-    previousPhaseReceiptValue: predecessor,
-    currentWebsiteEvidenceProofValue: websiteEvidence,
-    assessmentDurableReloadValue: durable,
-  });
+  const proof = input.currentWebsiteEligibilityResultValue === undefined
+    ? buildPrivateKwAssessmentProgressProof({
+      manifestValue: manifest,
+      previousPhaseReceiptValue: predecessor,
+      currentWebsiteEvidenceProofValue: websiteEvidence,
+      assessmentDurableReloadValue: durable,
+    })
+    : buildPrivateKwAssessmentProgressProofForPersistedWebsiteCheckpoint({
+      manifestValue: manifest,
+      previousPhaseReceiptValue: predecessor,
+      currentWebsiteEvidenceProofValue: websiteEvidence,
+      assessmentDurableReloadValue: durable,
+      currentWebsiteEligibilityResultValue: input.currentWebsiteEligibilityResultValue,
+    });
   if (
     proof.manifestId !== manifest.manifestId
     || proof.manifestDigest !== manifest.manifestDigest
@@ -239,4 +253,29 @@ export function buildPrivateKwAssessmentProgressInput(input: {
     parentCheckpointDigest: previousProgress.checkpointDigest,
   });
   return trusted;
+}
+
+export function buildPrivateKwAssessmentProgressInput(input: {
+  manifestValue: unknown;
+  previousProgressValue: unknown;
+  currentWebsiteEvidenceProofValue: unknown;
+  currentAssessmentResultValue: unknown;
+}): PrivateKwShadowSlicePhaseReceiptInput {
+  return buildPrivateKwAssessmentProgressInputInternal(input);
+}
+
+/**
+ * Rebuilds the assessment phase input against the exact persisted Task 4B1
+ * website checkpoint. The completion timestamp is supplied only from the
+ * canonical durable eligibility reload, preserving the ordinary assessment
+ * builder's workflow-completion invariant for every other caller.
+ */
+export function buildPrivateKwAssessmentProgressInputForPersistedWebsiteCheckpoint(input: {
+  manifestValue: unknown;
+  previousProgressValue: unknown;
+  currentWebsiteEvidenceProofValue: unknown;
+  currentAssessmentResultValue: unknown;
+  currentWebsiteEligibilityResultValue: unknown;
+}): PrivateKwShadowSlicePhaseReceiptInput {
+  return buildPrivateKwAssessmentProgressInputInternal(input);
 }

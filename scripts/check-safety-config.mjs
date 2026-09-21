@@ -91,6 +91,7 @@ const privateKwWebsiteEvidenceEligibilityD1 = await readFile(new URL("../src/lib
 const privateKwWebsiteEvidenceProgress = await readFile(new URL("../src/lib/revenue-engine/private-kw-current-website-evidence-progress.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceProgressAppend = await readFile(new URL("../src/lib/revenue-engine/private-kw-current-website-evidence-progress-append.ts", import.meta.url), "utf8");
 const privateKwM1WebsiteCheckpoint = await readFile(new URL("./execute-private-kw-m1-website-checkpoint.ts", import.meta.url), "utf8");
+const privateKwM1Dossier = await readFile(new URL("./execute-private-kw-m1-dossier.ts", import.meta.url), "utf8");
 const privateKwLocalPlanExecutor = await readFile(new URL("./private-kw-local-plan-executor.ts", import.meta.url), "utf8");
 const privateKwAssessmentProgressProof = await readFile(new URL("../src/lib/revenue-engine/private-kw-assessment-progress-proof.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
@@ -190,6 +191,7 @@ requireMatch("package.json", packageJson, /"kw:prepare-shadow-slice"\s*:\s*"tsx 
 requireMatch("package.json", packageJson, /"kw:prepare-source-workflow-progress"\s*:\s*"tsx scripts\/prepare-private-kw-source-workflow-progress\.ts"/, "source/workflow progress proof must use the guarded read-only adapter CLI");
 requireMatch("package.json", packageJson, /"kw:record-shadow-progress"\s*:\s*"tsx scripts\/record-private-kw-shadow-progress\.ts"/, "shadow progress must use the guarded ignored-local append-only CLI");
 requireMatch("package.json", packageJson, /"kw:execute-assessment"\s*:\s*"tsx scripts\/execute-private-kw-assessment\.ts"/, "private assessment execution must use the guarded ignored-local CLI");
+requireMatch("package.json", packageJson, /"kw:execute-m1-dossier"\s*:\s*"tsx scripts\/execute-private-kw-m1-dossier\.ts"/, "the M1 dossier composition must use the bounded local CLI");
 requireMatch(".github/workflows/ci.yml", ci, /run:\s*npm run cf:engine:typegen:check/, "CI must verify generated engine bindings");
 requireMatch(".github/workflows/ci.yml", ci, /run:\s*npm run cf:engine:dry-run/, "CI must dry-run the inert engine bundle");
 requireMatch(".github/workflows/ci.yml", ci, /run:\s*npx playwright install --with-deps chromium/, "CI must install the pinned owner UI browser");
@@ -268,6 +270,17 @@ requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli,
 requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /sourceMutationPerformed:\s*false/, "private assessment execution must report no source mutation");
 requireMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /providerOperationsAuthorized:\s*0/, "private assessment execution must authorize zero provider operations");
 forbidMatch("scripts/execute-private-kw-assessment.ts", privateKwAssessmentCli, /wrangler|--remote|deploy|fetch\s*\(|env\.[A-Z_]+|@cloudflare|R2Bucket/i, "private assessment execution must not access Cloudflare, providers, network, or remote resources");
+requireMatch("scripts/execute-private-kw-m1-dossier.ts", privateKwM1Dossier, /parsePrivateKwM1DossierOperation/, "the M1 dossier must parse one strict bounded operation");
+requireMatch("scripts/execute-private-kw-m1-dossier.ts", privateKwM1Dossier, /executePrivateKwM1WebsiteCheckpoint/, "the M1 dossier must compose the Task 4B1 website checkpoint service");
+requireMatch("scripts/execute-private-kw-m1-dossier.ts", privateKwM1Dossier, /executePrivateKwAssessmentFile/, "the M1 dossier must use the validated assessment file boundary");
+requireMatch("scripts/execute-private-kw-m1-dossier.ts", privateKwM1Dossier, /loadPrivateRevenueLeadAssessmentD1/, "the M1 dossier must reload assessment rows after closing SQLite");
+requireMatch("scripts/execute-private-kw-m1-dossier.ts", privateKwM1Dossier, /readOwnerLeadDetail/, "the M1 dossier must use the canonical owner detail reader");
+requireMatch("scripts/execute-private-kw-m1-dossier.ts", privateKwM1Dossier, /buildPrivateKwAssessmentProgressInputForPersistedWebsiteCheckpoint/, "the M1 dossier must use the exact persisted-website assessment composition boundary");
+requireMatch("scripts/execute-private-kw-m1-dossier.ts", privateKwM1Dossier, /writeOrVerifyPrivateKwJson/, "the M1 dossier must use exact replay-safe JSON outputs");
+requireMatch("scripts/execute-private-kw-m1-dossier.ts", privateKwM1Dossier, /contactReview\.state !== \"NOT_RECORDED\"/, "the M1 dossier must preserve missing contact review explicitly");
+requireMatch("src/lib/revenue-engine/private-kw-assessment-progress-proof.ts", privateKwAssessmentProgressProof, /requireCurrentPrivateKwWebsiteEvidenceEligibilityD1Result/, "persisted website assessment proof must require the exact trusted eligibility reload");
+requireMatch("src/lib/revenue-engine/private-kw-assessment-progress-proof.ts", privateKwAssessmentProgressProof, /eligibility\.receiptRecordedAt/, "persisted website assessment proof must derive completion from durable eligibility");
+forbidMatch("scripts/execute-private-kw-m1-dossier.ts", privateKwM1Dossier, /wrangler|--remote|deploy|fetch\s*\(|env\.[A-Z_]+|@cloudflare|R2Bucket|mailbox|\.send\s*\(|outreachAuthorized:\s*true|sendAuthorized:\s*true|providerOperationsAuthorized:\s*[1-9]|costAuthorizedUsd:\s*[1-9]/i, "the M1 dossier must remain local, offline, and before contact or provider action");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-assessment-invocation|execute-private-kw-assessment/, "the inert engine must not wire owner-approved local assessment execution to runtime");
 requireMatch("src/lib/revenue-engine/browser-measurement-adapter.ts", browserMeasurementAdapter, /runnerKind:\s*z\.literal\("FIXTURE"\)/, "browser measurement requests must remain fixture-only");
 requireMatch("src/lib/revenue-engine/browser-measurement-adapter.ts", browserMeasurementAdapter, /artifactWriteAuthorized:\s*z\.literal\(false\)/, "browser measurement drafts must not authorize artifact writes");

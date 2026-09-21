@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildPrivateKwAssessmentProgressInput,
+  buildPrivateKwAssessmentProgressInputForPersistedWebsiteCheckpoint,
   requireInProcessPrivateKwAssessmentProgressInput,
   requireInProcessPrivateKwAssessmentProgressInputForParent,
 } from "@/lib/revenue-engine/private-kw-assessment-progress";
@@ -18,6 +19,7 @@ import {
   PrivateKwShadowSliceProgressCheckpointSchema,
   appendPrivateKwShadowSliceProgress,
   buildInitialPrivateKwShadowSliceProgress,
+  buildPrivateKwShadowSlicePhaseReceipt,
   privateKwShadowSliceProgressDigest,
   type PrivateKwShadowSlicePhaseReceipt,
 } from "@/lib/revenue-engine/private-kw-shadow-slice-progress";
@@ -122,6 +124,40 @@ test("derives one frozen parent-bound assessment input from exact current durabl
     fixture.websiteProgress.records.find((record) => record.businessId === phaseInput.businessId)
       ?.phaseReceipts.length,
     2,
+  );
+});
+
+test("ordinary assessment proof keeps the exact workflow completion binding", async () => {
+  const fixture = await createAssessmentProgressFixture({ suffix: "workflow-binding" });
+  const altered = buildPrivateKwShadowSlicePhaseReceipt(fixture.manifest, {
+    ...inputFromReceipt(fixture.currentWebsitePhaseReceipt),
+    completedAt: new Date(Date.parse(fixture.currentWebsitePhaseReceipt.completedAt) + 1).toISOString(),
+  });
+
+  assert.throws(
+    () => buildPrivateKwAssessmentProgressProof({
+      manifestValue: fixture.manifest,
+      previousPhaseReceiptValue: altered,
+      currentWebsiteEvidenceProofValue: fixture.evidenceProof,
+      assessmentDurableReloadValue: fixture.assessmentDurableReload,
+    }),
+    /ordered and fresh/i,
+  );
+});
+
+test("persisted-checkpoint composition rejects a copied or unbound eligibility value", async () => {
+  const fixture = await createAssessmentProgressFixture({ suffix: "eligibility-binding" });
+  assert.throws(
+    () => buildPrivateKwAssessmentProgressInputForPersistedWebsiteCheckpoint({
+      manifestValue: fixture.manifest,
+      previousProgressValue: fixture.websiteProgress,
+      currentWebsiteEvidenceProofValue: fixture.evidenceProof,
+      currentAssessmentResultValue: fixture.assessmentDurableReload,
+      currentWebsiteEligibilityResultValue: {
+        receiptRecordedAt: fixture.currentWebsitePhaseReceipt.completedAt,
+      },
+    }),
+    /expected|eligibility|schema/i,
   );
 });
 

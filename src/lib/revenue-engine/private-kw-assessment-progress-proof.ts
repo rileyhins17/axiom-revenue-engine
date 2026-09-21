@@ -11,6 +11,9 @@ import {
   PrivateKwCurrentWebsiteEvidenceProofSchema,
 } from "@/lib/revenue-engine/private-kw-current-website-evidence";
 import {
+  requireCurrentPrivateKwWebsiteEvidenceEligibilityD1Result,
+} from "@/lib/revenue-engine/private-kw-current-website-evidence-eligibility-d1";
+import {
   PrivateKwShadowSliceManifestSchema,
 } from "@/lib/revenue-engine/private-kw-shadow-slice";
 import {
@@ -190,12 +193,17 @@ function assertAssessmentIdentity(assessment: z.infer<typeof RevenueLeadAssessme
   }
 }
 
-export function buildPrivateKwAssessmentProgressProof(input: {
+type AssessmentProgressProofInput = {
   manifestValue: unknown;
   previousPhaseReceiptValue: unknown;
   currentWebsiteEvidenceProofValue: unknown;
   assessmentDurableReloadValue: unknown;
-}): PrivateKwAssessmentProgressProof {
+};
+
+function buildPrivateKwAssessmentProgressProofInternal(
+  input: AssessmentProgressProofInput,
+  expectedPreviousCompletionAt: string,
+): PrivateKwAssessmentProgressProof {
   const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifestValue);
   const previous = PrivateKwShadowSlicePhaseReceiptSchema.parse(input.previousPhaseReceiptValue);
   const evidence = PrivateKwCurrentWebsiteEvidenceProofSchema.parse(input.currentWebsiteEvidenceProofValue);
@@ -261,7 +269,7 @@ export function buildPrivateKwAssessmentProgressProof(input: {
     throw new Error("Assessment must bind the exact current website workflow, audit, and evidence proof.");
   }
   if (
-    previous.completedAt !== evidence.workflow.completedAt
+    previous.completedAt !== expectedPreviousCompletionAt
     || Date.parse(previous.recordedAt) < Date.parse(evidence.preparedAt)
     || Date.parse(assessment.assessedAt) < Date.parse(previous.recordedAt)
     || Date.parse(execution.assessmentReceiptRecordedAt) < Date.parse(assessment.assessedAt)
@@ -339,4 +347,44 @@ export function buildPrivateKwAssessmentProgressProof(input: {
     proofId: `assessment-proof:${proofDigest}`,
     proofDigest,
   });
+}
+
+export function buildPrivateKwAssessmentProgressProof(input: AssessmentProgressProofInput): PrivateKwAssessmentProgressProof {
+  return buildPrivateKwAssessmentProgressProofInternal(input, PrivateKwCurrentWebsiteEvidenceProofSchema.parse(input.currentWebsiteEvidenceProofValue).workflow.completedAt);
+}
+
+/**
+ * Rebuilds assessment proof for the persisted Task 4B1 website checkpoint.
+ * That checkpoint's phase completion is the durable eligibility receipt
+ * timestamp, while the ordinary proof path binds completion to workflow
+ * completion. The caller must supply the exact trusted durable eligibility
+ * reload; its receipt timestamp is derived internally and the existing
+ * workflow-equality path remains unchanged.
+ */
+export function buildPrivateKwAssessmentProgressProofForPersistedWebsiteCheckpoint(input: AssessmentProgressProofInput & {
+  currentWebsiteEligibilityResultValue: unknown;
+}): PrivateKwAssessmentProgressProof {
+  const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifestValue);
+  const previous = PrivateKwShadowSlicePhaseReceiptSchema.parse(input.previousPhaseReceiptValue);
+  const evidence = PrivateKwCurrentWebsiteEvidenceProofSchema.parse(input.currentWebsiteEvidenceProofValue);
+  const eligibility = requireCurrentPrivateKwWebsiteEvidenceEligibilityD1Result(input.currentWebsiteEligibilityResultValue);
+  const supportingEligibility = previous.proof.supportingReceipts[0];
+  if (
+    eligibility.executionPath !== "DURABLE_RELOAD"
+    || !supportingEligibility
+    || eligibility.receipt.receiptId !== supportingEligibility.receiptId
+    || eligibility.receipt.receiptDigest !== supportingEligibility.receiptDigest
+    || eligibility.receipt.manifestId !== manifest.manifestId
+    || eligibility.receipt.manifestDigest !== manifest.manifestDigest
+    || eligibility.receipt.businessId !== evidence.businessId
+    || eligibility.receipt.evaluationCandidateId !== evidence.evaluationCandidateId
+    || eligibility.receipt.sourceRecordId !== evidence.sourceRecordId
+    || eligibility.receipt.websiteEvidence.proofId !== evidence.proofId
+    || eligibility.receipt.websiteEvidence.proofDigest !== evidence.proofDigest
+    || eligibility.receipt.websiteEvidence.workflowReceiptId !== evidence.workflow.receiptId
+    || eligibility.receipt.persistedWorkflow.workflowReceiptDigest !== evidence.workflow.receiptDigest
+  ) {
+    throw new Error("Persisted website checkpoint completion must come from its exact durable eligibility reload.");
+  }
+  return buildPrivateKwAssessmentProgressProofInternal(input, TimestampSchema.parse(eligibility.receiptRecordedAt));
 }

@@ -42,6 +42,7 @@
     "kw:record-owner-labels": "tsx scripts/record-private-kw-owner-labels.ts",
     "kw:materialize-source-workflow": "tsx scripts/materialize-private-kw-source-workflow.ts",
     "kw:execute-assessment": "tsx scripts/execute-private-kw-assessment.ts",
+    "kw:execute-m1-dossier": "tsx scripts/execute-private-kw-m1-dossier.ts",
     "kw:prepare-contact-review": "tsx scripts/prepare-private-kw-contact-review.ts",
     "kw:persist-contacts": "tsx scripts/persist-private-kw-contacts.ts"
   },
