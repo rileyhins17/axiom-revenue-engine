@@ -541,7 +541,7 @@ async function persistedDatabaseFixture(
       manifest,
       checkedAt: timing.availabilityCheckedAt,
       validThrough: timing.availabilityValidThrough,
-      expiresAt: manifest.retentionClass === "SHADOW_30D" ? "2026-09-20T00:00:00.000Z" : null,
+      expiresAt: manifest.retentionClass === "SHADOW_30D" ? timing.availabilityValidThrough : null,
       checkerKind: "R2_HEAD",
       objects: availabilityObjects(manifest),
     });
