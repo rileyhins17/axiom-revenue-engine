@@ -190,6 +190,9 @@ export type PrivateKwM1WebsiteCheckpointOperation = z.infer<typeof OperationSche
 export type PrivateKwM1WebsiteCheckpointResult = z.infer<typeof ResultSchema>;
 export type PrivateKwM1WebsiteCheckpointTestHooks = Readonly<{
   afterCompleteness?: () => void;
+  afterSourceMaterialized?: () => void;
+  afterEligibilityPersisted?: () => void;
+  afterWebsiteProgressPersisted?: () => void;
 }>;
 
 function deepFreeze<T>(value: T): T {
@@ -387,6 +390,7 @@ export async function executePrivateKwM1WebsiteCheckpoint(
 
     const plan = buildPrivateKwSourceWorkflowMaterializationPlan(source, materialization);
     const sourceExecution = executePrivateKwSourceWorkflowPlanForLocalDatabase(database, plan);
+    hooks.afterSourceMaterialized?.();
     const storedRecords = plan.records.map((record) => ({
       entity: record.entity,
       recordId: record.recordId,
@@ -458,6 +462,7 @@ export async function executePrivateKwM1WebsiteCheckpoint(
     });
     eligibilityResult = seeded.eligibilityResult;
     eligibilityPath = seeded.eligibilityPath;
+    hooks.afterEligibilityPersisted?.();
     for (const record of seeded.seed.durable.preflights) for (const table of sqlTables(record.selectSql)) websiteTables.add(table);
     for (const record of seeded.seed.durable.mutations) for (const table of sqlTables(record.sql)) websiteTables.add(table);
     for (const record of seeded.seed.resume.preflights) for (const table of sqlTables(record.selectSql)) websiteTables.add(table);
@@ -491,6 +496,7 @@ export async function executePrivateKwM1WebsiteCheckpoint(
       phaseInputValue: websiteInput,
     });
     const output = await writeOrVerifyPrivateKwJson(operation.output, checkpoint);
+    hooks.afterWebsiteProgressPersisted?.();
     const parsed = ResultSchema.parse({
       version: "private-kw-m1-website-checkpoint-v1",
       businessId: plan.businessId,

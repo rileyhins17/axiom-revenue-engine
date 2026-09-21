@@ -53,6 +53,18 @@ import {
   type PrivateKwM1WebsiteCheckpointResult,
 } from "./execute-private-kw-m1-website-checkpoint";
 
+export type M1FailureAfterStage =
+  | "SOURCE_MATERIALIZED"
+  | "ELIGIBILITY_PERSISTED"
+  | "WEBSITE_PROGRESS_PERSISTED"
+  | "ASSESSMENT_PERSISTED"
+  | "ASSESSMENT_PROGRESS_PERSISTED"
+  | "REPORT_PERSISTED";
+
+export type PrivateKwM1DossierTestHooks = Readonly<{
+  failureAfterStage?: M1FailureAfterStage;
+}>;
+
 const MAX_JSON_BYTES = 50_000_000;
 const MAX_DATABASE_BYTES = 512_000_000;
 const SOURCE_NOW_FROM_CAPTURED_AT_MS = 6 * 60_000;
@@ -438,7 +450,14 @@ async function readExistingReport(path: string) {
   }
 }
 
-export async function executePrivateKwM1Dossier(value: unknown): Promise<PrivateKwM1DossierResult> {
+function failAfterStage(hooks: PrivateKwM1DossierTestHooks, stage: M1FailureAfterStage) {
+  if (hooks.failureAfterStage === stage) throw new Error(`M1 test interruption after ${stage}.`);
+}
+
+export async function executePrivateKwM1Dossier(
+  value: unknown,
+  hooks: PrivateKwM1DossierTestHooks = {},
+): Promise<PrivateKwM1DossierResult> {
   const { operation, files } = parsePrivateKwM1DossierOperation(value);
   const [sourceRead, materializationRead, manifestRead, invocationRead] = await Promise.all([
     readPrivateKwJson(files.sourcePlan, MAX_JSON_BYTES),
@@ -466,6 +485,10 @@ export async function executePrivateKwM1Dossier(value: unknown): Promise<Private
     database: files.database,
     output: files.websiteCheckpoint,
     now: initialNow,
+  }, {
+    afterSourceMaterialized: () => failAfterStage(hooks, "SOURCE_MATERIALIZED"),
+    afterEligibilityPersisted: () => failAfterStage(hooks, "ELIGIBILITY_PERSISTED"),
+    afterWebsiteProgressPersisted: () => failAfterStage(hooks, "WEBSITE_PROGRESS_PERSISTED"),
   });
   const storedWebsiteCheckpoint = (await readPrivateKwJson(files.websiteCheckpoint, MAX_JSON_BYTES)).value;
   const website = await rebuildWebsiteCheckpoint(
@@ -478,6 +501,7 @@ export async function executePrivateKwM1Dossier(value: unknown): Promise<Private
   );
   const beforeAssessment = await readPrivateKwRowCounts(files.database);
   const assessmentStage = await executePrivateKwAssessmentFile(createAssessmentArgs(files));
+  failAfterStage(hooks, "ASSESSMENT_PERSISTED");
   const databaseFile = await inspectPrivateKwDatabase(files.database, MAX_DATABASE_BYTES);
   const database = new Database(databaseFile, { fileMustExist: true, timeout: 0 });
   let assessmentCheckpointOutput: "FRESH_WRITE" | "EXACT_REPLAY";
@@ -523,6 +547,7 @@ export async function executePrivateKwM1Dossier(value: unknown): Promise<Private
       ) throw new Error("The stored assessment checkpoint does not match the canonical durable rebuild.");
     }
     assessmentCheckpointOutput = (await writeOrVerifyPrivateKwJson(files.assessmentCheckpoint, rebuiltAssessmentCheckpoint)).executionPath;
+    failAfterStage(hooks, "ASSESSMENT_PROGRESS_PERSISTED");
     const afterAssessment = rowCounts(database);
     const insertedRows = AssessmentInsertedRowsSchema.parse(assessmentStage.insertedRows);
     const beforeAssessmentRows = RowCountsSchema.parse(beforeAssessment);
@@ -586,6 +611,7 @@ export async function executePrivateKwM1Dossier(value: unknown): Promise<Private
       throw new Error("The existing dossier report conflicts with the canonical durable rebuild.");
     }
     reportOutput = (await writeOrVerifyPrivateKwJson(files.report, report)).executionPath;
+    failAfterStage(hooks, "REPORT_PERSISTED");
     return PrivateKwM1DossierResultSchema.parse({
       report,
       execution: {
