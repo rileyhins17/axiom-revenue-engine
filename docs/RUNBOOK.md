@@ -254,8 +254,8 @@ command uses the canonical assessment writer and local SQLite reload to build
 the owner dossier. Never hand-author either the durable reload or proof. There
 is no Worker import, live D1 binding, or real-business path. The loader and
 integrated command authorize only the bounded local shadow assessment mutation;
-they do not authorize qualification execution beyond the synthetic fixture,
-contact work, provider use, deployment, outreach, send, or spend.
+they do not authorize qualification execution, contact work, provider use,
+deployment, outreach, send, or spend.
 
 ## Owner-approved local KW materialization and assessment
 
