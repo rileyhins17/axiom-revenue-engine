@@ -1,8 +1,9 @@
 # Current status — Axiom Revenue Engine
 
 **Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Task 8
-local backup and restore drill. The current code checkpoint was verified
-from base `4ec69fd`; the prior fully verified code tree is `a77ccc8`.
+local backup and restore drill. The fully verified code checkpoint is `42eebd3`
+(`feat(revenue): verify local backup and restore snapshots`), built from base
+`4ec69fd`. This following status update is documentation only.
 
 ## M2 backup and restore-drill checkpoint
 
