@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import { rm, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { lstat, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
@@ -9,7 +9,7 @@ import { WEBSITE_CAPTURE_VERSION, type WebsiteCaptureResult } from "@/lib/revenu
 import { buildPrivateKwM2HtmlAuditReceipt, PrivateKwM2HtmlAuditReceiptSchema } from "@/lib/revenue-engine/private-kw-m2-html-audit";
 import { createPrivateKwM2HtmlEvidenceReceiptStore, privateKwM2ReceiptCanonicalDigest } from "@/lib/revenue-engine/private-kw-m2-html-evidence-receipt";
 import { createPrivateKwPublicHttpTransport } from "@/lib/revenue-engine/private-kw-public-http-transport";
-import { createPrivateKwLocalHtmlEvidenceStore } from "@/lib/revenue-engine/private-kw-local-html-evidence-store";
+import { createPrivateKwLocalHtmlEvidenceStore, PRIVATE_KW_EVIDENCE_ROOT } from "@/lib/revenue-engine/private-kw-local-html-evidence-store";
 import {
   buildPrivateKwM2ExecutionAuthorization,
   buildPrivateKwM2OwnerApprovalCandidate,
@@ -27,6 +27,7 @@ import {
   PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION,
   PrivateKwM2HtmlEvidenceRequestSchema,
   PrivateKwM2WebsiteEvidenceReceiptSchema,
+  type PrivateKwM2WebsiteEvidenceReceipt,
 } from "@/lib/revenue-engine/private-kw-m2-html-evidence-workflow";
 
 test("exposes a strict HTML-only workflow request and receipt contract", () => {
@@ -82,14 +83,20 @@ test("HTML-only projection discards contact and qualification material", async (
 });
 
 test("sealed receipt store is content addressed, exclusive, and tamper rejecting", async () => {
-  const operationId = "11111111-1111-5111-8111-111111111111";
-  const file = path.join(process.cwd(), "data", "kw-evaluation", "m2-evidence", "sealed", "sha256", operationId.slice(0, 2), operationId + ".json");
-  await rm(path.dirname(file), { recursive: true, force: true });
+  const chain = approvedChain();
+  const request = { requestId: "11111111-1111-4111-8111-111111111111", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const valid = await executePrivateKwM2HtmlEvidence(request, { transport: fakeTransport(() => undefined), store: fakeEvidenceStore(), receiptStore: memoryReceiptStore(), clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  const operationId = valid.operationId;
+  const testRoot = path.join(path.dirname(PRIVATE_KW_EVIDENCE_ROOT), "m2-receipt-test-workflow");
+  const file = path.join(testRoot, "sealed", "sha256", operationId.slice(0, 2), operationId + ".json");
+  await rm(testRoot, { recursive: true, force: true });
   try {
-    const store = createPrivateKwM2HtmlEvidenceReceiptStore();
-    const core = { operationId, status: "COMPLETE", pages: [] };
-    const receipt = { ...core, operationDigest: privateKwM2ReceiptCanonicalDigest(core) };
+    const store = createPrivateKwM2HtmlEvidenceReceiptStore({ rootPath: testRoot, validateReceipt: (value) => PrivateKwM2WebsiteEvidenceReceiptSchema.parse(value) });
+    const receipt = valid;
     assert.equal(await store.loadSealed(receipt.operationId), null);
+    await assert.rejects(lstat(testRoot), /ENOENT/);
+    const incompleteCore = { operationId, status: "COMPLETE", pages: [] };
+    await assert.rejects(store.publishSealed({ ...incompleteCore, operationDigest: privateKwM2ReceiptCanonicalDigest(incompleteCore) } as never), /expected|invalid|required/i);
     assert.equal(await store.publishSealed(receipt), "CREATED");
     assert.deepEqual(await store.loadSealed(receipt.operationId), receipt);
     assert.equal(await store.publishSealed({ ...receipt }), "EXACT_REPLAY");
@@ -98,7 +105,7 @@ test("sealed receipt store is content addressed, exclusive, and tamper rejecting
     await writeFile(file, JSON.stringify({ ...receipt, status: "FAILED" }) + "\n", "utf8");
     await assert.rejects(store.loadSealed(operationId), /SEALED_RECEIPT_DIGEST_MISMATCH|SEALED_RECEIPT_BYTES_MISMATCH/);
   } finally {
-    await rm(path.dirname(file), { recursive: true, force: true });
+    await rm(testRoot, { recursive: true, force: true });
   }
 });
 
@@ -114,7 +121,7 @@ test("workflow request rejects unbounded CLI-shaped extras", () => {
   assert.throws(() => PrivateKwM2HtmlEvidenceRequestSchema.parse({ ...valid, websiteUrl: "https://attacker.example/" }), /unrecognized/i);
 });
 
-function approvedChain(networkRequestCap = 8) {
+function approvedChain(networkRequestCap = 8, firstRetention: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED" = "RAW_HTML_ALLOWED") {
   const sourcePlan = preparePrivateKwImport({
     importVersion: PRIVATE_KW_IMPORT_VERSION, importId: "m2-task-4-test-source", adapter: "MANUAL_RESEARCH",
     queryText: "Synthetic Task4 website evidence", filters: { synthetic: true }, capturedAt: "2026-09-01T15:00:00.000Z", costUsd: 0,
@@ -140,7 +147,7 @@ function approvedChain(networkRequestCap = 8) {
   });
   const policyDecisions: ResearchPolicyDecisionInput[] = sourcePlan.records.map((record, index) => ({
     businessId: record.business.id, sourceRights: "PUBLIC_SOURCE_REVIEWED" as const, termsDecision: "TERMS_REVIEWED_FOR_FACTS" as const,
-    robotsDecision: "ROBOTS_REVIEWED_PUBLIC_ONLY" as const, evidenceRetention: index === 0 ? "RAW_HTML_ALLOWED" : "DERIVED_FACTS_ONLY",
+    robotsDecision: "ROBOTS_REVIEWED_PUBLIC_ONLY" as const, evidenceRetention: index === 0 ? firstRetention : "DERIVED_FACTS_ONLY",
     retentionReviewDate: "2026-09-30T15:00:00.000Z", stopConditions: ["ROBOTS_OR_TERMS_UNCLEAR" as const],
   }));
   const researchPacket = buildPrivateKwM2ResearchPacket({ manifest, sourcePlan, reviewedAt: "2026-09-03T15:00:00.000Z", policyDecisions });
@@ -151,14 +158,14 @@ function approvedChain(networkRequestCap = 8) {
   return { sourcePlan, manifest, researchPacket, authorization, ownerEnvelope, researchPolicy };
 }
 
-function fakeTransport(onRequest: () => void) {
+function fakeTransport(onRequest: () => void, robotsBody = "User-agent: *\\nAllow: /\\n") {
   return createPrivateKwPublicHttpTransport({
     resolveDns: async () => [{ address: "93.184.216.34", family: 4 as const }],
     executeConnection: async (request) => {
       onRequest();
       const url = new URL(request.url);
       const body = url.pathname === "/robots.txt"
-        ? "User-agent: *\\nAllow: /\\n"
+        ? robotsBody
         : "<!doctype html><html><head><title>Roof repair</title></head><body><h1>Roof repair in Kitchener</h1><a href=\"/roofing\">Services</a><a href=\"/about\">About</a><a href=\"/contact\">Contact</a><a href=\"tel:+15195550123\">Call</a></body></html>";
       const bytes = new TextEncoder().encode(body);
       return { statusCode: 200, headers: { "content-type": url.pathname === "/robots.txt" ? "text/plain" : "text/html" }, body: new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(bytes); controller.close(); } }), abort() {} };
@@ -170,6 +177,7 @@ function fakeTransport(onRequest: () => void) {
 function fakeEvidenceStore(writes: Array<{ requestedUrl: string; sourcePageUrl?: string }> = []) {
   type PersistedInput = Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwHtmlEvidence"]>[0] | Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwDerivedFacts"]>[0];
   const persisted: Array<{ outcome: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY"; input: PersistedInput }> = [];
+  let reloadIndex = 0;
   const refs = (outcome: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY") => outcome === "RAW_HTML_ALLOWED"
     ? { outcome, contentRef: "kw-html:sha256:" + "c".repeat(64), metadataRef: "kw-html-meta:sha256:" + "d".repeat(64), contentPath: "sealed/content.html", metadataPath: "sealed/metadata.json", executionPath: "CREATED" as const }
     : { outcome, contentRef: "kw-html:sha256:" + "c".repeat(64), metadataRef: "kw-html-meta:sha256:" + "d".repeat(64), factsRef: "kw-html-facts:sha256:" + "e".repeat(64), metadataPath: "sealed/metadata.json", factsPath: "sealed/facts.json", rawArtifactRef: null, executionPath: "CREATED" as const };
@@ -180,28 +188,35 @@ function fakeEvidenceStore(writes: Array<{ requestedUrl: string; sourcePageUrl?:
     writePrivateKwDerivedFacts: async (input: Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwDerivedFacts"]>[0]) => { writes.push({ requestedUrl: input.requestedUrl, sourcePageUrl: input.sourcePageUrl }); persisted.push({ outcome: "DERIVED_FACTS_ONLY", input }); return refs("DERIVED_FACTS_ONLY"); },
     reloadPrivateKwHtmlEvidence: async (reference: unknown) => {
       void reference;
-      const entry = persisted.shift()!;
+      const entry = persisted[reloadIndex++]!;
       const bytes = entry.outcome === "RAW_HTML_ALLOWED" ? Buffer.from((entry.input as Extract<PersistedInput, { outcome: "RAW_HTML_ALLOWED" }>).bytes) : Buffer.from((entry.input as Extract<PersistedInput, { outcome: "DERIVED_FACTS_ONLY" }>).captureBytes);
-      const contentDigest = createHash("sha256").update(bytes).digest("hex");
-      const metadata = { ...entry.input, metadataVersion: "private-kw-html-metadata-v1", contentRef: "kw-html:sha256:" + contentDigest, contentByteLength: bytes.byteLength, contentType: "text/html", rightsDecision: "ALLOWED", termsDecision: "REVIEWED", robotsDecision: "ALLOWED", retentionDecision: entry.outcome, legalHold: false, metadataRef: "kw-html-meta:sha256:" + "d".repeat(64) };
+      const metadata = { ...entry.input, metadataVersion: "private-kw-html-metadata-v1", contentRef: "kw-html:sha256:" + "c".repeat(64), contentByteLength: bytes.byteLength, contentType: "text/html", rightsDecision: "ALLOWED", termsDecision: "REVIEWED", robotsDecision: "ALLOWED", retentionDecision: entry.outcome, legalHold: false, metadataRef: "kw-html-meta:sha256:" + "d".repeat(64) };
       return entry.outcome === "RAW_HTML_ALLOWED" ? { outcome: entry.outcome, bytes, metadata } as never : { outcome: entry.outcome, facts: { factsVersion: "private-kw-html-facts-v1", contentRef: metadata.contentRef, metadataRef: metadata.metadataRef, rawArtifactRef: null, facts: (entry.input as Extract<PersistedInput, { outcome: "DERIVED_FACTS_ONLY" }>).facts, factsRef: "kw-html-facts:sha256:" + "e".repeat(64) }, metadata } as never;
     },
+    resetReplay: () => { reloadIndex = 0; },
   };
 }
 
 function memoryReceiptStore() {
-  const values = new Map<string, unknown>();
+  const values = new Map<string, PrivateKwM2WebsiteEvidenceReceipt>();
   return {
     values,
-    async loadSealed(operationId: string) { return values.get(operationId) ?? null; },
-    async publishSealed(receipt: unknown) {
-      const operationId = (receipt as { operationId: string }).operationId;
+    async loadSealed(operationId: string): Promise<PrivateKwM2WebsiteEvidenceReceipt | null> { return values.get(operationId) ?? null; },
+    async publishSealed(receipt: PrivateKwM2WebsiteEvidenceReceipt) {
+      const operationId = receipt.operationId;
       const existing = values.get(operationId);
       if (!existing) { values.set(operationId, receipt); return "CREATED" as const; }
       if (JSON.stringify(existing) !== JSON.stringify(receipt)) throw new Error("SEALED_RECEIPT_CONFLICT");
       return "EXACT_REPLAY" as const;
     },
   };
+}
+type MutableReceipt = { operationDigest?: string; [key: string]: unknown };
+function redigestReceipt(value: MutableReceipt) {
+  const core = { ...value };
+  delete core.operationDigest;
+  value.operationDigest = privateKwM2ReceiptCanonicalDigest(core);
+  return value;
 }
 
 test("fresh workflow seals a bounded local receipt and exact replay performs zero requests", async () => {
@@ -231,12 +246,29 @@ test("fresh workflow seals a bounded local receipt and exact replay performs zer
     const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), store: evidenceStore, receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
     assert.deepEqual(replay, fresh);
     assert.equal(requests, beforeReplay);
+    const replayTampered = async (mutate: (receipt: MutableReceipt) => void) => {
+      const tampered = structuredClone(fresh) as unknown as MutableReceipt;
+      mutate(tampered);
+      redigestReceipt(tampered);
+      receiptStore.values.set(fresh.operationId, tampered as unknown as PrivateKwM2WebsiteEvidenceReceipt);
+      evidenceStore.resetReplay();
+      const rejected = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), store: evidenceStore, receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+      assert.equal(rejected.status, "FAILED");
+      assert.equal(rejected.stopReason, "REPLAY_MISMATCH");
+      assert.equal(requests, beforeReplay);
+      receiptStore.values.set(fresh.operationId, fresh);
+    };
+    await replayTampered((tampered) => { const selection = tampered.pageSelection as { selectedPages: Array<unknown> }; selection.selectedPages.reverse(); });
+    await replayTampered((tampered) => { tampered.networkRequestCap = fresh.networkRequestCap + 1; });
+    await replayTampered((tampered) => { tampered.status = "PARTIAL"; });
+    await replayTampered((tampered) => { const audit = tampered.audit as { pages: Array<{ statusCode: number }> }; audit.pages[0]!.statusCode += 1; });
+    await replayTampered((tampered) => { const page = tampered.pages as Array<{ storageRefs: { metadataRef: string | null } }>; page[0]!.storageRefs.metadataRef = "kw-html-meta:sha256:" + "e".repeat(64); });
     const tamperedPolicy = structuredClone(fresh) as unknown as { sourcePolicy: { reason: string }; operationDigest?: string } & Record<string, unknown>;
     tamperedPolicy.sourcePolicy.reason = "schema-valid but untrusted replacement";
     const tamperedCore = { ...tamperedPolicy };
     delete tamperedCore.operationDigest;
     tamperedPolicy.operationDigest = privateKwM2ReceiptCanonicalDigest(tamperedCore);
-    receiptStore.values.set(fresh.operationId, tamperedPolicy);
+      receiptStore.values.set(fresh.operationId, tamperedPolicy as unknown as PrivateKwM2WebsiteEvidenceReceipt);
     const rejectedPolicy = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), store: evidenceStore, receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
     assert.equal(rejectedPolicy.status, "FAILED");
     assert.equal(rejectedPolicy.stopReason, "REPLAY_MISMATCH");
@@ -246,7 +278,7 @@ test("fresh workflow seals a bounded local receipt and exact replay performs zer
     assert.equal(expiredReplay.status, "FAILED");
     assert.equal(expiredReplay.stopReason, "AUTHORIZATION_EXPIRED");
     assert.equal(requests, beforeReplay);
-    const tampered = receiptStore.values.get(fresh.operationId) as Record<string, unknown>;
+    const tampered = receiptStore.values.get(fresh.operationId) as unknown as MutableReceipt;
     tampered.operationDigest = "a".repeat(64);
     const rejected = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), store: fakeEvidenceStore(), receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
     assert.equal(rejected.status, "FAILED");
@@ -287,6 +319,35 @@ test("expiry after a selected-page body returns in-memory failure without later 
   assert.equal(result.stopReason, "AUTHORIZATION_EXPIRED");
   assert.equal(requests, 3);
   assert.equal(receiptStore.values.size, 0);
+});
+
+test("expiry at blocked, retention, homepage, and selected-page storage boundaries is terminal and unsealed", async () => {
+  const expiry = new Date("2026-09-30T15:00:00.000Z");
+  const run = async (chain: ReturnType<typeof approvedChain>, robotsBody: string, failOnWrite: number) => {
+    let now = new Date("2026-09-21T15:00:00.000Z");
+    let requests = 0;
+    let writes = 0;
+    const receiptStore = memoryReceiptStore();
+    const baseStore = fakeEvidenceStore();
+    const expiringStore = {
+      ...baseStore,
+      writePrivateKwHtmlEvidence: async (input: Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwHtmlEvidence"]>[0]) => {
+        writes += 1;
+        if (writes === failOnWrite) { now = expiry; throw new Error("AUTHORIZATION_EXPIRED"); }
+        return baseStore.writePrivateKwHtmlEvidence(input);
+      },
+    };
+    const request = { requestId: randomUUID(), requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+    const result = await executePrivateKwM2HtmlEvidence(request, { transport: fakeTransport(() => { requests += 1; }, robotsBody), store: expiringStore, receiptStore, clock: () => now });
+    assert.equal(result.status, "FAILED");
+    assert.equal(result.stopReason, "AUTHORIZATION_EXPIRED");
+    assert.equal(receiptStore.values.size, 0);
+    return { requests, writes };
+  };
+  assert.deepEqual(await run(approvedChain(8, "BLOCKED"), "User-agent: *\\nDisallow: /\\n", 1), { requests: 1, writes: 1 });
+  assert.deepEqual(await run(approvedChain(8, "BLOCKED"), "User-agent: *\\nAllow: /\\n", 1), { requests: 1, writes: 1 });
+  assert.deepEqual(await run(approvedChain(), "User-agent: *\\nAllow: /\\n", 1), { requests: 2, writes: 1 });
+  assert.deepEqual(await run(approvedChain(), "User-agent: *\\nAllow: /\\n", 2), { requests: 3, writes: 2 });
 });
 
 test("transport ledger rejects a duplicate receipt instead of laundering the global count", async () => {
