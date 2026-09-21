@@ -344,10 +344,23 @@ function assertExactSourcePolicy(input: { requestedUrl: string; finalUrl: string
   if (policy.robotsUrl !== expectedRobotsUrl || approved.hostname !== final.hostname || policy.httpStatus === null || policy.httpStatus < 200 || policy.httpStatus >= 300 || policy.contentDigest === null) throw new Error("Raw evidence source-policy URL, status, or robots proof is incomplete.");
   if (policy.networkRequestCount !== policy.transportReceiptIds.length || policy.networkRequestCount !== policy.transportReceiptDigests.length || policy.networkRequestCount !== receipts.length || policy.networkRequestCount === 0) throw new Error("Raw evidence transport receipt count is incomplete.");
   const seen = new Set<number>();
+  const terminal = receipts.at(-1);
   receipts.forEach((receipt, index) => {
-    if (seen.has(receipt.requestId) || receipt.requestId !== policy.transportReceiptIds[index] || receipt.receiptDigest !== policy.transportReceiptDigests[index] || receipt.receiptDigest !== privateKwPublicHttpTransportReceiptDigest(receipt) || new URL(receipt.normalizedUrl).hostname !== approved.hostname) throw new Error("Raw evidence transport receipt chain mismatch.");
+    const receiptUrl = new URL(receipt.normalizedUrl);
+    const isTerminal = index === receipts.length - 1;
+    if (
+      seen.has(receipt.requestId) ||
+      receipt.requestId !== policy.transportReceiptIds[index] ||
+      receipt.receiptDigest !== policy.transportReceiptDigests[index] ||
+      receipt.receiptDigest !== privateKwPublicHttpTransportReceiptDigest(receipt) ||
+      receipt.hostname !== receiptUrl.hostname ||
+      receiptUrl.hostname !== approved.hostname ||
+      receipt.statusCode === undefined ||
+      (isTerminal ? receipt.statusCode !== policy.httpStatus : receipt.statusCode < 300 || receipt.statusCode >= 400)
+    ) throw new Error("Raw evidence transport receipt chain mismatch.");
     seen.add(receipt.requestId);
   });
+  if (!terminal || terminal.normalizedUrl === undefined || receipts[0]!.normalizedUrl !== expectedRobotsUrl) throw new Error("Raw evidence transport receipt chain must begin at the canonical robots URL.");
   if (authorization.authority.providerOperationsAuthorized !== 0 || authorization.authority.costAuthorizedUsd !== 0) throw new Error("Raw evidence authorization cannot grant provider or cost authority.");
 }
 

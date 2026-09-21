@@ -375,6 +375,44 @@ test("raw storage accepts only the exact copied Task2 policy and receipt chain",
   await store.writePrivateKwHtmlEvidence(valid);
 });
 
+test("raw storage rejects redigested error receipts, wrong paths, host mismatches, and bad ordering", async () => {
+  const store = createPrivateKwLocalHtmlEvidenceStore();
+  const valid = {
+    ...baseMetadata({ retentionDecision: "RAW_HTML_ALLOWED", retainUntil: "2026-10-21T12:00:00.000Z" }),
+    outcome: "RAW_HTML_ALLOWED" as const,
+    contentType: "text/html" as const,
+    bytes: HTML,
+  };
+  const policy = valid.sourcePolicyDecision!;
+  const originalReceipt = valid.transportReceipts![0]!;
+  const withReceipt = (changes: Partial<typeof originalReceipt>) => {
+    const withoutDigest = { ...originalReceipt, ...changes, receiptDigest: "0".repeat(64) };
+    const digest = privateKwPublicHttpTransportReceiptDigest(withoutDigest);
+    const receipt = { ...withoutDigest, receiptDigest: digest };
+    return {
+      ...valid,
+      sourcePolicyDecision: { ...policy, transportReceiptDigests: [digest] },
+      transportReceipts: [receipt],
+    };
+  };
+  await assert.rejects(store.writePrivateKwHtmlEvidence(withReceipt({ statusCode: 302 })), /receipt|transport|chain/i);
+  await assert.rejects(store.writePrivateKwHtmlEvidence(withReceipt({ normalizedUrl: "https://business-1.com/wrong-robots-path" })), /receipt|transport|chain/i);
+  await assert.rejects(store.writePrivateKwHtmlEvidence(withReceipt({ hostname: "other-host.example" })), /receipt|transport|chain/i);
+
+  const redirectWithoutDigest = { ...originalReceipt, statusCode: 302, requestId: 2, receiptDigest: "0".repeat(64) };
+  const redirectReceipt = { ...redirectWithoutDigest, receiptDigest: privateKwPublicHttpTransportReceiptDigest(redirectWithoutDigest) };
+  const terminalWithoutDigest = { ...originalReceipt, normalizedUrl: "https://business-1.com/redirected-robots.txt", requestId: 3, receiptDigest: "0".repeat(64) };
+  const terminalReceipt = { ...terminalWithoutDigest, receiptDigest: privateKwPublicHttpTransportReceiptDigest(terminalWithoutDigest) };
+  const chain = {
+    ...valid,
+    sourcePolicyDecision: { ...policy, transportReceiptIds: [2, 3], transportReceiptDigests: [redirectReceipt.receiptDigest, terminalReceipt.receiptDigest], networkRequestCount: 2 },
+    transportReceipts: [redirectReceipt, terminalReceipt],
+  };
+  await store.writePrivateKwHtmlEvidence(chain);
+  await assert.rejects(store.writePrivateKwHtmlEvidence({ ...chain, transportReceipts: [terminalReceipt, redirectReceipt] }), /receipt|transport|chain/i);
+  await assert.rejects(store.writePrivateKwHtmlEvidence({ ...chain, transportReceipts: [redirectReceipt, redirectReceipt] }), /receipt|transport|chain/i);
+});
+
 test("rejects malformed metadata and leaves temp residue untouched", async () => {
   const store = createPrivateKwLocalHtmlEvidenceStore();
   const result = await store.writePrivateKwHtmlEvidence({
