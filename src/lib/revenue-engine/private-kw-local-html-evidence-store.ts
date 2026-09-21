@@ -424,6 +424,17 @@ async function ensureSafeRoot(root: string, safety?: PrivateKwEvidenceFilesystem
   await assertDirectory(root, root, safety);
 }
 
+async function assertExistingSafeRoot(root: string, safety?: PrivateKwEvidenceFilesystemSafety) {
+  await assertDirectory(REPOSITORY_ROOT, REPOSITORY_ROOT, safety);
+  let current = REPOSITORY_ROOT;
+  for (const segment of ["data", "kw-evaluation"] as const) {
+    current = path.join(current, segment);
+    await assertDirectory(current, current, safety);
+  }
+  await assertDirectory(PRIVATE_KW_EVIDENCE_PARENT, PRIVATE_KW_EVIDENCE_PARENT, safety);
+  await assertDirectory(root, root, safety);
+}
+
 async function ensureShardDirectory(root: string, category: "objects" | "metadata" | "facts" | "receipts", digest: string, safety?: PrivateKwEvidenceFilesystemSafety) {
   const directory = path.join(root, category, "sha256", shard(digest));
   let current = root;
@@ -740,6 +751,47 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     return { outcome: "DERIVED_FACTS_ONLY", facts, metadata };
   }
 
+  async function reloadPrivateKwHtmlEvidenceReadOnly(reference: unknown): Promise<ReloadedEvidence> {
+    await assertExistingSafeRoot(root, filesystemSafety);
+    const parsed = z.discriminatedUnion("outcome", [
+      z.object({ outcome: z.literal("RAW_HTML_ALLOWED"), contentRef: z.string().regex(REF), metadataRef: z.string().regex(META_REF) }).strict(),
+      z.object({ outcome: z.literal("DERIVED_FACTS_ONLY"), contentRef: z.string().regex(REF), metadataRef: z.string().regex(META_REF), factsRef: z.string().regex(FACTS_REF) }).strict(),
+      z.object({ outcome: z.literal("BLOCKED"), receiptRef: z.string().regex(RECEIPT_REF) }).strict(),
+    ]).parse(reference);
+    if (parsed.outcome === "BLOCKED") {
+      const receiptDigest = parsed.receiptRef.slice(-64);
+      const expectedReceiptPath = expectedArtifactPath(root, "receipts", receiptDigest, "json");
+      const bytes = await readVerifiedFile(expectedReceiptPath, undefined, undefined, MAX_JSON_BYTES, root, filesystemSafety);
+      const receipt = StoredReceiptSchema.parse(JSON.parse(bytes.toString("utf8")));
+      const { receiptRef: storedReceiptRef, ...receiptCore } = receipt;
+      if (storedReceiptRef !== parsed.receiptRef || receiptRef(receiptDigest) !== parsed.receiptRef || sha256(canonicalize(receiptCore)) !== receiptDigest) throw new Error("BLOCKED receipt identity mismatch.");
+      return { outcome: "BLOCKED", blockCode: receipt.blockCode, receipt };
+    }
+    const metadataDigest = parsed.metadataRef.slice(-64);
+    const expectedMetadataPath = expectedArtifactPath(root, "metadata", metadataDigest, "json");
+    const metadataBytes = await readVerifiedFile(expectedMetadataPath, undefined, undefined, MAX_JSON_BYTES, root, filesystemSafety);
+    const metadata = StoredMetadataSchema.parse(JSON.parse(metadataBytes.toString("utf8")));
+    const { metadataRef: storedMetadataRef, ...metadataCoreValue } = metadata;
+    if (storedMetadataRef !== parsed.metadataRef || sha256(canonicalize(metadataCoreValue)) !== metadataDigest) throw new Error("MALFORMED_METADATA: metadata digest mismatch.");
+    const contentDigest = parsed.contentRef.slice(-64);
+    if (metadata.contentRef !== parsed.contentRef) throw new Error("Metadata content reference mismatch.");
+    if (parsed.outcome === "RAW_HTML_ALLOWED") {
+      const expectedContentPath = expectedArtifactPath(root, "objects", contentDigest, "html");
+      const bytes = await readVerifiedFile(expectedContentPath, contentDigest, metadata.contentByteLength, undefined, root, filesystemSafety);
+      if (metadata.outcome !== "RAW_HTML_ALLOWED") throw new Error("Metadata outcome mismatch.");
+      return { outcome: "RAW_HTML_ALLOWED", bytes, metadata };
+    }
+    if (metadata.outcome !== "DERIVED_FACTS_ONLY") throw new Error("Metadata outcome mismatch.");
+    const factsDigest = parsed.factsRef.slice(-64);
+    const expectedFactsPath = expectedArtifactPath(root, "facts", factsDigest, "json");
+    const factsBytes = await readVerifiedFile(expectedFactsPath, undefined, undefined, MAX_JSON_BYTES, root, filesystemSafety);
+    const facts = StoredFactsSchema.parse(JSON.parse(factsBytes.toString("utf8")));
+    const { factsRef: storedFactsRef, ...factsCoreValue } = facts;
+    if (storedFactsRef !== parsed.factsRef || facts.contentRef !== parsed.contentRef || facts.metadataRef !== parsed.metadataRef || sha256(canonicalize(factsCoreValue)) !== factsDigest) throw new Error("Facts identity mismatch.");
+    assertFactsSafe(facts.facts, metadata.contentByteLength);
+    return { outcome: "DERIVED_FACTS_ONLY", facts, metadata };
+  }
+
   async function assertPrivateKwHtmlEvidenceRetention(reference: unknown, now: Date): Promise<PrivateKwEvidenceRetentionState> {
     const reloaded = await reloadPrivateKwHtmlEvidence(reference);
     if (reloaded.outcome === "BLOCKED") return "ACTIVE";
@@ -748,7 +800,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     return now.getTime() >= Date.parse(reloaded.metadata.reviewAt ?? "") ? "REVIEW_DUE" : "ACTIVE";
   }
 
-  return { writePrivateKwHtmlEvidence, writePrivateKwDerivedFacts, reloadPrivateKwHtmlEvidence, assertPrivateKwHtmlEvidenceRetention };
+  return { writePrivateKwHtmlEvidence, writePrivateKwDerivedFacts, reloadPrivateKwHtmlEvidence, reloadPrivateKwHtmlEvidenceReadOnly, assertPrivateKwHtmlEvidenceRetention };
 }
 
 async function optionalFileExists(file: string) {

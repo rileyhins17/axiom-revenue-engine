@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import path from "node:path";
 import { z } from "zod";
 
 import {
@@ -15,7 +14,7 @@ import {
 } from "@/lib/revenue-engine/private-kw-m2-authorization";
 import { PrivateKwImportPlanSchema, type PrivateKwImportPlan } from "@/lib/revenue-engine/private-kw-import";
 import { PrivateKwShadowSliceManifestSchema, type PrivateKwShadowSliceManifest } from "@/lib/revenue-engine/private-kw-shadow-slice";
-import { createPrivateKwLocalHtmlEvidenceStore, PRIVATE_KW_EVIDENCE_ROOT, type PrivateKwFacts, type PrivateKwHtmlEvidenceRef } from "@/lib/revenue-engine/private-kw-local-html-evidence-store";
+import { createPrivateKwLocalHtmlEvidenceStore, type PrivateKwFacts, type PrivateKwHtmlEvidenceRef, type ReloadedEvidence } from "@/lib/revenue-engine/private-kw-local-html-evidence-store";
 import { createPrivateKwPublicHttpTransport, privateKwPublicHttpTransportReceiptDigest } from "@/lib/revenue-engine/private-kw-public-http-transport";
 import { evaluatePrivateKwRobotsPolicy, PrivateKwSourcePolicyDecisionSchema, type PrivateKwSourcePolicyDecision } from "@/lib/revenue-engine/private-kw-source-policy";
 import { PrivateKwPublicHttpTransportReceiptSchema } from "@/lib/revenue-engine/private-kw-public-http-transport";
@@ -33,11 +32,35 @@ export {
   PrivateKwM2HtmlEvidenceRequestSchema, PrivateKwM2WebsiteEvidenceReceiptSchema, PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION,
 } from "@/lib/revenue-engine/private-kw-m2-html-evidence-schema";
 export type { PrivateKwM2HtmlEvidenceRequest, PrivateKwM2WebsiteEvidenceReceipt } from "@/lib/revenue-engine/private-kw-m2-html-evidence-schema";
-type Store = Pick<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>, "writePrivateKwHtmlEvidence" | "writePrivateKwDerivedFacts" | "reloadPrivateKwHtmlEvidence">;
+type Store = Pick<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>, "writePrivateKwHtmlEvidence" | "writePrivateKwDerivedFacts" | "reloadPrivateKwHtmlEvidenceReadOnly">;
 export type PrivateKwM2HtmlEvidenceDependencies = {
   transport?: ReturnType<typeof createPrivateKwPublicHttpTransport>;
   store?: Store; receiptStore?: PrivateKwM2HtmlEvidenceReceiptStore; clock?: () => Date;
   sleep?: (milliseconds: number) => Promise<void>;
+};
+export type PrivateKwM2MaterializationLineageProof = {
+  materializationId: string;
+  materializationDigest: string;
+  sourcePlanDigest: string;
+  businessId: string;
+  evaluationCandidateId: string;
+  workflowReceiptId: string;
+  workflowReceiptDigest: string;
+  rowIdentityDigest: string;
+  rowCountDigest: string;
+};
+export type PrivateKwM2HtmlEvidenceReadIdentity =
+  | { outcome: "RAW_HTML_ALLOWED"; contentRef: string; metadataRef: string }
+  | { outcome: "DERIVED_FACTS_ONLY"; contentRef: string; metadataRef: string; factsRef: string }
+  | { outcome: "BLOCKED"; receiptRef: string };
+export type PrivateKwM2HtmlEvidenceReadStore = {
+  reloadPrivateKwHtmlEvidenceReadOnly: (identity: PrivateKwM2HtmlEvidenceReadIdentity) => Promise<ReloadedEvidence>;
+};
+export type PrivateKwM2WebsiteEvidenceReceiptReloadInput = {
+  request: PrivateKwM2HtmlEvidenceRequest;
+  materialization: PrivateKwM2MaterializationLineageProof;
+  receiptStore?: Pick<PrivateKwM2HtmlEvidenceReceiptStore, "loadSealed">;
+  evidenceStore?: PrivateKwM2HtmlEvidenceReadStore;
 };
 type Identity = z.infer<typeof SourceIdentitySchema> & {
   record: PrivateKwShadowSliceManifest["records"][number]; sourcePlan: PrivateKwImportPlan;
@@ -136,34 +159,24 @@ function safeCapture(value: unknown) { const parsed = WebsiteCaptureResultSchema
 function isAuthorizationExpired(error: unknown, authorization: PrivateKwM2ExecutionAuthorization, clock: () => Date) {
   return (error instanceof Error && (error.message.includes("AUTHORIZATION_EXPIRED") || /expired/i.test(error.message))) || Date.parse(authorization.expiresAt) <= clock().getTime();
 }
-function replayReference(page: z.infer<typeof PageReceiptSchema>) {
+function replayReadIdentity(page: z.infer<typeof PageReceiptSchema>): PrivateKwM2HtmlEvidenceReadIdentity {
   const refs = page.storageRefs;
   if (page.storageOutcome === "RAW_HTML_ALLOWED") {
     if (!refs.contentRef || !refs.metadataRef) throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
-    const contentDigest = refs.contentRef.slice(-64); const metadataDigest = refs.metadataRef.slice(-64);
-    return { outcome: "RAW_HTML_ALLOWED" as const, contentRef: refs.contentRef, metadataRef: refs.metadataRef, contentPath: path.join(PRIVATE_KW_EVIDENCE_ROOT, "objects", "sha256", contentDigest.slice(0, 2), `${contentDigest}.html`), metadataPath: path.join(PRIVATE_KW_EVIDENCE_ROOT, "metadata", "sha256", metadataDigest.slice(0, 2), `${metadataDigest}.json`), executionPath: "EXACT_REPLAY" as const };
+    return { outcome: "RAW_HTML_ALLOWED", contentRef: refs.contentRef, metadataRef: refs.metadataRef };
   }
   if (page.storageOutcome === "DERIVED_FACTS_ONLY") {
     if (!refs.contentRef || !refs.metadataRef || !refs.factsRef) throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
-    const metadataDigest = refs.metadataRef.slice(-64); const factsDigest = refs.factsRef.slice(-64);
-    return { outcome: "DERIVED_FACTS_ONLY" as const, contentRef: refs.contentRef, metadataRef: refs.metadataRef, factsRef: refs.factsRef, metadataPath: path.join(PRIVATE_KW_EVIDENCE_ROOT, "metadata", "sha256", metadataDigest.slice(0, 2), `${metadataDigest}.json`), factsPath: path.join(PRIVATE_KW_EVIDENCE_ROOT, "facts", "sha256", factsDigest.slice(0, 2), `${factsDigest}.json`), rawArtifactRef: null, executionPath: "EXACT_REPLAY" as const };
+    return { outcome: "DERIVED_FACTS_ONLY", contentRef: refs.contentRef, metadataRef: refs.metadataRef, factsRef: refs.factsRef };
   }
   if (page.storageOutcome === "BLOCKED") {
     if (!refs.receiptRef) throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
-    const receiptDigest = refs.receiptRef.slice(-64);
-    return { outcome: "BLOCKED" as const, receiptRef: refs.receiptRef, receiptPath: path.join(PRIVATE_KW_EVIDENCE_ROOT, "receipts", "sha256", receiptDigest.slice(0, 2), `${receiptDigest}.json`), blockCode: page.failureCode ?? "REPLAY_BLOCKED", executionPath: "EXACT_REPLAY" as const };
+    return { outcome: "BLOCKED", receiptRef: refs.receiptRef };
   }
-  return null;
+  throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
 }
-function replayBlockedReference(value: z.infer<typeof BlockedEvidenceSchema>) {
-  const receiptDigest = value.receiptRef.slice(-64);
-  return {
-    outcome: "BLOCKED" as const,
-    receiptRef: value.receiptRef,
-    receiptPath: path.join(PRIVATE_KW_EVIDENCE_ROOT, "receipts", "sha256", receiptDigest.slice(0, 2), `${receiptDigest}.json`),
-    blockCode: value.blockCode,
-    executionPath: "EXACT_REPLAY" as const,
-  };
+function replayBlockedReadIdentity(value: z.infer<typeof BlockedEvidenceSchema>): PrivateKwM2HtmlEvidenceReadIdentity {
+  return { outcome: "BLOCKED", receiptRef: value.receiptRef };
 }
 function validateReplayShape(receipt: PrivateKwM2WebsiteEvidenceReceipt, authorization: PrivateKwM2ExecutionAuthorization, transport: ReturnType<typeof createPrivateKwPublicHttpTransport>) {
   if (receipt.networkRequestCap !== authorization.networkRequestCap || receipt.networkRequestCount !== transport.takeReceipts().length || receipt.networkRequestCount !== receipt.transportReceipts.length || receipt.transportReceiptIds.length !== receipt.transportReceipts.length || receipt.transportReceiptDigests.length !== receipt.transportReceipts.length) throw new Error("REPLAY_COUNT_OR_CAP_MISMATCH");
@@ -210,7 +223,15 @@ function validateReplayShape(receipt: PrivateKwM2WebsiteEvidenceReceipt, authori
     if (!availability || !home || availability.sourceIdentityDigest !== receipt.sourceIdentity.sourceIdentityDigest || availability.requestedUrl !== home.requestedUrl || availability.finalUrl !== home.finalUrl || availability.statusCode !== home.statusCode || availability.capturedAt !== home.capturedAt || availability.contentDigest !== home.contentDigest || availability.checks.some((check) => check.category !== "availability" || check.method !== "http_probe" || check.confidence !== 0 || check.conversionCritical !== false || check.artifactRef !== null)) throw new Error("REPLAY_AUDIT_AVAILABILITY_MISMATCH");
   }
 }
-async function validateSealedReplay(receipt: PrivateKwM2WebsiteEvidenceReceipt, input: { request: PrivateKwM2HtmlEvidenceRequest; identity: Identity; authorization: PrivateKwM2ExecutionAuthorization; clock: () => Date; store: Store }) {
+type ReplayContext = {
+  request: PrivateKwM2HtmlEvidenceRequest;
+  identity: Identity;
+  authorization: PrivateKwM2ExecutionAuthorization;
+  clock: () => Date;
+  reloadEvidence: (identity: PrivateKwM2HtmlEvidenceReadIdentity) => Promise<ReloadedEvidence>;
+  beforeArtifactRead?: () => void;
+};
+async function validateSealedReplay(receipt: PrivateKwM2WebsiteEvidenceReceipt, input: ReplayContext) {
   const { operationDigest, ...core } = receipt;
   if (digest(core) !== operationDigest) throw new Error("REPLAY_OPERATION_DIGEST_MISMATCH");
   const operationId = operationIdFor(input.request, input.identity);
@@ -227,17 +248,16 @@ async function validateSealedReplay(receipt: PrivateKwM2WebsiteEvidenceReceipt, 
   if (receipt.blockedEvidence) {
     const expectedParent = blockedParentReceiptDigest(input.identity, receipt.stopReason!, policy, { takeReceipts: () => transport } as unknown as ReturnType<typeof createPrivateKwPublicHttpTransport>);
     if (receipt.blockedEvidence.parentReceiptDigest !== expectedParent) throw new Error("REPLAY_BLOCKED_PARENT_MISMATCH");
-    const reference = replayBlockedReference(receipt.blockedEvidence);
-    const reloaded = await input.store.reloadPrivateKwHtmlEvidence(reference);
+    input.beforeArtifactRead?.();
+    const reloaded = await input.reloadEvidence(replayBlockedReadIdentity(receipt.blockedEvidence));
     if (reloaded.outcome !== "BLOCKED" || reloaded.blockCode !== receipt.blockedEvidence.blockCode || reloaded.receipt.receiptRef !== receipt.blockedEvidence.receiptRef || reloaded.receipt.businessId !== receipt.businessId || reloaded.receipt.sourceId !== input.identity.sourceRecordId || reloaded.receipt.parentReceiptDigest !== expectedParent || reloaded.receipt.blockCode !== receipt.stopReason) throw new Error("REPLAY_BLOCKED_WITNESS_MISMATCH");
   }
   if (receipt.pages.length > 4) throw new Error("REPLAY_PAGE_COUNT_MISMATCH");
   let homepageWitness: { statusCode: number; redirectCount: number; finalUrl: string; capturedAt: string; contentDigest: string } | null = null;
   for (const page of receipt.pages) {
     if (page.outcome === "CAPTURED") {
-      const reference = replayReference(page);
-      if (!reference) throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
-      const reloaded = await input.store.reloadPrivateKwHtmlEvidence(reference);
+      input.beforeArtifactRead?.();
+      const reloaded = await input.reloadEvidence(replayReadIdentity(page));
       if (reloaded.outcome === "BLOCKED" || reloaded.outcome !== page.storageOutcome) throw new Error("REPLAY_DURABLE_METADATA_MISMATCH");
       const metadata = reloaded.metadata;
       if (metadata.businessId !== receipt.businessId || metadata.sourceId !== input.identity.sourceRecordId || metadata.requestedUrl !== page.requestedUrl || metadata.finalUrl !== page.finalUrl || metadata.sourcePageUrl !== input.identity.approvedWebsiteUrl || metadata.capturedAt !== page.capturedAt || metadata.statusCode !== page.statusCode || metadata.redirectCount !== page.redirectCount || metadata.authorizationDigest !== receipt.authorizationDigest || metadata.authorizationExpiresAt !== receipt.authorizationExpiresAt || metadata.sourcePolicyVersion !== policy.policyVersion || digest(metadata.sourcePolicyDecision) !== digest(policy) || digest(metadata.transportReceipts) !== digest(transport.slice(0, policy.networkRequestCount)) || metadata.retentionDecision !== page.storageOutcome || metadata.contentRef !== page.storageRefs.contentRef || metadata.metadataRef !== page.storageRefs.metadataRef || (page.storageOutcome === "DERIVED_FACTS_ONLY" && reloaded.outcome === "DERIVED_FACTS_ONLY" && reloaded.facts.factsRef !== page.storageRefs.factsRef)) throw new Error("REPLAY_DURABLE_METADATA_MISMATCH");
@@ -253,6 +273,112 @@ async function validateSealedReplay(receipt: PrivateKwM2WebsiteEvidenceReceipt, 
     if (receipt.audit.availability.redirectCount !== homepageWitness.redirectCount || checks.some((check, index) => check.outcome !== expectedOutcomes[index] || check.sourceUrl !== homepageWitness!.finalUrl || check.capturedAt !== homepageWitness!.capturedAt)) throw new Error("REPLAY_AUDIT_CHECKS_MISMATCH");
   }
   return receipt;
+}
+
+export type PrivateKwM2WebsiteEvidenceReloadErrorCode =
+  | "M2_WEBSITE_RECEIPT_REPLAY_MISSING"
+  | "M2_WEBSITE_RECEIPT_SCHEMA_INVALID"
+  | "M2_WEBSITE_RECEIPT_CANONICAL_BYTES_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_OPERATION_DIGEST_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_UNSAFE_PATH"
+  | "M2_WEBSITE_RECEIPT_REPARSE_OR_SYMLINK"
+  | "M2_WEBSITE_RECEIPT_UNKNOWN_BRANCH"
+  | "M2_WEBSITE_RECEIPT_AUTHORIZATION_EXPIRED"
+  | "M2_WEBSITE_RECEIPT_AUTHORIZATION_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_SOURCE_IDENTITY_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_MATERIALIZATION_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_SOURCE_POLICY_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_TRANSPORT_LEDGER_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_PAGE_SELECTION_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_ARTIFACT_MISSING"
+  | "M2_WEBSITE_RECEIPT_ARTIFACT_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_AUDIT_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_STATUS_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_UNSUPPORTED_UNSEALED_FAILURE";
+
+export class PrivateKwM2WebsiteEvidenceReloadError extends Error {
+  readonly code: PrivateKwM2WebsiteEvidenceReloadErrorCode;
+  constructor(code: PrivateKwM2WebsiteEvidenceReloadErrorCode) {
+    super(code);
+    this.name = "PrivateKwM2WebsiteEvidenceReloadError";
+    this.code = code;
+  }
+}
+
+const MaterializationLineageProofSchema = z.object({
+  materializationId: z.string().min(1).max(200), materializationDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  sourcePlanDigest: z.string().regex(/^[a-f0-9]{64}$/), businessId: z.string().min(1).max(128),
+  evaluationCandidateId: z.string().min(1).max(128), workflowReceiptId: z.string().min(1).max(200),
+  workflowReceiptDigest: z.string().regex(/^[a-f0-9]{64}$/), rowIdentityDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  rowCountDigest: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict();
+
+function requestChainSnapshot(request: PrivateKwM2HtmlEvidenceRequest) {
+  return digest({ requestId: request.requestId, requestedAt: request.requestedAt, businessId: request.businessId, researchPacket: request.researchPacket, authorization: request.authorization, ownerEnvelope: request.ownerEnvelope, manifest: request.manifest, sourcePlan: request.sourcePlan, researchPolicy: request.researchPolicy });
+}
+function mapReloadError(error: unknown): PrivateKwM2WebsiteEvidenceReloadError {
+  if (error instanceof PrivateKwM2WebsiteEvidenceReloadError) return error;
+  const message = error instanceof Error ? error.message : "";
+  if (/AUTHORIZATION_EXPIRED|expired|approval window/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_AUTHORIZATION_EXPIRED");
+  if (/unknown discriminator|invalid discriminator|unknown outcome|unknown branch/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_UNKNOWN_BRANCH");
+  if (/schema|invalid|expected|required|ZodError/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SCHEMA_INVALID");
+  if (/canonical.?bytes|BYTES_MISMATCH|SEALED_RECEIPT_BYTES_MISMATCH/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_CANONICAL_BYTES_MISMATCH");
+  if (/operation.?digest|SEALED_RECEIPT_DIGEST_MISMATCH/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_OPERATION_DIGEST_MISMATCH");
+  if (/reparse|symlink|UNSAFE_PATH|UNSAFE_SEALED|IDENTITY_UNAVAILABLE/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_REPARSE_OR_SYMLINK");
+  if (/ENOENT|missing|MISSING_/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_ARTIFACT_MISSING");
+  if (/SOURCE_POLICY|POLICY/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SOURCE_POLICY_MISMATCH");
+  if (/TRANSPORT/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_TRANSPORT_LEDGER_MISMATCH");
+  if (/PAGE_|SELECTION/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_PAGE_SELECTION_MISMATCH");
+  if (/AUDIT/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_AUDIT_MISMATCH");
+  if (/STATUS|BRANCH/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_STATUS_MISMATCH");
+  return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_ARTIFACT_MISMATCH");
+}
+
+export async function reloadPrivateKwM2WebsiteEvidenceReceipt(input: PrivateKwM2WebsiteEvidenceReceiptReloadInput): Promise<PrivateKwM2WebsiteEvidenceReceipt> {
+  try {
+    const request = PrivateKwM2HtmlEvidenceRequestSchema.parse(input.request);
+    const packet = PrivateKwM2ResearchPacketSchema.parse(request.researchPacket);
+    const authorization = PrivateKwM2ExecutionAuthorizationSchema.parse(request.authorization);
+    const ownerEnvelope = PrivateKwM2OwnerApprovalEnvelopeSchema.parse(request.ownerEnvelope);
+    const manifest = PrivateKwShadowSliceManifestSchema.parse(request.manifest);
+    const sourcePlan = PrivateKwImportPlanSchema.parse(request.sourcePlan);
+    const researchPolicy = request.researchPolicy === undefined ? undefined : PrivateKwM2ResearchPolicySchema.parse(request.researchPolicy);
+    const materialization = MaterializationLineageProofSchema.parse(input.materialization);
+    const chainSnapshot = requestChainSnapshot(request);
+    const identity = deriveIdentity({ businessId: request.businessId, researchPacket: packet, authorization, ownerEnvelope, manifest, sourcePlan, researchPolicy });
+    const assertMaterialization = () => {
+      if (materialization.sourcePlanDigest !== identity.sourcePlanDigest || materialization.businessId !== identity.businessId || materialization.evaluationCandidateId !== identity.evaluationCandidateId) throw new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_MATERIALIZATION_MISMATCH");
+    };
+    const clock = () => new Date();
+    const assertCurrent = () => {
+      const currentRequest = PrivateKwM2HtmlEvidenceRequestSchema.parse(input.request);
+      if (requestChainSnapshot(currentRequest) !== chainSnapshot) throw new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SOURCE_IDENTITY_MISMATCH");
+      const currentPacket = PrivateKwM2ResearchPacketSchema.parse(currentRequest.researchPacket);
+      const currentAuthorization = PrivateKwM2ExecutionAuthorizationSchema.parse(currentRequest.authorization);
+      const currentOwnerEnvelope = PrivateKwM2OwnerApprovalEnvelopeSchema.parse(currentRequest.ownerEnvelope);
+      const currentManifest = PrivateKwShadowSliceManifestSchema.parse(currentRequest.manifest);
+      const currentSourcePlan = PrivateKwImportPlanSchema.parse(currentRequest.sourcePlan);
+      const currentPolicy = currentRequest.researchPolicy === undefined ? undefined : PrivateKwM2ResearchPolicySchema.parse(currentRequest.researchPolicy);
+      const currentIdentity = deriveIdentity({ businessId: currentRequest.businessId, researchPacket: currentPacket, authorization: currentAuthorization, ownerEnvelope: currentOwnerEnvelope, manifest: currentManifest, sourcePlan: currentSourcePlan, researchPolicy: currentPolicy });
+      if (currentIdentity.sourceIdentityDigest !== identity.sourceIdentityDigest || currentAuthorization.authorizationDigest !== authorization.authorizationDigest) throw new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SOURCE_IDENTITY_MISMATCH");
+      try {
+        assertPrivateKwM2ApprovalChain({ researchPacket: currentPacket, authorization: currentAuthorization, ownerEnvelope: currentOwnerEnvelope, manifest: currentManifest, sourcePlan: currentSourcePlan, phase: "GET", now: clock().toISOString(), researchPolicy: currentPolicy });
+      } catch (error) {
+        throw mapReloadError(error);
+      }
+      assertMaterialization();
+    };
+    assertCurrent();
+    const receiptStore = input.receiptStore ?? createPrivateKwM2HtmlEvidenceReceiptStore();
+    const evidenceStore = input.evidenceStore ?? createPrivateKwLocalHtmlEvidenceStore();
+    const existing = await receiptStore.loadSealed(operationIdFor(request, identity));
+    if (!existing) throw new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_REPLAY_MISSING");
+    const receipt = PrivateKwM2WebsiteEvidenceReceiptSchema.parse(existing);
+    const reloadEvidence = (readIdentity: PrivateKwM2HtmlEvidenceReadIdentity) => evidenceStore.reloadPrivateKwHtmlEvidenceReadOnly(readIdentity);
+    return await validateSealedReplay(receipt, { request, identity, authorization, clock, reloadEvidence, beforeArtifactRead: assertCurrent });
+  } catch (error) {
+    throw mapReloadError(error);
+  }
 }
 
 export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencies: PrivateKwM2HtmlEvidenceDependencies = {}): Promise<PrivateKwM2WebsiteEvidenceReceipt> {
@@ -281,7 +407,13 @@ export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencie
   const existing = await receiptStore.loadSealed(operationId);
   if (existing) {
     const parsed = PrivateKwM2WebsiteEvidenceReceiptSchema.parse(existing);
-    try { return await validateSealedReplay(parsed, { request, identity, authorization, clock, store: replayStore }); }
+    const reloadEvidence = async (readIdentity: PrivateKwM2HtmlEvidenceReadIdentity) => replayStore.reloadPrivateKwHtmlEvidenceReadOnly(readIdentity);
+    const beforeArtifactRead = () => {
+      assertPrivateKwM2ApprovalChain({ researchPacket: packet, authorization, ownerEnvelope, manifest, sourcePlan, phase: "GET", now: clock().toISOString(), researchPolicy: policy });
+      const current = deriveIdentity({ businessId: request.businessId, researchPacket: packet, authorization, manifest, sourcePlan, ownerEnvelope, researchPolicy: policy });
+      if (current.sourceIdentityDigest !== identity.sourceIdentityDigest) throw new Error("M2 HTML workflow source identity changed.");
+    };
+    try { return await validateSealedReplay(parsed, { request, identity, authorization, clock, reloadEvidence, beforeArtifactRead }); }
     catch (error) {
       const reason = error instanceof Error && error.message === "AUTHORIZATION_EXPIRED" ? "AUTHORIZATION_EXPIRED" : "REPLAY_MISMATCH";
       return buildReceipt({ request, identity, authorization, status: "FAILED", stopReason: reason, policy: null, plan: null, pages: [], audit: null, transport: undefined, attempts: 0, operationId });

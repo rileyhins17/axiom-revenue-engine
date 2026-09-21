@@ -21,7 +21,7 @@ import {
 import { preparePrivateKwImport, PRIVATE_KW_IMPORT_VERSION } from "@/lib/revenue-engine/private-kw-import";
 import { buildPrivateKwPersistencePlan } from "@/lib/revenue-engine/private-kw-persistence-plan";
 import { buildPrivateKwShadowSliceManifest, PRIVATE_KW_SHADOW_SLICE_SIZE, PRIVATE_KW_SHADOW_SLICE_VERSION } from "@/lib/revenue-engine/private-kw-shadow-slice";
-import { executePrivateKwM2HtmlEvidence } from "@/lib/revenue-engine/private-kw-m2-html-evidence-workflow";
+import { executePrivateKwM2HtmlEvidence, reloadPrivateKwM2WebsiteEvidenceReceipt } from "@/lib/revenue-engine/private-kw-m2-html-evidence-workflow";
 
 import {
   PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION,
@@ -184,23 +184,25 @@ function fakeEvidenceStore(writes: Array<{ requestedUrl: string; sourcePageUrl?:
   const refs = (outcome: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY") => outcome === "RAW_HTML_ALLOWED"
     ? { outcome, contentRef: "kw-html:sha256:" + "c".repeat(64), metadataRef: "kw-html-meta:sha256:" + "d".repeat(64), contentPath: "sealed/content.html", metadataPath: "sealed/metadata.json", executionPath: "CREATED" as const }
     : { outcome, contentRef: "kw-html:sha256:" + "c".repeat(64), metadataRef: "kw-html-meta:sha256:" + "d".repeat(64), factsRef: "kw-html-facts:sha256:" + "e".repeat(64), metadataPath: "sealed/metadata.json", factsPath: "sealed/facts.json", rawArtifactRef: null, executionPath: "CREATED" as const };
+  const reload = async (reference: unknown) => {
+    if ((reference as { outcome?: unknown }).outcome === "BLOCKED") {
+      const blockedReference = reference as { receiptRef: string; blockCode: string };
+      const input = blockedPersisted.get(blockedReference.receiptRef);
+      if (!input) throw new Error("MISSING_BLOCKED_RECEIPT");
+      return { outcome: "BLOCKED", blockCode: input.blockCode, receipt: { receiptVersion: "private-kw-html-blocked-receipt-v1", outcome: "BLOCKED", blockCode: input.blockCode, businessId: input.businessId, sourceId: input.sourceId, parentReceiptDigest: input.parentReceiptDigest, capturedAt: input.capturedAt, receiptRef: blockedReference.receiptRef } } as never;
+    }
+    const entry = persisted[reloadIndex++]!;
+    const bytes = entry.outcome === "RAW_HTML_ALLOWED" ? Buffer.from((entry.input as Extract<PersistedInput, { outcome: "RAW_HTML_ALLOWED" }>).bytes) : Buffer.from((entry.input as Extract<PersistedInput, { outcome: "DERIVED_FACTS_ONLY" }>).captureBytes);
+    const metadata = { ...entry.input, metadataVersion: "private-kw-html-metadata-v1", contentRef: "kw-html:sha256:" + "c".repeat(64), contentByteLength: bytes.byteLength, contentType: "text/html", rightsDecision: "ALLOWED", termsDecision: "REVIEWED", robotsDecision: "ALLOWED", retentionDecision: entry.outcome, legalHold: false, metadataRef: "kw-html-meta:sha256:" + "d".repeat(64) };
+    return entry.outcome === "RAW_HTML_ALLOWED" ? { outcome: entry.outcome, bytes, metadata } as never : { outcome: entry.outcome, facts: { factsVersion: "private-kw-html-facts-v1", contentRef: metadata.contentRef, metadataRef: metadata.metadataRef, rawArtifactRef: null, facts: (entry.input as Extract<PersistedInput, { outcome: "DERIVED_FACTS_ONLY" }>).facts, factsRef: "kw-html-facts:sha256:" + "e".repeat(64) }, metadata } as never;
+  };
   return {
     writePrivateKwHtmlEvidence: async (input: Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwHtmlEvidence"]>[0]) => { writes.push({ requestedUrl: input.requestedUrl, sourcePageUrl: input.sourcePageUrl }); return input.outcome === "BLOCKED"
       ? (blockedPersisted.set("kw-html-receipt:sha256:" + "f".repeat(64), input), { outcome: "BLOCKED" as const, receiptRef: "kw-html-receipt:sha256:" + "f".repeat(64), receiptPath: "sealed/blocked.json", blockCode: input.blockCode, executionPath: "CREATED" as const })
       : (persisted.push({ outcome: "RAW_HTML_ALLOWED", input }), refs("RAW_HTML_ALLOWED")); },
     writePrivateKwDerivedFacts: async (input: Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwDerivedFacts"]>[0]) => { writes.push({ requestedUrl: input.requestedUrl, sourcePageUrl: input.sourcePageUrl }); persisted.push({ outcome: "DERIVED_FACTS_ONLY", input }); return refs("DERIVED_FACTS_ONLY"); },
-    reloadPrivateKwHtmlEvidence: async (reference: unknown) => {
-      if ((reference as { outcome?: unknown }).outcome === "BLOCKED") {
-        const blockedReference = reference as { receiptRef: string; blockCode: string };
-        const input = blockedPersisted.get(blockedReference.receiptRef);
-        if (!input) throw new Error("MISSING_BLOCKED_RECEIPT");
-        return { outcome: "BLOCKED", blockCode: input.blockCode, receipt: { receiptVersion: "private-kw-html-blocked-receipt-v1", outcome: "BLOCKED", blockCode: input.blockCode, businessId: input.businessId, sourceId: input.sourceId, parentReceiptDigest: input.parentReceiptDigest, capturedAt: input.capturedAt, receiptRef: blockedReference.receiptRef } } as never;
-      }
-      const entry = persisted[reloadIndex++]!;
-      const bytes = entry.outcome === "RAW_HTML_ALLOWED" ? Buffer.from((entry.input as Extract<PersistedInput, { outcome: "RAW_HTML_ALLOWED" }>).bytes) : Buffer.from((entry.input as Extract<PersistedInput, { outcome: "DERIVED_FACTS_ONLY" }>).captureBytes);
-      const metadata = { ...entry.input, metadataVersion: "private-kw-html-metadata-v1", contentRef: "kw-html:sha256:" + "c".repeat(64), contentByteLength: bytes.byteLength, contentType: "text/html", rightsDecision: "ALLOWED", termsDecision: "REVIEWED", robotsDecision: "ALLOWED", retentionDecision: entry.outcome, legalHold: false, metadataRef: "kw-html-meta:sha256:" + "d".repeat(64) };
-      return entry.outcome === "RAW_HTML_ALLOWED" ? { outcome: entry.outcome, bytes, metadata } as never : { outcome: entry.outcome, facts: { factsVersion: "private-kw-html-facts-v1", contentRef: metadata.contentRef, metadataRef: metadata.metadataRef, rawArtifactRef: null, facts: (entry.input as Extract<PersistedInput, { outcome: "DERIVED_FACTS_ONLY" }>).facts, factsRef: "kw-html-facts:sha256:" + "e".repeat(64) }, metadata } as never;
-    },
+    reloadPrivateKwHtmlEvidence: reload,
+    reloadPrivateKwHtmlEvidenceReadOnly: reload,
     resetReplay: () => { reloadIndex = 0; },
   };
 }
@@ -295,6 +297,69 @@ test("fresh workflow seals a bounded local receipt and exact replay performs zer
     assert.equal(rejected.status, "FAILED");
     assert.equal(rejected.stopReason, "REPLAY_MISMATCH");
     assert.equal(requests, beforeReplay);
+});
+
+test("trusted reloader uses the same receipt validator through a pathless read seam", async () => {
+  const chain = approvedChain();
+  const receiptStore = memoryReceiptStore();
+  const evidenceStore = fakeEvidenceStore();
+  const pathlessReader = evidenceStore.reloadPrivateKwHtmlEvidenceReadOnly;
+  evidenceStore.reloadPrivateKwHtmlEvidenceReadOnly = async (identity: unknown) => {
+    assert.equal("contentPath" in (identity as object), false);
+    assert.equal("metadataPath" in (identity as object), false);
+    assert.equal("factsPath" in (identity as object), false);
+    assert.equal("receiptPath" in (identity as object), false);
+    return pathlessReader(identity);
+  };
+  const request = { requestId: "29292929-2929-4292-8292-292929292929", requestedAt: "2026-09-21T15:00:00.000Z", replayMode: "NEW" as const, businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const fresh = await executePrivateKwM2HtmlEvidence(request, { transport: fakeTransport(() => undefined), receiptStore, store: evidenceStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  evidenceStore.resetReplay();
+  const reloaded = await reloadPrivateKwM2WebsiteEvidenceReceipt({
+    request,
+    materialization: {
+      materializationId: "kw-materialization:test",
+      materializationDigest: "a".repeat(64),
+      sourcePlanDigest: chain.manifest.sourcePlanDigest,
+      businessId: request.businessId,
+      evaluationCandidateId: chain.sourcePlan.records[0]!.evaluationCandidateId,
+      workflowReceiptId: "kw-workflow:test",
+      workflowReceiptDigest: "b".repeat(64),
+      rowIdentityDigest: "c".repeat(64),
+      rowCountDigest: "d".repeat(64),
+    },
+    receiptStore,
+    evidenceStore,
+  });
+  assert.deepEqual(reloaded, fresh);
+});
+
+test("trusted reloader fails closed with redacted typed errors before any evidence read", async () => {
+  const chain = approvedChain();
+  const receiptStore = memoryReceiptStore();
+  let evidenceReads = 0;
+  const request = { requestId: "29292929-2929-4292-8292-292929292930", requestedAt: "2026-09-21T15:00:00.000Z", replayMode: "NEW" as const, businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const materialization = {
+    materializationId: "kw-materialization:test", materializationDigest: "a".repeat(64), sourcePlanDigest: chain.manifest.sourcePlanDigest,
+    businessId: request.businessId, evaluationCandidateId: chain.sourcePlan.records[0]!.evaluationCandidateId,
+    workflowReceiptId: "kw-workflow:test", workflowReceiptDigest: "b".repeat(64), rowIdentityDigest: "c".repeat(64), rowCountDigest: "d".repeat(64),
+  };
+  await assert.rejects(
+    reloadPrivateKwM2WebsiteEvidenceReceipt({ request, materialization, receiptStore, evidenceStore: { reloadPrivateKwHtmlEvidenceReadOnly: async () => { evidenceReads += 1; throw new Error("must not read"); } } }),
+    (error: unknown) => error instanceof Error && (error as { code?: string }).code === "M2_WEBSITE_RECEIPT_REPLAY_MISSING" && !error.message.includes("data/") && !error.message.includes("html"),
+  );
+  assert.equal(evidenceReads, 0);
+  await assert.rejects(
+    reloadPrivateKwM2WebsiteEvidenceReceipt({ request, materialization, receiptStore: { loadSealed: async () => ({ operationId: "not-a-valid-receipt" } as never) }, evidenceStore: { reloadPrivateKwHtmlEvidenceReadOnly: async () => { evidenceReads += 1; throw new Error("must not read"); } } }),
+    (error: unknown) => error instanceof Error && (error as { code?: string }).code === "M2_WEBSITE_RECEIPT_SCHEMA_INVALID",
+  );
+  assert.equal(evidenceReads, 0);
+  let loads = 0;
+  const mismatch = { ...materialization, sourcePlanDigest: "e".repeat(64) };
+  await assert.rejects(
+    reloadPrivateKwM2WebsiteEvidenceReceipt({ request, materialization: mismatch, receiptStore: { loadSealed: async () => { loads += 1; return null; } }, evidenceStore: { reloadPrivateKwHtmlEvidenceReadOnly: async () => { evidenceReads += 1; throw new Error("must not read"); } } }),
+    (error: unknown) => error instanceof Error && (error as { code?: string }).code === "M2_WEBSITE_RECEIPT_MATERIALIZATION_MISMATCH",
+  );
+  assert.equal(loads, 0);
 });
 
 test("policy failure without a durable policy witness remains unsealed and replay is missing", async () => {

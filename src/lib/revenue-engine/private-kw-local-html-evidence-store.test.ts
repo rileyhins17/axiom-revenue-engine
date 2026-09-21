@@ -286,6 +286,34 @@ test("writes and reloads raw HTML with content and metadata identities", async (
   assert.equal(reloaded.metadata.transportReceipts?.length, 1);
 });
 
+test("pathless read-only reload derives fixed paths and does not mutate the evidence root", async () => {
+  const store = createPrivateKwLocalHtmlEvidenceStore();
+  const input = {
+    ...baseMetadata({ retentionDecision: "RAW_HTML_ALLOWED", retainUntil: "2026-10-21T12:00:00.000Z" }),
+    outcome: "RAW_HTML_ALLOWED" as const,
+    contentType: "text/html" as const,
+    bytes: HTML,
+  };
+  const result = await store.writePrivateKwHtmlEvidence(input);
+  if (result.outcome !== "RAW_HTML_ALLOWED") throw new Error("expected raw evidence");
+  const before = await snapshot();
+  const reloaded = await store.reloadPrivateKwHtmlEvidenceReadOnly({ outcome: "RAW_HTML_ALLOWED", contentRef: result.contentRef, metadataRef: result.metadataRef });
+  const after = await snapshot();
+  assert.equal(reloaded.outcome, "RAW_HTML_ALLOWED");
+  assert.deepEqual(reloaded.bytes, HTML);
+  assert.deepEqual(after, before);
+});
+
+test("pathless read-only reload never creates a missing root", async () => {
+  const store = createPrivateKwLocalHtmlEvidenceStore();
+  await rm(PRIVATE_KW_EVIDENCE_ROOT, { recursive: true, force: true });
+  await assert.rejects(
+    store.reloadPrivateKwHtmlEvidenceReadOnly({ outcome: "RAW_HTML_ALLOWED", contentRef: "kw-html:sha256:" + "a".repeat(64), metadataRef: "kw-html-meta:sha256:" + "b".repeat(64) }),
+    /ENOENT|no such file|evidence/i,
+  );
+  await assert.rejects(lstat(PRIVATE_KW_EVIDENCE_ROOT), /ENOENT/);
+});
+
 test("same complete raw parent replays exactly without changing files", async () => {
   const store = createPrivateKwLocalHtmlEvidenceStore();
   const input = {
