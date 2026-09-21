@@ -4,11 +4,11 @@ Axiom Web's private system for finding worthwhile local website opportunities, p
 
 ## Current state
 
-The application is in a controlled rebuild. The 2026-09-20 master-plan revision is **documentation only**. New execution, providers, mailboxes, AI, deployments and outreach were not enabled. The typed engine Worker remains deliberately inert; substantial evidence and owner-UI code exists, but the new end-to-end acquisition loop is not operational.
+The application is in a controlled rebuild. The M1 implementation is now saved through commit `96a0277`: one synthetic business can run through the real local source, website, eligibility, assessment, owner-dossier, checkpoint, and report writers, then replay from the same files with exact durable state and bytes. The retained checkpoint under `data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-*` is local evidence only. It uses an ignored SQLite database and synthetic fixture inputs; it does not establish a live acquisition loop.
 
-Riley has no OpenAI API keys. Existing adapter code is not a connected service. Jev is an optional later experiment, not a prerequisite for a useful deterministic/manual pilot.
+The checkpoint is synthetic, offline, and disconnected from providers, network access, contacts, qualification execution, outreach, sending, and spend. Its report records `fixtureOnly=true`, `synthetic=true`, zero network/provider operations, all contact/consent/qualification/outreach/send authority false, `costAuthorizedUsd=0`, and `contactReview.state=NOT_RECORDED`. `localAssessmentMutationAuthorized=true` covers only the explicitly approved local shadow SQLite write. Riley has no OpenAI API keys. Existing adapter code is not a connected service. Jev is an optional later experiment, not a prerequisite for a useful deterministic/manual pilot.
 
-Start with [STATUS](docs/STATUS.md) for current evidence and failures. The verification baseline currently includes 22 time-expired fixture failures and a separate owner-UI warmup timeout; it is not release eligible. Historical production/staging records were not refreshed remotely in this planning cycle.
+Start with [STATUS](docs/STATUS.md) for the current M1 artifact, exact identities, remaining verification, and blockers. The last Task 4C full test run recorded 511 passing tests and one Windows developer-mode symlink skip. Task 5 has not claimed the final M1 verification gate: the required exact-commit build, dry-run, and owner-UI checks remain for the root checkpoint owner. Historical production/staging records were not refreshed remotely.
 
 ## Read the plan
 
@@ -38,6 +38,16 @@ A lead should answer: who is this, what is actually wrong, why is it worth atten
 Read `AGENTS.md` and the required documents before changes. Use Node.js 22+, npm and the pinned project dependencies. Install with `npm ci` only when needed. Create ignored local configuration from the value-free examples; local auth needs a suitable `BETTER_AUTH_SECRET`. Provider API keys are optional for fixture development and must not be supplied merely to run tests.
 
 `npm run dev` starts the console. `npm run cf:engine:dev` inspects the locked engine scaffold. Neither command is permission to contact a provider, run real acquisition, sync an inbox, send, migrate remotely or deploy. Existing guarded private-KW commands are documented in the runbook; their approval and trusted-input requirements remain.
+
+### Local M1 offline dossier checkpoint
+
+The integrated M1 CLI accepts only the bounded direct-child paths and identities below. Prepare a new local SQLite with the canonical private-KW migrations, generate the canonical synthetic source/materialization/manifest/invocation inputs, and then run the same command twice without changing any path or ID:
+
+```powershell
+npm run kw:execute-m1-dossier -- --source-plan data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-source.json --materialization data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-materialization.json --manifest data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-manifest.json --invocation data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-invocation.json --website-checkpoint data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-website-checkpoint.json --assessment-checkpoint data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-assessment-checkpoint.json --report data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-report.json --database data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277.sqlite --business-id business:d4d99cc1cfb327216db2655e --evaluation-candidate-id evaluation-candidate:098c9b31dcbb8fd71e641ad1
+```
+
+The first run must report fresh local commits/writes. The unchanged retry must report `EXACT_REPLAY` for source, eligibility, assessment, both checkpoint outputs, and the report, with zero assessment `insertedRows`. Preserve the three JSON inputs, invocation, website checkpoint, assessment checkpoint, report, SQLite file, both CLI stdout captures, and the machine-readable `m1-checkpoint-2026-09-21-96a0277-verification.json` receipt. This procedure is synthetic, local SQLite only, and performs no provider, network, contact, qualification, outreach, send, migration, deployment, or spend action.
 
 Secrets belong in ignored local files or approved provider secret stores. Cloudflare builds remove local environment fallback values and scan the bundle before upload. Never commit private seed files, screenshots, inbox contents, exports, databases, tokens or production backups.
 

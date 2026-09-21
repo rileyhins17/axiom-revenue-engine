@@ -228,12 +228,12 @@ it. A content-equivalent reloaded parent is valid; any redigested change anywher
 in the ten-business checkpoint is not. The boundary calls the canonical
 appender, independently verifies that exactly one website-evidence receipt and
 no other business changed, deeply freezes the result, and returns the same
-checkpoint object on an identical in-process retry. It does not write a file or
-database. There is no operator command, live binding, or durable progress path
-for this phase. Synthetic tests use local SQLite rows and in-memory artifacts
-only. Live capture, R2 activation/HEAD reads, Cloudflare D1 execution, applying
-schema 0068 to a real database, and real progress remain separate future
-approvals and implementations.
+checkpoint object on an identical in-process retry. It does not itself write a
+file or database. The integrated local M1 dossier command below composes this
+boundary with the real local website writer and persists its bounded checkpoint;
+it does not create a live binding. Live capture, R2 activation/HEAD reads,
+Cloudflare D1 execution, applying schema 0068 to a real database, and real
+business progress remain separate future approvals and implementations.
 
 The `ASSESSMENT` proof contract is also an engineering boundary rather than an
 operator command. Its private D1 loader starts from only the assessment ID and
@@ -249,12 +249,13 @@ closed.
 The proof builder accepts only that exact current durable reload and uses its D1
 clock as proof time. It binds those facts to the exact completed
 current-website-evidence phase in one `assessment-proof:*`. The progress recorder
-requires the separate proof reference, but no adapter turns it into an
-`ASSESSMENT` phase input and no append occurs. Never hand-author either the
-durable reload or proof. There is no operator command, Worker import, live D1
-binding, or real-business path. The loader authorizes database reads only; it
-does not authorize qualification execution, contact work, progress mutation,
-provider use, deployment, outreach, send, or spend.
+requires the separate proof reference, while the integrated local M1 dossier
+command uses the canonical assessment writer and local SQLite reload to build
+the owner dossier. Never hand-author either the durable reload or proof. There
+is no Worker import, live D1 binding, or real-business path. The loader and
+integrated command authorize only the bounded local shadow assessment mutation;
+they do not authorize qualification execution beyond the synthetic fixture,
+contact work, provider use, deployment, outreach, send, or spend.
 
 ## Owner-approved local KW materialization and assessment
 
@@ -298,6 +299,46 @@ deployment, or a migration.
    gate by editing SQLite.
 7. Verify the owner reader shows the new assessment with reachability zero and
    route `RESEARCH`. No provider cost or external action should exist.
+
+## Integrated local M1 offline dossier
+
+This is the retained owner-checkpoint procedure for one synthetic business. It
+composes the source materialization, current website evidence/eligibility
+writer, assessment writer, owner dossier reader, two progress checkpoints, and
+report writer through the actual `kw:execute-m1-dossier` CLI. It runs against a
+new local SQLite database with the canonical private-KW migrations already
+applied. The CLI itself does not create or migrate the database.
+
+Keep each input, checkpoint, report, SQLite database, stdout capture, and
+verification receipt as a separate ignored direct child of
+`data/kw-evaluation/`. Use canonical synthetic fixture builders to create the
+source plan, materialization, manifest, and assessment invocation. The fixture
+builder's timestamp relationship must be exact: `fixture now` equals assessment
+`assessedAt` minus 3.8 minutes. The selected business and evaluation candidate
+must match the invocation and manifest.
+
+Run the following command twice with identical paths and IDs:
+
+```powershell
+npm run kw:execute-m1-dossier -- --source-plan data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-source.json --materialization data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-materialization.json --manifest data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-manifest.json --invocation data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-invocation.json --website-checkpoint data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-website-checkpoint.json --assessment-checkpoint data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-assessment-checkpoint.json --report data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-report.json --database data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277.sqlite --business-id business:d4d99cc1cfb327216db2655e --evaluation-candidate-id evaluation-candidate:098c9b31dcbb8fd71e641ad1
+```
+
+Capture each stdout stream separately. The first result must report
+`FRESH_COMMIT` for website source and eligibility, `FRESH_COMMIT` for
+assessment, and `FRESH_WRITE` for both checkpoints and the report. The second
+result must report `EXACT_REPLAY` for all six paths and zero values for every
+assessment `insertedRows` field. Independently compare the website checkpoint,
+assessment checkpoint, report, and SQLite bytes/counts before and after the
+retry; retain those hashes in a machine-readable verification receipt.
+
+The report must retain `fixtureOnly=true`, `synthetic=true`,
+`workerRuntimeConnected=false`, zero network/provider operations,
+`contactReview.state=NOT_RECORDED`, all contact/consent/qualification/outreach/
+send authority false, and `costAuthorizedUsd=0`. The one true local assessment
+mutation flag authorizes only the explicitly approved synthetic SQLite write.
+This procedure contacts no provider or prospect, performs no network operation,
+does not deploy or migrate remotely, and spends nothing. It does not establish
+real-business evidence, staging/production readiness, or M2 readiness.
 
 ## Local contact persistence boundary
 
