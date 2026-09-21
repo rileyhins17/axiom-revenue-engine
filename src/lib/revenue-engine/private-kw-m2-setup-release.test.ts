@@ -119,9 +119,11 @@ describe("private KW M2 setup release contract", () => {
     await mkdir("data/kw-evaluation", { recursive: true });
     await writeFile(relative, JSON.stringify(envelope));
     try {
-      const loaded = await loadPrivateKwM2SetupReleaseEnvelope(relative, { now });
+      const testResolvers = { repositoryCommit: () => repositoryCommit, migrationManifest: () => migrationManifest };
+      const loaded = await loadPrivateKwM2SetupReleaseEnvelope(relative, { now, resolvers: testResolvers });
       assert.equal(loaded.envelopeDigest, digest);
       assert.throws(() => (loaded as { rationale: string }).rationale = "changed", TypeError);
+      await assert.rejects(loadPrivateKwM2SetupReleaseEnvelope(relative, { now }), /clean migration working tree|Git HEAD blobs/);
       await assert.rejects(loadPrivateKwM2SetupReleaseEnvelope(relative, { now, resolvers: {
         repositoryCommit: () => "c".repeat(40),
         migrationManifest: () => migrationManifest,

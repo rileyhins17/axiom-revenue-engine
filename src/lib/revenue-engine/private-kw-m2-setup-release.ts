@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { lstat, open, realpath } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
@@ -168,16 +169,35 @@ type LoaderResolvers = {
 
 type LoaderOptions = {
   now?: Date;
-  repositoryRoot?: string;
   /** Narrow test seam; production uses the repository-derived defaults. */
   resolvers?: LoaderResolvers;
 };
 
-function repositoryResolvers(repositoryRoot: string): LoaderResolvers {
+const CANONICAL_REPOSITORY_ROOT = path.resolve(fileURLToPath(new URL("../../../", import.meta.url)));
+
+function repositoryResolvers(): LoaderResolvers {
   return {
-    repositoryCommit: () => execFileSync("git", ["-C", repositoryRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
-    migrationManifest: () => privateKwM2MigrationManifest(path.join(repositoryRoot, "migrations")),
+    repositoryCommit: () => execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+    migrationManifest: () => {
+      const dirty = execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "status", "--porcelain", "--", "migrations"], { encoding: "utf8" }).trim();
+      if (dirty) throw new Error("The setup release requires a clean migration working tree.");
+      const working = privateKwM2MigrationManifest(path.join(CANONICAL_REPOSITORY_ROOT, "migrations"));
+      const committed = PRIVATE_KW_M2_MIGRATION_FILES.map((filename) => ({
+        filename,
+        sha256: createHash("sha256").update(execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "show", `HEAD:migrations/${filename}`])).digest("hex"),
+      }));
+      if (JSON.stringify(working) !== JSON.stringify(committed)) throw new Error("Migration bytes do not match the exact Git HEAD blobs.");
+      return committed;
+    },
   };
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  }
+  return value;
 }
 
 function sameIdentity(left: { dev: bigint; ino: bigint }, right: { dev: bigint; ino: bigint }) {
@@ -207,14 +227,20 @@ async function readStableJson(file: string) {
 
 export async function loadPrivateKwM2SetupReleaseEnvelope(file: string, options: LoaderOptions) {
   if (!/^data[\\/]kw-evaluation[\\/][A-Za-z0-9._-]+\.json$/.test(file)) throw new Error("M2 setup release must be a direct-child data/kw-evaluation JSON file.");
-  const parsed = PrivateKwM2SetupReleaseEnvelopeSchema.parse(await readStableJson(file));
+  const absolute = path.resolve(CANONICAL_REPOSITORY_ROOT, file);
+  const expectedRoot = path.join(CANONICAL_REPOSITORY_ROOT, "data", "kw-evaluation");
+  if (path.dirname(absolute) !== expectedRoot) throw new Error("M2 setup release must reside under the canonical repository data/kw-evaluation root.");
+  const parent = await lstat(expectedRoot, { bigint: true });
+  const parentReal = await realpath(expectedRoot);
+  if (!parent.isDirectory() || parentReal !== expectedRoot) throw new Error("The setup release root must be a canonical directory.");
+  const parsed = PrivateKwM2SetupReleaseEnvelopeSchema.parse(await readStableJson(absolute));
   const now = options.now ?? new Date();
-  const resolvers = options.resolvers ?? repositoryResolvers(path.resolve(options.repositoryRoot ?? process.cwd()));
+  const resolvers = options.resolvers ?? repositoryResolvers();
   const currentCommit = resolvers.repositoryCommit();
   const currentManifest = resolvers.migrationManifest();
   if (Date.parse(parsed.reviewedAt) > now.getTime()) throw new Error("The M2 setup release envelope is dated in the future.");
   if (Date.parse(parsed.expiresAt) <= now.getTime()) throw new Error("The M2 setup release envelope has expired.");
   if (parsed.repositoryCommit !== currentCommit) throw new Error("The M2 setup release commit does not match the current repository.");
   if (JSON.stringify(parsed.migrationManifest) !== JSON.stringify(currentManifest)) throw new Error("The M2 setup release migration manifest does not match the current repository.");
-  return Object.freeze(parsed);
+  return deepFreeze(parsed);
 }
