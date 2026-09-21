@@ -432,6 +432,28 @@ binding. Together they authorize no database mutation, provider or network
 operation, acquisition, qualification change, consent
 decision, outreach, sending, deployment, remote database, or spend.
 
+## M2 local setup backup boundary
+
+The local setup CLI currently performs recorded-release preflight and lock
+validation only. It does not apply migration 0069 or publish a setup receipt.
+The internal backup function requires the actual live preflight session; a JSON
+object or a copied session does not grant execution authority.
+
+For the synthetic test path, the backup function opens the source read-only,
+publishes a verified backup without overwriting a conflicting destination, and
+checks a restore into a separate temporary directory. Source, backup, and restore
+must preserve the same logical schema and rows, including non-Revenue tables.
+Each file has its own physical hash; SQLite backups can be logically identical
+while having different bytes. See [ADR 0041](adr/0041-verify-local-backups-by-logical-snapshot.md).
+
+An incomplete temporary output or cleanup failure invalidates the session.
+Release its lock before obtaining a fresh preflight. Preserve unexpected files
+for inspection; never recursively delete `data/kw-evaluation` or remove another
+process's lock. The lock assumes cooperative processes in an owner-only local
+directory. A successful restore drill proves a usable copy, not an applied
+migration or an actual rollback. The mutation, receipt, and rollback runner
+remain separate unfinished Task 8 work.
+
 ## Weekly owner review (30 minutes)
 
 1. Handle qualified replies and overdue opportunities.

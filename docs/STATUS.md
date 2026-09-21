@@ -1,10 +1,68 @@
 # Current status — Axiom Revenue Engine
 
 **Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Task 8
-local prerequisites. The last fully verified code tree is `a77ccc8`; this
-status checkpoint is documentation only.
+local backup and restore drill. The current code checkpoint was verified
+from base `4ec69fd`; the prior fully verified code tree is `a77ccc8`.
 
-## M2 local prerequisite checkpoint
+## M2 backup and restore-drill checkpoint
+
+The bounded backup function now requires a live canonical preflight session
+and holds the cooperative lock handle for its entire operation. It rereads
+approval and source identity, backs up a read-only SQLite snapshot, publishes
+without overwriting a conflicting target, and restores into a separate private
+temporary directory for independent verification. CLI behavior remains
+preflight-only. This completes the synthetic backup/drill prerequisite, not
+Task 8, M2, a real setup release, or migration 0069.
+
+[ADR 0041](adr/0041-verify-local-backups-by-logical-snapshot.md) records the
+verified SQLite behavior: logically equal backups can have different physical
+hashes. Validation therefore compares full schema and all-table content digests
+while retaining each file's separate physical identity and hash. Tests cover
+non-Revenue rows and integer, real, text, blob, and null values.
+
+Independent Luna review identified reusable sessions after cleanup failure,
+missing temporary-output tests, and stale byte-equality wording. Root fixed the
+lifecycle defect and the related incomplete-backup failure with failing-then-
+passing regressions, integrated the bounded Luna tests, and corrected the design.
+Incomplete output or cleanup failure preserves evidence and requires a fresh
+session. The lock assumes cooperative processes in an owner-only directory;
+the later mutation runner still requires its separate release review.
+
+| Check on this code checkpoint | Result |
+|---|---|
+| Focused backup and snapshot tests | PASS — 14 total, 13 passed, 1 Windows symlink-privilege skip |
+| `npm run check:safety` | PASS |
+| `npm test` | PASS — 610 total, 607 passed, 0 failed, 3 Windows symlink-privilege skips |
+| `npm run typecheck` | PASS |
+| `npm run lint` | PASS — no warnings |
+| `npm run build:cloudflare` | PASS — 2,018 files sanitized, 0 local secret values |
+| `npx wrangler deploy --env="" --dry-run --autoconfig false` | PASS — no upload; generated duplicate-`options` warnings nonblocking |
+| `npm run test:owner-ui` | PASS — list 429 ms, dossier 827 ms; widths 1440/390; 6 WCAG pages; 0 external requests |
+
+The previous M1 fresh4 synthetic evidence is retained; website checkpoint,
+report and database SHA-256 values still match the recorded proof. Two private temporary
+directories from an earlier failed test-harness cleanup remain as local failure
+evidence (`.m2-setup-3c1cf8e...` and `.m2-setup-43f4aef2...`); the corrected
+tests clean only their observed owned paths, and the successful path asserts
+that it leaves no new temporary directory. No shared-root cleanup is used.
+
+Production and staging were not inspected or changed. This checkpoint used
+synthetic local databases only; no real setup envelope, migration, receipt,
+provider action, prospect request, deployment, message, or paid spend occurred.
+Production automation remains off or unverified. The C$50/month ceiling and
+zero-paid-mailbox decision remain: Cloudflare Email Routing inbound with a
+separately gated free outbound/reply candidate; no Google Workspace.
+
+The next three concrete actions are:
+
+1. Complete Task 8's separately reviewed 0069 transaction, receipt-last
+   publication and rollback runner, then obtain the real local setup gate.
+2. Implement Task 5's double source-materialization preflight, legacy/M2 reader
+   compatibility and HTML-only assessment against the verified setup receipt.
+3. Complete Task 6 orchestration and the exact ten-business owner packet before
+   a supervised one-then-ten real-source operation. M3 has not started.
+
+## Prior M2 local prerequisite checkpoint (`a77ccc8`)
 
 The Task 4 website evidence reloader is independently **APPROVED** at
 `211c41c`. It authenticates the bounded pathless Task 3 durable website

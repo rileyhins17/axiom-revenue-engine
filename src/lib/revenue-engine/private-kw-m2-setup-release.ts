@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
-import { PRIVATE_KW_M2_MIGRATION_FILES, type PrivateKwM2MigrationManifestEntry } from "../../../scripts/private-kw-m2-database.js";
+import { PRIVATE_KW_M2_MIGRATION_FILES } from "../../../scripts/private-kw-m2-database.js";
 
 export const PRIVATE_KW_M2_SETUP_RELEASE_VERSION = "kw-m2-local-0069-release-v1" as const;
 export const PRIVATE_KW_M2_DATABASE_RECEIPT_V2 = "kw-m2-database-receipt-v2" as const;
