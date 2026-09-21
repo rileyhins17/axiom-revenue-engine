@@ -1,5 +1,13 @@
 # KW lead-quality evaluation guide
 
+> Planning update (2026-09-20): [Master Plan v2](MASTER_PLAN.md) and
+> [VALIDATION_PLAN](VALIDATION_PLAN.md) govern future evaluation sequencing.
+> Preserve the implemented exact-50/balance/label contract. Add class-level
+> metrics and a frozen tuning/holdout protocol before model or policy tuning;
+> >=85% means at least 43/50 and is not evidence of rare-error safety or
+> independent generalization. These evaluation additions are proposed, not yet
+> implemented. The ten-business correctness slice precedes the full cohort.
+
 ## What this is
 
 Before the engine is allowed to contact anyone, Riley will review 50 real

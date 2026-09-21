@@ -27,6 +27,16 @@ Then verify `git status`, the current branch, the latest commit, and the tests
 that cover the area. Do not assume a previous agent's commentary still matches
 the repository or production.
 
+Master Plan v2 (2026-09-20) is the current roadmap. Read its delivery, operating,
+provider/budget and validation companions only as relevant to the milestone.
+Archived documents and earlier experiment plans are historical context, not
+current execution authority. Distinguish built, connected, authorized and
+verified capabilities; model names or adapter files do not prove API access.
+New milestone gates should complete an owner workflow or resolve a demonstrated
+blocker. Do not expand disconnected infrastructure merely because a further
+abstraction is possible. This planning revision grants no implementation,
+provider, deployment, migration or outreach authority.
+
 ## Product rule
 
 Optimize for qualified opportunities and customers, not scraped rows, generated

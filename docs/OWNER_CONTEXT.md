@@ -21,8 +21,14 @@ include it in public logs.
 - Public domain: `getaxiom.ca`.
 - Current offer: conversion-focused websites/rebuilds, managed hosting, and
   ongoing support for established local service businesses.
-- Current public price truth: approximately C$150–C$200 monthly, or projects
-  starting around C$3,500. Verify the public site before using prices in copy.
+- Public pricing checked 2026-09-20 at https://getaxiom.ca/pricing/: Local Launch
+  Special from C$900 (one page, up to six sections), Local Business Website from
+  C$1,200 (up to three pages), Expanded Website from C$1,500 (up to five pages),
+  and Custom quoted work. Standard packages include first-year basic hosting;
+  basic hosting afterward starts at C$120/year. These are published starting
+  offers, not guarantees for arbitrary scope. Verify again and obtain owner
+  approval before campaign copy. The older C$150–C$200/month and C$3,500 starting
+  assumptions are superseded for planning.
 - Portfolio concepts are not customer case studies. Never imply otherwise.
 - Do not use the stale name “Axiom Infrastructure” in new material.
 
@@ -45,6 +51,13 @@ include it in public logs.
   `aidan@getaxiom.ca`. Aliases are for routing, not mailbox capacity.
 - Do not build a mailbox farm. Add capacity only after reply economics and owner
   handling capacity prove it is needed.
+- Riley confirmed on 2026-09-20 that no OpenAI API keys are available. OpenAI
+  source/model configuration is not a provisioned service. Jev, OpenAI, mailbox,
+  source and verification account readiness must be recorded separately from code.
+- The 30-minute weekly review target excludes initial calibration, actual sales
+  conversations/proposals, and client delivery. The proposed initial outbound
+  experiment is 5–10 total first touches/week, only after separate authorization;
+  the existing 50/week limit is a ceiling, not a target or current permission.
 - Use concise, calm, owner-friendly language. Avoid unexplained jargon, vanity
   metrics, and “healthy” claims that are not backed by real checks.
 

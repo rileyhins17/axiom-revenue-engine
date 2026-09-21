@@ -1,5 +1,22 @@
 # Revenue Engine data dictionary
 
+**Readiness note (2026-09-20):** this is a vocabulary of implemented contracts and
+planned business records, not proof that every table, provider or owner flow is
+live. Consult [STATUS](STATUS.md) and [the source audit](research/2026-09-20-revenue-engine-code-reality.md).
+The v2 roadmap preserves existing schemas and adds records only when their
+delivery milestone needs them. New conceptual records below are not migrations.
+
+| Proposed operational record | Contract and milestone |
+|---|---|
+| ProviderCapability | Non-secret account/route/model status with separate built, connected, authorized, verified evidence; expiry and environment. M2/M4. |
+| SourceUsePolicy | Field-level permitted use/retention/attribution and terms capture; independently sourced data cannot inherit restricted directory rights. M2. |
+| BudgetReservation / ProviderAttempt | Atomic CAD micro-unit commitments, rate/FX/tax version, worst-case attempt cost, settlement/ambiguous outcome and shared period. Before paid execution. |
+| DecisionAdvisory | Exact business/evidence/question/model lineage and uncertainty; cannot mutate qualification, consent, verification or action authority. Optional after M3. |
+| SendOutbox / SendAttempt | Exact approved content and gate versions; prepared/reserved/dispatch/accepted/unknown/failure events; no automatic redispatch from unknown. M4. |
+| SuppressionEvent | Minimal durable stop scope/reason/source/time with contact/business mappings; identity changes and imports preserve stops. M4. |
+| OwnerAction | Accountable owner, next action, due time, capacity/backlog and completion/reassignment history. M4 onward. |
+| CommercialOutcome | Opportunity transition, owner-confirmed signed value, invoice, collected cash, refund and handoff as distinct referenced events. M4/M6. |
+
 | Record | Meaning |
 |---|---|
 | Business | Canonical company identity, independent of any source or contact. |

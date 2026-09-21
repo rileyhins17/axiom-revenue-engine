@@ -1,5 +1,11 @@
 # ADR 0002 — Evidence-first, provider-isolated runtime AI
 
+> Planning update, 2026-09-20: [ADR 0039](0039-deliver-owner-workflows-before-optional-ai-and-autonomy.md)
+> makes AI activation optional and separately provisioned. The OpenAI adapter
+> remains source code; Riley has no OpenAI API keys. This ADR's evidence/schema/
+> pinning principles remain, but its initial-provider assumption is not proof of
+> account readiness or a requirement to activate OpenAI before a usable pilot.
+
 - Status: accepted
 - Date: 2026-08-16
 

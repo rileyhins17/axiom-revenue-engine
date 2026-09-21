@@ -1,5 +1,14 @@
 # Operator and release runbook
 
+> Readiness update (2026-09-20): procedures below describe existing guarded
+> mechanisms and historical release requirements; they do not establish that
+> accounts, provider keys, current deployments or new runtime flows are ready.
+> Use [STATUS](STATUS.md) for current verification and failures and
+> [DELIVERY_PLAN](DELIVERY_PLAN.md) for sequencing. Master Plan v2 does not
+> activate any command, change an approval phrase, or grant a release gate.
+> Future simplified owner operations must preserve these authority boundaries
+> until separately reviewed implementations replace them.
+
 ## Emergency stop
 
 1. Use the visible emergency stop in System/Outreach.
