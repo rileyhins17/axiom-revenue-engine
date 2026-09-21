@@ -8,6 +8,7 @@ import {
   attachBrowserDiagnostics,
   cssTimeToMilliseconds,
   isAllowedOwnerAcceptanceUrl,
+  reportBrowserAcceptanceFailure,
   writeBrowserDiagnostics,
 } from "./verify-owner-ui-acceptance";
 
@@ -114,4 +115,70 @@ test("browser diagnostics retain event-time stage and all supported event detail
   ]);
   assert.equal(diagnostics[1]?.name, "TypeError");
   assert.match(diagnostics[1]?.stack ?? "", /page boom/);
+});
+
+test("failure reporting writes captured diagnostics before rethrowing with the measured URL", async () => {
+  const primaryError = new Error("acceptance failed");
+  const diagnostic = {
+    capturedAt: "2026-09-21T12:00:00.000Z",
+    stage: "desktop quality lab",
+    kind: "page-error" as const,
+    url: "http://127.0.0.1:8787/leads/evaluation",
+    message: "page boom",
+  };
+  const writes: Array<Record<string, unknown>> = [];
+  const order: string[] = [];
+  await assert.rejects(
+    reportBrowserAcceptanceFailure({
+      error: primaryError,
+      outputDirectory: "output/owner-ui-test",
+      diagnostics: [diagnostic],
+      failedStage: "desktop quality lab",
+      measuredPageUrl: "http://127.0.0.1:8787/leads/evaluation",
+      warmupPageUrl: "http://127.0.0.1:8787/leads",
+      writeDiagnostics: async (outputDirectory, diagnostics, failedStage, failedUrl) => {
+        order.push("write-start");
+        await new Promise<void>((resolve) => setTimeout(resolve, 1));
+        order.push("write-done");
+        writes.push({ outputDirectory, diagnostics, failedStage, failedUrl });
+      },
+    }),
+    (error) => {
+      assert.strictEqual(error, primaryError);
+      assert.equal((error as Error).message, "desktop quality lab at http://127.0.0.1:8787/leads/evaluation: acceptance failed");
+      return true;
+    },
+  );
+  assert.deepEqual(order, ["write-start", "write-done"]);
+  assert.deepEqual(writes[0], {
+    outputDirectory: "output/owner-ui-test",
+    diagnostics: [diagnostic],
+    failedStage: "desktop quality lab",
+    failedUrl: "http://127.0.0.1:8787/leads/evaluation",
+  });
+});
+
+test("failure reporting falls back to warmup URL and safely warns when persistence fails", async () => {
+  const primaryError = new Error("warmup failed");
+  const warnings: string[] = [];
+  await assert.rejects(
+    reportBrowserAcceptanceFailure({
+      error: primaryError,
+      outputDirectory: "output/owner-ui-test",
+      diagnostics: [],
+      failedStage: "owner route warmup",
+      measuredPageUrl: null,
+      warmupPageUrl: "http://127.0.0.1:8787/leads",
+      writeDiagnostics: async () => {
+        throw new Error("filesystem failure with sensitive implementation detail");
+      },
+      warn: (message) => warnings.push(message),
+    }),
+    (error) => {
+      assert.strictEqual(error, primaryError);
+      assert.equal((error as Error).message, "owner route warmup at http://127.0.0.1:8787/leads: warmup failed");
+      return true;
+    },
+  );
+  assert.deepEqual(warnings, ["Owner UI browser diagnostics persistence failed; primary acceptance error preserved."]);
 });

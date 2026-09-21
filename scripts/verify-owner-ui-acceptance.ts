@@ -143,6 +143,42 @@ export async function writeBrowserDiagnostics(
   );
 }
 
+type BrowserDiagnosticsWriter = (
+  outputDirectory: string,
+  diagnostics: BrowserDiagnostic[],
+  failedStage: string,
+  failedUrl: string | null,
+) => Promise<void>;
+
+export async function reportBrowserAcceptanceFailure({
+  error,
+  outputDirectory,
+  diagnostics,
+  failedStage,
+  measuredPageUrl,
+  warmupPageUrl,
+  writeDiagnostics = writeBrowserDiagnostics,
+  warn = (message) => console.warn(message),
+}: {
+  error: unknown;
+  outputDirectory: string;
+  diagnostics: BrowserDiagnostic[];
+  failedStage: string;
+  measuredPageUrl: string | null;
+  warmupPageUrl: string | null;
+  writeDiagnostics?: BrowserDiagnosticsWriter;
+  warn?: (message: string) => void;
+}): Promise<never> {
+  const failedUrl = measuredPageUrl ?? warmupPageUrl ?? null;
+  try {
+    await writeDiagnostics(outputDirectory, diagnostics, failedStage, failedUrl);
+  } catch {
+    warn("Owner UI browser diagnostics persistence failed; primary acceptance error preserved.");
+  }
+  if (error instanceof Error) error.message = `${failedStage} at ${failedUrl ?? "no page"}: ${error.message}`;
+  throw error;
+}
+
 export function isAllowedOwnerAcceptanceUrl(rawUrl: string, baseUrl: string) {
   const value = new URL(rawUrl);
   if (value.protocol === "data:" || value.protocol === "about:") return true;
@@ -1038,9 +1074,14 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     } satisfies AcceptanceResult;
   } catch (error) {
     if (page) await page.screenshot({ path: join(outputDirectory, "owner-ui-failure.png"), fullPage: true }).catch(() => undefined);
-    await writeBrowserDiagnostics(outputDirectory, diagnostics, stage, page?.url() ?? warmupPage?.url() ?? null).catch(() => undefined);
-    if (error instanceof Error) error.message = `${stage} at ${page?.url() ?? "no page"}: ${error.message}`;
-    throw error;
+    return await reportBrowserAcceptanceFailure({
+      error,
+      outputDirectory,
+      diagnostics,
+      failedStage: stage,
+      measuredPageUrl: page?.url() ?? null,
+      warmupPageUrl: warmupPage?.url() ?? null,
+    });
   } finally {
     await browser?.close().catch(() => undefined);
   }
