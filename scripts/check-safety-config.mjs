@@ -92,6 +92,8 @@ const privateKwWebsiteEvidenceProgress = await readFile(new URL("../src/lib/reve
 const privateKwWebsiteEvidenceProgressAppend = await readFile(new URL("../src/lib/revenue-engine/private-kw-current-website-evidence-progress-append.ts", import.meta.url), "utf8");
 const privateKwM1WebsiteCheckpoint = await readFile(new URL("./execute-private-kw-m1-website-checkpoint.ts", import.meta.url), "utf8");
 const privateKwM1Dossier = await readFile(new URL("./execute-private-kw-m1-dossier.ts", import.meta.url), "utf8");
+const privateKwM2Authorization = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-authorization.ts", import.meta.url), "utf8");
+const privateKwM2AuthorizationCli = await readFile(new URL("./prepare-private-kw-m2-authorization.ts", import.meta.url), "utf8");
 const privateKwLocalPlanExecutor = await readFile(new URL("./private-kw-local-plan-executor.ts", import.meta.url), "utf8");
 const privateKwAssessmentProgressProof = await readFile(new URL("../src/lib/revenue-engine/private-kw-assessment-progress-proof.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../migrations/0068_current_website_evidence_eligibility_receipts.sql", import.meta.url), "utf8");
@@ -186,6 +188,7 @@ for (const field of ["contactDiscoveryAuthorized", "contactVerificationAuthorize
 requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /providerOperationsAuthorized: 0/, "the owner dossier contact fixture must authorize zero provider operations");
 requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /costAuthorizedUsd: 0/, "the owner dossier contact fixture must authorize zero cost");
 requireMatch("package.json", packageJson, /"kw:prepare-import"\s*:\s*"tsx scripts\/prepare-private-kw-import\.ts"/, "the private KW import must use the guarded local CLI");
+requireMatch("package.json", packageJson, /"kw:prepare-m2-authorization"\s*:\s*"tsx scripts\/prepare-private-kw-m2-authorization\.ts"/, "M2 authorization preparation must use the bounded local CLI");
 requireMatch("package.json", packageJson, /"kw:plan-persistence"\s*:\s*"tsx scripts\/plan-private-kw-persistence\.ts"/, "private persistence planning must use the validation-only CLI");
 requireMatch("package.json", packageJson, /"kw:prepare-shadow-slice"\s*:\s*"tsx scripts\/prepare-private-kw-shadow-slice\.ts"/, "the bounded shadow slice must use the ignored-local plan-only CLI");
 requireMatch("package.json", packageJson, /"kw:prepare-source-workflow-progress"\s*:\s*"tsx scripts\/prepare-private-kw-source-workflow-progress\.ts"/, "source/workflow progress proof must use the guarded read-only adapter CLI");
@@ -203,6 +206,18 @@ requireMatch("scripts/private-kw-files.ts", privateKwFiles, /open\(file,\s*"wx"\
 forbidMatch("scripts/prepare-private-kw-import.ts", privateKwCli, /wrangler|--remote|deploy|fetch\s*\(/i, "the private import CLI must not access providers or Cloudflare");
 forbidMatch("scripts/plan-private-kw-persistence.ts", privateKwPersistenceCli, /wrangler|--remote|deploy|fetch\s*\(|better-sqlite3|D1Database/i, "persistence planning must not access a database, provider, or Cloudflare");
 forbidMatch("scripts/prepare-private-kw-shadow-slice.ts", privateKwShadowSliceCli, /wrangler|--remote|\bdeploy\b|fetch\s*\(|better-sqlite3|D1Database|R2Bucket/i, "shadow-slice preparation must not access a database, provider, network, or Cloudflare");
+forbidMatch("scripts/prepare-private-kw-m2-authorization.ts", privateKwM2AuthorizationCli, /wrangler|--remote|\bdeploy\b|fetch\s*\(|better-sqlite3|D1Database|R2Bucket|@cloudflare|process\.env|\.prepare\s*\(|\.run\s*\(|\.transaction\s*\(|--database|--url|--business-id|--phase|--clock|--provider|--failure-stage/i, "M2 authorization preparation must remain bounded to local JSON packet inputs and must not accept database, network, provider, or execution controls");
+requireMatch("scripts/prepare-private-kw-m2-authorization.ts", privateKwM2AuthorizationCli, /status !== \"PENDING\"/, "M2 authorization preparation must fail closed if a builder ever returns an approved owner envelope");
+forbidMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /@cloudflare|D1Database|R2Bucket|better-sqlite3|fetch\s*\(|process\.env|\.prepare\s*\(|\.run\s*\(|\.transaction\s*\(/i, "M2 authorization contracts must remain provider-free, database-free, and network-free");
+for (const field of ["liveSourceAuthorized", "browserCaptureAuthorized", "artifactStorageAuthorized", "databaseMutationAuthorized", "contactDiscoveryExecutionAuthorized", "contactVerificationExecutionAuthorized", "consentDecisionAuthorized", "qualificationAuthorized", "mailboxSyncAuthorized", "outreachAuthorized", "sendAuthorized", "deploymentAuthorized"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in M2 authorization contracts`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /providerOperationsAuthorized:\s*z\.literal\(0\)/, "M2 authorization contracts must authorize zero provider operations");
+requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /costAuthorizedUsd:\s*z\.literal\(0\)/, "M2 authorization contracts must authorize zero cost");
+requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /fixtureOnly:\s*z\.literal\(true\)/, "M2 mapping policy must remain explicitly fixture-only");
+requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /productionAssessmentApprovalAuthorized:\s*z\.literal\(false\)/, "Task 1 must not authorize a production assessment approval");
+requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /migrationRange:\s*z\.literal\(PRIVATE_KW_M2_DATABASE_MIGRATION_RANGE\)/, "M2 database receipt must bind the canonical migration range");
+requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /localOnly:\s*z\.literal\(true\)/, "M2 database receipt must remain local-only");
 forbidMatch("scripts/record-private-kw-shadow-progress.ts", privateKwShadowSliceProgressCli, /wrangler|--remote|\bdeploy\b|fetch\s*\(|better-sqlite3|D1Database|R2Bucket|@cloudflare/i, "shadow progress recording must not access a database, provider, network, or Cloudflare");
 requireMatch("scripts/record-private-kw-shadow-progress.ts", privateKwShadowSliceProgressCli, /writePrivateKwJson\(files\.output, checkpoint\)/, "shadow progress must create a new ignored no-overwrite checkpoint");
 forbidMatch("scripts/prepare-private-kw-source-workflow-progress.ts", privateKwSourceWorkflowProgressCli, /wrangler|--remote|\bdeploy\b|fetch\s*\(|D1Database|R2Bucket|@cloudflare/i, "source/workflow progress proof must not access a provider, network, remote database, or Cloudflare");

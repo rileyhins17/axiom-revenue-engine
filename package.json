@@ -34,6 +34,7 @@
     "cf:engine:dry-run": "wrangler deploy --config wrangler.engine.jsonc --dry-run --autoconfig false",
     "staging:verify-console-release": "tsx scripts/verify-staging-console-release.ts",
     "kw:prepare-import": "tsx scripts/prepare-private-kw-import.ts",
+    "kw:prepare-m2-authorization": "tsx scripts/prepare-private-kw-m2-authorization.ts",
     "kw:plan-persistence": "tsx scripts/plan-private-kw-persistence.ts",
     "kw:prepare-shadow-slice": "tsx scripts/prepare-private-kw-shadow-slice.ts",
     "kw:prepare-source-workflow-progress": "tsx scripts/prepare-private-kw-source-workflow-progress.ts",
