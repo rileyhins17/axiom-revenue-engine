@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, symlink, unlink, writeFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import path from "node:path";
 
@@ -16,8 +16,15 @@ const databasePath = path.join(root, `m2-preflight-database-${token}.sqlite`);
 const backupPath = path.join(root, `m2-preflight-backup-${token}.sqlite`);
 const receiptPath = path.join(root, `m2-preflight-receipt-${token}.json`);
 const quarantinePath = path.join(root, `m2-preflight-quarantine-${token}.sqlite`);
+const sidecarPath = `${databasePath}-wal`;
 const sha = (bytes: Buffer | string) => createHash("sha256").update(bytes).digest("hex");
 const manifest = PRIVATE_KW_M2_MIGRATION_FILES.map((filename) => ({ filename, sha256: sha(execFileSync("git", ["show", `HEAD:migrations/${filename}`])) }));
+const createdIdentities = new Map<string, { dev: bigint; ino: bigint }>();
+
+async function rememberCreated(file: string) {
+  const stats = await lstat(file, { bigint: true });
+  createdIdentities.set(file, { dev: stats.dev, ino: stats.ino });
+}
 
 function envelope(overrides: Record<string, unknown> = {}) {
   const core = {
@@ -32,17 +39,21 @@ function envelope(overrides: Record<string, unknown> = {}) {
 async function prepare() {
   await mkdir(root, { recursive: true });
   await writeFile(databasePath, Buffer.from("synthetic preflight database", "utf8"), { flag: "wx" });
+  await rememberCreated(databasePath);
   await writeFile(envelopePath, JSON.stringify(envelope()), { flag: "wx" });
+  await rememberCreated(envelopePath);
 }
 
 async function cleanupFixture() {
-  for (const file of [envelopePath, databasePath, backupPath, receiptPath, quarantinePath]) {
+  for (const file of [envelopePath, databasePath, backupPath, receiptPath, quarantinePath, sidecarPath]) {
     try {
       const opened = await lstat(file, { bigint: true });
-      if (!opened.isFile() || opened.isSymbolicLink()) continue;
-      await rm(file, { force: true });
+      const owned = createdIdentities.get(file);
+      if (!owned || !opened.isFile() || opened.isSymbolicLink() || opened.dev !== owned.dev || opened.ino !== owned.ino) continue;
+      await unlink(file);
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   }
+  createdIdentities.clear();
 }
 
 describe("private KW M2 setup preflight", () => {
@@ -61,11 +72,15 @@ describe("private KW M2 setup preflight", () => {
   it("fails closed for missing, invalid, expired, colliding, and symlink targets", async () => {
     await prepare();
     try {
-      await rm(envelopePath); await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /ENOENT|release/);
-      await writeFile(envelopePath, JSON.stringify(envelope({ status: "PENDING" }))); await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /APPROVED|Invalid/);
-      await writeFile(envelopePath, JSON.stringify(envelope({ expiresAt: "2020-01-01T00:00:00.000Z" }))); await assert.rejects(preflightPrivateKwM2Setup(envelopePath, new Date("2026-09-21T12:00:00.000Z")), /expire/);
-      await writeFile(envelopePath, JSON.stringify(envelope({ backupPath: `data/kw-evaluation/${path.basename(databasePath)}` }))); await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /distinct/);
-      await writeFile(envelopePath, JSON.stringify(envelope()));
+      await unlink(envelopePath); await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /ENOENT|release/);
+      await writeFile(envelopePath, JSON.stringify(envelope({ status: "PENDING" }))); await rememberCreated(envelopePath); await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /APPROVED|Invalid/);
+      await unlink(envelopePath); await writeFile(envelopePath, JSON.stringify(envelope({ expiresAt: "2020-01-01T00:00:00.000Z" }))); await rememberCreated(envelopePath); await assert.rejects(preflightPrivateKwM2Setup(envelopePath, new Date("2026-09-21T12:00:00.000Z")), /expire/);
+      await unlink(envelopePath); await writeFile(envelopePath, JSON.stringify(envelope({ backupPath: `data/kw-evaluation/${path.basename(databasePath)}` }))); await rememberCreated(envelopePath); await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /distinct/);
+      await unlink(envelopePath); await writeFile(envelopePath, JSON.stringify(envelope())); await rememberCreated(envelopePath);
+      await writeFile(sidecarPath, "wal", { flag: "wx" }); await rememberCreated(sidecarPath);
+      await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /sidecars/);
+      await assert.rejects(readFile(PRIVATE_KW_M2_SETUP_LOCK_PATH), { code: "ENOENT" });
+      await unlink(sidecarPath); createdIdentities.delete(sidecarPath);
       try { await symlink(databasePath, backupPath); await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /regular canonical|symbolic/); } catch (error) { assert.equal((error as NodeJS.ErrnoException).code, "EPERM"); }
     } finally { await cleanupFixture(); }
   });
@@ -75,8 +90,10 @@ describe("private KW M2 setup preflight", () => {
     try {
       try { await lstat(PRIVATE_KW_M2_SETUP_LOCK_PATH); return; } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
       await writeFile(PRIVATE_KW_M2_SETUP_LOCK_PATH, "other-process\n", { flag: "wx" });
+      const ownedLock = await lstat(PRIVATE_KW_M2_SETUP_LOCK_PATH, { bigint: true });
       await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /already locked/);
-      await unlink(PRIVATE_KW_M2_SETUP_LOCK_PATH);
+      const currentLock = await lstat(PRIVATE_KW_M2_SETUP_LOCK_PATH, { bigint: true });
+      if (currentLock.dev === ownedLock.dev && currentLock.ino === ownedLock.ino) await unlink(PRIVATE_KW_M2_SETUP_LOCK_PATH);
     } finally { await cleanupFixture(); }
   });
 });

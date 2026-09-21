@@ -14,13 +14,27 @@ async function assertCanonicalDirectory(directory: string) {
   if (!stats.isDirectory() || stats.isSymbolicLink() || await realpath(directory) !== directory) throw new Error("M2 setup paths require a canonical non-reparse directory.");
 }
 
-async function assertRegularTarget(file: string, required: boolean) {
+type FileIdentity = { dev: bigint; ino: bigint };
+
+async function assertRegularTarget(file: string, required: boolean): Promise<FileIdentity | null> {
   try {
     const stats = await lstat(file, { bigint: true });
     if (stats.isSymbolicLink() || !stats.isFile() || await realpath(file) !== file) throw new Error("M2 setup targets must remain regular canonical files.");
+    return { dev: stats.dev, ino: stats.ino };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT" && !required) return;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT" && !required) return null;
     throw error;
+  }
+}
+
+function assertDistinctFileIdentities(stats: Array<FileIdentity | null>) {
+  const existing = stats.filter((value): value is FileIdentity => value !== null);
+  for (let index = 0; index < existing.length; index += 1) {
+    for (let other = index + 1; other < existing.length; other += 1) {
+      if (existing[index].dev === existing[other].dev && existing[index].ino === existing[other].ino) {
+        throw new Error("M2 setup targets cannot share file identity.");
+      }
+    }
   }
 }
 
@@ -29,20 +43,29 @@ async function acquireSetupLock() {
   await assertCanonicalDirectory(DATA_ROOT);
   let handle;
   let created = false;
+  let createdIdentity: FileIdentity | null = null;
   let failure: unknown;
   try {
     handle = await open(LOCK_PATH, "wx");
     created = true;
+    const stats = await handle.stat({ bigint: true });
+    createdIdentity = { dev: stats.dev, ino: stats.ino };
     await handle.writeFile(`${process.pid}\n`, "utf8");
   } catch (error) {
     failure = error;
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error("M2 local setup is already locked by another process.");
-    throw error;
   } finally {
     await handle?.close();
   }
-  if (failure && created) { try { await unlink(LOCK_PATH); } catch { /* preserve the original failure */ } }
-  if (failure) throw failure;
+  if (failure) {
+    if (created && createdIdentity) {
+      try {
+        const current = await lstat(LOCK_PATH, { bigint: true });
+        if (!current.isSymbolicLink() && current.dev === createdIdentity.dev && current.ino === createdIdentity.ino) await unlink(LOCK_PATH);
+      } catch { /* preserve the original failure */ }
+    }
+    if ((failure as NodeJS.ErrnoException).code === "EEXIST") throw new Error("M2 local setup is already locked by another process.");
+    throw failure;
+  }
   const identity = await lstat(LOCK_PATH, { bigint: true });
   return async () => {
     const current = await lstat(LOCK_PATH, { bigint: true });
@@ -65,22 +88,33 @@ export async function preflightPrivateKwM2Setup(envelopePath: string, now = new 
   const paths = [envelope.databasePath, envelope.backupPath, envelope.receiptPath, envelope.quarantinePath].map((value) => path.resolve(REPOSITORY_ROOT, value));
   if (new Set(paths).size !== paths.length) throw new Error("M2 setup database, backup, receipt, and quarantine paths must be distinct.");
   await assertCanonicalDirectory(DATA_ROOT);
-  await Promise.all([
+  const initialStats = await Promise.all([
     assertRegularTarget(paths[0], true),
     assertRegularTarget(paths[1], false),
     assertRegularTarget(paths[2], false),
     assertRegularTarget(paths[3], false),
   ]);
+  assertDistinctFileIdentities(initialStats);
   const releaseLock = await acquireSetupLock();
-  await Promise.all([
-    assertRegularTarget(paths[0], true),
-    assertRegularTarget(paths[1], false),
-    assertRegularTarget(paths[2], false),
-    assertRegularTarget(paths[3], false),
-  ]);
-  for (const sidecar of [`${paths[0]}-wal`, `${paths[0]}-shm`]) {
-    try { await lstat(sidecar); throw new Error("M2 setup database sidecars must be absent."); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  try {
+    const lockedStats = await Promise.all([
+      assertRegularTarget(paths[0], true),
+      assertRegularTarget(paths[1], false),
+      assertRegularTarget(paths[2], false),
+      assertRegularTarget(paths[3], false),
+    ]);
+    assertDistinctFileIdentities(lockedStats);
+    for (const sidecar of [`${paths[0]}-wal`, `${paths[0]}-shm`]) {
+      try {
+        await lstat(sidecar);
+        throw new Error("M2 setup database sidecars must be absent.");
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    }
+  } catch (error) {
+    try { await releaseLock(); } catch { /* preserve the validation failure */ }
+    throw error;
   }
   return { envelope, databasePath: paths[0], backupPath: paths[1], receiptPath: paths[2], quarantinePath: paths[3], releaseLock };
 }
