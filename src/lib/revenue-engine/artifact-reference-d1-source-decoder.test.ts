@@ -27,7 +27,6 @@ import {
 import {
   executeArtifactReferenceD1Snapshot,
   type ArtifactReferenceD1BatchBoundary,
-  type ArtifactReferenceD1BatchStatement,
 } from "@/lib/revenue-engine/artifact-reference-d1-executor";
 import { decodeArtifactReferenceD1SourceSnapshot } from "@/lib/revenue-engine/artifact-reference-d1-source-decoder";
 import {
@@ -43,6 +42,7 @@ import type {
   FixtureArtifactStore,
   FixturePutRequest,
 } from "@/lib/revenue-engine/content-addressed-artifact-store";
+import { createPrivateKwLocalD1Adapter } from "../../../scripts/private-kw-local-d1";
 import {
   DURABLE_EVIDENCE_PERSISTENCE_PLAN_VERSION,
   DURABLE_EVIDENCE_TARGET_SCHEMA_VERSION,
@@ -82,7 +82,6 @@ import {
   requireCurrentPrivateKwWebsiteEvidenceEligibilityD1Result,
   requireTrustedPrivateKwWebsiteEvidenceEligibilityD1Result,
   type PrivateKwWebsiteEvidenceEligibilityD1Boundary,
-  type PrivateKwWebsiteEvidenceEligibilityD1Statement,
 } from "@/lib/revenue-engine/private-kw-current-website-evidence-eligibility-d1";
 import {
   buildPrivateKwCurrentWebsiteEvidenceProgressInput,
@@ -978,24 +977,7 @@ async function trustedWebsiteArtifactExecutions(
 
 function sqliteD1Boundary(database: Database.Database):
 ArtifactReferenceD1BatchBoundary & PrivateKwWebsiteEvidenceEligibilityD1Boundary {
-  return {
-    async batch(statements) {
-      return database.transaction((batch: readonly (
-        ArtifactReferenceD1BatchStatement | PrivateKwWebsiteEvidenceEligibilityD1Statement
-      )[]) => batch.map((statement) => {
-        const prepared = database.prepare(statement.sql);
-        if (prepared.reader) {
-          return {
-            success: true as const,
-            results: prepared.all(...statement.bindings) as Array<Record<string, string | number | null>>,
-            changes: 0,
-          };
-        }
-        const mutation = prepared.run(...statement.bindings);
-        return { success: true as const, results: [], changes: mutation.changes };
-      }))(statements);
-    },
-  };
+  return createPrivateKwLocalD1Adapter(database) as ArtifactReferenceD1BatchBoundary & PrivateKwWebsiteEvidenceEligibilityD1Boundary;
 }
 
 function tableCount(database: Database.Database, table: string) {

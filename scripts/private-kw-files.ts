@@ -1,4 +1,5 @@
 import { lstat, mkdir, open, readFile, stat } from "node:fs/promises";
+import type { BigIntStats } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -72,6 +73,30 @@ export async function writePrivateKwJson(value: string, data: unknown) {
 
 export const PRIVATE_KW_JSON_OUTPUT_MAX_BYTES = 50_000_000;
 
+type PrivateKwOutputFileStats = Pick<BigIntStats, "isFile" | "isSymbolicLink" | "dev" | "ino">;
+
+export function assertPrivateKwOutputFileIdentity(
+  pathStats: PrivateKwOutputFileStats,
+  handleStats: PrivateKwOutputFileStats,
+) {
+  if (pathStats.isSymbolicLink()) {
+    throw new Error("Private KW output files cannot be symbolic links.");
+  }
+  if (!pathStats.isFile() || !handleStats.isFile()) {
+    throw new Error("Private KW output must remain a regular file while it is being replayed.");
+  }
+  if (
+    typeof pathStats.dev !== "bigint"
+    || typeof pathStats.ino !== "bigint"
+    || typeof handleStats.dev !== "bigint"
+    || typeof handleStats.ino !== "bigint"
+    || pathStats.dev !== handleStats.dev
+    || pathStats.ino !== handleStats.ino
+  ) {
+    throw new Error("Private KW output file identity changed during replay; refusing the possible race.");
+  }
+}
+
 /**
  * Create one ignored local JSON checkpoint, or prove that an existing file is
  * the exact byte-for-byte replay of the same checkpoint. Existing files are
@@ -84,7 +109,11 @@ export async function writeOrVerifyPrivateKwJson(
 ) {
   const file = resolvePrivateKwDataPath(value);
   await assertSafePrivateRoot();
-  const serialized = `${JSON.stringify(data, null, 2)}\n`;
+  const serializedValue = JSON.stringify(data, null, 2);
+  if (typeof serializedValue !== "string") {
+    throw new TypeError("Private KW output must be a top-level JSON-serializable value.");
+  }
+  const serialized = `${serializedValue}\n`;
   const expected = Buffer.from(serialized, "utf8");
   if (!Number.isInteger(maxBytes) || maxBytes < 0 || expected.byteLength > maxBytes) {
     throw new Error(`The private KW output must be a JSON file no larger than ${maxBytes} bytes.`);
@@ -102,17 +131,20 @@ export async function writeOrVerifyPrivateKwJson(
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
   }
 
-  const linkStats = await lstat(file);
-  if (linkStats.isSymbolicLink()) {
-    throw new Error("Private KW output files cannot be symbolic links.");
-  }
   const handle = await open(file, "r");
   try {
-    const fileStats = await handle.stat();
-    if (!fileStats.isFile() || fileStats.size > maxBytes) {
+    const handleStats = await handle.stat({ bigint: true });
+    if (!handleStats.isFile() || handleStats.size > BigInt(maxBytes)) {
       throw new Error(`The private KW output must be a JSON file no larger than ${maxBytes} bytes.`);
     }
+    const pathStats = await lstat(file, { bigint: true });
+    assertPrivateKwOutputFileIdentity(pathStats, handleStats);
     const current = await handle.readFile();
+    if (current.byteLength > maxBytes) {
+      throw new Error(`The private KW output must be a JSON file no larger than ${maxBytes} bytes.`);
+    }
+    const finalPathStats = await lstat(file, { bigint: true });
+    assertPrivateKwOutputFileIdentity(finalPathStats, handleStats);
     if (!current.equals(expected)) {
       try {
         JSON.parse(current.toString("utf8"));

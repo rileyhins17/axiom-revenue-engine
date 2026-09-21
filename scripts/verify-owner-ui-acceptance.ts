@@ -39,7 +39,7 @@ const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
 const OUTPUT_ROOT = join(REPOSITORY_ROOT, "output", "playwright");
 const FIXTURE_EMAIL = "owner-acceptance@getaxiom.ca";
 const FIXTURE_PASSWORD = "owner-acceptance-only-password";
-const FIXTURE_BUSINESS_ID = "business:owner-acceptance-roofing";
+export const FIXTURE_BUSINESS_ID = "business:owner-acceptance-roofing";
 const TEST_AUTH_SECRET = "owner-ui-acceptance-only-secret-00000000000000000000";
 const AXE_PATH = createRequire(import.meta.url).resolve("axe-core/axe.min.js");
 const OWNER_LIST_BUDGET_MS = 10_000;
@@ -377,7 +377,7 @@ function buildOwnerContactFixture(sourceCapturedAt: string, sourceEvidenceUrl: s
   return { discovery, verifications, approval };
 }
 
-function seedOwnerLead(database: SqliteDatabase) {
+export function seedOwnerLead(database: SqliteDatabase) {
   const sourceCapturedAt = fixtureTimestamp(-2 * 60 * 60 * 1_000);
   const capturedAt = fixtureTimestamp(-60 * 60 * 1_000);
   const refreshAfter = new Date(Date.parse(capturedAt) + 60 * 24 * 60 * 60 * 1_000).toISOString();

@@ -1,19 +1,19 @@
 import assert from "node:assert/strict";
-import { readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import test from "node:test";
 
 import Database from "better-sqlite3";
 
 import type { D1DatabaseLike } from "../src/lib/cloudflare";
-import type { RevenueLeadAssessmentD1Boundary } from "../src/lib/revenue-engine/lead-assessment-d1";
 import { readOwnerLeadDetail } from "../src/lib/revenue-engine/owner-lead-detail-read-model";
-import type { PrivateKwWebsiteEvidenceEligibilityD1Boundary } from "../src/lib/revenue-engine/private-kw-current-website-evidence-eligibility-d1";
 import { applyCanonicalPrivateKwMigrations } from "./private-kw-database";
 import {
   resolvePrivateKwDataPath,
+  assertPrivateKwOutputFileIdentity,
   writeOrVerifyPrivateKwJson,
 } from "./private-kw-files";
 import { createPrivateKwLocalD1Adapter } from "./private-kw-local-d1";
+import { FIXTURE_BUSINESS_ID, seedOwnerLead } from "./verify-owner-ui-acceptance";
 
 let sequence = 0;
 function unique(relativePrefix: string) {
@@ -73,18 +73,16 @@ test("local D1 prepared statements implement bound values, first, run, and metad
   assert.throws(() => adapter.prepare("SELECT 1"), /closed/);
 });
 
-test("local D1 remains assignable to the eligibility, assessment, and owner reader boundaries", async () => {
+test("local D1 drives the owner reader against the materialized current dossier fixture", async () => {
   const databaseHandle = database();
   applyCanonicalPrivateKwMigrations(databaseHandle);
+  seedOwnerLead(databaseHandle);
   const adapter = createPrivateKwLocalD1Adapter(databaseHandle);
-  const eligibility: PrivateKwWebsiteEvidenceEligibilityD1Boundary = adapter;
-  const assessment: RevenueLeadAssessmentD1Boundary = adapter;
   const ownerDatabase: D1DatabaseLike = adapter;
-  const eligibilityResult = await eligibility.batch([{ statementId: "test", sql: "SELECT 1 AS \"ok\"", bindings: [] }]);
-  const assessmentResult = await assessment.batch([{ statementId: "test", sql: "SELECT 1 AS \"ok\"", bindings: [] }]);
-  assert.equal((eligibilityResult[0] as { success: boolean }).success, true);
-  assert.equal((assessmentResult[0] as { success: boolean }).success, true);
-  assert.equal(await readOwnerLeadDetail(ownerDatabase, "business:missing", "2026-09-21T12:00:00.000Z"), null);
+  const detail = await readOwnerLeadDetail(ownerDatabase, FIXTURE_BUSINESS_ID, new Date().toISOString());
+  assert.ok(detail);
+  assert.equal(detail.lead.business.businessId, FIXTURE_BUSINESS_ID);
+  assert.equal(detail.lead.business.canonicalName, "Tri-City Roofing Fixture");
   databaseHandle.close();
 });
 
@@ -102,6 +100,37 @@ test("private KW JSON output writes exact bytes and accepts only exact replay", 
   } finally {
     await rm(file, { force: true });
   }
+});
+
+test("private KW JSON output rejects top-level values that JSON.stringify cannot serialize", async () => {
+  const values: unknown[] = [undefined, () => "not JSON", Symbol("not JSON")];
+  for (const value of values) {
+    const relative = unique("boundary-non-json");
+    const file = resolvePrivateKwDataPath(relative);
+    try {
+      await assert.rejects(writeOrVerifyPrivateKwJson(relative, value), /JSON|serializ|string/i);
+      await assert.rejects(lstat(file), { code: "ENOENT" });
+    } finally {
+      await rm(file, { force: true });
+    }
+  }
+});
+
+test("private KW output identity verification rejects symlinks, non-files, and drift", () => {
+  const regular = { isFile: () => true, isSymbolicLink: () => false, dev: BigInt(1), ino: BigInt(2) } as const;
+  assert.doesNotThrow(() => assertPrivateKwOutputFileIdentity(regular, regular));
+  assert.throws(
+    () => assertPrivateKwOutputFileIdentity({ ...regular, isSymbolicLink: () => true }, regular),
+    /symbolic|symlink/i,
+  );
+  assert.throws(
+    () => assertPrivateKwOutputFileIdentity({ ...regular, isFile: () => false }, regular),
+    /regular file/i,
+  );
+  assert.throws(
+    () => assertPrivateKwOutputFileIdentity({ ...regular, ino: BigInt(3) }, regular),
+    /identity|changed|race/i,
+  );
 });
 
 test("private KW JSON output rejects malformed, truncated, symlinked, and oversized existing files without overwrite", async (t) => {

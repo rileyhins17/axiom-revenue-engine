@@ -9,7 +9,6 @@ import {
   loadPrivateRevenueLeadAssessmentD1,
   requireCurrentRevenueLeadAssessmentD1DurableReload,
   type RevenueLeadAssessmentD1Boundary,
-  type RevenueLeadAssessmentD1Statement,
 } from "@/lib/revenue-engine/lead-assessment-d1";
 import {
   REVENUE_LEAD_ASSESSMENT_VERSION,
@@ -20,6 +19,7 @@ import {
 } from "@/lib/revenue-engine/lead-assessment";
 import { OWNER_LEAD_CANDIDATE_QUERY } from "@/lib/revenue-engine/owner-lead-read-model";
 import { auditWebsiteDeterministically } from "@/lib/revenue-engine/website-audit";
+import { createPrivateKwLocalD1Adapter } from "../../../scripts/private-kw-local-d1";
 
 const BUSINESS_ID = "business:assessment-d1-fixture";
 const WORKFLOW_ID = "11111111-1111-4111-8111-111111111111";
@@ -177,15 +177,7 @@ function seedSealedSource(database: Database.Database, options: { wrongDigest?: 
 }
 
 function createBoundary(database: Database.Database): RevenueLeadAssessmentD1Boundary {
-  const transaction = database.transaction((statements: readonly RevenueLeadAssessmentD1Statement[]) => statements.map((item) => {
-    const prepared = database.prepare(item.sql);
-    if (prepared.reader) {
-      return { success: true, results: prepared.all(...item.bindings) as Record<string, string | number | null>[], changes: 0 };
-    }
-    const result = prepared.run(...item.bindings);
-    return { success: true, results: [], changes: result.changes };
-  }));
-  return { async batch(statements) { return transaction(statements); } };
+  return createPrivateKwLocalD1Adapter(database);
 }
 
 function count(database: Database.Database, table: string) {
