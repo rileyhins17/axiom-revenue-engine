@@ -1,9 +1,9 @@
 # Current status — Axiom Revenue Engine
 
 **Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Task 8
-transactional setup and approved recovery, verified from base `33fe02d`.
-All required checkpoint checks below passed; the code commit is recorded in the
-following documentation checkpoint.
+transactional setup and approved recovery. The verified code checkpoint is
+`d19e344` (`feat(revenue): add transactional local setup and recovery`), based on
+`33fe02d`. This following status update is documentation only.
 
 ## M2 local setup runner checkpoint
 
