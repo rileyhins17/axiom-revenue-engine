@@ -53,6 +53,13 @@ const AuthoritySchema = z.object({
   costAuthorizedUsd: z.literal(0),
 }).strict();
 
+// These values are deliberately synthetic preparation defaults. A real Task 7
+// packet must provide its separately reviewed policy decisions explicitly.
+const SYNTHETIC_DEFAULT_SOURCE_RIGHTS = "PUBLIC_SOURCE_REVIEWED" as const;
+const SYNTHETIC_DEFAULT_TERMS_DECISION = "PUBLIC_REVIEW_ONLY" as const;
+const SYNTHETIC_DEFAULT_ROBOTS_DECISION = "PREFLIGHT_REQUIRED_BEFORE_FETCH" as const;
+const SYNTHETIC_DEFAULT_RETENTION = "DERIVED_FACTS_ONLY" as const;
+
 export type PrivateKwM2Authority = z.infer<typeof AuthoritySchema>;
 
 function canonicalValue(value: unknown): unknown {
@@ -176,6 +183,16 @@ export const PrivateKwM2ResearchPolicySchema = z.object({
 });
 
 export type PrivateKwM2ResearchPolicy = z.infer<typeof PrivateKwM2ResearchPolicySchema>;
+
+export type ResearchPolicyDecisionInput = {
+  businessId: string;
+  sourceRights: "PUBLIC_SOURCE_REVIEWED" | "PUBLIC_SOURCE_DERIVED";
+  termsDecision: "PUBLIC_REVIEW_ONLY" | "TERMS_REVIEWED_FOR_FACTS";
+  robotsDecision: "PREFLIGHT_REQUIRED_BEFORE_FETCH" | "ROBOTS_REVIEWED_PUBLIC_ONLY";
+  evidenceRetention: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED";
+  retentionReviewDate: string;
+  stopConditions: ReadonlyArray<"AMBIGUOUS_IDENTITY" | "ROBOTS_OR_TERMS_UNCLEAR" | "SOURCE_RIGHTS_UNCLEAR" | "PERSONAL_DATA_DOMINANT" | "STALE_EVIDENCE" | "OUT_OF_SCOPE" | "RETENTION_NOT_ALLOWED">;
+};
 
 const AuthorizationDecisionSchema = z.object({
   businessId: z.string().trim().min(1).max(128),
@@ -349,6 +366,7 @@ export function buildPrivateKwM2ResearchPacket(input: {
   sourcePlan: PrivateKwImportPlan;
   reviewedAt: string;
   retentionDecisions?: ReadonlyArray<{ businessId: string; evidenceRetention: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED" }>;
+  policyDecisions?: ReadonlyArray<ResearchPolicyDecisionInput>;
 }): PrivateKwM2ResearchPacket {
   const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifest);
   const sourcePlan = PrivateKwImportPlanSchema.parse(input.sourcePlan);
@@ -360,6 +378,7 @@ export function buildPrivateKwM2ResearchPacket(input: {
     manifest,
     reviewedAt: input.reviewedAt,
     retentionDecisions: input.retentionDecisions,
+    policyDecisions: input.policyDecisions,
   });
   const candidates = canonicalResearchCandidates(manifest, sourcePlan, policy);
   const core = {
@@ -391,22 +410,27 @@ export function buildPrivateKwM2ResearchPolicy(input: {
   manifest: PrivateKwShadowSliceManifest;
   reviewedAt: string;
   retentionDecisions?: ReadonlyArray<{ businessId: string; evidenceRetention: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED" }>;
+  policyDecisions?: ReadonlyArray<ResearchPolicyDecisionInput>;
 }): PrivateKwM2ResearchPolicy {
   const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifest);
   const requestedRetention = new Map((input.retentionDecisions ?? []).map((decision) => [decision.businessId, decision.evidenceRetention]));
   if (input.retentionDecisions && (requestedRetention.size !== input.retentionDecisions.length || requestedRetention.size !== manifest.records.length || manifest.records.some((record) => !requestedRetention.has(record.businessId)))) {
     throw new Error("Retention decisions must cover the exact ten manifest business IDs once.");
   }
+  const requestedPolicy = new Map((input.policyDecisions ?? []).map((decision) => [decision.businessId, decision]));
+  if (input.policyDecisions && (requestedPolicy.size !== input.policyDecisions.length || requestedPolicy.size !== manifest.records.length || manifest.records.some((record) => !requestedPolicy.has(record.businessId)))) {
+    throw new Error("Reviewed policy decisions must cover the exact ten manifest business IDs once.");
+  }
   return PrivateKwM2ResearchPolicySchema.parse({
     policyVersion: "kw-m2-research-policy-v1",
     decisions: manifest.records.map((record) => ({
       businessId: record.businessId,
-      sourceRights: "PUBLIC_SOURCE_REVIEWED" as const,
-      termsDecision: "PUBLIC_REVIEW_ONLY" as const,
-      robotsDecision: "PREFLIGHT_REQUIRED_BEFORE_FETCH" as const,
-      evidenceRetention: requestedRetention.get(record.businessId) ?? "DERIVED_FACTS_ONLY",
-      retentionReviewDate: input.reviewedAt,
-      stopConditions: [
+      sourceRights: requestedPolicy.get(record.businessId)?.sourceRights ?? SYNTHETIC_DEFAULT_SOURCE_RIGHTS,
+      termsDecision: requestedPolicy.get(record.businessId)?.termsDecision ?? SYNTHETIC_DEFAULT_TERMS_DECISION,
+      robotsDecision: requestedPolicy.get(record.businessId)?.robotsDecision ?? SYNTHETIC_DEFAULT_ROBOTS_DECISION,
+      evidenceRetention: requestedPolicy.get(record.businessId)?.evidenceRetention ?? requestedRetention.get(record.businessId) ?? SYNTHETIC_DEFAULT_RETENTION,
+      retentionReviewDate: requestedPolicy.get(record.businessId)?.retentionReviewDate ?? input.reviewedAt,
+      stopConditions: requestedPolicy.get(record.businessId)?.stopConditions ?? [
         "AMBIGUOUS_IDENTITY",
         "ROBOTS_OR_TERMS_UNCLEAR",
         "SOURCE_RIGHTS_UNCLEAR",
@@ -579,7 +603,7 @@ export function assertPrivateKwM2ApprovalChain(input: {
   if (Date.parse(ownerEnvelope.expiresAt) > Date.parse(authorization.expiresAt)) {
     throw new Error("Owner approval expiry cannot exceed execution authorization expiry.");
   }
-  const now = Date.parse(input.now ?? new Date().toISOString());
+  const now = parseOperationClock(input.now);
   if (now >= Date.parse(authorization.expiresAt)) {
     throw new Error("The pending execution authorization is expired.");
   }
@@ -623,10 +647,17 @@ function assertPacketSourceChain(packet: PrivateKwM2ResearchPacket, manifest: Pr
   const policy = PrivateKwM2ResearchPolicySchema.parse(suppliedPolicy ?? buildPrivateKwM2ResearchPolicy({ manifest, reviewedAt: packet.createdAt }));
   const expectedCandidates = canonicalResearchCandidates(manifest, sourcePlan, policy);
   const candidateFields: Array<[keyof PrivateKwM2ResearchPacket["candidates"][number], string]> = [
+    ["businessId", "business ID"],
+    ["evaluationCandidateId", "evaluation candidate ID"],
+    ["businessName", "business name"],
+    ["city", "city"],
+    ["niche", "niche"],
     ["websiteUrl", "website URL"],
     ["sourceEvidenceUrl", "source evidence URL"],
     ["sourceMethod", "source method"],
     ["sourceCapturedAt", "captured time"],
+    ["sourceReviewedAt", "review time"],
+    ["independenceStatus", "independence"],
     ["sourceRights", "source rights"],
     ["termsDecision", "terms"],
     ["robotsDecision", "robots"],
@@ -642,6 +673,15 @@ function assertPacketSourceChain(packet: PrivateKwM2ResearchPacket, manifest: Pr
       }
     }
   });
+}
+
+function parseOperationClock(value?: string) {
+  const candidate = value ?? new Date().toISOString();
+  const parsed = TimestampSchema.safeParse(candidate);
+  if (!parsed.success) throw new Error("The operation clock must be a valid offset datetime.");
+  const milliseconds = Date.parse(parsed.data);
+  if (!Number.isFinite(milliseconds)) throw new Error("The operation clock must be a valid datetime.");
+  return milliseconds;
 }
 
 function canonicalResearchCandidates(manifest: PrivateKwShadowSliceManifest, sourcePlan: PrivateKwImportPlan, policy: PrivateKwM2ResearchPolicy) {

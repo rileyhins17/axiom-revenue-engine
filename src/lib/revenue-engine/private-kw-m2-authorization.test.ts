@@ -22,6 +22,7 @@ import {
   buildPrivateKwM2ExecutionAuthorization,
   buildPrivateKwM2OwnerApprovalCandidate,
   buildPrivateKwM2ResearchPacket,
+  buildPrivateKwM2ResearchPolicy,
   privateKwM2DatabaseReceiptDigest,
   privateKwM2Digest,
   recordPrivateKwM2OwnerApproval,
@@ -309,6 +310,33 @@ test("rejects an expired authorization even when a copied owner envelope appears
     phase: "GET",
     now: "2026-09-04T15:00:00.000Z",
   }), /authorization|expired|review window/i);
+  assert.throws(() => assertPrivateKwM2ApprovalChain({
+    researchPacket,
+    authorization,
+    ownerEnvelope: approved,
+    manifest,
+    sourcePlan,
+    phase: "GET",
+    now: "not-a-timestamp",
+  }), /clock|datetime|time/i);
+  assert.throws(() => assertPrivateKwM2ApprovalChain({
+    researchPacket,
+    authorization,
+    ownerEnvelope: approved,
+    manifest,
+    sourcePlan,
+    phase: "GET",
+    now: "2026-09-04T15:00:00",
+  }), /clock|datetime|time/i);
+  assert.throws(() => assertPrivateKwM2ApprovalChain({
+    researchPacket,
+    authorization,
+    ownerEnvelope: approved,
+    manifest,
+    sourcePlan,
+    phase: "GET",
+    now: "2026-09-04T14:00:00.000Z",
+  }), /review window|reviewed|time/i);
 });
 
 test("rebuilds every material candidate field from canonical source and policy inputs", () => {
@@ -327,7 +355,21 @@ test("rebuilds every material candidate field from canonical source and policy i
   ];
   for (const [label, mutate] of mutations) {
     const mutatedCandidates = researchPacket.candidates.map((candidate, index) => index === 0 ? mutate(candidate) : candidate);
-    const { packetId: _packetId, packetDigest: _packetDigest, ...packetBody } = { ...researchPacket, candidates: mutatedCandidates };
+    const countsByCity = {
+      KITCHENER: mutatedCandidates.filter((candidate) => candidate.city === "KITCHENER").length,
+      WATERLOO: mutatedCandidates.filter((candidate) => candidate.city === "WATERLOO").length,
+      CAMBRIDGE: mutatedCandidates.filter((candidate) => candidate.city === "CAMBRIDGE").length,
+    };
+    const countsByNiche = {
+      ROOFING: mutatedCandidates.filter((candidate) => candidate.niche === "ROOFING").length,
+      HVAC: mutatedCandidates.filter((candidate) => candidate.niche === "HVAC").length,
+      LANDSCAPING: mutatedCandidates.filter((candidate) => candidate.niche === "LANDSCAPING").length,
+    };
+    const { packetId: _packetId, packetDigest: _packetDigest, ...packetBody } = {
+      ...researchPacket,
+      candidates: mutatedCandidates,
+      summary: { ...researchPacket.summary, countsByCity, countsByNiche },
+    };
     void _packetId;
     void _packetDigest;
     const packetDigest = privateKwM2Digest(packetBody);
@@ -344,8 +386,45 @@ test("rebuilds every material candidate field from canonical source and policy i
       sourcePlan,
       phase: "PREPARE",
       now: "2026-09-05T15:00:00.000Z",
-    }), new RegExp(label, "i"));
+    }), new RegExp(`${label}|summary`, "i"));
   }
+});
+
+test("rejects redigested identity, review, and independence-field tampering", () => {
+  const { sourcePlan, manifest, researchPacket, authorization, ownerCandidate } = chainFixture();
+  const mutations: Array<[string, (candidate: typeof researchPacket.candidates[number]) => typeof candidate]> = [
+    ["business ID", (candidate) => ({ ...candidate, businessId: "changed-business" })],
+    ["evaluation candidate ID", (candidate) => ({ ...candidate, evaluationCandidateId: "changed-candidate" })],
+    ["business name", (candidate) => ({ ...candidate, businessName: "Changed Business" })],
+    ["city", (candidate) => ({ ...candidate, city: "WATERLOO" })],
+    ["niche", (candidate) => ({ ...candidate, niche: "HVAC" })],
+    ["review time", (candidate) => ({ ...candidate, sourceReviewedAt: "2026-09-02T15:00:00.000Z" })],
+  ];
+  for (const [label, mutate] of mutations) {
+    const mutatedCandidates = researchPacket.candidates.map((candidate, index) => index === 0 ? mutate(candidate) : candidate);
+    const { packetId: _packetId, packetDigest: _packetDigest, ...packetBody } = { ...researchPacket, candidates: mutatedCandidates };
+    void _packetId;
+    void _packetDigest;
+    const packetDigest = privateKwM2Digest(packetBody);
+    assert.throws(() => assertPrivateKwM2ApprovalChain({
+      researchPacket: {
+        ...packetBody,
+        packetId: `kw-m2-research:${packetDigest}`,
+        packetDigest,
+      },
+      authorization,
+      ownerEnvelope: ownerCandidate,
+      manifest,
+      sourcePlan,
+      phase: "PREPARE",
+      now: "2026-09-05T15:00:00.000Z",
+    }), new RegExp(`${label}|summary`, "i"));
+  }
+  const independenceTamper = {
+    ...researchPacket,
+    candidates: researchPacket.candidates.map((candidate, index) => index === 0 ? { ...candidate, independenceStatus: "CHAIN" } : candidate),
+  };
+  assert.throws(() => PrivateKwM2ResearchPacketSchema.parse(independenceTamper), /Invalid|independence/i);
 });
 
 test("allows each explicit retention decision while preserving the same zero-authority chain", () => {
@@ -362,6 +441,32 @@ test("allows each explicit retention decision while preserving the same zero-aut
     assert.equal(researchPacket.authority.sendAuthorized, false);
     assert.equal(researchPacket.authority.providerOperationsAuthorized, 0);
   }
+});
+
+test("accepts explicit reviewed rights, terms, robots, and retention policy branches", () => {
+  const sourcePlan = sourceFixture();
+  const manifest = manifestFixture(sourcePlan);
+  const policyDecisions = sourcePlan.records.map((record) => ({
+    businessId: record.business.id,
+    sourceRights: "PUBLIC_SOURCE_DERIVED" as const,
+    termsDecision: "TERMS_REVIEWED_FOR_FACTS" as const,
+    robotsDecision: "ROBOTS_REVIEWED_PUBLIC_ONLY" as const,
+    evidenceRetention: "BLOCKED" as const,
+    retentionReviewDate: "2026-09-03T15:00:00.000Z",
+    stopConditions: ["OUT_OF_SCOPE"] as const,
+  }));
+  const policy = buildPrivateKwM2ResearchPolicy({ manifest, reviewedAt: "2026-09-03T15:00:00.000Z", policyDecisions });
+  const researchPacket = buildPrivateKwM2ResearchPacket({ manifest, sourcePlan, reviewedAt: "2026-09-03T15:00:00.000Z", policyDecisions });
+  const authorization = buildPrivateKwM2ExecutionAuthorization({
+    researchPacket,
+    manifest,
+    sourcePlan,
+    researchPolicy: policy,
+    websitePolicy: { version: "kw-m2-website-policy-v1", networkRequestCap: 20, expiresAt: "2026-09-10T15:00:00.000Z" },
+  });
+  const ownerCandidate = buildPrivateKwM2OwnerApprovalCandidate({ researchPacket, authorization, manifest, sourcePlan, researchPolicy: policy });
+  assert(researchPacket.candidates.every((candidate) => candidate.sourceRights === "PUBLIC_SOURCE_DERIVED" && candidate.termsDecision === "TERMS_REVIEWED_FOR_FACTS" && candidate.robotsDecision === "ROBOTS_REVIEWED_PUBLIC_ONLY" && candidate.evidenceRetention === "BLOCKED"));
+  assert.doesNotThrow(() => assertPrivateKwM2ApprovalChain({ researchPacket, authorization, ownerEnvelope: ownerCandidate, manifest, sourcePlan, researchPolicy: policy, phase: "PREPARE", now: "2026-09-05T15:00:00.000Z" }));
 });
 
 test("keeps the mapping policy fixture-only and verifies the database receipt contract", () => {
