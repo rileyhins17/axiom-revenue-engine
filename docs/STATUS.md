@@ -1,7 +1,70 @@
 # Current status — Axiom Revenue Engine
 
-**Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Tasks 1-3
-verified foundations recorded on `65cb2d5`.
+**Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Task 4
+HTML-only composition accepted on `f131bbe`; checkpoint verification completed
+before this status commit.
+
+## M2 Task 4 checkpoint
+
+Task 4 is **APPROVED for the bounded local HTML-only implementation** after
+independent review of `f131bbe` (`fix(revenue): close M2 receipt trust seams`).
+The earlier review rounds rejected incomplete replay, expiry, policy, and
+receipt-storage boundaries; the accepted tree closes those findings. The
+workflow requires the exact Task 1 owner-approved chain, uses the Task 2
+address-pinned transport and canonical robots policy, and writes only through
+the conditional Task 3 local evidence store. It retains the complete transport
+and source-policy proof, exact raw-byte digests, a four-page maximum, and
+conservative HTML-only availability observations. It does not create a
+qualification, contact, consent, outreach, or send decision. Sealed replay
+requires current approval and independently reloaded durable page or blocked
+evidence; failures without a durable witness remain unsealed in-memory results.
+
+| Check on accepted tree | Result |
+|---|---|
+| Independent Task 4 review | APPROVED on `f131bbe` |
+| `npm run check:safety` | PASS |
+| `npm test` | PASS — 580 total, 578 passed, 0 failed, 2 Windows symlink-privilege skips |
+| `npm run typecheck` | PASS |
+| `npm run lint` | PASS |
+| `npm run build:cloudflare` | PASS — 2,018 files sanitized, 0 local secret values |
+| `npx wrangler deploy --env="" --dry-run --autoconfig false` | PASS — no upload; generated duplicate-`options` warnings were nonblocking |
+| `npm run test:owner-ui` | PASS — desktop list 389 ms, dossier 496 ms, widths 1440/390, 6 WCAG pages, 0 external requests |
+
+The root also ran an affected focused suite after the accepted commit: 54
+total, 53 passed, 0 failed, and one Windows symlink-privilege skip. The
+independent reviewer ran its broader affected suite: 64 total, 63 passed,
+0 failed, and one such skip. The full suite result above was recorded on the
+same accepted code by the implementation agent; the root's full suite on its
+preceding repair was also green. The final build, dry run, safety, typecheck,
+lint, focused tests, and owner UI were run by the root on `f131bbe`.
+
+Task 5's design is independently **APPROVED, execution blocked on external
+prerequisites**. The design is retained in ignored local planning artifacts.
+It requires a complete trusted Task 4 receipt reloader and the separately
+applied, independently verified local migration 0069 and matching `0054-0069`
+database setup receipt. Task 5 must return a zero-write `EXTERNAL_BLOCKER`
+until those proofs exist; it does not create or migrate a database. Task 6
+orchestration and the exact ten-business owner packet remain ahead of any
+supervised real-source run. No real business was captured in this checkpoint.
+
+Production and staging were not inspected or changed. Automation, follow-ups,
+contact review, provider operations, deployment, migration, outreach, and send
+remain off or unverified as applicable. This checkpoint made no live prospect
+request, provider/account/DNS change, database migration, deployment, send,
+or spend; runtime remains capped at C$50/month. The zero-paid-mailbox decision
+remains in force: Cloudflare Email Routing inbound and separately gated free
+Resend or free owner-only outbound/reply are the only mail candidates. There
+is no Google Workspace or paid-mailbox path in scope.
+
+The next three concrete actions are:
+
+1. Specify, implement, and independently review the trusted Task 4 durable
+   receipt reloader for Task 5's input boundary, with zero-network replay tests.
+2. Prepare Task 8's migration 0069 and local setup/backup/rollback evidence
+   under its separate release gate; do not apply a remote migration.
+3. Implement Task 5's HTML-only, zero-authority assessment materialization
+   against those exact prerequisites, then prepare Task 6 and the exact
+   ten-business owner decision packet.
 
 ## M2 foundation checkpoint
 
@@ -41,18 +104,11 @@ satisfy reply ownership and privacy gates, mail activation remains blocked.
 Paid mailboxes and Workspace are out of scope unless Riley explicitly reverses
 that decision.
 
-The completed gate covers local M2 foundations only; it does not authorize or
-perform real-business capture. Remaining blockers are approval and
-implementation of Task 4 composition, a real exact-ten research packet with
-rights and owner approval, a local database receipt, and supervised
-one-then-ten business execution. The Task 4 composition design review remains
-unresolved until its design is approved and finalized for implementation.
-
-The next three actions are:
-
-1. Approve and finalize the Task 4 design, then implement it.
-2. Implement Tasks 5-6 composition and orchestrator work.
-3. Prepare the Task 7 packet for owner approval.
+The foundation gate covered only local M2 prerequisites. The Task 4 gate above
+adds bounded HTML-only composition, without authorizing real-business capture.
+The remaining real-run blockers are the Task 5/6/8 implementation and setup
+proofs, an exact-ten research packet with rights and owner approval, and
+supervised one-then-ten business execution.
 
 ## Owner-facing state
 
