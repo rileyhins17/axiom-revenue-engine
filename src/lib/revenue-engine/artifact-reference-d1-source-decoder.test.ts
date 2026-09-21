@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
@@ -157,6 +158,7 @@ function workflowRequest(): FixtureWebsiteEvidenceWorkflowRequest {
 }
 
 function capturedHome(): WebsiteCaptureResult {
+  const rawBytes = new TextEncoder().encode(homeHtml);
   return {
     captureVersion: WEBSITE_CAPTURE_VERSION,
     policy: {
@@ -172,7 +174,9 @@ function capturedHome(): WebsiteCaptureResult {
     redirectChain: [HOME_URL],
     outcome: "CAPTURED",
     contentType: "text/html",
-    bodyBytes: new TextEncoder().encode(homeHtml).byteLength,
+    bodyBytes: rawBytes.byteLength,
+    rawBytes,
+    contentDigest: createHash("sha256").update(rawBytes).digest("hex"),
     html: homeHtml,
     failure: null,
   };

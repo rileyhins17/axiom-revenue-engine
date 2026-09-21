@@ -112,6 +112,7 @@ function capturePolicy() {
 }
 
 function captured(url: string, html: string): WebsiteCaptureResult {
+  const rawBytes = new TextEncoder().encode(html);
   return {
     captureVersion: WEBSITE_CAPTURE_VERSION,
     policy: capturePolicy(),
@@ -123,7 +124,9 @@ function captured(url: string, html: string): WebsiteCaptureResult {
     redirectChain: [url],
     outcome: "CAPTURED",
     contentType: "text/html",
-    bodyBytes: new TextEncoder().encode(html).byteLength,
+    bodyBytes: rawBytes.byteLength,
+    rawBytes,
+    contentDigest: createHash("sha256").update(rawBytes).digest("hex"),
     html,
     failure: null,
   };

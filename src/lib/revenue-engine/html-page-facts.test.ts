@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/lib/revenue-engine/website-capture";
 
 function captured(html: string): WebsiteCaptureResult {
+  const rawBytes = new TextEncoder().encode(html);
   return {
     captureVersion: WEBSITE_CAPTURE_VERSION,
     policy: { maxRedirects: 5, maxResponseBytes: 1_048_576, timeoutMs: 10_000 },
@@ -22,7 +24,9 @@ function captured(html: string): WebsiteCaptureResult {
     redirectChain: ["https://public-roofer.ca/"],
     outcome: "CAPTURED",
     contentType: "text/html",
-    bodyBytes: new TextEncoder().encode(html).byteLength,
+    bodyBytes: rawBytes.byteLength,
+    rawBytes,
+    contentDigest: createHash("sha256").update(rawBytes).digest("hex"),
     html,
     failure: null,
   };

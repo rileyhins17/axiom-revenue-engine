@@ -201,6 +201,7 @@ function pageInput(
     : pageKind === "SERVICE" ? "Roof repair and replacement services."
       : pageKind === "ABOUT" ? "Our experienced local roofing team."
         : "Contact Fixture Roofing for a quote.";
+  const rawBytes = new TextEncoder().encode(html);
   return {
     pageKind,
     capture: {
@@ -214,7 +215,9 @@ function pageInput(
       redirectChain: [url],
       outcome: "CAPTURED",
       contentType: "text/html",
-      bodyBytes: new TextEncoder().encode(html).byteLength,
+      bodyBytes: rawBytes.byteLength,
+      rawBytes,
+      contentDigest: createHash("sha256").update(rawBytes).digest("hex"),
       html,
       failure: null,
     },

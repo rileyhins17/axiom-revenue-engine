@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { z } from "zod";
 
 import {
@@ -9,6 +11,7 @@ export const WEBSITE_CAPTURE_VERSION = "website-capture-v1";
 export const WEBSITE_CAPTURE_MAX_REDIRECTS = 5;
 export const WEBSITE_CAPTURE_MAX_RESPONSE_BYTES = 1_048_576;
 export const WEBSITE_CAPTURE_TIMEOUT_MS = 10_000;
+const DigestSchema = z.string().regex(/^[a-f0-9]{64}$/);
 
 const WebsiteCaptureFailureCodeSchema = z.enum([
   "INVALID_URL",
@@ -43,11 +46,13 @@ const WebsiteCaptureBaseSchema = z.object({
   redirectChain: z.array(z.string().url()).max(WEBSITE_CAPTURE_MAX_REDIRECTS + 1),
 });
 
-export const WebsiteCaptureResultSchema = z.discriminatedUnion("outcome", [
+const WebsiteCaptureResultUnionSchema = z.discriminatedUnion("outcome", [
   WebsiteCaptureBaseSchema.extend({
     outcome: z.literal("CAPTURED"),
     contentType: z.enum(["text/html", "application/xhtml+xml"]),
     bodyBytes: z.number().int().positive().max(WEBSITE_CAPTURE_MAX_RESPONSE_BYTES),
+    rawBytes: z.instanceof(Uint8Array),
+    contentDigest: DigestSchema,
     html: z.string().min(1),
     failure: z.null(),
   }).strict(),
@@ -81,6 +86,17 @@ export const WebsiteCaptureResultSchema = z.discriminatedUnion("outcome", [
       .strict(),
   }).strict(),
 ]);
+
+export const WebsiteCaptureResultSchema = WebsiteCaptureResultUnionSchema.superRefine((value, context) => {
+  if (value.outcome !== "CAPTURED") return;
+  if (value.bodyBytes !== value.rawBytes.byteLength) {
+    context.addIssue({ code: "custom", path: ["bodyBytes"], message: "Captured bodyBytes must equal rawBytes.byteLength." });
+  }
+  const digest = createHash("sha256").update(value.rawBytes).digest("hex");
+  if (value.contentDigest !== digest) {
+    context.addIssue({ code: "custom", path: ["contentDigest"], message: "Captured contentDigest must equal SHA-256(rawBytes)." });
+  }
+});
 
 export type WebsiteCaptureResult = z.infer<typeof WebsiteCaptureResultSchema>;
 
@@ -169,7 +185,8 @@ async function readBoundedBody(response: Response, maxBytes: number, signal: Abo
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return { bytes: total, html: new TextDecoder().decode(bytes) };
+  const contentDigest = createHash("sha256").update(bytes).digest("hex");
+  return { rawBytes: bytes, contentDigest, bodyBytes: total, html: new TextDecoder().decode(bytes) };
 }
 
 function rejectedResult(
@@ -296,7 +313,7 @@ export async function capturePublicWebsiteDocument(
       }
 
       const body = await readBoundedBody(response, policy.maxResponseBytes, controller.signal);
-      currentBodyBytes = body.bytes;
+      currentBodyBytes = body.bodyBytes;
       return WebsiteCaptureResultSchema.parse({
         captureVersion: WEBSITE_CAPTURE_VERSION,
         policy,
@@ -308,7 +325,9 @@ export async function capturePublicWebsiteDocument(
         redirectChain,
         outcome: "CAPTURED",
         contentType: currentContentType,
-        bodyBytes: body.bytes,
+        bodyBytes: body.bodyBytes,
+        rawBytes: body.rawBytes,
+        contentDigest: body.contentDigest,
         html: body.html,
         failure: null,
       });
