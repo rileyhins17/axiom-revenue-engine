@@ -162,23 +162,14 @@ export function privateKwM2DatabaseSetupReceiptDigest(core: Omit<PrivateKwM2Data
   return privateKwM2SetupDigest(core);
 }
 
-type LoaderResolvers = {
-  repositoryCommit: () => string;
-  migrationManifest: () => readonly PrivateKwM2MigrationManifestEntry[];
-};
-
 type LoaderOptions = {
   now?: Date;
-  /** Narrow test seam; production uses the repository-derived defaults. */
-  resolvers?: LoaderResolvers;
 };
 
 const CANONICAL_REPOSITORY_ROOT = path.resolve(fileURLToPath(new URL("../../../", import.meta.url)));
 
-function repositoryResolvers(): LoaderResolvers {
-  return {
-    repositoryCommit: () => execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
-    migrationManifest: () => {
+function currentRepositoryManifest() {
+      const repositoryCommit = execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
       const dirty = execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "status", "--porcelain", "--", "migrations"], { encoding: "utf8" }).trim();
       if (dirty) throw new Error("The setup release requires a clean migration working tree.");
       const working = privateKwM2MigrationManifest(path.join(CANONICAL_REPOSITORY_ROOT, "migrations"));
@@ -187,9 +178,7 @@ function repositoryResolvers(): LoaderResolvers {
         sha256: createHash("sha256").update(execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "show", `HEAD:migrations/${filename}`])).digest("hex"),
       }));
       if (JSON.stringify(working) !== JSON.stringify(committed)) throw new Error("Migration bytes do not match the exact Git HEAD blobs.");
-      return committed;
-    },
-  };
+      return { repositoryCommit, migrationManifest: committed };
 }
 
 function deepFreeze<T>(value: T): T {
@@ -235,12 +224,10 @@ export async function loadPrivateKwM2SetupReleaseEnvelope(file: string, options:
   if (!parent.isDirectory() || parentReal !== expectedRoot) throw new Error("The setup release root must be a canonical directory.");
   const parsed = PrivateKwM2SetupReleaseEnvelopeSchema.parse(await readStableJson(absolute));
   const now = options.now ?? new Date();
-  const resolvers = options.resolvers ?? repositoryResolvers();
-  const currentCommit = resolvers.repositoryCommit();
-  const currentManifest = resolvers.migrationManifest();
+  const current = currentRepositoryManifest();
   if (Date.parse(parsed.reviewedAt) > now.getTime()) throw new Error("The M2 setup release envelope is dated in the future.");
   if (Date.parse(parsed.expiresAt) <= now.getTime()) throw new Error("The M2 setup release envelope has expired.");
-  if (parsed.repositoryCommit !== currentCommit) throw new Error("The M2 setup release commit does not match the current repository.");
-  if (JSON.stringify(parsed.migrationManifest) !== JSON.stringify(currentManifest)) throw new Error("The M2 setup release migration manifest does not match the current repository.");
+  if (parsed.repositoryCommit !== current.repositoryCommit) throw new Error("The M2 setup release commit does not match the current repository.");
+  if (JSON.stringify(parsed.migrationManifest) !== JSON.stringify(current.migrationManifest)) throw new Error("The M2 setup release migration manifest does not match the current repository.");
   return deepFreeze(parsed);
 }
