@@ -49,7 +49,7 @@ async function cleanupFixture() {
     try {
       const opened = await lstat(file, { bigint: true });
       const owned = createdIdentities.get(file);
-      if (!owned || !opened.isFile() || opened.isSymbolicLink() || opened.dev !== owned.dev || opened.ino !== owned.ino) continue;
+      if (!owned || (!opened.isFile() && !opened.isSymbolicLink()) || opened.dev !== owned.dev || opened.ino !== owned.ino) continue;
       await unlink(file);
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   }
@@ -81,7 +81,11 @@ describe("private KW M2 setup preflight", () => {
       await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /sidecars/);
       await assert.rejects(readFile(PRIVATE_KW_M2_SETUP_LOCK_PATH), { code: "ENOENT" });
       await unlink(sidecarPath); createdIdentities.delete(sidecarPath);
-      try { await symlink(databasePath, backupPath); await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /regular canonical|symbolic/); } catch (error) { assert.equal((error as NodeJS.ErrnoException).code, "EPERM"); }
+      try {
+        await symlink(databasePath, backupPath);
+        await rememberCreated(backupPath);
+        await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /regular canonical|symbolic/);
+      } catch (error) { assert.equal((error as NodeJS.ErrnoException).code, "EPERM"); }
     } finally { await cleanupFixture(); }
   });
 
