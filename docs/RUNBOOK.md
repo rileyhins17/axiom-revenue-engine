@@ -317,10 +317,14 @@ builder's timestamp relationship must be exact: `fixture now` equals assessment
 `assessedAt` minus 3.8 minutes. The selected business and evaluation candidate
 must match the invocation and manifest.
 
-Run the following command twice with identical paths and IDs:
+The following is the recorded `2026-09-21` fresh synthetic checkpoint command.
+Its eligibility clock is bounded; to execute a new checkpoint, generate new
+fixture inputs with a new suffix and current timestamps, then run the resulting
+command twice with identical paths and IDs. Do not re-use the deleted earlier
+`96a0277` artifact identity.
 
 ```powershell
-npm run kw:execute-m1-dossier -- --source-plan data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-source.json --materialization data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-materialization.json --manifest data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-manifest.json --invocation data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-invocation.json --website-checkpoint data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-website-checkpoint.json --assessment-checkpoint data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-assessment-checkpoint.json --report data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-report.json --database data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277.sqlite --business-id business:d4d99cc1cfb327216db2655e --evaluation-candidate-id evaluation-candidate:098c9b31dcbb8fd71e641ad1
+npm run kw:execute-m1-dossier -- --source-plan data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-source.json --materialization data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-materialization.json --manifest data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-manifest.json --invocation data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-invocation.json --website-checkpoint data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-website-checkpoint.json --assessment-checkpoint data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-assessment-checkpoint.json --report data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-report.json --database data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4.sqlite --business-id business:d4d99cc1cfb327216db2655e --evaluation-candidate-id evaluation-candidate:7027717d3b1760239bd62191
 ```
 
 Capture each stdout stream separately. The first result must report

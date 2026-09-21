@@ -1,8 +1,71 @@
 # Current status — Axiom Revenue Engine
 
-**Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Task 4
-HTML-only composition accepted on `f131bbe`; checkpoint verification completed
-before this status commit.
+**Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Task 8
+local prerequisites. The last fully verified code tree is `a77ccc8`; this
+status checkpoint is documentation only.
+
+## M2 local prerequisite checkpoint
+
+The Task 4 website evidence reloader is independently **APPROVED** at
+`211c41c`. It authenticates the bounded pathless Task 3 durable website
+evidence with current Task 1 approval, read-only replay, and zero network or
+write authority. It does not authenticate a caller-supplied source
+materialization claim. Task 5 must independently reload and compare the exact
+source materialization before and after this evidence reload and before any
+assessment write.
+
+The Task 8 additive migration 0069 and canonical `0054-0069` release/receipt
+contract are independently **APPROVED as a schema/contract slice** at
+`581fdbe`. The local setup preflight/lock is separately **APPROVED as a
+preflight slice** through `a77ccc8`: it validates the canonical recorded
+release envelope, bounded paths, target identities, sidecar absence, and
+exclusive cooperative lock, then exits without opening SQLite or applying a
+migration. The remaining lock-release `lstat`/`unlink` interval assumes
+cooperative processes; a stronger ownership primitive is needed before a
+real mutation runner uses the lock. The executable backup, separate restore
+drill, migration application, receipt publication, and rollback runner remain
+**unimplemented and unapproved**. No real owner setup envelope or database
+setup receipt was created.
+
+| Check on `a77ccc8` | Result |
+|---|---|
+| Independent Task 8 schema and preflight reviews | APPROVED for their bounded slices only |
+| `npm run check:safety` | PASS |
+| `npm test` | PASS — 599 total, 597 passed, 0 failed, 2 Windows symlink-privilege skips |
+| `npm run typecheck` | PASS |
+| `npm run lint` | PASS — one unused type-import warning, no errors |
+| `npm run build:cloudflare` | PASS — 2,018 files sanitized, 0 local secret values |
+| `npx wrangler deploy --env="" --dry-run --autoconfig false` | PASS — no upload; generated duplicate-`options` warnings nonblocking |
+| `npm run test:owner-ui` | PASS — desktop list 369 ms, dossier 1,221 ms, widths 1440/390, 6 WCAG pages, 0 external requests |
+
+The owner UI fixture now deliberately applies legacy migrations through 0068
+(`d742fc6`) because its legacy contact writer exact-checks that partition;
+Task 5 must separately implement ordinary-reader compatibility for 0069.
+This checkpoint is local/offline only. Production and staging were not
+inspected or changed. Automation, follow-ups, provider operations, deployment,
+real migration, outreach, and send remain off or unverified. No real prospect
+request or paid spend occurred. Runtime remains capped at C$50/month and the
+zero-paid-mailbox decision remains: Cloudflare Email Routing inbound with a
+separately gated free Resend or owner-only reply candidate, no Workspace.
+
+The preflight test originally contained an unsafe shared-directory cleanup
+which removed the ignored local M1 synthetic checkpoint files. This was found
+in review, repaired in `b42094a` and `a77ccc8`, and the test now cleans only
+its own identity-checked direct-child files. The old checkpoint identities
+below are historical evidence, not retained files. A new synthetic M1
+checkpoint was independently rebuilt and verified below; neither incident
+nor rebuild touched production or a real prospect database.
+
+The next three concrete actions are:
+
+1. Implement and independently review Task 8's gated local backup, separate
+   restore drill, 0069 transaction, receipt-last publication, and rollback
+   runner; strengthen lock ownership before any real setup action.
+2. Implement Task 5's double read-only source-materialization preflight,
+   legacy/M2 reader partition, HTML-only assessment writer and replay against
+   an independently verified Task 8 local setup receipt.
+3. Complete Task 6 orchestration and the exact ten-business owner decision
+   packet before any supervised one-then-ten real-source operation.
 
 ## M2 Task 4 checkpoint
 
@@ -38,12 +101,14 @@ same accepted code by the implementation agent; the root's full suite on its
 preceding repair was also green. The final build, dry run, safety, typecheck,
 lint, focused tests, and owner UI were run by the root on `f131bbe`.
 
-Task 5's design is independently **APPROVED, execution blocked on external
-prerequisites**. The design is retained in ignored local planning artifacts.
-It requires a complete trusted Task 4 receipt reloader and the separately
-applied, independently verified local migration 0069 and matching `0054-0069`
-database setup receipt. Task 5 must return a zero-write `EXTERNAL_BLOCKER`
-until those proofs exist; it does not create or migrate a database. Task 6
+Task 5's design is independently **APPROVED, execution blocked on its setup
+prerequisite**. The design is retained in ignored local planning artifacts.
+The trusted Task 4 receipt reloader is now approved above. Task 5 still
+requires its own independent source-materialization preflight and the
+separately applied, independently verified local migration 0069 with a matching
+`0054-0069` database setup receipt. It must return a zero-write
+`EXTERNAL_BLOCKER` until those proofs exist; it does not create or migrate a
+database. Task 6
 orchestration and the exact ten-business owner packet remain ahead of any
 supervised real-source run. No real business was captured in this checkpoint.
 
@@ -56,7 +121,7 @@ remains in force: Cloudflare Email Routing inbound and separately gated free
 Resend or free owner-only outbound/reply are the only mail candidates. There
 is no Google Workspace or paid-mailbox path in scope.
 
-The next three concrete actions are:
+At the earlier Task 4 checkpoint, the next three actions were:
 
 1. Specify, implement, and independently review the trusted Task 4 durable
    receipt reloader for Task 5's input boundary, with zero-network replay tests.
@@ -64,7 +129,8 @@ The next three concrete actions are:
    under its separate release gate; do not apply a remote migration.
 3. Implement Task 5's HTML-only, zero-authority assessment materialization
    against those exact prerequisites, then prepare Task 6 and the exact
-   ten-business owner decision packet.
+   ten-business owner decision packet. The current next actions are listed at
+   the top of this document.
 
 ## M2 foundation checkpoint
 
@@ -112,26 +178,28 @@ supervised one-then-ten business execution.
 
 ## Owner-facing state
 
-M1 now has one fresh ignored local synthetic dossier produced through the actual
-`npm run kw:execute-m1-dossier` CLI. The first run used the canonical source,
+M1 again has one fresh ignored local synthetic dossier produced through the actual
+`npm run kw:execute-m1-dossier` CLI. This is a **new** checkpoint with new
+identities after the unsafe test cleanup removed the earlier ignored artifact
+set. The first run used the canonical source,
 materialization, manifest, and assessment invocation inputs and wrote the real
 local website checkpoint, assessment checkpoint, report, and SQLite state. An
 unchanged second run used the same paths and IDs and replayed all stages exactly.
 
 The retained artifact set is under
-`data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-*`:
+`data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-*`:
 
-- [source plan](../data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-source.json),
-  [materialization](../data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-materialization.json),
-  [manifest](../data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-manifest.json),
-  and [assessment invocation](../data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-invocation.json);
-- [website checkpoint](../data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-website-checkpoint.json),
-  [assessment checkpoint](../data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-assessment-checkpoint.json),
-  [report](../data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-report.json), and
-  [SQLite database](../data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277.sqlite);
-- [first CLI stdout](../data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-first.stdout.json),
-  [second CLI stdout](../data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-second.stdout.json),
-  and the [machine-readable verification receipt](../data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-verification.json).
+- [source plan](../data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-source.json),
+  [materialization](../data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-materialization.json),
+  [manifest](../data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-manifest.json),
+  and [assessment invocation](../data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-invocation.json);
+- [website checkpoint](../data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-website-checkpoint.json),
+  [assessment checkpoint](../data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-assessment-checkpoint.json),
+  [report](../data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-report.json), and
+  [SQLite database](../data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4.sqlite);
+- [first CLI stdout](../data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-first.stdout.json),
+  [second CLI stdout](../data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-second.stdout.json),
+  and the [machine-readable verification receipt](../data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-verification.json).
 
 The retained receipt independently verifies exact byte hashes before and after
 replay, complete `Revenue*` row-count maps, stable IDs/digests, first-run fresh
@@ -140,10 +208,10 @@ The exact durable identities are:
 
 | Artifact | ID | Digest |
 |---|---|---|
-| Website checkpoint | `kw-shadow-progress:9a0a2874312fbff0d21ad88f5f42199903c458ad7c132c13c36054d89dd221bc` | `9a0a2874312fbff0d21ad88f5f42199903c458ad7c132c13c36054d89dd221bc` |
-| Assessment checkpoint | `kw-shadow-progress:5554730a1bdcace5edd7feb47c7ef7e282cb2154cbe66ad6fb4851e5592adf8b` | `5554730a1bdcace5edd7feb47c7ef7e282cb2154cbe66ad6fb4851e5592adf8b` |
-| Assessment receipt | `assessment:a3c5c139eb13a3b28211d18ae53a94c9b2c15baf370e0e3da70b78a634ca46f7` | `1070b1f40b10ebd325b55a5efd5857f615e78d95ae7a9d5c02c9d9f8c21f6266` |
-| M1 report | `private-kw-m1-dossier:cf44b2168822296e6868c8577f85f596935b88c3908390278fdd5467fa4a9d0c` | `cf44b2168822296e6868c8577f85f596935b88c3908390278fdd5467fa4a9d0c` |
+| Website checkpoint | `kw-shadow-progress:e504f554cb36efbb997bb3f0eafd1a9112913fe6bdb7558b91330bfde78b174d` | `e504f554cb36efbb997bb3f0eafd1a9112913fe6bdb7558b91330bfde78b174d` |
+| Assessment checkpoint | `kw-shadow-progress:ccd76cab505200be50ec2f72eaf73b9366e53e458e442e96fdde38b73826a3dc` | `ccd76cab505200be50ec2f72eaf73b9366e53e458e442e96fdde38b73826a3dc` |
+| Assessment receipt | `assessment:5ee2e8e059b43543497260bad3d773aa163cc9798cd301e94f6a70cc3272172a` | `f7d3994ec9a1dfccd6b1b1549534813e0adc759e9c6daa8931e63a3e4a80f982` |
+| M1 report | `private-kw-m1-dossier:2bb5f58830ec14c947d300dcaaedfda924e3256ea18939d6187309c2e358fc3b` | `2bb5f58830ec14c947d300dcaaedfda924e3256ea18939d6187309c2e358fc3b` |
 
 ## Completed gate
 
