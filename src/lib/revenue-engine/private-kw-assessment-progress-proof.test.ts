@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  PRIVATE_KW_ASSESSMENT_PROGRESS_PROOF_VERSION,
   PrivateKwAssessmentProgressProofSchema,
   buildPrivateKwAssessmentProgressProof,
 } from "@/lib/revenue-engine/private-kw-assessment-progress-proof";
@@ -51,6 +52,25 @@ test("builds one deterministic assessment proof bound to current evidence and im
   assert.equal(first.authority.outreachAuthorized, false);
   assert.equal(first.authority.providerOperationsAuthorized, 0);
   assert.equal(first.authority.costAuthorizedUsd, 0);
+});
+
+test("versions reconstruction-clock proofs explicitly and rejects the old databaseNow shape", async () => {
+  const fixture = await createPrivateKwAssessmentProgressProofFixture({ suffix: "proof-version" });
+  const proof = buildProof(fixture);
+
+  assert.equal(proof.proofVersion, PRIVATE_KW_ASSESSMENT_PROGRESS_PROOF_VERSION);
+  assert.deepEqual(PrivateKwAssessmentProgressProofSchema.parse(proof), proof);
+
+  const oldV1Shape = structuredClone(proof) as Record<string, unknown> & {
+    persistence: Record<string, unknown>;
+  };
+  oldV1Shape.proofVersion = "kw-assessment-progress-proof-v1";
+  oldV1Shape.persistence.databaseNow = proof.persistence.reconstructionClock.value;
+  delete oldV1Shape.persistence.reconstructionClock;
+  assert.throws(
+    () => PrivateKwAssessmentProgressProofSchema.parse(oldV1Shape),
+    /Invalid literal value|Required|unrecognized key|schema/i,
+  );
 });
 
 test("rejects cross-business, predecessor, and website-workflow lineage drift", async () => {

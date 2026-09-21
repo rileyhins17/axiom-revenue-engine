@@ -20,7 +20,7 @@ import {
   PrivateKwShadowSlicePhaseReceiptSchema,
 } from "@/lib/revenue-engine/private-kw-shadow-slice-progress";
 
-export const PRIVATE_KW_ASSESSMENT_PROGRESS_PROOF_VERSION = "kw-assessment-progress-proof-v1";
+export const PRIVATE_KW_ASSESSMENT_PROGRESS_PROOF_VERSION = "kw-assessment-progress-proof-v2";
 
 const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 const TimestampSchema = z.string().datetime({ offset: true });
