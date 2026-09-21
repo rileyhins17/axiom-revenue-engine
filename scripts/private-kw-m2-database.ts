@@ -40,10 +40,13 @@ export type PrivateKwM2MigrationManifestEntry = {
 };
 
 export function privateKwM2MigrationManifest(migrationRoot: URL | string = new URL("../migrations/", import.meta.url)) {
-  const root = migrationRoot instanceof URL ? migrationRoot : pathToFileURL(path.resolve(migrationRoot.endsWith("/") ? migrationRoot : `${migrationRoot}/`));
+  const root = migrationRoot instanceof URL
+    ? migrationRoot
+    : pathToFileURL(path.resolve(migrationRoot) + path.sep);
+  const directory = root.href.endsWith("/") ? root : new URL("./", root);
   return PRIVATE_KW_M2_MIGRATION_FILES.map((filename) => ({
     filename,
-    sha256: createHash("sha256").update(readFileSync(new URL(filename, root))).digest("hex"),
+    sha256: createHash("sha256").update(readFileSync(new URL(filename, directory))).digest("hex"),
   }));
 }
 

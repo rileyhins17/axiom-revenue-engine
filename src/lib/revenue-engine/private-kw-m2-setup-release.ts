@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { lstat, open, realpath } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 
 import { z } from "zod";
 
-import { PRIVATE_KW_M2_MIGRATION_FILES, type PrivateKwM2MigrationManifestEntry } from "../../../scripts/private-kw-m2-database.js";
+import { PRIVATE_KW_M2_MIGRATION_FILES, privateKwM2MigrationManifest, type PrivateKwM2MigrationManifestEntry } from "../../../scripts/private-kw-m2-database.js";
 
 export const PRIVATE_KW_M2_SETUP_RELEASE_VERSION = "kw-m2-local-0069-release-v1" as const;
 export const PRIVATE_KW_M2_DATABASE_RECEIPT_V2 = "kw-m2-database-receipt-v2" as const;
@@ -94,6 +95,7 @@ const AuthoritySchema = z.object({
   localOnly: z.literal(true),
   localSchemaMutationPerformed: z.literal(true),
   setupReleaseEnvelopeId: z.string().regex(/^kw-m2-local-0069-release:[a-f0-9]{64}$/),
+  setupReleaseEnvelopeDigest: Sha256Schema,
   remoteMigrationAuthorized: z.literal(false),
   runtimeQualificationAuthorized: z.literal(false),
   runtimeContactAuthorized: z.literal(false),
@@ -144,6 +146,9 @@ export const PrivateKwM2DatabaseSetupReceiptSchema = z.object({
   if (receipt.authority.setupReleaseEnvelopeId !== receipt.setupReleaseEnvelopeId) {
     context.addIssue({ code: "custom", path: ["authority", "setupReleaseEnvelopeId"], message: "Receipt authority must bind the exact release envelope." });
   }
+  if (receipt.authority.setupReleaseEnvelopeDigest !== receipt.setupReleaseEnvelopeDigest) {
+    context.addIssue({ code: "custom", path: ["authority", "setupReleaseEnvelopeDigest"], message: "Receipt authority must bind the exact release envelope digest." });
+  }
 });
 
 export type PrivateKwM2DatabaseSetupReceipt = z.infer<typeof PrivateKwM2DatabaseSetupReceiptSchema>;
@@ -156,23 +161,42 @@ export function privateKwM2DatabaseSetupReceiptDigest(core: Omit<PrivateKwM2Data
   return privateKwM2SetupDigest(core);
 }
 
+type LoaderResolvers = {
+  repositoryCommit: () => string;
+  migrationManifest: () => readonly PrivateKwM2MigrationManifestEntry[];
+};
+
 type LoaderOptions = {
   now?: Date;
-  repositoryCommit: string;
-  migrationManifest: readonly PrivateKwM2MigrationManifestEntry[];
+  repositoryRoot?: string;
+  /** Narrow test seam; production uses the repository-derived defaults. */
+  resolvers?: LoaderResolvers;
 };
+
+function repositoryResolvers(repositoryRoot: string): LoaderResolvers {
+  return {
+    repositoryCommit: () => execFileSync("git", ["-C", repositoryRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+    migrationManifest: () => privateKwM2MigrationManifest(path.join(repositoryRoot, "migrations")),
+  };
+}
+
+function sameIdentity(left: { dev: bigint; ino: bigint }, right: { dev: bigint; ino: bigint }) {
+  return left.dev === right.dev && left.ino === right.ino;
+}
 
 async function readStableJson(file: string) {
   const absolute = path.resolve(file);
   const handle = await open(absolute, "r");
   try {
+    const handleBefore = await handle.stat({ bigint: true });
     const beforePath = await lstat(absolute, { bigint: true });
     const beforeReal = await realpath(absolute);
-    if (!beforePath.isFile() || beforeReal !== absolute) throw new Error("The setup release file must be a regular direct file.");
+    if (!handleBefore.isFile() || !beforePath.isFile() || beforeReal !== absolute || !sameIdentity(handleBefore, beforePath)) throw new Error("The setup release file must be a regular direct file with stable identity.");
     const bytes = await handle.readFile();
+    const handleAfter = await handle.stat({ bigint: true });
     const afterPath = await lstat(absolute, { bigint: true });
     const afterReal = await realpath(absolute);
-    if (!afterPath.isFile() || afterReal !== absolute || beforePath.dev !== afterPath.dev || beforePath.ino !== afterPath.ino) {
+    if (!handleAfter.isFile() || !afterPath.isFile() || afterReal !== absolute || !sameIdentity(handleBefore, handleAfter) || !sameIdentity(handleAfter, afterPath) || afterPath.size !== BigInt(bytes.byteLength)) {
       throw new Error("The setup release file changed identity during read.");
     }
     return JSON.parse(bytes.toString("utf8")) as unknown;
@@ -185,8 +209,12 @@ export async function loadPrivateKwM2SetupReleaseEnvelope(file: string, options:
   if (!/^data[\\/]kw-evaluation[\\/][A-Za-z0-9._-]+\.json$/.test(file)) throw new Error("M2 setup release must be a direct-child data/kw-evaluation JSON file.");
   const parsed = PrivateKwM2SetupReleaseEnvelopeSchema.parse(await readStableJson(file));
   const now = options.now ?? new Date();
+  const resolvers = options.resolvers ?? repositoryResolvers(path.resolve(options.repositoryRoot ?? process.cwd()));
+  const currentCommit = resolvers.repositoryCommit();
+  const currentManifest = resolvers.migrationManifest();
+  if (Date.parse(parsed.reviewedAt) > now.getTime()) throw new Error("The M2 setup release envelope is dated in the future.");
   if (Date.parse(parsed.expiresAt) <= now.getTime()) throw new Error("The M2 setup release envelope has expired.");
-  if (parsed.repositoryCommit !== options.repositoryCommit) throw new Error("The M2 setup release commit does not match the current repository.");
-  if (JSON.stringify(parsed.migrationManifest) !== JSON.stringify(options.migrationManifest)) throw new Error("The M2 setup release migration manifest does not match the current repository.");
-  return parsed;
+  if (parsed.repositoryCommit !== currentCommit) throw new Error("The M2 setup release commit does not match the current repository.");
+  if (JSON.stringify(parsed.migrationManifest) !== JSON.stringify(currentManifest)) throw new Error("The M2 setup release migration manifest does not match the current repository.");
+  return Object.freeze(parsed);
 }
