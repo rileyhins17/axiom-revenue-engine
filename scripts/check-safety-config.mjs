@@ -79,6 +79,8 @@ const [wrangler, engineWrangler, engineWorker, example, envSource, packageJson, 
 ]);
 
 const failures = [];
+const privateKwM2PublicTransport = await readFile(new URL("../src/lib/revenue-engine/private-kw-public-http-transport.ts", import.meta.url), "utf8");
+const privateKwM2SourcePolicy = await readFile(new URL("../src/lib/revenue-engine/private-kw-source-policy.ts", import.meta.url), "utf8");
 const ownerUiAcceptance = await readFile(new URL("./verify-owner-ui-acceptance.ts", import.meta.url), "utf8");
 const privateKwOwnerLabeling = await readFile(new URL("../src/lib/revenue-engine/private-kw-owner-labeling.ts", import.meta.url), "utf8");
 const privateKwShadowSliceProgress = await readFile(new URL("../src/lib/revenue-engine/private-kw-shadow-slice-progress.ts", import.meta.url), "utf8");
@@ -218,6 +220,18 @@ requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM
 requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /productionAssessmentApprovalAuthorized:\s*z\.literal\(false\)/, "Task 1 must not authorize a production assessment approval");
 requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /migrationRange:\s*z\.literal\(PRIVATE_KW_M2_DATABASE_MIGRATION_RANGE\)/, "M2 database receipt must bind the canonical migration range");
 requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM2Authorization, /localOnly:\s*z\.literal\(true\)/, "M2 database receipt must remain local-only");
+for (const moduleName of ["node:http", "node:https", "node:dns/promises", "node:net"]) {
+  requireMatch("src/lib/revenue-engine/private-kw-public-http-transport.ts", privateKwM2PublicTransport, new RegExp(`from \\\"${moduleName}\\\"`), `M2 transport must use ${moduleName}`);
+}
+for (const pattern of [/PublicDnsResolver/, /PublicConnectionExecutor/, /address:\s*selected\.address/, /servername:\s*hostname/, /agent:\s*false/, /Connection:\s*"close"/, /Readable\.toWeb/]) {
+  requireMatch("src/lib/revenue-engine/private-kw-public-http-transport.ts", privateKwM2PublicTransport, pattern, `M2 transport is missing required address-pinned native seam ${pattern}`);
+}
+for (const pattern of [/globalThis\.fetch/, /\bfetch\s*\(/, /undici/i, /axios/i, /redirect:\s*[\"']follow[\"']/i, /process\.env/, /D1Database|R2Bucket|Browser|provider|contact|form|send/i]) {
+  forbidMatch("src/lib/revenue-engine/private-kw-public-http-transport.ts", privateKwM2PublicTransport, pattern, `M2 transport contains a forbidden shortcut or authority ${pattern}`);
+}
+requireMatch("src/lib/revenue-engine/private-kw-source-policy.ts", privateKwM2SourcePolicy, /evaluatePrivateKwRobotsPolicy/, "M2 source policy must expose the robots/terms preflight");
+requireMatch("src/lib/revenue-engine/private-kw-source-policy.ts", privateKwM2SourcePolicy, /transport\.request/, "M2 source policy must use the shared secure transport");
+forbidMatch("src/lib/revenue-engine/private-kw-source-policy.ts", privateKwM2SourcePolicy, /capturePublicWebsiteDocument|globalThis\.fetch|\bfetch\s*\(|D1Database|R2Bucket|Browser|\bcontact\b|\bform\b|\bsend\b/i, "M2 source policy must remain bounded and provider/contact free");
 forbidMatch("scripts/record-private-kw-shadow-progress.ts", privateKwShadowSliceProgressCli, /wrangler|--remote|\bdeploy\b|fetch\s*\(|better-sqlite3|D1Database|R2Bucket|@cloudflare/i, "shadow progress recording must not access a database, provider, network, or Cloudflare");
 requireMatch("scripts/record-private-kw-shadow-progress.ts", privateKwShadowSliceProgressCli, /writePrivateKwJson\(files\.output, checkpoint\)/, "shadow progress must create a new ignored no-overwrite checkpoint");
 forbidMatch("scripts/prepare-private-kw-source-workflow-progress.ts", privateKwSourceWorkflowProgressCli, /wrangler|--remote|\bdeploy\b|fetch\s*\(|D1Database|R2Bucket|@cloudflare/i, "source/workflow progress proof must not access a provider, network, remote database, or Cloudflare");
