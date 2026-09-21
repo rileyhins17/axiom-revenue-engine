@@ -1,8 +1,9 @@
 # Current status — Axiom Revenue Engine
 
 **Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Task 5 legacy/M2
-reader compatibility, based on `0e5558d`. The previous verified setup code
-checkpoint remains `d19e344`. Current checkpoint verification is recorded below.
+reader compatibility. The verified code checkpoint is `52f9009`
+(`fix(revenue): isolate HTML evidence from legacy assessments`), based on
+`0e5558d`. This following update only records that checkpoint identity.
 
 ## M2 assessment partition compatibility checkpoint
 
