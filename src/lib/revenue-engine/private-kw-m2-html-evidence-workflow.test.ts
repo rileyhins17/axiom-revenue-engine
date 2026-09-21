@@ -316,21 +316,24 @@ test("trusted reloader uses the same receipt validator through a pathless read s
   evidenceStore.resetReplay();
   const reloaded = await reloadPrivateKwM2WebsiteEvidenceReceipt({
     request,
-    materialization: {
-      materializationId: "kw-materialization:test",
-      materializationDigest: "a".repeat(64),
-      sourcePlanDigest: chain.manifest.sourcePlanDigest,
-      businessId: request.businessId,
-      evaluationCandidateId: chain.sourcePlan.records[0]!.evaluationCandidateId,
-      workflowReceiptId: "kw-workflow:test",
-      workflowReceiptDigest: "b".repeat(64),
-      rowIdentityDigest: "c".repeat(64),
-      rowCountDigest: "d".repeat(64),
-    },
     receiptStore,
     evidenceStore,
   });
   assert.deepEqual(reloaded, fresh);
+});
+
+test("trusted reloader keeps unsafe paths distinct from reparse failures", async () => {
+  const chain = approvedChain();
+  const receiptStore = memoryReceiptStore();
+  const request = { requestId: "29292929-2929-4292-8292-292929292931", requestedAt: "2026-09-21T15:00:00.000Z", replayMode: "NEW" as const, businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  await executePrivateKwM2HtmlEvidence(request, { transport: fakeTransport(() => undefined), receiptStore, store: fakeEvidenceStore(), clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  const reload = (message: string) => reloadPrivateKwM2WebsiteEvidenceReceipt({
+    request,
+    receiptStore,
+    evidenceStore: { reloadPrivateKwHtmlEvidenceReadOnly: async () => { throw new Error(message); } },
+  });
+  await assert.rejects(reload("UNSAFE_PATH: ancestor is outside approved root"), (error: unknown) => (error as { code?: string }).code === "M2_WEBSITE_RECEIPT_UNSAFE_PATH");
+  await assert.rejects(reload("UNKNOWN_REPARSE_CLASSIFICATION: filesystem identity unavailable"), (error: unknown) => (error as { code?: string }).code === "M2_WEBSITE_RECEIPT_REPARSE_OR_SYMLINK");
 });
 
 test("trusted reloader fails closed with redacted typed errors before any evidence read", async () => {
@@ -338,26 +341,20 @@ test("trusted reloader fails closed with redacted typed errors before any eviden
   const receiptStore = memoryReceiptStore();
   let evidenceReads = 0;
   const request = { requestId: "29292929-2929-4292-8292-292929292930", requestedAt: "2026-09-21T15:00:00.000Z", replayMode: "NEW" as const, businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
-  const materialization = {
-    materializationId: "kw-materialization:test", materializationDigest: "a".repeat(64), sourcePlanDigest: chain.manifest.sourcePlanDigest,
-    businessId: request.businessId, evaluationCandidateId: chain.sourcePlan.records[0]!.evaluationCandidateId,
-    workflowReceiptId: "kw-workflow:test", workflowReceiptDigest: "b".repeat(64), rowIdentityDigest: "c".repeat(64), rowCountDigest: "d".repeat(64),
-  };
   await assert.rejects(
-    reloadPrivateKwM2WebsiteEvidenceReceipt({ request, materialization, receiptStore, evidenceStore: { reloadPrivateKwHtmlEvidenceReadOnly: async () => { evidenceReads += 1; throw new Error("must not read"); } } }),
+    reloadPrivateKwM2WebsiteEvidenceReceipt({ request, receiptStore, evidenceStore: { reloadPrivateKwHtmlEvidenceReadOnly: async () => { evidenceReads += 1; throw new Error("must not read"); } } }),
     (error: unknown) => error instanceof Error && (error as { code?: string }).code === "M2_WEBSITE_RECEIPT_REPLAY_MISSING" && !error.message.includes("data/") && !error.message.includes("html"),
   );
   assert.equal(evidenceReads, 0);
   await assert.rejects(
-    reloadPrivateKwM2WebsiteEvidenceReceipt({ request, materialization, receiptStore: { loadSealed: async () => ({ operationId: "not-a-valid-receipt" } as never) }, evidenceStore: { reloadPrivateKwHtmlEvidenceReadOnly: async () => { evidenceReads += 1; throw new Error("must not read"); } } }),
+    reloadPrivateKwM2WebsiteEvidenceReceipt({ request, receiptStore: { loadSealed: async () => ({ status: "BROKEN" } as never) }, evidenceStore: { reloadPrivateKwHtmlEvidenceReadOnly: async () => { evidenceReads += 1; throw new Error("must not read"); } } }),
     (error: unknown) => error instanceof Error && (error as { code?: string }).code === "M2_WEBSITE_RECEIPT_SCHEMA_INVALID",
   );
   assert.equal(evidenceReads, 0);
   let loads = 0;
-  const mismatch = { ...materialization, sourcePlanDigest: "e".repeat(64) };
   await assert.rejects(
-    reloadPrivateKwM2WebsiteEvidenceReceipt({ request, materialization: mismatch, receiptStore: { loadSealed: async () => { loads += 1; return null; } }, evidenceStore: { reloadPrivateKwHtmlEvidenceReadOnly: async () => { evidenceReads += 1; throw new Error("must not read"); } } }),
-    (error: unknown) => error instanceof Error && (error as { code?: string }).code === "M2_WEBSITE_RECEIPT_MATERIALIZATION_MISMATCH",
+    reloadPrivateKwM2WebsiteEvidenceReceipt({ request: { ...request, businessId: "business:not-the-approved-record" }, receiptStore: { loadSealed: async () => { loads += 1; return null; } }, evidenceStore: { reloadPrivateKwHtmlEvidenceReadOnly: async () => { evidenceReads += 1; throw new Error("must not read"); } } }),
+    (error: unknown) => error instanceof Error && (error as { code?: string }).code === "M2_WEBSITE_RECEIPT_SOURCE_IDENTITY_MISMATCH",
   );
   assert.equal(loads, 0);
 });

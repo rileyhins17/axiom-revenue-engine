@@ -314,6 +314,42 @@ test("pathless read-only reload never creates a missing root", async () => {
   await assert.rejects(lstat(PRIVATE_KW_EVIDENCE_ROOT), /ENOENT/);
 });
 
+test("pathless read-only reload covers derived facts without exposing raw bytes", async () => {
+  const store = createPrivateKwLocalHtmlEvidenceStore();
+  const result = await store.writePrivateKwDerivedFacts({
+    ...baseMetadata({ retentionDecision: "DERIVED_FACTS_ONLY", reviewAt: "2026-09-28T12:00:00.000Z" }),
+    outcome: "DERIVED_FACTS_ONLY",
+    captureBytes: HTML,
+    facts: facts(),
+    rawArtifactRef: null,
+  });
+  if (result.outcome !== "DERIVED_FACTS_ONLY") throw new Error("expected derived evidence");
+  const before = await snapshot();
+  const reloaded = await store.reloadPrivateKwHtmlEvidenceReadOnly({ outcome: "DERIVED_FACTS_ONLY", contentRef: result.contentRef, metadataRef: result.metadataRef, factsRef: result.factsRef });
+  const after = await snapshot();
+  assert.equal(reloaded.outcome, "DERIVED_FACTS_ONLY");
+  assert.deepEqual(reloaded.facts.facts, facts());
+  assert.equal("bytes" in reloaded, false);
+  assert.deepEqual(after, before);
+});
+
+test("pathless read-only reload covers blocked receipts without document paths", async () => {
+  const store = createPrivateKwLocalHtmlEvidenceStore();
+  const result = await store.writePrivateKwHtmlEvidence({
+    ...baseMetadata({ retentionDecision: "BLOCKED" }),
+    outcome: "BLOCKED",
+    blockCode: "ROBOTS_UNRESOLVED",
+  });
+  if (result.outcome !== "BLOCKED") throw new Error("expected blocked evidence");
+  const before = await snapshot();
+  const reloaded = await store.reloadPrivateKwHtmlEvidenceReadOnly({ outcome: "BLOCKED", receiptRef: result.receiptRef });
+  const after = await snapshot();
+  assert.equal(reloaded.outcome, "BLOCKED");
+  assert.equal(reloaded.blockCode, result.blockCode);
+  assert.equal(reloaded.receipt.receiptRef, result.receiptRef);
+  assert.deepEqual(after, before);
+});
+
 test("same complete raw parent replays exactly without changing files", async () => {
   const store = createPrivateKwLocalHtmlEvidenceStore();
   const input = {

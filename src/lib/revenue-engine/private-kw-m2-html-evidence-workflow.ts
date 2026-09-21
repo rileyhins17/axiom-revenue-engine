@@ -38,17 +38,6 @@ export type PrivateKwM2HtmlEvidenceDependencies = {
   store?: Store; receiptStore?: PrivateKwM2HtmlEvidenceReceiptStore; clock?: () => Date;
   sleep?: (milliseconds: number) => Promise<void>;
 };
-export type PrivateKwM2MaterializationLineageProof = {
-  materializationId: string;
-  materializationDigest: string;
-  sourcePlanDigest: string;
-  businessId: string;
-  evaluationCandidateId: string;
-  workflowReceiptId: string;
-  workflowReceiptDigest: string;
-  rowIdentityDigest: string;
-  rowCountDigest: string;
-};
 export type PrivateKwM2HtmlEvidenceReadIdentity =
   | { outcome: "RAW_HTML_ALLOWED"; contentRef: string; metadataRef: string }
   | { outcome: "DERIVED_FACTS_ONLY"; contentRef: string; metadataRef: string; factsRef: string }
@@ -58,7 +47,6 @@ export type PrivateKwM2HtmlEvidenceReadStore = {
 };
 export type PrivateKwM2WebsiteEvidenceReceiptReloadInput = {
   request: PrivateKwM2HtmlEvidenceRequest;
-  materialization: PrivateKwM2MaterializationLineageProof;
   receiptStore?: Pick<PrivateKwM2HtmlEvidenceReceiptStore, "loadSealed">;
   evidenceStore?: PrivateKwM2HtmlEvidenceReadStore;
 };
@@ -286,7 +274,6 @@ export type PrivateKwM2WebsiteEvidenceReloadErrorCode =
   | "M2_WEBSITE_RECEIPT_AUTHORIZATION_EXPIRED"
   | "M2_WEBSITE_RECEIPT_AUTHORIZATION_MISMATCH"
   | "M2_WEBSITE_RECEIPT_SOURCE_IDENTITY_MISMATCH"
-  | "M2_WEBSITE_RECEIPT_MATERIALIZATION_MISMATCH"
   | "M2_WEBSITE_RECEIPT_SOURCE_POLICY_MISMATCH"
   | "M2_WEBSITE_RECEIPT_TRANSPORT_LEDGER_MISMATCH"
   | "M2_WEBSITE_RECEIPT_PAGE_SELECTION_MISMATCH"
@@ -305,14 +292,6 @@ export class PrivateKwM2WebsiteEvidenceReloadError extends Error {
   }
 }
 
-const MaterializationLineageProofSchema = z.object({
-  materializationId: z.string().min(1).max(200), materializationDigest: z.string().regex(/^[a-f0-9]{64}$/),
-  sourcePlanDigest: z.string().regex(/^[a-f0-9]{64}$/), businessId: z.string().min(1).max(128),
-  evaluationCandidateId: z.string().min(1).max(128), workflowReceiptId: z.string().min(1).max(200),
-  workflowReceiptDigest: z.string().regex(/^[a-f0-9]{64}$/), rowIdentityDigest: z.string().regex(/^[a-f0-9]{64}$/),
-  rowCountDigest: z.string().regex(/^[a-f0-9]{64}$/),
-}).strict();
-
 function requestChainSnapshot(request: PrivateKwM2HtmlEvidenceRequest) {
   return digest({ requestId: request.requestId, requestedAt: request.requestedAt, businessId: request.businessId, researchPacket: request.researchPacket, authorization: request.authorization, ownerEnvelope: request.ownerEnvelope, manifest: request.manifest, sourcePlan: request.sourcePlan, researchPolicy: request.researchPolicy });
 }
@@ -324,7 +303,9 @@ function mapReloadError(error: unknown): PrivateKwM2WebsiteEvidenceReloadError {
   if (/schema|invalid|expected|required|ZodError/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SCHEMA_INVALID");
   if (/canonical.?bytes|BYTES_MISMATCH|SEALED_RECEIPT_BYTES_MISMATCH/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_CANONICAL_BYTES_MISMATCH");
   if (/operation.?digest|SEALED_RECEIPT_DIGEST_MISMATCH/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_OPERATION_DIGEST_MISMATCH");
-  if (/reparse|symlink|UNSAFE_PATH|UNSAFE_SEALED|IDENTITY_UNAVAILABLE/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_REPARSE_OR_SYMLINK");
+  if (/source identity|source-plan|source-run|source.*mismatch/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SOURCE_IDENTITY_MISMATCH");
+  if (/reparse|symlink|junction|UNKNOWN_REPARSE_CLASSIFICATION/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_REPARSE_OR_SYMLINK");
+  if (/UNSAFE_PATH|UNSAFE_SEALED|IDENTITY_UNAVAILABLE|outside approved|traversal/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_UNSAFE_PATH");
   if (/ENOENT|missing|MISSING_/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_ARTIFACT_MISSING");
   if (/SOURCE_POLICY|POLICY/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SOURCE_POLICY_MISMATCH");
   if (/TRANSPORT/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_TRANSPORT_LEDGER_MISMATCH");
@@ -334,7 +315,7 @@ function mapReloadError(error: unknown): PrivateKwM2WebsiteEvidenceReloadError {
   return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_ARTIFACT_MISMATCH");
 }
 
-export async function reloadPrivateKwM2WebsiteEvidenceReceipt(input: PrivateKwM2WebsiteEvidenceReceiptReloadInput): Promise<PrivateKwM2WebsiteEvidenceReceipt> {
+export async function reloadPrivateKwM2WebsiteEvidenceReceipt(input: PrivateKwM2WebsiteEvidenceReceiptReloadInput, options: { clock?: () => Date } = {}): Promise<PrivateKwM2WebsiteEvidenceReceipt> {
   try {
     const request = PrivateKwM2HtmlEvidenceRequestSchema.parse(input.request);
     const packet = PrivateKwM2ResearchPacketSchema.parse(request.researchPacket);
@@ -343,13 +324,9 @@ export async function reloadPrivateKwM2WebsiteEvidenceReceipt(input: PrivateKwM2
     const manifest = PrivateKwShadowSliceManifestSchema.parse(request.manifest);
     const sourcePlan = PrivateKwImportPlanSchema.parse(request.sourcePlan);
     const researchPolicy = request.researchPolicy === undefined ? undefined : PrivateKwM2ResearchPolicySchema.parse(request.researchPolicy);
-    const materialization = MaterializationLineageProofSchema.parse(input.materialization);
     const chainSnapshot = requestChainSnapshot(request);
     const identity = deriveIdentity({ businessId: request.businessId, researchPacket: packet, authorization, ownerEnvelope, manifest, sourcePlan, researchPolicy });
-    const assertMaterialization = () => {
-      if (materialization.sourcePlanDigest !== identity.sourcePlanDigest || materialization.businessId !== identity.businessId || materialization.evaluationCandidateId !== identity.evaluationCandidateId) throw new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_MATERIALIZATION_MISMATCH");
-    };
-    const clock = () => new Date();
+    const clock = options.clock ?? (() => new Date());
     const assertCurrent = () => {
       const currentRequest = PrivateKwM2HtmlEvidenceRequestSchema.parse(input.request);
       if (requestChainSnapshot(currentRequest) !== chainSnapshot) throw new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SOURCE_IDENTITY_MISMATCH");
@@ -366,7 +343,6 @@ export async function reloadPrivateKwM2WebsiteEvidenceReceipt(input: PrivateKwM2
       } catch (error) {
         throw mapReloadError(error);
       }
-      assertMaterialization();
     };
     assertCurrent();
     const receiptStore = input.receiptStore ?? createPrivateKwM2HtmlEvidenceReceiptStore();
@@ -405,22 +381,19 @@ export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencie
   const receiptStore = dependencies.receiptStore ?? createPrivateKwM2HtmlEvidenceReceiptStore();
   const replayStore = dependencies.store ?? createPrivateKwLocalHtmlEvidenceStore({ clock });
   const existing = await receiptStore.loadSealed(operationId);
-  if (existing) {
-    const parsed = PrivateKwM2WebsiteEvidenceReceiptSchema.parse(existing);
-    const reloadEvidence = async (readIdentity: PrivateKwM2HtmlEvidenceReadIdentity) => replayStore.reloadPrivateKwHtmlEvidenceReadOnly(readIdentity);
-    const beforeArtifactRead = () => {
-      assertPrivateKwM2ApprovalChain({ researchPacket: packet, authorization, ownerEnvelope, manifest, sourcePlan, phase: "GET", now: clock().toISOString(), researchPolicy: policy });
-      const current = deriveIdentity({ businessId: request.businessId, researchPacket: packet, authorization, manifest, sourcePlan, ownerEnvelope, researchPolicy: policy });
-      if (current.sourceIdentityDigest !== identity.sourceIdentityDigest) throw new Error("M2 HTML workflow source identity changed.");
-    };
-    try { return await validateSealedReplay(parsed, { request, identity, authorization, clock, reloadEvidence, beforeArtifactRead }); }
+  if (existing || request.replayMode === "EXACT_REPLAY") {
+    try {
+      return await reloadPrivateKwM2WebsiteEvidenceReceipt(
+        { request, receiptStore, evidenceStore: replayStore },
+        { clock },
+      );
+    }
     catch (error) {
-      const reason = error instanceof Error && error.message === "AUTHORIZATION_EXPIRED" ? "AUTHORIZATION_EXPIRED" : "REPLAY_MISMATCH";
+      const reason = error instanceof Error && error.message.includes("AUTHORIZATION_EXPIRED")
+        ? "AUTHORIZATION_EXPIRED"
+        : error instanceof Error && error.message.includes("REPLAY_MISSING") ? "REPLAY_MISSING" : "REPLAY_MISMATCH";
       return buildReceipt({ request, identity, authorization, status: "FAILED", stopReason: reason, policy: null, plan: null, pages: [], audit: null, transport: undefined, attempts: 0, operationId });
     }
-  }
-  if (request.replayMode === "EXACT_REPLAY") {
-    return buildReceipt({ request, identity, authorization, status: "FAILED", stopReason: "REPLAY_MISSING", policy: null, plan: null, pages: [], audit: null, transport: undefined, attempts: 0, operationId });
   }
   const base = dependencies.transport ?? createPrivateKwPublicHttpTransport({ now: clock });
   let stage: "ROBOTS" | "GET" = "ROBOTS";
