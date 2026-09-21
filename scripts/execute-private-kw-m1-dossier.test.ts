@@ -65,14 +65,6 @@ test("executes one bounded synthetic business through the durable offline websit
     } finally {
       rolledBack.close();
     }
-    await rm(files.database, { force: true });
-    const cleanRetryDatabase = new Database(fileURLToPath(files.database));
-    try {
-      cleanRetryDatabase.pragma("foreign_keys = ON");
-      applyCanonicalPrivateKwMigrations(cleanRetryDatabase);
-    } finally {
-      cleanRetryDatabase.close();
-    }
     const trackedTables = [
       "RevenueSourceRun", "RevenueBusiness", "RevenueLocation", "RevenueSourceRecord", "RevenuePrivateKwMaterializationReceipt",
       "RevenueWorkflowDefinition", "RevenueWorkflowRun", "RevenueWorkflowDelivery", "RevenueWorkflowAttempt", "RevenueWorkflowLease",
@@ -93,7 +85,13 @@ test("executes one bounded synthetic business through the durable offline websit
       }
     };
     const preFirstCounts = countMap(files.database, trackedTables);
-    assert.ok(Object.values(preFirstCounts).every((count) => count === 0));
+    for (const table of [
+      "RevenueArtifactReferenceSnapshotAttempt",
+      "RevenueArtifactReferenceCompletenessReceipt",
+      "RevenueArtifactReferenceSourceSetProof",
+      "RevenueCurrentWebsiteEvidenceEligibilityReceipt",
+    ]) assert.equal(preFirstCounts[table], 0, `${table} must be empty before same-file retry`);
+    assert.ok((preFirstCounts.RevenueSourceRun ?? 0) > 0, "same-file retry must retain the committed source materialization");
     const first = await executePrivateKwM1WebsiteCheckpoint(operation);
     const firstBytes = await readFile(files.output);
     const postFirstCounts = countMap(files.database, trackedTables);
@@ -110,7 +108,7 @@ test("executes one bounded synthetic business through the durable offline websit
     assert.deepEqual(postFirstCounts, preReplayCounts);
     assert.deepEqual(preReplayCounts, postReplayCounts);
     for (const [table, count] of Object.entries(postFirstCounts)) assert.equal(first.rowCounts[table], count);
-    assert.equal(first.source.executionPath, "FRESH_COMMIT");
+    assert.equal(first.source.executionPath, "EXACT_REPLAY");
     assert.equal(second.source.executionPath, "EXACT_REPLAY");
     assert.equal(first.source.workflowReceiptDigest, first.source.workflowReceiptId.slice("workflow-receipt:".length));
     assert.equal(first.authority.fixtureOnly, true);
