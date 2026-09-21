@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
-import { PRIVATE_KW_M2_MIGRATION_FILES, privateKwM2MigrationManifest, type PrivateKwM2MigrationManifestEntry } from "../../../scripts/private-kw-m2-database.js";
+import { PRIVATE_KW_M2_MIGRATION_FILES, type PrivateKwM2MigrationManifestEntry } from "../../../scripts/private-kw-m2-database.js";
 
 export const PRIVATE_KW_M2_SETUP_RELEASE_VERSION = "kw-m2-local-0069-release-v1" as const;
 export const PRIVATE_KW_M2_DATABASE_RECEIPT_V2 = "kw-m2-database-receipt-v2" as const;
@@ -172,12 +172,15 @@ function currentRepositoryManifest() {
       const repositoryCommit = execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
       const dirty = execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "status", "--porcelain", "--", "migrations"], { encoding: "utf8" }).trim();
       if (dirty) throw new Error("The setup release requires a clean migration working tree.");
-      const working = privateKwM2MigrationManifest(path.join(CANONICAL_REPOSITORY_ROOT, "migrations"));
       const committed = PRIVATE_KW_M2_MIGRATION_FILES.map((filename) => ({
         filename,
         sha256: createHash("sha256").update(execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "show", `HEAD:migrations/${filename}`])).digest("hex"),
       }));
-      if (JSON.stringify(working) !== JSON.stringify(committed)) throw new Error("Migration bytes do not match the exact Git HEAD blobs.");
+      for (const filename of PRIVATE_KW_M2_MIGRATION_FILES) {
+        const expectedBlob = execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "rev-parse", `HEAD:migrations/${filename}`], { encoding: "utf8" }).trim();
+        const workingBlob = execFileSync("git", ["-C", CANONICAL_REPOSITORY_ROOT, "hash-object", "--path", `migrations/${filename}`, path.join(CANONICAL_REPOSITORY_ROOT, "migrations", filename)], { encoding: "utf8" }).trim();
+        if (workingBlob !== expectedBlob) throw new Error("Migration bytes do not match the exact Git HEAD blobs.");
+      }
       return { repositoryCommit, migrationManifest: committed };
 }
 

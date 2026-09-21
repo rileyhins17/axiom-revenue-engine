@@ -1,11 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 
 import {
   PRIVATE_KW_M2_DATABASE_RECEIPT_V2,
   PRIVATE_KW_M2_MIGRATION_RANGE,
+  PRIVATE_KW_M2_MIGRATION_FILES,
   PRIVATE_KW_M2_SETUP_RELEASE_VERSION,
   PrivateKwM2DatabaseSetupReceiptSchema,
   PrivateKwM2SetupReleaseEnvelopeSchema,
@@ -13,9 +15,8 @@ import {
   privateKwM2SetupReleaseEnvelopeDigest,
   loadPrivateKwM2SetupReleaseEnvelope,
 } from "./private-kw-m2-setup-release";
-import { privateKwM2MigrationManifest } from "../../../scripts/private-kw-m2-database";
 
-const migrationManifest = privateKwM2MigrationManifest();
+const migrationManifest = PRIVATE_KW_M2_MIGRATION_FILES.map((filename) => ({ filename, sha256: createHash("sha256").update(execFileSync("git", ["show", `HEAD:migrations/${filename}`])).digest("hex") }));
 const digest = "a".repeat(64);
 const identity = { device: "1", inode: "2", byteLength: 10, modificationMarker: "3:4", sha256: digest };
 
@@ -119,8 +120,6 @@ describe("private KW M2 setup release contract", () => {
     await mkdir("data/kw-evaluation", { recursive: true });
     await writeFile(relative, JSON.stringify(envelope));
     try {
-      await assert.rejects(loadPrivateKwM2SetupReleaseEnvelope(relative, { now }), /clean migration working tree|Git HEAD blobs/);
-      return;
       const loaded = await loadPrivateKwM2SetupReleaseEnvelope(relative, { now });
       assert.equal(loaded.envelopeDigest, digest);
       assert.throws(() => (loaded as { rationale: string }).rationale = "changed", TypeError);

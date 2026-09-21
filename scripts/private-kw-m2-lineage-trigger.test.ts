@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
@@ -20,7 +21,9 @@ function fixture() {
   const core = {
     lineageVersion: "kw-m2-html-lineage-v1", assessmentKind: "WEBSITE_FIT_EVIDENCE", businessId: "business:test", sourceMaterializationReceiptId: "materialization:test", sourcePlanDigest: digest("a"), workflowReceiptId: "workflow:test", htmlOperationId: "operation:test", htmlOperationDigest: digest("b"), mappingId: "mapping:test", mappingDigest: digest("c"), websiteSnapshotId: "website:test", qualificationSnapshotId: "qualification:test", assessmentReceiptId: "assessment:test", assessmentReceiptDigest: digest("d"), websiteProgressId: "progress:website", websiteProgressDigest: digest("e"), assessmentProgressId: "progress:assessment", assessmentProgressDigest: digest("f"), lineageSeedDigest: digest("a"), sourcePolicyDigest: digest("b"), transportChainDigest: digest("c"), pageSetDigest: digest("d"), htmlClassification: "UNKNOWN", retentionDisposition: "DERIVED_FACTS_ONLY", authority: { localOnly: 1, qualificationAuthorized: 0, contactAuthorized: 0, consentAuthorized: 0, outreachAuthorized: 0, sendAuthorized: 0, browserAuthorized: 0, r2Authorized: 0, deploymentAuthorized: 0, providerOperationsAuthorized: 0, costAuthorizedUsd: 0 },
   };
-  const row = { id: `kw-m2-html-lineage:${digest("1")}`, lineageDigest: digest("1"), ...core, lineageJson: JSON.stringify(core), recordedAt: "2026-09-21T12:00:00.000Z", ...core.authority };
+  const lineageJson = JSON.stringify(core);
+  const lineageDigest = createHash("sha256").update(lineageJson).digest("hex");
+  const row = { id: `kw-m2-html-lineage:${lineageDigest}`, lineageDigest, ...core, lineageJson, recordedAt: "2026-09-21T12:00:00.000Z", ...core.authority };
   delete (row as { authority?: unknown }).authority;
   return { db, core, row, insert: db.prepare(`INSERT INTO RevenuePrivateKwM2HtmlAssessmentLineage (${Object.keys(row).map((key) => `"${key}"`).join(",")}) VALUES (${Object.keys(row).map(() => "?").join(",")})`) };
 }
