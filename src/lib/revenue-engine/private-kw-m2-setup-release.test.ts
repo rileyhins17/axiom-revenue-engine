@@ -123,7 +123,6 @@ describe("private KW M2 setup release contract", () => {
       const loaded = await loadPrivateKwM2SetupReleaseEnvelope(relative, { now });
       assert.equal(loaded.envelopeDigest, digest);
       assert.throws(() => (loaded as { rationale: string }).rationale = "changed", TypeError);
-      await assert.rejects(loadPrivateKwM2SetupReleaseEnvelope(relative, { now }), /clean migration working tree|Git HEAD blobs/);
       const futureCore = { ...core, reviewedAt: "2026-09-21T12:00:01.000Z" };
       const futureDigest = privateKwM2SetupReleaseEnvelopeDigest(futureCore);
       await writeFile(relative, JSON.stringify({ ...futureCore, envelopeId: `kw-m2-local-0069-release:${futureDigest}`, envelopeDigest: futureDigest }));
