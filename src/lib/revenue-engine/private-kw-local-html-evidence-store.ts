@@ -6,9 +6,24 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 import {
+  assertPrivateKwM2ApprovalChain,
   PrivateKwM2ExecutionAuthorizationSchema,
+  type PrivateKwM2OwnerApprovalEnvelope,
+  type PrivateKwM2ResearchPacket,
+  type PrivateKwM2ResearchPolicy,
   type PrivateKwM2ExecutionAuthorization,
 } from "@/lib/revenue-engine/private-kw-m2-authorization";
+import {
+  PrivateKwSourcePolicyDecisionSchema,
+  type PrivateKwSourcePolicyDecision,
+} from "@/lib/revenue-engine/private-kw-source-policy";
+import {
+  PrivateKwPublicHttpTransportReceiptSchema,
+  privateKwPublicHttpTransportReceiptDigest,
+  type PrivateKwPublicHttpTransportReceipt,
+} from "@/lib/revenue-engine/private-kw-public-http-transport";
+import { type PrivateKwImportPlan } from "@/lib/revenue-engine/private-kw-import";
+import { type PrivateKwShadowSliceManifest } from "@/lib/revenue-engine/private-kw-shadow-slice";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const PRIVATE_KW_EVIDENCE_PARENT = path.resolve(REPOSITORY_ROOT, "data", "kw-evaluation");
@@ -48,17 +63,25 @@ export interface PrivateKwEvidenceMetadataInput {
   transportVersion: string;
   sourcePolicyVersion: string;
   capturedAt: string;
-  rightsDecision: "ALLOWED";
-  termsDecision: "REVIEWED";
-  robotsDecision: "ALLOWED";
   parentReceiptDigest: string;
   authorizationDigest: string;
   authorizationExpiresAt: string;
-  authorization: PrivateKwM2ExecutionAuthorization;
+  authorizationChain: PrivateKwEvidenceAuthorizationChain;
+  sourcePolicyDecision?: PrivateKwSourcePolicyDecision;
+  transportReceipts?: readonly PrivateKwPublicHttpTransportReceipt[];
   retentionDecision?: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED";
   retainUntil?: string;
   reviewAt?: string;
   legalHold?: boolean;
+}
+
+export interface PrivateKwEvidenceAuthorizationChain {
+  researchPacket: PrivateKwM2ResearchPacket;
+  authorization: PrivateKwM2ExecutionAuthorization;
+  ownerEnvelope: PrivateKwM2OwnerApprovalEnvelope;
+  manifest: PrivateKwShadowSliceManifest;
+  sourcePlan: PrivateKwImportPlan;
+  researchPolicy?: PrivateKwM2ResearchPolicy;
 }
 
 type RawEvidenceInput = PrivateKwEvidenceMetadataInput & {
@@ -183,6 +206,15 @@ export type ReloadedEvidence =
 
 export type PrivateKwEvidenceRetentionState = "ACTIVE" | "REVIEW_DUE" | "EXPIRED" | "LEGAL_HOLD" | "INVALID_RETENTION";
 
+export type PrivateKwEvidenceReparseClassification = "SAFE" | "REPARSE" | "UNKNOWN";
+
+export interface PrivateKwEvidenceFilesystemSafety {
+  /** Testable seam for platform-specific reparse-point classification. UNKNOWN fails closed. */
+  classifyReparsePoint?: (filePath: string, stats: unknown) => PrivateKwEvidenceReparseClassification;
+  /** Testable seam for filesystems where dev/ino identity cannot be established. */
+  identityAvailable?: (filePath: string, pathStats: unknown, handleStats: unknown) => boolean;
+}
+
 function canonicalize(value: unknown): string {
   if (value === undefined) return "null";
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -218,17 +250,17 @@ function samePath(left: string, right: string) {
     : normalizedLeft === normalizedRight;
 }
 
-async function assertSafeArtifactAncestors(root: string, file: string) {
+async function assertSafeArtifactAncestors(root: string, file: string, safety?: PrivateKwEvidenceFilesystemSafety) {
   const relative = path.relative(root, file);
   if (!relative || path.isAbsolute(relative) || relative === ".." || relative.startsWith(`..${path.sep}`)) {
     throw new Error("UNSAFE_PATH: evidence artifact must remain below the approved root.");
   }
   const segments = relative.split(path.sep).slice(0, -1);
   let current = root;
-  await assertDirectory(current, current);
+  await assertDirectory(current, current, safety);
   for (const segment of segments) {
     current = path.join(current, segment);
-    await assertDirectory(current, current);
+    await assertDirectory(current, current, safety);
   }
 }
 
@@ -247,20 +279,19 @@ function assertBranchInput(input: PrivateKwEvidenceMetadataInput & { outcome: st
     transportVersion: z.string().trim().min(1).max(120),
     sourcePolicyVersion: z.string().trim().min(1).max(120),
     capturedAt: IsoDateSchema,
-    rightsDecision: z.literal("ALLOWED"),
-    termsDecision: z.literal("REVIEWED"),
-    robotsDecision: z.literal("ALLOWED"),
     parentReceiptDigest: DigestSchema,
     authorizationDigest: DigestSchema,
     authorizationExpiresAt: IsoDateSchema,
-    authorization: z.unknown(),
+    authorizationChain: z.unknown(),
+    sourcePolicyDecision: z.unknown().optional(),
+    transportReceipts: z.array(z.unknown()).optional(),
     retentionDecision: z.enum(["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY", "BLOCKED"]),
     retainUntil: IsoDateSchema.optional(),
     reviewAt: IsoDateSchema.optional(),
     legalHold: z.boolean().optional(),
   };
   const parsed = z.discriminatedUnion("outcome", [
-    z.object({ ...common, outcome: z.literal("RAW_HTML_ALLOWED"), contentType: z.literal("text/html"), bytes: z.instanceof(Uint8Array) }).strict(),
+    z.object({ ...common, sourcePolicyDecision: z.unknown(), transportReceipts: z.array(z.unknown()), outcome: z.literal("RAW_HTML_ALLOWED"), contentType: z.literal("text/html"), bytes: z.instanceof(Uint8Array) }).strict(),
     z.object({ ...common, outcome: z.literal("DERIVED_FACTS_ONLY"), captureBytes: z.instanceof(Uint8Array), facts: FactsSchema, rawArtifactRef: z.null() }).strict(),
     z.object({ ...common, outcome: z.literal("BLOCKED"), blockCode: z.string().regex(/^[A-Z0-9_:-]{1,120}$/) }).strict(),
   ]).parse(input);
@@ -272,14 +303,25 @@ function assertBranchInput(input: PrivateKwEvidenceMetadataInput & { outcome: st
   }
   assertDigest(parsed.parentReceiptDigest, "parentReceiptDigest");
   assertDigest(parsed.authorizationDigest, "authorizationDigest");
-  const authorization = PrivateKwM2ExecutionAuthorizationSchema.parse(parsed.authorization);
+  const chain = parsed.authorizationChain as PrivateKwEvidenceAuthorizationChain;
+  if (!chain || typeof chain !== "object") throw new Error("Evidence requires the exact Task 1 approval chain.");
+  assertPrivateKwM2ApprovalChain({
+    researchPacket: chain.researchPacket,
+    authorization: chain.authorization,
+    ownerEnvelope: chain.ownerEnvelope,
+    manifest: chain.manifest,
+    sourcePlan: chain.sourcePlan,
+    researchPolicy: chain.researchPolicy,
+    phase: "GET",
+    now: new Date(nowMs).toISOString(),
+  });
+  const authorization = PrivateKwM2ExecutionAuthorizationSchema.parse(chain.authorization);
   const decision = authorization.sourceDecisions.find((candidate) => candidate.businessId === parsed.businessId);
   if (!decision || authorization.businessIds.indexOf(parsed.businessId) < 0) throw new Error("Evidence business is absent from the exact execution authorization.");
   if (decision.evidenceRetention !== parsed.outcome) throw new Error("Evidence outcome does not match the exact authorized retention decision.");
   if (parsed.authorizationDigest !== authorization.authorizationDigest || parsed.authorizationExpiresAt !== authorization.expiresAt) {
     throw new Error("Evidence authorization identity must match the exact execution authorization.");
   }
-  if (parsed.sourcePolicyVersion !== authorization.websitePolicyVersion) throw new Error("Evidence source policy must match the exact execution authorization policy.");
   if (decision.websiteUrl !== null && parsed.requestedUrl !== decision.websiteUrl) throw new Error("Evidence URL does not match the exact authorized website.");
   if (parsed.outcome === "RAW_HTML_ALLOWED" && (decision.sourceRights !== "PUBLIC_SOURCE_REVIEWED" || decision.termsDecision !== "TERMS_REVIEWED_FOR_FACTS" || decision.robotsDecision !== "ROBOTS_REVIEWED_PUBLIC_ONLY")) {
     throw new Error("RAW_HTML_ALLOWED requires the exact reviewed public-source policy decision.");
@@ -287,7 +329,26 @@ function assertBranchInput(input: PrivateKwEvidenceMetadataInput & { outcome: st
   if (authorization.authority.liveSourceAuthorized || authorization.authority.artifactStorageAuthorized || authorization.authority.providerOperationsAuthorized !== 0 || authorization.authority.costAuthorizedUsd !== 0) {
     throw new Error("Evidence authorization contains disallowed authority.");
   }
+  if (parsed.outcome === "RAW_HTML_ALLOWED") assertExactSourcePolicy(parsed, decision, authorization);
   return parsed;
+}
+
+function assertExactSourcePolicy(input: { requestedUrl: string; finalUrl: string; sourcePolicyVersion: string; sourcePolicyDecision?: unknown; transportReceipts?: readonly unknown[] }, decision: PrivateKwM2ExecutionAuthorization["sourceDecisions"][number], authorization: PrivateKwM2ExecutionAuthorization) {
+  const policy = PrivateKwSourcePolicyDecisionSchema.parse(input.sourcePolicyDecision);
+  const receipts = (input.transportReceipts ?? []).map((receipt) => PrivateKwPublicHttpTransportReceiptSchema.parse(receipt));
+  if (policy.policyVersion !== input.sourcePolicyVersion || !policy.allowed || policy.providerOperationsAuthorized !== 0 || policy.costAuthorizedUsd !== 0) throw new Error("Raw evidence requires an exact allowed zero-cost source-policy decision.");
+  if (policy.termsDecision !== decision.termsDecision) throw new Error("Raw evidence terms decision does not match the exact authorization chain.");
+  const approved = new URL(input.requestedUrl);
+  const final = new URL(input.finalUrl);
+  const expectedRobotsUrl = new URL("/robots.txt", approved).toString();
+  if (policy.robotsUrl !== expectedRobotsUrl || approved.hostname !== final.hostname || policy.httpStatus === null || policy.httpStatus < 200 || policy.httpStatus >= 300 || policy.contentDigest === null) throw new Error("Raw evidence source-policy URL, status, or robots proof is incomplete.");
+  if (policy.networkRequestCount !== policy.transportReceiptIds.length || policy.networkRequestCount !== policy.transportReceiptDigests.length || policy.networkRequestCount !== receipts.length || policy.networkRequestCount === 0) throw new Error("Raw evidence transport receipt count is incomplete.");
+  const seen = new Set<number>();
+  receipts.forEach((receipt, index) => {
+    if (seen.has(receipt.requestId) || receipt.requestId !== policy.transportReceiptIds[index] || receipt.receiptDigest !== policy.transportReceiptDigests[index] || receipt.receiptDigest !== privateKwPublicHttpTransportReceiptDigest(receipt) || new URL(receipt.normalizedUrl).hostname !== approved.hostname) throw new Error("Raw evidence transport receipt chain mismatch.");
+    seen.add(receipt.requestId);
+  });
+  if (authorization.authority.providerOperationsAuthorized !== 0 || authorization.authority.costAuthorizedUsd !== 0) throw new Error("Raw evidence authorization cannot grant provider or cost authority.");
 }
 
 export function resolvePrivateKwEvidenceRoot(value = "data/kw-evaluation/m2-evidence") {
@@ -298,31 +359,45 @@ export function resolvePrivateKwEvidenceRoot(value = "data/kw-evaluation/m2-evid
   return resolved;
 }
 
-async function assertDirectory(directory: string, expected: string) {
+function assertNoReparse(directory: string, stats: unknown, safety?: PrivateKwEvidenceFilesystemSafety) {
+  const classification = safety?.classifyReparsePoint?.(directory, stats);
+  if (classification === "REPARSE" || classification === "UNKNOWN") {
+    throw new Error("UNSAFE_PATH: evidence paths cannot contain reparse points or unknown filesystem objects.");
+  }
+  if (process.platform === "win32") {
+    const candidate = stats as { isReparsePoint?: () => boolean };
+    if (typeof candidate.isReparsePoint === "function" && candidate.isReparsePoint()) {
+      throw new Error("UNSAFE_PATH: evidence paths cannot contain reparse points.");
+    }
+  }
+}
+
+async function assertDirectory(directory: string, expected: string, safety?: PrivateKwEvidenceFilesystemSafety) {
   const stats = await lstat(directory);
+  assertNoReparse(directory, stats, safety);
   if (stats.isSymbolicLink() || !stats.isDirectory()) throw new Error("Private KW evidence paths cannot be symbolic links or non-directories.");
   const canonical = await realpath(directory);
   if (!samePath(canonical, expected)) throw new Error("Private KW evidence path resolves outside its approved root.");
 }
 
-async function ensureSafeRoot(root: string) {
-  await assertDirectory(REPOSITORY_ROOT, REPOSITORY_ROOT);
+async function ensureSafeRoot(root: string, safety?: PrivateKwEvidenceFilesystemSafety) {
+  await assertDirectory(REPOSITORY_ROOT, REPOSITORY_ROOT, safety);
   let current = REPOSITORY_ROOT;
   for (const segment of ["data", "kw-evaluation"]) {
     current = path.join(current, segment);
     try { await mkdir(current); } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     }
-    await assertDirectory(current, current);
+    await assertDirectory(current, current, safety);
   }
-  await assertDirectory(PRIVATE_KW_EVIDENCE_PARENT, PRIVATE_KW_EVIDENCE_PARENT);
+  await assertDirectory(PRIVATE_KW_EVIDENCE_PARENT, PRIVATE_KW_EVIDENCE_PARENT, safety);
   try { await mkdir(root); } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
   }
-  await assertDirectory(root, root);
+  await assertDirectory(root, root, safety);
 }
 
-async function ensureShardDirectory(root: string, category: "objects" | "metadata" | "facts" | "receipts", digest: string) {
+async function ensureShardDirectory(root: string, category: "objects" | "metadata" | "facts" | "receipts", digest: string, safety?: PrivateKwEvidenceFilesystemSafety) {
   const directory = path.join(root, category, "sha256", shard(digest));
   let current = root;
   for (const segment of [category, "sha256", shard(digest)]) {
@@ -330,30 +405,32 @@ async function ensureShardDirectory(root: string, category: "objects" | "metadat
     try { await mkdir(current); } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     }
-    await assertDirectory(current, current);
+    await assertDirectory(current, current, safety);
   }
   return directory;
 }
 
-function assertRegularIdentity(pathStats: { isFile(): boolean; isSymbolicLink(): boolean; dev: bigint; ino: bigint }, handleStats: { isFile(): boolean; dev: bigint; ino: bigint }) {
+function assertRegularIdentity(file: string, pathStats: { isFile(): boolean; isSymbolicLink(): boolean; dev: bigint; ino: bigint }, handleStats: { isFile(): boolean; dev: bigint; ino: bigint }, safety?: PrivateKwEvidenceFilesystemSafety) {
+  assertNoReparse(file, pathStats, safety);
+  if (safety?.identityAvailable && !safety.identityAvailable(file, pathStats, handleStats)) throw new Error("IDENTITY_UNAVAILABLE: stable file identity is required.");
   if (pathStats.isSymbolicLink() || !pathStats.isFile() || !handleStats.isFile()) throw new Error("UNSAFE_PATH: evidence must remain a regular file.");
   if (pathStats.dev === BigInt(0) || pathStats.ino === BigInt(0) || handleStats.dev === BigInt(0) || handleStats.ino === BigInt(0)) throw new Error("IDENTITY_UNAVAILABLE: stable file identity is required.");
   if (pathStats.dev !== handleStats.dev || pathStats.ino !== handleStats.ino) throw new Error("IDENTITY_CHANGED: evidence file identity changed.");
 }
 
-async function readVerifiedFile(file: string, expectedDigest?: string, expectedLength?: number, maxLength?: number, root?: string) {
-  if (root) await assertSafeArtifactAncestors(root, file);
+async function readVerifiedFile(file: string, expectedDigest?: string, expectedLength?: number, maxLength?: number, root?: string, safety?: PrivateKwEvidenceFilesystemSafety) {
+  if (root) await assertSafeArtifactAncestors(root, file, safety);
   const handle = await open(file, "r");
   try {
     const handleStats = await handle.stat({ bigint: true });
     const before = await lstat(file, { bigint: true });
-    assertRegularIdentity(before, handleStats);
+    assertRegularIdentity(file, before, handleStats, safety);
     if (expectedLength !== undefined && handleStats.size !== BigInt(expectedLength)) throw new Error("LENGTH_MISMATCH: evidence length changed.");
     if (maxLength !== undefined && handleStats.size > BigInt(maxLength)) throw new Error("LENGTH_MISMATCH: evidence exceeds its bound.");
     const bytes = await handle.readFile();
     const after = await lstat(file, { bigint: true });
-    assertRegularIdentity(after, handleStats);
-    if (root) await assertSafeArtifactAncestors(root, file);
+    assertRegularIdentity(file, after, handleStats, safety);
+    if (root) await assertSafeArtifactAncestors(root, file, safety);
     if (after.size !== BigInt(bytes.byteLength)) throw new Error("LENGTH_MISMATCH: evidence length changed during read.");
     if (expectedDigest !== undefined && sha256(bytes) !== expectedDigest) throw new Error("DIGEST_MISMATCH: evidence bytes do not match their content reference.");
     return bytes;
@@ -362,10 +439,10 @@ async function readVerifiedFile(file: string, expectedDigest?: string, expectedL
   }
 }
 
-async function publishExclusive(root: string, file: string, bytes: Uint8Array, digest: string, maxBytes: number) {
+async function publishExclusive(root: string, file: string, bytes: Uint8Array, digest: string, maxBytes: number, safety?: PrivateKwEvidenceFilesystemSafety) {
   if (bytes.byteLength <= 0 || bytes.byteLength > maxBytes) throw new Error("Evidence bytes exceed the bounded store limit.");
   const directory = path.dirname(file);
-  await assertSafeArtifactAncestors(root, file);
+  await assertSafeArtifactAncestors(root, file, safety);
   const temp = path.join(directory, `.tmp-${process.pid}-${randomUUID()}.part`);
   const handle = await open(temp, "wx");
   try {
@@ -373,21 +450,21 @@ async function publishExclusive(root: string, file: string, bytes: Uint8Array, d
     await handle.sync();
     const tempHandleStats = await handle.stat({ bigint: true });
     const tempPathStats = await lstat(temp, { bigint: true });
-    assertRegularIdentity(tempPathStats, tempHandleStats);
+    assertRegularIdentity(temp, tempPathStats, tempHandleStats, safety);
     if (tempHandleStats.size !== BigInt(bytes.byteLength) || sha256(bytes) !== digest) throw new Error("DIGEST_MISMATCH: temporary bytes do not match their content reference.");
-    await assertSafeArtifactAncestors(root, file);
+    await assertSafeArtifactAncestors(root, file, safety);
     try {
       await link(temp, file);
       const finalPathStats = await lstat(file, { bigint: true });
-      assertRegularIdentity(finalPathStats, tempHandleStats);
-      await assertSafeArtifactAncestors(root, file);
-      const published = await readVerifiedFile(file, digest, bytes.byteLength, undefined, root);
+      assertRegularIdentity(file, finalPathStats, tempHandleStats, safety);
+      await assertSafeArtifactAncestors(root, file, safety);
+      const published = await readVerifiedFile(file, digest, bytes.byteLength, undefined, root, safety);
       if (!published.equals(Buffer.from(bytes))) throw new Error("EXISTING_OBJECT_MISMATCH: published object differs.");
       await unlink(temp);
       return "CREATED" as const;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      const existing = await readVerifiedFile(file, digest, bytes.byteLength, undefined, root);
+      const existing = await readVerifiedFile(file, digest, bytes.byteLength, undefined, root, safety);
       if (!existing.equals(Buffer.from(bytes))) throw new Error("EXISTING_OBJECT_MISMATCH: immutable object differs.");
       await unlink(temp);
       return "REUSED" as const;
@@ -411,14 +488,14 @@ function metadataCore(input: PrivateKwEvidenceMetadataInput, outcome: "RAW_HTML_
     redirectChainDigest: input.redirectChainDigest,
     captureVersion: input.captureVersion,
     transportVersion: input.transportVersion,
-    sourcePolicyVersion: input.sourcePolicyVersion,
+    sourcePolicyVersion: outcome === "RAW_HTML_ALLOWED" && input.sourcePolicyDecision ? input.sourcePolicyDecision.policyVersion : input.sourcePolicyVersion,
     capturedAt: input.capturedAt,
-    rightsDecision: input.rightsDecision,
-    termsDecision: input.termsDecision,
-    robotsDecision: input.robotsDecision,
+    rightsDecision: "ALLOWED" as const,
+    termsDecision: "REVIEWED" as const,
+    robotsDecision: "ALLOWED" as const,
     parentReceiptDigest: input.parentReceiptDigest,
-    authorizationDigest: input.authorizationDigest,
-    authorizationExpiresAt: input.authorizationExpiresAt,
+    authorizationDigest: input.authorizationChain.authorization.authorizationDigest,
+    authorizationExpiresAt: input.authorizationChain.authorization.expiresAt,
     retentionDecision: outcome,
     ...(outcome === "RAW_HTML_ALLOWED" ? { retainUntil: input.retainUntil } : { reviewAt: input.reviewAt }),
     legalHold: input.legalHold ?? false,
@@ -448,15 +525,16 @@ function assertFactsSafe(value: PrivateKwFacts, captureByteLength: number) {
   return serialized;
 }
 
-export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: string; clock?: () => Date } = {}) {
+export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: string; clock?: () => Date; filesystemSafety?: PrivateKwEvidenceFilesystemSafety } = {}) {
   const root = resolvePrivateKwEvidenceRoot(options.rootPath ?? "data/kw-evaluation/m2-evidence");
   const clock = options.clock ?? (() => new Date());
+  const filesystemSafety = options.filesystemSafety;
 
   async function writeMetadata(core: Record<string, unknown>, ref: string) {
-    const metadataDirectory = await ensureShardDirectory(root, "metadata", ref.slice(-64));
+    const metadataDirectory = await ensureShardDirectory(root, "metadata", ref.slice(-64), filesystemSafety);
     const file = path.join(metadataDirectory, `${ref.slice(-64)}.json`);
     const bytes = Buffer.from(`${JSON.stringify({ ...core, metadataRef: ref }, null, 2)}\n`, "utf8");
-    const operation = await publishExclusive(root, file, bytes, sha256(bytes), MAX_JSON_BYTES);
+    const operation = await publishExclusive(root, file, bytes, sha256(bytes), MAX_JSON_BYTES, filesystemSafety);
     return { file, operation };
   }
 
@@ -468,9 +546,9 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     const core = metadataCore(input, "RAW_HTML_ALLOWED", digest, bytes.byteLength);
     const parsedCore = CommonMetadataSchema.parse(core);
     const metadataDigest = sha256(canonicalize(parsedCore));
-    const rawDirectory = await ensureShardDirectory(root, "objects", digest);
+    const rawDirectory = await ensureShardDirectory(root, "objects", digest, filesystemSafety);
     const contentPath = path.join(rawDirectory, `${digest}.html`);
-    const metadataDirectory = await ensureShardDirectory(root, "metadata", metadataDigest);
+    const metadataDirectory = await ensureShardDirectory(root, "metadata", metadataDigest, filesystemSafety);
     const metadataPath = path.join(metadataDirectory, `${metadataDigest}.json`);
     const existingContent = await optionalFileExists(contentPath);
     const existingMetadata = await optionalFileExists(metadataPath);
@@ -478,7 +556,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     if (existingContent && !existingMetadata && !(await hasMetadataForContent(contentRef(digest)))) {
       throw new Error("INCOMPLETE_EXISTING: raw content exists without a complete metadata pair.");
     }
-    const contentOperation = await publishExclusive(root, contentPath, bytes, digest, MAX_HTML_BYTES);
+    const contentOperation = await publishExclusive(root, contentPath, bytes, digest, MAX_HTML_BYTES, filesystemSafety);
     const metadata = await writeMetadata(parsedCore, metadataRef(metadataDigest));
     return {
       outcome: "RAW_HTML_ALLOWED" as const,
@@ -502,7 +580,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
         if (stats.isDirectory()) {
           await walk(full);
         } else if (path.extname(child).toLowerCase() === ".json") {
-          const bytes = await readVerifiedFile(full, undefined, undefined, MAX_JSON_BYTES, root);
+          const bytes = await readVerifiedFile(full, undefined, undefined, MAX_JSON_BYTES, root, filesystemSafety);
           const metadata = StoredMetadataSchema.parse(JSON.parse(bytes.toString("utf8")));
           if (metadata.contentRef === ref) found.value = true;
         }
@@ -523,7 +601,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     const core = metadataCore(input, "DERIVED_FACTS_ONLY", digest, captureBytes.byteLength);
     const parsedCore = CommonMetadataSchema.parse(core);
     const metadataDigest = sha256(canonicalize(parsedCore));
-    const metadataDirectory = await ensureShardDirectory(root, "metadata", metadataDigest);
+    const metadataDirectory = await ensureShardDirectory(root, "metadata", metadataDigest, filesystemSafety);
     const metadataFile = path.join(metadataDirectory, `${metadataDigest}.json`);
     const factsCore = {
       factsVersion: "private-kw-html-facts-v1" as const,
@@ -533,14 +611,14 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
       facts: parsedFacts,
     };
     const factsDigest = sha256(canonicalize(factsCore));
-    const factsDirectory = await ensureShardDirectory(root, "facts", factsDigest);
+    const factsDirectory = await ensureShardDirectory(root, "facts", factsDigest, filesystemSafety);
     const factsFile = path.join(factsDirectory, `${factsDigest}.json`);
     const existingMetadata = await optionalFileExists(metadataFile);
     const existingFacts = await optionalFileExists(factsFile);
     if (existingMetadata !== existingFacts) throw new Error("INCOMPLETE_EXISTING: derived facts pair is incomplete.");
     const metadata = await writeMetadata(parsedCore, metadataRef(metadataDigest));
     const factsBytes = Buffer.from(`${JSON.stringify({ ...factsCore, factsRef: factsRef(factsDigest) }, null, 2)}\n`);
-    const facts = await publishExclusive(root, factsFile, factsBytes, sha256(factsBytes), MAX_JSON_BYTES);
+    const facts = await publishExclusive(root, factsFile, factsBytes, sha256(factsBytes), MAX_JSON_BYTES, filesystemSafety);
     void factsJson;
     return {
       outcome: "DERIVED_FACTS_ONLY" as const,
@@ -568,25 +646,25 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     };
     const digest = sha256(canonicalize(receiptCore));
     const ref = receiptRef(digest);
-    const directory = await ensureShardDirectory(root, "receipts", digest);
+    const directory = await ensureShardDirectory(root, "receipts", digest, filesystemSafety);
     const file = path.join(directory, `${digest}.json`);
     const bytes = Buffer.from(`${JSON.stringify({ ...receiptCore, receiptRef: ref }, null, 2)}\n`);
-    const operation = await publishExclusive(root, file, bytes, sha256(bytes), MAX_JSON_BYTES);
+    const operation = await publishExclusive(root, file, bytes, sha256(bytes), MAX_JSON_BYTES, filesystemSafety);
     return { outcome: "BLOCKED" as const, receiptRef: ref, receiptPath: file, blockCode: input.blockCode, executionPath: operation === "REUSED" ? "EXACT_REPLAY" as const : "CREATED" as const };
   }
 
   async function writePrivateKwHtmlEvidence(input: RawOrBlockedInput): Promise<PrivateKwHtmlEvidenceRef> {
-    await ensureSafeRoot(root);
+    await ensureSafeRoot(root, filesystemSafety);
     return input.outcome === "RAW_HTML_ALLOWED" ? writeRaw(input) : writeBlocked(input);
   }
 
   async function writePrivateKwDerivedFacts(input: DerivedFactsInput): Promise<PrivateKwHtmlEvidenceRef> {
-    await ensureSafeRoot(root);
+    await ensureSafeRoot(root, filesystemSafety);
     return writeDerived(input);
   }
 
   async function reloadPrivateKwHtmlEvidence(reference: unknown): Promise<ReloadedEvidence> {
-    await ensureSafeRoot(root);
+    await ensureSafeRoot(root, filesystemSafety);
     const parsed = z.discriminatedUnion("outcome", [
       z.object({ outcome: z.literal("RAW_HTML_ALLOWED"), contentRef: z.string().regex(REF), metadataRef: z.string().regex(META_REF), contentPath: z.string(), metadataPath: z.string(), executionPath: z.enum(["CREATED", "EXACT_REPLAY"]) }).strict(),
       z.object({ outcome: z.literal("DERIVED_FACTS_ONLY"), contentRef: z.string().regex(REF), metadataRef: z.string().regex(META_REF), factsRef: z.string().regex(FACTS_REF), metadataPath: z.string(), factsPath: z.string(), rawArtifactRef: z.null(), executionPath: z.enum(["CREATED", "EXACT_REPLAY"]) }).strict(),
@@ -596,7 +674,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
       const digest = parsed.receiptRef.slice(-64);
       const expectedReceiptPath = expectedArtifactPath(root, "receipts", digest, "json");
       assertExpectedArtifactPath(parsed.receiptPath, expectedReceiptPath, "Blocked receipt");
-      const bytes = await readVerifiedFile(expectedReceiptPath, undefined, undefined, MAX_JSON_BYTES, root);
+      const bytes = await readVerifiedFile(expectedReceiptPath, undefined, undefined, MAX_JSON_BYTES, root, filesystemSafety);
       const receipt = StoredReceiptSchema.parse(JSON.parse(bytes.toString("utf8")));
       const { receiptRef: storedReceiptRef, ...receiptCore } = receipt;
       if (storedReceiptRef !== parsed.receiptRef || receipt.blockCode !== parsed.blockCode || receiptRef(digest) !== parsed.receiptRef || sha256(canonicalize(receiptCore)) !== digest) throw new Error("BLOCKED receipt identity mismatch.");
@@ -605,7 +683,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     const metadataDigest = parsed.metadataRef.slice(-64);
     const expectedMetadataPath = expectedArtifactPath(root, "metadata", metadataDigest, "json");
     assertExpectedArtifactPath(parsed.metadataPath, expectedMetadataPath, "Metadata");
-    const metadataBytes = await readVerifiedFile(expectedMetadataPath, undefined, undefined, MAX_JSON_BYTES, root);
+    const metadataBytes = await readVerifiedFile(expectedMetadataPath, undefined, undefined, MAX_JSON_BYTES, root, filesystemSafety);
     const metadata = StoredMetadataSchema.parse(JSON.parse(metadataBytes.toString("utf8")));
     const { metadataRef: storedMetadataRef, ...metadataCoreValue } = metadata;
     if (storedMetadataRef !== parsed.metadataRef || sha256(canonicalize(metadataCoreValue)) !== metadataDigest) throw new Error("MALFORMED_METADATA: metadata digest mismatch.");
@@ -614,7 +692,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     if (parsed.outcome === "RAW_HTML_ALLOWED") {
       const expectedContentPath = expectedArtifactPath(root, "objects", contentDigest, "html");
       assertExpectedArtifactPath(parsed.contentPath, expectedContentPath, "Raw content");
-      const bytes = await readVerifiedFile(expectedContentPath, contentDigest, metadata.contentByteLength, undefined, root);
+      const bytes = await readVerifiedFile(expectedContentPath, contentDigest, metadata.contentByteLength, undefined, root, filesystemSafety);
       if (metadata.outcome !== "RAW_HTML_ALLOWED") throw new Error("Metadata outcome mismatch.");
       return { outcome: "RAW_HTML_ALLOWED", bytes, metadata };
     }
@@ -622,7 +700,7 @@ export function createPrivateKwLocalHtmlEvidenceStore(options: { rootPath?: stri
     const factsDigest = parsed.factsRef.slice(-64);
     const expectedFactsPath = expectedArtifactPath(root, "facts", factsDigest, "json");
     assertExpectedArtifactPath(parsed.factsPath, expectedFactsPath, "Facts");
-    const factsBytes = await readVerifiedFile(expectedFactsPath, undefined, undefined, MAX_JSON_BYTES, root);
+    const factsBytes = await readVerifiedFile(expectedFactsPath, undefined, undefined, MAX_JSON_BYTES, root, filesystemSafety);
     const facts = StoredFactsSchema.parse(JSON.parse(factsBytes.toString("utf8")));
     const { factsRef: storedFactsRef, ...factsCoreValue } = facts;
     if (storedFactsRef !== parsed.factsRef || facts.contentRef !== parsed.contentRef || facts.metadataRef !== parsed.metadataRef || sha256(canonicalize(factsCoreValue)) !== factsDigest) throw new Error("Facts identity mismatch.");

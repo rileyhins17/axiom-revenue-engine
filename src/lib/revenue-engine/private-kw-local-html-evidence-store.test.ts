@@ -9,7 +9,20 @@ import {
   createPrivateKwLocalHtmlEvidenceStore,
   type PrivateKwEvidenceMetadataInput,
 } from "./private-kw-local-html-evidence-store";
-import { privateKwM2Digest, PrivateKwM2ExecutionAuthorizationSchema, type PrivateKwM2ExecutionAuthorization } from "./private-kw-m2-authorization";
+import { preparePrivateKwImport, PRIVATE_KW_IMPORT_VERSION } from "./private-kw-import";
+import { buildPrivateKwPersistencePlan } from "./private-kw-persistence-plan";
+import { buildPrivateKwShadowSliceManifest, PRIVATE_KW_SHADOW_SLICE_VERSION, PRIVATE_KW_SHADOW_SLICE_SIZE } from "./private-kw-shadow-slice";
+import {
+  buildPrivateKwM2ExecutionAuthorization,
+  buildPrivateKwM2OwnerApprovalCandidate,
+  buildPrivateKwM2ResearchPolicy,
+  buildPrivateKwM2ResearchPacket,
+  privateKwM2Digest,
+  PrivateKwM2ExecutionAuthorizationSchema,
+  recordPrivateKwM2OwnerApproval,
+  type PrivateKwM2ExecutionAuthorization,
+} from "./private-kw-m2-authorization";
+import { privateKwPublicHttpTransportReceiptDigest } from "./private-kw-public-http-transport";
 
 const HTML = Buffer.from("<!doctype html><html><title>Roofing</title><body>public facts</body></html>");
 const NOW = "2026-09-21T12:00:00.000Z";
@@ -63,38 +76,165 @@ function authorizationFor(retention: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" |
   return PrivateKwM2ExecutionAuthorizationSchema.parse({ ...core, authorizationId: `kw-m2-execution:${digest}`, authorizationDigest: digest });
 }
 
+function canonicalChain(retention: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED") {
+  const source = preparePrivateKwImport({
+    importVersion: PRIVATE_KW_IMPORT_VERSION,
+    importId: "m2-task-3-canonical-source",
+    adapter: "MANUAL_RESEARCH",
+    queryText: "Synthetic M2 evidence-store authorization",
+    filters: { synthetic: true },
+    capturedAt: "2026-09-01T15:00:00.000Z",
+    costUsd: 0,
+    records: Array.from({ length: PRIVATE_KW_SHADOW_SLICE_SIZE }, (_, index) => ({
+      sourceOwnedId: `m2-task-3-${index + 1}`,
+      sourceEvidenceUrl: `https://directory-${index + 1}.com/business-${index + 1}`,
+      businessName: `Synthetic Business ${index + 1}`,
+      city: (["KITCHENER", "WATERLOO", "CAMBRIDGE"] as const)[index % 3],
+      region: "ON" as const,
+      country: "CA" as const,
+      niche: (["ROOFING", "HVAC", "LANDSCAPING"] as const)[index % 3],
+      websiteUrl: `https://business-${index + 1}.com/`,
+      phone: null,
+      addressLine: `${index + 1} Example Street`,
+      postalCode: "N2G 1A1",
+      independenceStatus: "INDEPENDENT" as const,
+      capturedAt: "2026-09-01T14:00:00.000Z",
+      sourcePayload: { synthetic: true },
+    })),
+  });
+  const sourcePlanDigest = buildPrivateKwPersistencePlan(source).sourcePlanDigest;
+  const manifest = buildPrivateKwShadowSliceManifest(source, {
+    sliceVersion: PRIVATE_KW_SHADOW_SLICE_VERSION,
+    sliceKey: "m2-task-3-canonical-slice",
+    sourceImportId: source.importId,
+    sourcePlanDigest,
+    createdAt: "2026-09-02T15:00:00.000Z",
+    selections: source.records.map((record) => ({
+      businessId: record.business.id,
+      evaluationCandidateId: record.evaluationCandidateId,
+      sourceReview: {
+        decision: "APPROVED_FOR_BOUNDED_SHADOW_SLICE" as const,
+        reviewedBy: "RILEY" as const,
+        reviewedAt: "2026-09-02T14:00:00.000Z",
+        rationale: "Synthetic identity, market, niche, and independence were checked.",
+        identityConfirmed: true as const,
+        marketAndNicheConfirmed: true as const,
+        independenceConfirmed: true as const,
+      },
+    })),
+    mode: "SHADOW" as const,
+    authority: {
+      planOnly: true as const,
+      liveSourceAuthorized: false as const,
+      browserCaptureAuthorized: false as const,
+      artifactStorageAuthorized: false as const,
+      databaseMutationAuthorized: false as const,
+      contactDiscoveryExecutionAuthorized: false as const,
+      contactVerificationExecutionAuthorized: false as const,
+      consentDecisionAuthorized: false as const,
+      qualificationAuthorized: false as const,
+      mailboxSyncAuthorized: false as const,
+      outreachAuthorized: false as const,
+      sendAuthorized: false as const,
+      deploymentAuthorized: false as const,
+      providerOperationsAuthorized: 0 as const,
+      costAuthorizedUsd: 0 as const,
+    },
+  });
+  const policyDecisions = source.records.map((record, index) => ({
+    businessId: record.business.id,
+    sourceRights: index === 0 && retention === "RAW_HTML_ALLOWED" ? "PUBLIC_SOURCE_REVIEWED" as const : "PUBLIC_SOURCE_DERIVED" as const,
+    termsDecision: index === 0 && retention === "RAW_HTML_ALLOWED" ? "TERMS_REVIEWED_FOR_FACTS" as const : "PUBLIC_REVIEW_ONLY" as const,
+    robotsDecision: index === 0 && retention === "RAW_HTML_ALLOWED" ? "ROBOTS_REVIEWED_PUBLIC_ONLY" as const : "PREFLIGHT_REQUIRED_BEFORE_FETCH" as const,
+    evidenceRetention: index === 0 ? retention : "DERIVED_FACTS_ONLY" as const,
+    retentionReviewDate: "2026-09-30T15:00:00.000Z",
+    stopConditions: ["ROBOTS_OR_TERMS_UNCLEAR" as const],
+  }));
+  const researchPacket = buildPrivateKwM2ResearchPacket({ manifest, sourcePlan: source, reviewedAt: "2026-09-03T15:00:00.000Z", policyDecisions });
+  const researchPolicy = buildPrivateKwM2ResearchPolicy({ manifest, reviewedAt: "2026-09-03T15:00:00.000Z", policyDecisions });
+  const authorization = buildPrivateKwM2ExecutionAuthorization({ researchPacket, manifest, sourcePlan: source, researchPolicy, websitePolicy: { version: "kw-m2-website-policy-v1", networkRequestCap: 20, expiresAt: "2026-09-30T15:00:00.000Z" } });
+  const candidate = buildPrivateKwM2OwnerApprovalCandidate({ researchPacket, authorization, manifest, sourcePlan: source, researchPolicy });
+  const ownerEnvelope = recordPrivateKwM2OwnerApproval(candidate, { approver: "RILEY", reviewedAt: "2026-09-04T15:00:00.000Z", expiresAt: "2026-09-30T15:00:00.000Z", rationale: "Reviewed the exact canonical M2 packet and bounded local route.", dedicatedConfirmation: true });
+  return { researchPacket, authorization, ownerEnvelope, manifest, sourcePlan: source, researchPolicy };
+}
+
+function sourcePolicyProof(url: string, termsDecision: "PUBLIC_REVIEW_ONLY" | "TERMS_REVIEWED_FOR_FACTS") {
+  const robotsUrl = new URL("/robots.txt", url).toString();
+  const receiptCore = {
+    transportVersion: "kw-m2-public-transport-v1" as const,
+    requestId: 1,
+    normalizedUrl: robotsUrl,
+    method: "GET" as const,
+    hostname: new URL(robotsUrl).hostname,
+    selectedAddress: "93.184.216.34",
+    selectedFamily: 4 as const,
+    addressClass: "PUBLIC",
+    statusCode: 200,
+    startedAt: "2026-09-04T16:00:00.000Z",
+    completedAt: "2026-09-04T16:00:01.000Z",
+    socketOpened: true,
+    networkRequestCount: 1 as const,
+    acceptedAddressesDigest: "a".repeat(64),
+  };
+  const receiptDigest = privateKwPublicHttpTransportReceiptDigest({ ...receiptCore, receiptDigest: "0".repeat(64) });
+  const receipt = { ...receiptCore, receiptDigest };
+  return {
+    sourcePolicyDecision: {
+      policyVersion: "kw-m2-source-policy-v1" as const,
+      robotsUrl,
+      httpStatus: 200,
+      contentDigest: "b".repeat(64),
+      matchedGroup: "*",
+      matchedRule: null,
+      allowed: true,
+      crawlDelaySeconds: null,
+      nextAllowedAt: null,
+      termsDecision,
+      reason: "robots allows crawl; terms decision reviewed",
+      transportReceiptIds: [1],
+      transportReceiptDigests: [receiptDigest],
+      networkRequestCount: 1,
+      providerOperationsAuthorized: 0 as const,
+      costAuthorizedUsd: 0 as const,
+    },
+    transportReceipts: [receipt],
+  };
+}
+
 function baseMetadata(overrides: Partial<PrivateKwEvidenceMetadataInput> = {}): PrivateKwEvidenceMetadataInput {
+  const retention = overrides.retentionDecision ?? "DERIVED_FACTS_ONLY";
+  const chain = canonicalChain(retention);
+  const authorization = chain.authorization;
+  const requestedUrl = authorization.sourceDecisions[0]!.websiteUrl!;
+  const proof: Pick<PrivateKwEvidenceMetadataInput, "sourcePolicyDecision" | "transportReceipts"> = retention === "RAW_HTML_ALLOWED"
+    ? sourcePolicyProof(requestedUrl, authorization.sourceDecisions[0]!.termsDecision)
+    : {};
   const merged = {
-    businessId: "business:kw-roof-001",
+    businessId: authorization.businessIds[0]!,
     sourceId: "source:direct-site-001",
-    requestedUrl: "https://example.test/",
-    finalUrl: "https://example.test/",
+    requestedUrl,
+    finalUrl: requestedUrl,
     redirectChainDigest: "b".repeat(64),
     captureVersion: "html-capture-v1",
     transportVersion: "public-http-v1",
-    sourcePolicyVersion: "source-policy-v1",
+    sourcePolicyVersion: proof.sourcePolicyDecision?.policyVersion ?? "kw-m2-source-policy-v1",
     capturedAt: NOW,
-    rightsDecision: "ALLOWED",
-    termsDecision: "REVIEWED",
-    robotsDecision: "ALLOWED",
     parentReceiptDigest: PARENT,
+    ...proof,
     ...overrides,
   } as PrivateKwEvidenceMetadataInput;
-  const retention = merged.retentionDecision ?? "DERIVED_FACTS_ONLY";
-  const authorization = authorizationFor(retention);
   return {
     ...merged,
-    sourcePolicyVersion: authorization.websitePolicyVersion,
     authorizationDigest: authorization.authorizationDigest,
     authorizationExpiresAt: authorization.expiresAt,
-    authorization,
+    authorizationChain: chain,
   };
 }
 
 function facts() {
   return {
     pageTitle: "Roofing services",
-    canonicalUrl: "https://example.test/",
+    canonicalUrl: "https://business-1.com/",
     serviceObservations: ["roof repair"],
     locationObservations: ["Kitchener"],
     claimIds: ["claim:service-1"],
@@ -191,18 +331,48 @@ test("does not repair a raw metadata object left without its content pair", asyn
 
 test("requires the exact authorized retention decision and authorization identity", async () => {
   const store = createPrivateKwLocalHtmlEvidenceStore();
-  const factsOnlyAuthorization = authorizationFor("DERIVED_FACTS_ONLY");
+  const factsOnlyChain = canonicalChain("DERIVED_FACTS_ONLY");
   const raw = {
     ...baseMetadata({ retentionDecision: "RAW_HTML_ALLOWED", retainUntil: "2026-10-21T12:00:00.000Z" }),
     outcome: "RAW_HTML_ALLOWED" as const,
     contentType: "text/html" as const,
     bytes: HTML,
-    authorization: factsOnlyAuthorization,
-    authorizationDigest: factsOnlyAuthorization.authorizationDigest,
-    authorizationExpiresAt: factsOnlyAuthorization.expiresAt,
+    authorizationChain: factsOnlyChain,
+    authorizationDigest: factsOnlyChain.authorization.authorizationDigest,
+    authorizationExpiresAt: factsOnlyChain.authorization.expiresAt,
   };
   await assert.rejects(store.writePrivateKwHtmlEvidence(raw), /retention|authorized/i);
-  await assert.rejects(store.writePrivateKwHtmlEvidence({ ...raw, authorization: authorizationFor("RAW_HTML_ALLOWED"), authorizationDigest: "d".repeat(64) }), /identity|authorization/i);
+  const rawChain = canonicalChain("RAW_HTML_ALLOWED");
+  await assert.rejects(store.writePrivateKwHtmlEvidence({ ...raw, authorizationChain: rawChain, authorizationDigest: "d".repeat(64), authorizationExpiresAt: rawChain.authorization.expiresAt }), /identity|authorization/i);
+  const selfAsserted = authorizationFor("RAW_HTML_ALLOWED");
+  await assert.rejects(store.writePrivateKwHtmlEvidence({
+    ...raw,
+    authorizationChain: { ...rawChain, authorization: selfAsserted },
+    authorizationDigest: selfAsserted.authorizationDigest,
+    authorizationExpiresAt: selfAsserted.expiresAt,
+  }), /exact|authorization|owner|packet/i);
+});
+
+test("raw storage accepts only the exact copied Task2 policy and receipt chain", async () => {
+  const store = createPrivateKwLocalHtmlEvidenceStore();
+  const valid = {
+    ...baseMetadata({ retentionDecision: "RAW_HTML_ALLOWED", retainUntil: "2026-10-21T12:00:00.000Z" }),
+    outcome: "RAW_HTML_ALLOWED" as const,
+    contentType: "text/html" as const,
+    bytes: HTML,
+  };
+  const policy = valid.sourcePolicyDecision!;
+  await assert.rejects(store.writePrivateKwHtmlEvidence({
+    ...valid,
+    sourcePolicyDecision: { ...policy, policyVersion: "kw-m2-source-policy-v2" } as never,
+  }), /policy|source/i);
+  const receipt = valid.transportReceipts![0]!;
+  await assert.rejects(store.writePrivateKwHtmlEvidence({
+    ...valid,
+    transportReceipts: [{ ...receipt, receiptDigest: "c".repeat(64) }],
+  }), /receipt|transport|chain/i);
+  await assert.rejects(store.writePrivateKwHtmlEvidence({ ...valid, rightsDecision: "ALLOWED" } as never), /unrecognized|unknown|strict/i);
+  await store.writePrivateKwHtmlEvidence(valid);
 });
 
 test("rejects malformed metadata and leaves temp residue untouched", async () => {
@@ -392,6 +562,29 @@ test("derived facts reject unknown body-like fields and forged raw references", 
   );
 });
 
+test("derived facts reject compressed, encoded, aliased, and oversized snippets before publication", async () => {
+  const aliases = [
+    ["compressedBody", "H4sIAAAAAAA="],
+    ["encodedHtml", Buffer.from(HTML).toString("base64")],
+    ["htmlSnapshot", "<html>copied body</html>"],
+    ["pageSource", "<html>copied body</html>"],
+    ["snippet", "x".repeat(400)],
+  ] as const;
+  for (const [alias, value] of aliases) {
+    await cleanRoot();
+    const store = createPrivateKwLocalHtmlEvidenceStore();
+    const candidate = {
+      ...baseMetadata({ retentionDecision: "DERIVED_FACTS_ONLY", reviewAt: "2026-09-28T12:00:00.000Z" }),
+      outcome: "DERIVED_FACTS_ONLY" as const,
+      captureBytes: HTML,
+      facts: { ...facts(), [alias]: value } as never,
+      rawArtifactRef: null,
+    };
+    await assert.rejects(store.writePrivateKwDerivedFacts(candidate), /facts|unknown|unrecognized|large|bounded/i);
+    assert.deepEqual(await readdir(PRIVATE_KW_EVIDENCE_ROOT), []);
+  }
+});
+
 test("blocked writes only a bounded reason receipt and never document evidence", async () => {
   const store = createPrivateKwLocalHtmlEvidenceStore();
   const result = await store.writePrivateKwHtmlEvidence({
@@ -429,6 +622,20 @@ test("existing content conflict, tamper, path traversal and identity-unavailable
   );
   const digest = createHash("sha256").update(HTML).digest("hex");
   assert.equal(digest.length, 64);
+});
+
+test("filesystem safety seams fail closed for unknown reparse classification and unavailable identity", async () => {
+  const raw = {
+    ...baseMetadata({ retentionDecision: "RAW_HTML_ALLOWED", retainUntil: "2026-10-21T12:00:00.000Z" }),
+    outcome: "RAW_HTML_ALLOWED" as const,
+    contentType: "text/html" as const,
+    bytes: HTML,
+  };
+  const unknownReparseStore = createPrivateKwLocalHtmlEvidenceStore({ filesystemSafety: { classifyReparsePoint: () => "UNKNOWN" } });
+  await assert.rejects(unknownReparseStore.writePrivateKwHtmlEvidence(raw), /reparse|unsafe/i);
+  await cleanRoot();
+  const noIdentityStore = createPrivateKwLocalHtmlEvidenceStore({ filesystemSafety: { classifyReparsePoint: () => "SAFE", identityAvailable: () => false } });
+  await assert.rejects(noIdentityStore.writePrivateKwHtmlEvidence(raw), /identity|unavailable/i);
 });
 
 test("retention classifies raw expiry, derived review, and legal hold without deletion", async () => {
