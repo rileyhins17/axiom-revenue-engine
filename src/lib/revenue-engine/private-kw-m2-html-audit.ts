@@ -20,14 +20,6 @@ const HtmlOnlyPageSchema = z.object({
   capturedAt: z.string().datetime({ offset: true }),
   statusCode: z.number().int().min(0).max(599),
   contentComplete: z.literal(false),
-  structuredDataTypes: z.array(z.enum([
-    "LocalBusiness",
-    "Organization",
-    "WebSite",
-    "WebPage",
-    "Service",
-    "BreadcrumbList",
-  ])).max(20),
 }).strict();
 
 export const PrivateKwM2HtmlAvailabilityProofSchema = z.object({
@@ -81,7 +73,6 @@ function toPage(pageKind: PrivateKwM2HtmlAuditPage["pageKind"], capture: Website
       capturedAt: capture.capturedAt,
       statusCode: capture.statusCode,
       contentComplete: false,
-      structuredDataTypes: [],
     };
   }
   return {
@@ -91,9 +82,6 @@ function toPage(pageKind: PrivateKwM2HtmlAuditPage["pageKind"], capture: Website
     capturedAt: capture.capturedAt,
     statusCode: capture.statusCode,
     contentComplete: false,
-    structuredDataTypes: facts.structuredDataTypes.filter((entry): entry is PrivateKwM2HtmlAuditPage["structuredDataTypes"][number] => [
-      "LocalBusiness", "Organization", "WebSite", "WebPage", "Service", "BreadcrumbList",
-    ].includes(entry)),
   };
 }
 
@@ -107,7 +95,7 @@ function toSnapshot(page: PrivateKwM2HtmlAuditPage): z.infer<typeof WebsitePageS
     actions: [],
     forms: [],
     trustSignals: [],
-    structuredDataTypes: page.structuredDataTypes,
+    structuredDataTypes: [],
     contentComplete: false,
     evidenceCoverage: {
       desktopRenderCaptured: false,

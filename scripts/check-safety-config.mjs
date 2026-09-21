@@ -110,6 +110,7 @@ const stagingConsoleRelease = await readFile(new URL("../src/lib/revenue-engine/
 const stagingConsoleReleaseVerifier = await readFile(new URL("./verify-staging-console-release.ts", import.meta.url), "utf8");
 const stagingConsoleReleasePacket = await readFile(new URL("../docs/releases/staging/2026-08-28-owner-quality-lab.json", import.meta.url), "utf8");
 const privateKwM2HtmlWorkflow = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", import.meta.url), "utf8");
+const privateKwM2HtmlSchema = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-html-evidence-schema.ts", import.meta.url), "utf8");
 const privateKwM2HtmlAudit = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-html-audit.ts", import.meta.url), "utf8");
 const privateKwM2HtmlReceipt = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", import.meta.url), "utf8");
 const stagingMarker = '"staging": {';
@@ -836,12 +837,12 @@ requireMatch("migrations/0060_artifact_reference_source_writer_guards.sql", arti
 forbidMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, /\b(?:INSERT\s+INTO|UPDATE\s+\"[^\"]+\"\s+SET|DELETE\s+FROM)\b/i, "writer-guard migration must not mutate existing rows");
 forbidMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, /retentionConclusionAuthorized\s*=\s*1|projectionPersistenceAuthorized\s*=\s*1|releaseAuthorized\s*=\s*1|deletionAuthorized\s*=\s*1|providerOperationsAuthorized\s*>\s*0/i, "writer-guard migration must not grant operational authority");
 
-requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION\s*=\s*[\"']kw-m2-html-evidence-workflow-v1/, "Task4 must expose its versioned HTML-only workflow contract");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-schema.ts", privateKwM2HtmlSchema, /PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION\s*=\s*[\"']kw-m2-html-evidence-workflow-v1/, "Task4 must expose its versioned HTML-only workflow contract");
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /assertPrivateKwM2ApprovalChain/, "Task4 must revalidate the canonical Task1 approval chain before requests");
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /createPrivateKwPublicHttpTransport/, "Task4 must use the address-pinned public transport adapter");
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /networkRequestCap/, "Task4 must enforce the approved shared request cap");
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /writePrivateKwHtmlEvidence|writePrivateKwDerivedFacts/, "Task4 must route retention through the canonical local evidence store");
-requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /transportReceipts:\s*z\.array\(PrivateKwPublicHttpTransportReceiptSchema\)/, "Task4 receipt must persist the complete transport receipt chain");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-schema.ts", privateKwM2HtmlSchema, /transportReceipts:\s*z\.array\(PrivateKwPublicHttpTransportReceiptSchema\)/, "Task4 receipt must persist the complete transport receipt chain");
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /validateSealedReplay/, "Task4 replay must reload and validate the complete sealed receipt before returning");
 forbidMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /rootPath/, "Task4 workflow must not expose a caller-controlled sealed-receipt root");
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /providerOperations:\s*0|costAuthorizedUsd:\s*0/, "Task4 receipt must report zero provider and cost authority");

@@ -79,6 +79,8 @@ test("HTML-only projection discards contact and qualification material", async (
   assert.equal(serialized.includes("+15195550123"), false);
   assert.equal(serialized.includes("owner@example.test"), false);
   assert.equal(serialized.includes("Five-star"), false);
+  assert.equal(serialized.includes("structuredDataTypes"), false);
+  assert.throws(() => PrivateKwM2HtmlAuditReceiptSchema.parse({ ...receipt, pages: [{ ...receipt.pages[0], structuredDataTypes: ["LocalBusiness"] }] }), /unrecognized/i);
   assert.throws(() => PrivateKwM2HtmlAuditReceiptSchema.parse({ ...receipt, classification: "REBUILD" }), /expected undefined|unrecognized/i);
 });
 
@@ -91,7 +93,7 @@ test("sealed receipt store is content addressed, exclusive, and tamper rejecting
   const file = path.join(testRoot, "sealed", "sha256", operationId.slice(0, 2), operationId + ".json");
   await rm(testRoot, { recursive: true, force: true });
   try {
-    const store = createPrivateKwM2HtmlEvidenceReceiptStore({ rootPath: testRoot, validateReceipt: (value) => PrivateKwM2WebsiteEvidenceReceiptSchema.parse(value) });
+    const store = createPrivateKwM2HtmlEvidenceReceiptStore({ rootPath: testRoot });
     const receipt = valid;
     assert.equal(await store.loadSealed(receipt.operationId), null);
     await assert.rejects(lstat(testRoot), /ENOENT/);
@@ -299,12 +301,12 @@ test("policy failure without a durable policy witness remains unsealed and repla
   const chain = approvedChain();
   const receiptStore = memoryReceiptStore();
   let requests = 0;
-  const transport = fakeTransport(() => { requests += 1; });
+  const transport = fakeTransport(() => { requests += 1; }, "not a valid robots document");
   const request = { requestId: "23232323-2323-4232-8232-232323232323", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
-  const failed = await executePrivateKwM2HtmlEvidence(request, { transport, receiptStore, store: fakeEvidenceStore(), evaluatePolicy: async () => { throw new Error("synthetic policy setup failure"); }, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  const failed = await executePrivateKwM2HtmlEvidence(request, { transport, receiptStore, store: fakeEvidenceStore(), clock: () => new Date("2026-09-21T15:00:00.000Z") });
   assert.equal(failed.status, "FAILED");
-  assert.equal(failed.stopReason, "ROBOTS_POLICY_FAILED");
-  assert.equal(failed.sourcePolicy, null);
+  assert.equal(failed.stopReason, "ROBOTS_OR_TERMS_BLOCKED");
+  assert.equal(failed.sourcePolicy?.allowed, false);
   assert.equal(receiptStore.values.size, 0);
   const beforeReplay = requests;
   const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), receiptStore, store: fakeEvidenceStore(), clock: () => new Date("2026-09-21T15:00:00.000Z") });
@@ -343,6 +345,7 @@ test("retention block seals only with a reloaded blocked witness", async () => {
   assert.equal(fresh.status, "FAILED");
   assert.equal(fresh.stopReason, "RETENTION_BLOCKED");
   assert(fresh.blockedEvidence);
+  assert.equal(JSON.stringify(fresh).includes("receiptPath"), false);
   const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { throw new Error("network must not run"); }), receiptStore, store: evidenceStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
   assert.deepEqual(replay, fresh);
   const tampered = structuredClone(fresh) as unknown as MutableReceipt;

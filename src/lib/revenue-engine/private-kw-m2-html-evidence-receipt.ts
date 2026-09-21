@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { lstat, mkdir, open, realpath } from "node:fs/promises";
 import path from "node:path";
 import { PRIVATE_KW_EVIDENCE_ROOT } from "@/lib/revenue-engine/private-kw-local-html-evidence-store";
-import type { PrivateKwM2WebsiteEvidenceReceipt } from "@/lib/revenue-engine/private-kw-m2-html-evidence-workflow";
+import { PrivateKwM2WebsiteEvidenceReceiptSchema, type PrivateKwM2WebsiteEvidenceReceipt } from "@/lib/revenue-engine/private-kw-m2-html-evidence-schema";
 
 function canonicalize(value: unknown): string {
   if (value === undefined) return "null";
@@ -18,7 +18,6 @@ function digest(value: string) {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const TEST_ROOT = /^m2-receipt-test-[a-z0-9-]+$/;
-type ReceiptValidator = (value: unknown) => PrivateKwM2WebsiteEvidenceReceipt;
 function resolveReceiptRoot(rootPath?: string) {
   if (rootPath === undefined) return PRIVATE_KW_EVIDENCE_ROOT;
   const resolved = path.resolve(rootPath);
@@ -45,7 +44,7 @@ async function assertSafeRoot(root: string, create = true) {
   return true;
 }
 
-async function readVerifiedReceipt(file: string, validateReceipt: ReceiptValidator) {
+async function readVerifiedReceipt(file: string) {
   const handle = await open(file, "r");
   try {
     const opened = await handle.stat();
@@ -58,7 +57,7 @@ async function readVerifiedReceipt(file: string, validateReceipt: ReceiptValidat
     if (!after.isFile() || after.isSymbolicLink() || opened.dev !== after.dev || opened.ino !== after.ino || await realpath(file) !== path.resolve(file)) {
       throw new Error("UNSAFE_SEALED_RECEIPT_FILE_IDENTITY");
     }
-    return { bytes, parsed: parseReceipt(bytes, validateReceipt) };
+    return { bytes, parsed: parseReceipt(bytes) };
   } finally {
     await handle.close();
   }
@@ -77,7 +76,7 @@ async function ensureSafeDirectoryChain(root: string, directory: string, create 
   return true;
 }
 
-function parseReceipt(bytes: Buffer, validateReceipt: ReceiptValidator) {
+function parseReceipt(bytes: Buffer) {
   const parsed: unknown = JSON.parse(bytes.toString("utf8"));
   if (!parsed || typeof parsed !== "object" || typeof (parsed as { operationId?: unknown }).operationId !== "string") {
     throw new Error("SEALED_RECEIPT_INVALID");
@@ -86,7 +85,7 @@ function parseReceipt(bytes: Buffer, validateReceipt: ReceiptValidator) {
   if (typeof value.operationDigest !== "string") throw new Error("SEALED_RECEIPT_DIGEST_MISSING");
   const { operationDigest, ...core } = value;
   if (digest(canonicalize(core)) !== operationDigest) throw new Error("SEALED_RECEIPT_DIGEST_MISMATCH");
-  return validateReceipt(parsed);
+  return PrivateKwM2WebsiteEvidenceReceiptSchema.parse(parsed);
 }
 
 export type PrivateKwM2HtmlEvidenceReceiptStore = {
@@ -94,7 +93,7 @@ export type PrivateKwM2HtmlEvidenceReceiptStore = {
   publishSealed: (receipt: PrivateKwM2WebsiteEvidenceReceipt) => Promise<"CREATED" | "EXACT_REPLAY">;
 };
 
-export function createPrivateKwM2HtmlEvidenceReceiptStore(options: { validateReceipt: ReceiptValidator; rootPath?: string }): PrivateKwM2HtmlEvidenceReceiptStore {
+export function createPrivateKwM2HtmlEvidenceReceiptStore(options: { rootPath?: string } = {}): PrivateKwM2HtmlEvidenceReceiptStore {
   const root = resolveReceiptRoot(options.rootPath);
   return {
     async loadSealed(operationId) {
@@ -102,7 +101,7 @@ export function createPrivateKwM2HtmlEvidenceReceiptStore(options: { validateRec
       const file = operationPath(root, operationId);
       try {
         if (!await ensureSafeDirectoryChain(root, path.dirname(file), false)) return null;
-        const { bytes, parsed } = await readVerifiedReceipt(file, options.validateReceipt);
+        const { bytes, parsed } = await readVerifiedReceipt(file);
         if (canonicalize(parsed) + "\n" !== bytes.toString("utf8")) throw new Error("SEALED_RECEIPT_BYTES_MISMATCH");
         if ((parsed as { operationId: string }).operationId !== operationId) throw new Error("SEALED_RECEIPT_OPERATION_ID_MISMATCH");
         return parsed;
@@ -118,7 +117,7 @@ export function createPrivateKwM2HtmlEvidenceReceiptStore(options: { validateRec
       const operationId = (receipt as { operationId: string }).operationId;
       operationPath(root, operationId);
       const bytes = Buffer.from(canonicalize(receipt) + "\n", "utf8");
-      parseReceipt(bytes, options.validateReceipt);
+      parseReceipt(bytes);
       await assertSafeRoot(root, true);
       const file = operationPath(root, operationId);
       await ensureSafeDirectoryChain(root, path.dirname(file), true);
@@ -132,12 +131,12 @@ export function createPrivateKwM2HtmlEvidenceReceiptStore(options: { validateRec
         } finally {
           await handle.close();
         }
-        const { bytes: publishedBytes, parsed: published } = await readVerifiedReceipt(file, options.validateReceipt);
+        const { bytes: publishedBytes, parsed: published } = await readVerifiedReceipt(file);
         if (canonicalize(published) + "\n" !== publishedBytes.toString("utf8") || publishedBytes.toString("utf8") !== bytes.toString("utf8")) throw new Error("SEALED_RECEIPT_BYTES_MISMATCH");
         return "CREATED";
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-        const { parsed: existing } = await readVerifiedReceipt(file, options.validateReceipt);
+        const { parsed: existing } = await readVerifiedReceipt(file);
         if (canonicalize(existing) !== canonicalize(receipt)) throw new Error("SEALED_RECEIPT_CONFLICT");
         return "EXACT_REPLAY";
       }
