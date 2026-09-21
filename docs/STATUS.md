@@ -1,7 +1,7 @@
 # Current status — Axiom Revenue Engine
 
-**Updated:** 2026-09-21 (America/Toronto). **Work cycle:** Task 5 M1 offline
-checkpoint package on commit `96a0277973eb05145f8f770dee94704510350b7e`.
+**Updated:** 2026-09-21 (America/Toronto). **Work cycle:** Task 5 M1 final
+exact-commit verification recorded on `fe921824439cda6b485cf11966977d30829d7133`.
 
 ## Owner-facing state
 
@@ -58,12 +58,23 @@ consent false, qualification false, outreach false, send false,
 local shadow SQLite write. No provider, network, mailbox, prospect, deployment,
 remote migration, outreach, send, or spend action occurred.
 
-This is an artifact checkpoint, not the final M1 release verification. The root
-checkpoint owner still must run the required exact-commit safety, full test,
-typecheck, lint, Cloudflare build, Wrangler dry-run, and owner-UI sequence and
-record those results. Task 5 did not claim those checks from this local CLI
-run. The prior Task 4C full test evidence was 511 passing tests and one skipped
-Windows developer-mode symlink case.
+The root checkpoint owner completed the final M1 verification sequence on the
+exact committed candidate `fe921824439cda6b485cf11966977d30829d7133`:
+
+| Check | Result |
+|---|---|
+| `npm run check:safety` | PASS |
+| `npm test` | PASS — 511 passed, 0 failed, 1 skipped, 512 total; the skip is the Windows developer-mode symlink privilege case |
+| `npm run typecheck` | PASS |
+| `npm run lint` | PASS |
+| `npm run build:cloudflare` | PASS — bundle sanitizer removed 0 local secret values and scanned 2018 files |
+| `npx wrangler deploy --env="" --dry-run --autoconfig false` | PASS — no upload after the custom rebuild; generated-bundle duplicate `options` warnings were non-blocking |
+| `npm run test:owner-ui` | PASS — desktop list 854 ms, dossier 464 ms, widths 1440/390, WCAG pages 6, external requests 0 |
+
+M1 is complete for the bounded synthetic offline scope. The verification
+sequence confirms the local implementation, build safety, dry-run packaging,
+and owner UI acceptance; it does not establish a live acquisition loop or
+real-business readiness.
 
 ## Production, staging, and automation
 
@@ -83,20 +94,21 @@ gate. M2 is blocked by the absence of an authorized real-source evidence packet,
 verified provider and mailbox readiness, live runtime proof, an owner-approved
 ten-business research cohort, and the separate contact/consent/reply gates.
 
-## Required remaining verification
+## M1 verification result
 
-The final M1 verification is intentionally unclaimed until the root checkpoint
-owner runs the required checks on the exact committed candidate. The local
-artifact proves only the synthetic offline path and its replay/restart behavior.
+The exact-commit M1 verification gate is complete for the synthetic offline
+scope. The retained artifact proves only the bounded local path and its
+replay/restart behavior. Production, staging, provider, contact, outreach,
+deployment, and spend facts remain unknown or off as stated above.
 
 ## Next three concrete actions
 
-1. Run the required exact-commit safety, full test, typecheck, lint, Cloudflare
-   build, Wrangler dry-run, and owner-UI sequence, then attach the results to
-   the M1 checkpoint.
-2. Prepare M2's owner decision packet for real-source rights, privacy, accounts,
+1. Prepare M2's owner decision packet for real-source rights, privacy, accounts,
    backup/rollback, ten-business scope, and the explicit release gate without
    activating any provider or contact path.
-3. Decide whether the real-source evidence and owner-review prerequisites are
-   approved; if they are, implement and verify the bounded M2 packet before any
-   contact, outreach, deployment, or spend action.
+2. Record the owner's approval or rejection of the M2 release and activation
+   gates, including provider, contact, privacy, and budget decisions, without
+   activating any capability.
+3. If M2 is approved, implement and verify its bounded capability packet while
+   keeping provider, contact, deployment, outreach, send, and spend actions
+   separately gated.
