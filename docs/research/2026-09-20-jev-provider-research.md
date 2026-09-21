@@ -5,7 +5,7 @@
 
 ## Executive finding
 
-Jev is TypeSafe’s first “System One” model: a typed decision API that evaluates one `state` (text or JSON-like object/array) against named `Choice`, `Score`, and `Noul` questions and returns structured answers. The official endpoint is `POST https://api.typesafe.ai/v1/systemone`, authenticated with `Authorization: Bearer <API_KEY>`. The official docs currently list `jev-1.13.0` and `jev-latest` (alias currently points to `jev-1.13.0`). The earlier claims of a 2026-09-15 launch and `70–500 ms` latency are not established by the primary sources reviewed. The homepage shows one illustrative workflow completed in `0.114s`, not a latency SLA or distribution.
+Jev is TypeSafe’s first “System One” model: a typed decision API that evaluates one `state` (text or JSON-like object/array) against named `Choice`, `Score`, and `Noul` questions and returns structured answers. The official endpoint is `POST https://api.typesafe.ai/v1/systemone`, authenticated with `Authorization: Bearer <API_KEY>`. The official docs currently list `jev-1.13.0` and `jev-latest` (alias currently points to `jev-1.13.0`). Follow-up research found the original launch article dated 2026-09-15 and its vendor-reported `70–500 ms` latency range; see the deep-research note below. This is not an independently verified latency guarantee. The homepage shows one illustrative workflow completed in `0.114s`, not a latency SLA or distribution.
 
 ## API shape and primitives
 
@@ -38,7 +38,7 @@ TypeSafe’s model page currently reports Jev 1.13 as `jev-1.13.0`, price `$42 /
 
 `jev-latest` is the default alias and currently resolves to `jev-1.13.0`; aliases move when releases ship. Pin `jev-1.13.0` for threshold stability, log the response `model`, and deliberately re-evaluate thresholds before upgrading. The docs also list `jev-preview`, currently pointing to the same release.
 
-The official homepage claims a particular TypeSafe workflow completed in `0.114s` versus an LLM workflow in `8.566s`, with stated comparison context on the page; this is an illustrative claim, not an independently reproducible benchmark. No official p50/p95, regional latency, uptime/SLA, or 70–500 ms range was found. Measure Axiom’s actual Cloudflare-to-API latency during an authorized staging test later.
+The official homepage claims a particular TypeSafe workflow completed in `0.114s` versus an LLM workflow in `8.566s`, with stated comparison context on the page; this is an illustrative claim, not an independently reproducible benchmark. The follow-up launch-article review establishes an official vendor claim of 70–500 ms from generally West Coast measurements; no Axiom-region p50/p95 or contractual latency guarantee is established. Measure Axiom’s actual Cloudflare-to-API latency during an authorized staging test later.
 
 ## Validation, retries, and runtime fit
 
@@ -58,7 +58,11 @@ TypeSafe says `jev-1.13` reads literally and is weak at math, counting, numeric 
 
 ## Decision for Axiom
 
-Jev is technically plausible for a read-only, evidence-grounded prospect triage assist in a Cloudflare Worker, using pinned `jev-1.13.0`, schema validation of both request and response, conservative confidence thresholds, and manual review. It is not yet cleared for production outreach automation: dynamic rate limits, no public SLA, ordinary retention ambiguity, known numeric/date/adversarial-state weaknesses, and no verified live latency need resolution. The 2026-09-15 launch date and 70–500 ms claim remain unverified. The model page publishes free output tokens, while the MCA establishes USD billing unless an Order says otherwise; account-specific credit/refill application still depends on the Order/account terms.
+Jev is technically plausible for a read-only, evidence-grounded prospect triage assist in a Cloudflare Worker, using pinned `jev-1.13.0`, schema validation of both request and response, conservative confidence thresholds, and manual review. It is not yet cleared for production outreach automation: dynamic rate limits, no public SLA, ordinary retention ambiguity, known numeric/date/adversarial-state weaknesses, and no verified live latency need resolution. The launch date and published 70–500 ms vendor claim are now verified from the original launch article; actual Axiom-route latency remains unmeasured. The model page publishes free output tokens, while the MCA establishes USD billing unless an Order says otherwise; account-specific credit/refill application still depends on the Order/account terms.
+
+## Follow-up research
+
+[Deep research](2026-09-20-jev-deep-research.md) adds the Vercel access path, live free promotion ending September 25, DOM/browser benchmark interpretation, SDK protocol, and unresolved account/version questions. Source for the corrected launch facts: https://typesafe.ai/blog/introducing-system-one-models-and-jev.
 
 ## Official sources
 

@@ -4,6 +4,19 @@
 
 ## Owner-facing state
 
+**Follow-up research:** the owner requested a deeper Jev/Vercel/DOM investigation.
+The [research synthesis](research/2026-09-20-jev-deep-research.md) and three
+companion reports document the live Vercel free promotion ending September 25,
+Gateway evaluation API, account limitations, browser benchmark evidence, and
+proposed DOM experiments. The browser access path reached Vercel sign-in;
+account entitlement, a key and successful inference are not verified. No
+inference, signup, purchase, code/dependency change or deployment occurred.
+This research supplements the plan; implementation remains unstarted.
+Documentation checks for this follow-up cover local links, whitespace and
+changed-file scope. The preceding full runtime verification below remains the
+last test evidence; no source/dependency changes justify rerunning those builds
+for this research-only checkpoint. Its existing failures remain unresolved.
+
 Master Plan v2 now defines a complete path from evidence-backed business discovery to outreach, replies, opportunities and customer outcomes. The plan retains the existing stack, makes AI optional, corrects provider/account assumptions, and prioritizes complete owner workflows. **It has not been implemented.** No source code, dependency, runtime configuration, provider account, credential, database, campaign, deployment or prospect interaction was changed by this planning cycle.
 
 Riley confirmed no OpenAI API keys. Existing OpenAI adapter/model assignments are source capability only. Jev, verifier and mailbox readiness are not established by their documentation or configuration. New provider and operational decisions remain separately gated.

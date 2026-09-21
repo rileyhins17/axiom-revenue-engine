@@ -77,6 +77,14 @@ free route whose expiry and immutable version must be rechecked before use.
 
 ## Exact C$50 planning example
 
+Follow-up live catalog inspection confirms the Vercel promotion is advertised
+to end September 25, 2026. See [the access investigation](research/2026-09-20-jev-vercel-access.md)
+for Gateway authentication, evaluation API, account/plan eligibility, rate
+limits, and budget semantics. Vercel Hobby terms restrict commercial use;
+do not assume the Gateway promotion waives account terms or requires a paid
+hosting migration. Any required plan fee must be added to this total budget;
+the scenario below does not include a Vercel subscription. No plan was bought.
+
 Use **US$1 = C$1.38** as a planning assumption only. Apply a uniform 13% tax
 placeholder to the taxable subtotal for headroom; this is not tax advice and
 actual provider tax/account treatment must be confirmed at checkout.

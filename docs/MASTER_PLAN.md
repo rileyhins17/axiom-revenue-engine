@@ -186,6 +186,7 @@ Weekly learning asks: which source found worthwhile accounts, which claim/offer 
 |---|---|---|---|
 | URL checks, dates, arithmetic, duplicates, budget and send gates | Deterministic code | None | Exact tests and current data |
 | Business/service fit and research triage | Rules + owner judgement | Jev Choice questions over bounded evidence | Improves owner time/useful-lead selection on frozen labels |
+| Relevant-page/DOM candidate selection | Extracted links + deterministic rules | Jev over bounded current element IDs | Better evidence yield/time on held-out sites; independent executor/verifier; no form submission |
 | Visual interpretation | Browser measurements + human review | A provisioned vision model | Adds supported findings without false claims |
 | Drafting | Approved templates + owner edits | Provisioned generative model | Less edit time; all claims grounded; no invented facts |
 | Reply labels | Conservative rules + owner | Jev or generative classifier | Excellent stop/negative recall; no autonomous reply authority |
@@ -195,6 +196,8 @@ Build no model orchestra. Use one provider for a proven task, one bounded reques
 Jev is text-only, does not generate prose, and has documented numeric/date, context, adversarial-input and cross-question consistency limitations. Use `Choice` with explicit unknown states for the first trial; evaluate Noul/Score separately. Neither typed output nor a high confidence score establishes truth. [Jev models](https://docs.typesafe.ai/models), [limitations](https://docs.typesafe.ai/model-jaggedness/jev-1.13).
 
 No OpenAI keys are available according to the owner. Existing OpenAI adapter code remains inactive/reusable. A ChatGPT/Codex subscription and connector access are not production API credentials or a supported unattended runtime bridge. Preserve the earlier Jev research as a subordinate experiment, but [this master plan and delivery sequence](DELIVERY_PLAN.md) now govern when to do it.
+
+[The deeper Jev investigation](research/2026-09-20-jev-deep-research.md) verifies a Vercel Gateway route (`typesafe-ai/jev`, evaluation API) and a live free promotion advertised to end September 25, 2026. This offers a candidate synthetic access experiment without OpenAI keys or moving Cloudflare hosting. Account eligibility, actual inference and immutable model pinning remain unverified. Browser demos justify testing closed-set DOM decisions, not promoting Jev to autonomous browsing, visual auditing, consent authority or a replacement for the M3 quality gate. Vercel plan commitments and commercial-use eligibility must fit the shared budget before adoption.
 
 ## 7. Data, execution, and security contracts
 
