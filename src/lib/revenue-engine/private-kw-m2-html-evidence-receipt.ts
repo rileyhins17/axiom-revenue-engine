@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { lstat, mkdir, open, readFile, realpath } from "node:fs/promises";
+import { lstat, mkdir, open, realpath } from "node:fs/promises";
 import path from "node:path";
 import { PRIVATE_KW_EVIDENCE_ROOT } from "@/lib/revenue-engine/private-kw-local-html-evidence-store";
 import type { PrivateKwM2WebsiteEvidenceReceipt } from "@/lib/revenue-engine/private-kw-m2-html-evidence-workflow";
@@ -45,9 +45,23 @@ async function assertSafeRoot(root: string, create = true) {
   return true;
 }
 
-async function assertSafeFile(file: string) {
-  const stats = await lstat(file);
-  if (!stats.isFile() || stats.isSymbolicLink() || await realpath(file) !== path.resolve(file)) throw new Error("UNSAFE_SEALED_RECEIPT_FILE");
+async function readVerifiedReceipt(file: string, validateReceipt: ReceiptValidator) {
+  const handle = await open(file, "r");
+  try {
+    const opened = await handle.stat();
+    const before = await lstat(file);
+    if (!opened.isFile() || !before.isFile() || before.isSymbolicLink() || opened.dev !== before.dev || opened.ino !== before.ino || await realpath(file) !== path.resolve(file)) {
+      throw new Error("UNSAFE_SEALED_RECEIPT_FILE_IDENTITY");
+    }
+    const bytes = await handle.readFile();
+    const after = await lstat(file);
+    if (!after.isFile() || after.isSymbolicLink() || opened.dev !== after.dev || opened.ino !== after.ino || await realpath(file) !== path.resolve(file)) {
+      throw new Error("UNSAFE_SEALED_RECEIPT_FILE_IDENTITY");
+    }
+    return { bytes, parsed: parseReceipt(bytes, validateReceipt) };
+  } finally {
+    await handle.close();
+  }
 }
 async function ensureSafeDirectoryChain(root: string, directory: string, create = true) {
   const relative = path.relative(root, directory);
@@ -88,9 +102,7 @@ export function createPrivateKwM2HtmlEvidenceReceiptStore(options: { validateRec
       const file = operationPath(root, operationId);
       try {
         if (!await ensureSafeDirectoryChain(root, path.dirname(file), false)) return null;
-        await assertSafeFile(file);
-        const bytes = await readFile(file);
-        const parsed = parseReceipt(bytes, options.validateReceipt);
+        const { bytes, parsed } = await readVerifiedReceipt(file, options.validateReceipt);
         if (canonicalize(parsed) + "\n" !== bytes.toString("utf8")) throw new Error("SEALED_RECEIPT_BYTES_MISMATCH");
         if ((parsed as { operationId: string }).operationId !== operationId) throw new Error("SEALED_RECEIPT_OPERATION_ID_MISMATCH");
         return parsed;
@@ -120,14 +132,12 @@ export function createPrivateKwM2HtmlEvidenceReceiptStore(options: { validateRec
         } finally {
           await handle.close();
         }
-        await assertSafeFile(file);
-        const published = parseReceipt(await readFile(file), options.validateReceipt);
-        if (canonicalize(published) + "\n" !== bytes.toString("utf8")) throw new Error("SEALED_RECEIPT_BYTES_MISMATCH");
+        const { bytes: publishedBytes, parsed: published } = await readVerifiedReceipt(file, options.validateReceipt);
+        if (canonicalize(published) + "\n" !== publishedBytes.toString("utf8") || publishedBytes.toString("utf8") !== bytes.toString("utf8")) throw new Error("SEALED_RECEIPT_BYTES_MISMATCH");
         return "CREATED";
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-        await assertSafeFile(file);
-        const existing = parseReceipt(await readFile(file), options.validateReceipt);
+        const { parsed: existing } = await readVerifiedReceipt(file, options.validateReceipt);
         if (canonicalize(existing) !== canonicalize(receipt)) throw new Error("SEALED_RECEIPT_CONFLICT");
         return "EXACT_REPLAY";
       }

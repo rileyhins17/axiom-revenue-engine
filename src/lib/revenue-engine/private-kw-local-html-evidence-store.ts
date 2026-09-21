@@ -64,6 +64,8 @@ export interface PrivateKwEvidenceMetadataInput {
   transportVersion: string;
   sourcePolicyVersion: string;
   capturedAt: string;
+  statusCode?: number;
+  redirectCount?: number;
   parentReceiptDigest: string;
   authorizationDigest: string;
   authorizationExpiresAt: string;
@@ -121,6 +123,8 @@ const CommonMetadataSchema = z.object({
   transportVersion: z.string().min(1).max(120),
   sourcePolicyVersion: z.string().min(1).max(120),
   capturedAt: IsoDateSchema,
+  statusCode: z.number().int().min(0).max(599).optional(),
+  redirectCount: z.number().int().nonnegative().max(20).optional(),
   rightsDecision: z.literal("ALLOWED"),
   termsDecision: z.literal("REVIEWED"),
   robotsDecision: z.literal("ALLOWED"),
@@ -514,6 +518,8 @@ function metadataCore(input: PrivateKwEvidenceMetadataInput, outcome: "RAW_HTML_
     transportVersion: input.transportVersion,
     sourcePolicyVersion: outcome === "RAW_HTML_ALLOWED" && input.sourcePolicyDecision ? input.sourcePolicyDecision.policyVersion : input.sourcePolicyVersion,
     capturedAt: input.capturedAt,
+    ...(input.statusCode !== undefined ? { statusCode: input.statusCode } : {}),
+    ...(input.redirectCount !== undefined ? { redirectCount: input.redirectCount } : {}),
     rightsDecision: "ALLOWED" as const,
     termsDecision: "REVIEWED" as const,
     robotsDecision: "ALLOWED" as const,

@@ -121,14 +121,14 @@ test("workflow request rejects unbounded CLI-shaped extras", () => {
   assert.throws(() => PrivateKwM2HtmlEvidenceRequestSchema.parse({ ...valid, websiteUrl: "https://attacker.example/" }), /unrecognized/i);
 });
 
-function approvedChain(networkRequestCap = 8, firstRetention: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED" = "RAW_HTML_ALLOWED") {
+function approvedChain(networkRequestCap = 8, firstRetention: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED" = "RAW_HTML_ALLOWED", firstWebsiteUrl = "https://business-1.com/") {
   const sourcePlan = preparePrivateKwImport({
     importVersion: PRIVATE_KW_IMPORT_VERSION, importId: "m2-task-4-test-source", adapter: "MANUAL_RESEARCH",
     queryText: "Synthetic Task4 website evidence", filters: { synthetic: true }, capturedAt: "2026-09-01T15:00:00.000Z", costUsd: 0,
     records: Array.from({ length: PRIVATE_KW_SHADOW_SLICE_SIZE }, (_, index) => ({
       sourceOwnedId: `m2-task-4-${index + 1}`, sourceEvidenceUrl: `https://directory-${index + 1}.com/business-${index + 1}`,
       businessName: `Synthetic Business ${index + 1}`, city: (["KITCHENER", "WATERLOO", "CAMBRIDGE"] as const)[index % 3], region: "ON" as const, country: "CA" as const,
-      niche: (["ROOFING", "HVAC", "LANDSCAPING"] as const)[index % 3], websiteUrl: `https://business-${index + 1}.com/`, phone: null,
+      niche: (["ROOFING", "HVAC", "LANDSCAPING"] as const)[index % 3], websiteUrl: index === 0 ? firstWebsiteUrl : `https://business-${index + 1}.com/`, phone: null,
       addressLine: `${index + 1} Example Street`, postalCode: "N2G 1A1", independenceStatus: "INDEPENDENT" as const,
       capturedAt: "2026-09-01T14:00:00.000Z", sourcePayload: { synthetic: true },
     })),
@@ -177,17 +177,23 @@ function fakeTransport(onRequest: () => void, robotsBody = "User-agent: *\\nAllo
 function fakeEvidenceStore(writes: Array<{ requestedUrl: string; sourcePageUrl?: string }> = []) {
   type PersistedInput = Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwHtmlEvidence"]>[0] | Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwDerivedFacts"]>[0];
   const persisted: Array<{ outcome: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY"; input: PersistedInput }> = [];
+  const blockedPersisted = new Map<string, Extract<PersistedInput, { outcome: "BLOCKED" }>>();
   let reloadIndex = 0;
   const refs = (outcome: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY") => outcome === "RAW_HTML_ALLOWED"
     ? { outcome, contentRef: "kw-html:sha256:" + "c".repeat(64), metadataRef: "kw-html-meta:sha256:" + "d".repeat(64), contentPath: "sealed/content.html", metadataPath: "sealed/metadata.json", executionPath: "CREATED" as const }
     : { outcome, contentRef: "kw-html:sha256:" + "c".repeat(64), metadataRef: "kw-html-meta:sha256:" + "d".repeat(64), factsRef: "kw-html-facts:sha256:" + "e".repeat(64), metadataPath: "sealed/metadata.json", factsPath: "sealed/facts.json", rawArtifactRef: null, executionPath: "CREATED" as const };
   return {
     writePrivateKwHtmlEvidence: async (input: Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwHtmlEvidence"]>[0]) => { writes.push({ requestedUrl: input.requestedUrl, sourcePageUrl: input.sourcePageUrl }); return input.outcome === "BLOCKED"
-      ? { outcome: "BLOCKED" as const, receiptRef: "kw-html-receipt:sha256:" + "f".repeat(64), receiptPath: "sealed/blocked.json", blockCode: input.blockCode, executionPath: "CREATED" as const }
+      ? (blockedPersisted.set("kw-html-receipt:sha256:" + "f".repeat(64), input), { outcome: "BLOCKED" as const, receiptRef: "kw-html-receipt:sha256:" + "f".repeat(64), receiptPath: "sealed/blocked.json", blockCode: input.blockCode, executionPath: "CREATED" as const })
       : (persisted.push({ outcome: "RAW_HTML_ALLOWED", input }), refs("RAW_HTML_ALLOWED")); },
     writePrivateKwDerivedFacts: async (input: Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwDerivedFacts"]>[0]) => { writes.push({ requestedUrl: input.requestedUrl, sourcePageUrl: input.sourcePageUrl }); persisted.push({ outcome: "DERIVED_FACTS_ONLY", input }); return refs("DERIVED_FACTS_ONLY"); },
     reloadPrivateKwHtmlEvidence: async (reference: unknown) => {
-      void reference;
+      if ((reference as { outcome?: unknown }).outcome === "BLOCKED") {
+        const blockedReference = reference as { receiptRef: string; blockCode: string };
+        const input = blockedPersisted.get(blockedReference.receiptRef);
+        if (!input) throw new Error("MISSING_BLOCKED_RECEIPT");
+        return { outcome: "BLOCKED", blockCode: input.blockCode, receipt: { receiptVersion: "private-kw-html-blocked-receipt-v1", outcome: "BLOCKED", blockCode: input.blockCode, businessId: input.businessId, sourceId: input.sourceId, parentReceiptDigest: input.parentReceiptDigest, capturedAt: input.capturedAt, receiptRef: blockedReference.receiptRef } } as never;
+      }
       const entry = persisted[reloadIndex++]!;
       const bytes = entry.outcome === "RAW_HTML_ALLOWED" ? Buffer.from((entry.input as Extract<PersistedInput, { outcome: "RAW_HTML_ALLOWED" }>).bytes) : Buffer.from((entry.input as Extract<PersistedInput, { outcome: "DERIVED_FACTS_ONLY" }>).captureBytes);
       const metadata = { ...entry.input, metadataVersion: "private-kw-html-metadata-v1", contentRef: "kw-html:sha256:" + "c".repeat(64), contentByteLength: bytes.byteLength, contentType: "text/html", rightsDecision: "ALLOWED", termsDecision: "REVIEWED", robotsDecision: "ALLOWED", retentionDecision: entry.outcome, legalHold: false, metadataRef: "kw-html-meta:sha256:" + "d".repeat(64) };
@@ -261,7 +267,10 @@ test("fresh workflow seals a bounded local receipt and exact replay performs zer
     await replayTampered((tampered) => { const selection = tampered.pageSelection as { selectedPages: Array<unknown> }; selection.selectedPages.reverse(); });
     await replayTampered((tampered) => { tampered.networkRequestCap = fresh.networkRequestCap + 1; });
     await replayTampered((tampered) => { tampered.status = "PARTIAL"; });
+    await replayTampered((tampered) => { tampered.stopReason = "schema-valid alternate status reason"; });
     await replayTampered((tampered) => { const audit = tampered.audit as { pages: Array<{ statusCode: number }> }; audit.pages[0]!.statusCode += 1; });
+    await replayTampered((tampered) => { const audit = tampered.audit as { unknownLimitations: string[] }; audit.unknownLimitations.reverse(); });
+    await replayTampered((tampered) => { const audit = tampered.audit as { availability: { checks: Array<{ outcome: string }> } }; audit.availability.checks[0]!.outcome = "UNKNOWN"; });
     await replayTampered((tampered) => { const page = tampered.pages as Array<{ storageRefs: { metadataRef: string | null } }>; page[0]!.storageRefs.metadataRef = "kw-html-meta:sha256:" + "e".repeat(64); });
     const tamperedPolicy = structuredClone(fresh) as unknown as { sourcePolicy: { reason: string }; operationDigest?: string } & Record<string, unknown>;
     tamperedPolicy.sourcePolicy.reason = "schema-valid but untrusted replacement";
@@ -284,6 +293,80 @@ test("fresh workflow seals a bounded local receipt and exact replay performs zer
     assert.equal(rejected.status, "FAILED");
     assert.equal(rejected.stopReason, "REPLAY_MISMATCH");
     assert.equal(requests, beforeReplay);
+});
+
+test("policy failure without a durable policy witness remains unsealed and replay is missing", async () => {
+  const chain = approvedChain();
+  const receiptStore = memoryReceiptStore();
+  let requests = 0;
+  const transport = fakeTransport(() => { requests += 1; });
+  const request = { requestId: "23232323-2323-4232-8232-232323232323", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const failed = await executePrivateKwM2HtmlEvidence(request, { transport, receiptStore, store: fakeEvidenceStore(), evaluatePolicy: async () => { throw new Error("synthetic policy setup failure"); }, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(failed.status, "FAILED");
+  assert.equal(failed.stopReason, "ROBOTS_POLICY_FAILED");
+  assert.equal(failed.sourcePolicy, null);
+  assert.equal(receiptStore.values.size, 0);
+  const beforeReplay = requests;
+  const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), receiptStore, store: fakeEvidenceStore(), clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(replay.status, "FAILED");
+  assert.equal(replay.stopReason, "REPLAY_MISSING");
+  assert.equal(requests, beforeReplay);
+});
+
+test("homepage capture failure remains an in-memory result without a sealed replay witness", async () => {
+  const chain = approvedChain();
+  const receiptStore = memoryReceiptStore();
+  const transport = createPrivateKwPublicHttpTransport({
+    resolveDns: async () => [{ address: "93.184.216.34", family: 4 as const }],
+    executeConnection: async (request) => {
+      const url = new URL(request.url);
+      const body = url.pathname === "/robots.txt" ? "User-agent: *\nAllow: /\n" : "<!doctype html><html><body>unavailable</body></html>";
+      const bytes = new TextEncoder().encode(body);
+      return { statusCode: url.pathname === "/robots.txt" ? 200 : 500, headers: { "content-type": url.pathname === "/robots.txt" ? "text/plain" : "text/html" }, body: new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(bytes); controller.close(); } }), abort() {} };
+    },
+    now: () => new Date("2026-09-21T15:00:00.000Z"),
+  });
+  const request = { requestId: "26262626-2626-4262-8262-262626262626", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const failed = await executePrivateKwM2HtmlEvidence(request, { transport, receiptStore, store: fakeEvidenceStore(), clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(failed.stopReason, "HOMEPAGE_CAPTURE_FAILED");
+  assert.equal(receiptStore.values.size, 0);
+  const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { throw new Error("network must not run"); }), receiptStore, store: fakeEvidenceStore(), clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(replay.stopReason, "REPLAY_MISSING");
+});
+
+test("retention block seals only with a reloaded blocked witness", async () => {
+  const chain = approvedChain(8, "BLOCKED");
+  const receiptStore = memoryReceiptStore();
+  const evidenceStore = fakeEvidenceStore();
+  const request = { requestId: "24242424-2424-4242-8242-242424242424", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const fresh = await executePrivateKwM2HtmlEvidence(request, { transport: fakeTransport(() => undefined), receiptStore, store: evidenceStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(fresh.status, "FAILED");
+  assert.equal(fresh.stopReason, "RETENTION_BLOCKED");
+  assert(fresh.blockedEvidence);
+  const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { throw new Error("network must not run"); }), receiptStore, store: evidenceStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.deepEqual(replay, fresh);
+  const tampered = structuredClone(fresh) as unknown as MutableReceipt;
+  (tampered.blockedEvidence as { parentReceiptDigest: string }).parentReceiptDigest = "a".repeat(64);
+  redigestReceipt(tampered);
+  receiptStore.values.set(fresh.operationId, tampered as unknown as PrivateKwM2WebsiteEvidenceReceipt);
+  const rejected = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { throw new Error("network must not run"); }), receiptStore, store: evidenceStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(rejected.stopReason, "REPLAY_MISMATCH");
+});
+
+test("robots policy block seals only with a complete blocked witness", async () => {
+  const chain = approvedChain(8, "BLOCKED");
+  const receiptStore = memoryReceiptStore();
+  const evidenceStore = fakeEvidenceStore();
+  const request = { requestId: "25252525-2525-4252-8252-252525252525", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const fresh = await executePrivateKwM2HtmlEvidence(request, { transport: fakeTransport(() => undefined, "User-agent: *\nDisallow: /\n"), receiptStore, store: evidenceStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(fresh.stopReason, "ROBOTS_OR_TERMS_BLOCKED");
+  assert(fresh.blockedEvidence);
+  const tampered = structuredClone(fresh) as unknown as MutableReceipt;
+  (tampered.blockedEvidence as { receiptRef: string }).receiptRef = "kw-html-receipt:sha256:" + "a".repeat(64);
+  redigestReceipt(tampered);
+  receiptStore.values.set(fresh.operationId, tampered as unknown as PrivateKwM2WebsiteEvidenceReceipt);
+  const rejected = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { throw new Error("network must not run"); }), receiptStore, store: evidenceStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(rejected.stopReason, "REPLAY_MISMATCH");
 });
 
 test("exact replay fails closed when the sealed receipt is missing and the shared cap stops nested requests", async () => {
@@ -361,5 +444,5 @@ test("transport ledger rejects a duplicate receipt instead of laundering the glo
   };
   const request = { requestId: "55555555-5555-4555-8555-555555555555", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id,
     researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
-  await assert.rejects(executePrivateKwM2HtmlEvidence(request, { transport: base, store: fakeEvidenceStore(), receiptStore: memoryReceiptStore(), clock: () => new Date("2026-09-21T15:00:00.000Z") }), /TRANSPORT_RECEIPT_RECONCILIATION_FAILED|TRANSPORT_LEDGER_COUNT_MISMATCH/);
+  await assert.rejects(executePrivateKwM2HtmlEvidence(request, { transport: base, store: fakeEvidenceStore(), receiptStore: memoryReceiptStore(), clock: () => new Date("2026-09-21T15:00:00.000Z") }), /TRANSPORT_RECEIPT_RECONCILIATION_FAILED|TRANSPORT_LEDGER_COUNT_MISMATCH|TRANSPORT_LEDGER_ORDER_MISMATCH/);
 });
