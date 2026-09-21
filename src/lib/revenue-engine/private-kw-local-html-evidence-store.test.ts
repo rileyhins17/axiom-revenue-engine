@@ -266,12 +266,13 @@ test.afterEach(cleanRoot);
 
 test("writes and reloads raw HTML with content and metadata identities", async () => {
   const store = createPrivateKwLocalHtmlEvidenceStore();
-  const result = await store.writePrivateKwHtmlEvidence({
+  const input = {
     ...baseMetadata({ retentionDecision: "RAW_HTML_ALLOWED", retainUntil: "2026-10-21T12:00:00.000Z" }),
     outcome: "RAW_HTML_ALLOWED",
     contentType: "text/html",
     bytes: HTML,
-  });
+  } as const;
+  const result = await store.writePrivateKwHtmlEvidence(input);
 
   assert.equal(result.outcome, "RAW_HTML_ALLOWED");
   assert.equal(result.executionPath, "CREATED");
@@ -281,6 +282,8 @@ test("writes and reloads raw HTML with content and metadata identities", async (
   assert.equal(reloaded.outcome, "RAW_HTML_ALLOWED");
   assert.deepEqual(reloaded.bytes, HTML);
   assert.equal(reloaded.metadata.contentType, "text/html");
+  assert.deepEqual(reloaded.metadata.sourcePolicyDecision, input.sourcePolicyDecision);
+  assert.equal(reloaded.metadata.transportReceipts?.length, 1);
 });
 
 test("same complete raw parent replays exactly without changing files", async () => {

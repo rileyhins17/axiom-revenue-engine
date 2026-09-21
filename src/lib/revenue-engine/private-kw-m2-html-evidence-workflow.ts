@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
 import { z } from "zod";
 
 import {
@@ -14,9 +15,10 @@ import {
 } from "@/lib/revenue-engine/private-kw-m2-authorization";
 import { PrivateKwImportPlanSchema, type PrivateKwImportPlan } from "@/lib/revenue-engine/private-kw-import";
 import { PrivateKwShadowSliceManifestSchema, type PrivateKwShadowSliceManifest } from "@/lib/revenue-engine/private-kw-shadow-slice";
-import { createPrivateKwLocalHtmlEvidenceStore, type PrivateKwFacts, type PrivateKwHtmlEvidenceRef } from "@/lib/revenue-engine/private-kw-local-html-evidence-store";
+import { createPrivateKwLocalHtmlEvidenceStore, PRIVATE_KW_EVIDENCE_ROOT, type PrivateKwFacts, type PrivateKwHtmlEvidenceRef } from "@/lib/revenue-engine/private-kw-local-html-evidence-store";
 import { createPrivateKwPublicHttpTransport, privateKwPublicHttpTransportReceiptDigest } from "@/lib/revenue-engine/private-kw-public-http-transport";
-import { evaluatePrivateKwRobotsPolicy, type PrivateKwSourcePolicyDecision } from "@/lib/revenue-engine/private-kw-source-policy";
+import { evaluatePrivateKwRobotsPolicy, PrivateKwSourcePolicyDecisionSchema, type PrivateKwSourcePolicyDecision } from "@/lib/revenue-engine/private-kw-source-policy";
+import { PrivateKwPublicHttpTransportReceiptSchema } from "@/lib/revenue-engine/private-kw-public-http-transport";
 import { capturePublicWebsiteDocument, WebsiteCaptureResultSchema, type WebsiteCaptureResult } from "@/lib/revenue-engine/website-capture";
 import { extractHtmlPageFacts, type HtmlPageFacts } from "@/lib/revenue-engine/html-page-facts";
 import { defaultWebsitePageSelectionPolicy, planWebsitePages, WebsitePageSelectionPlanSchema, type WebsitePageSelectionPlan } from "@/lib/revenue-engine/website-page-selection";
@@ -69,20 +71,20 @@ export const PrivateKwM2WebsiteEvidenceReceiptSchema = z.object({
   requestId: z.string().uuid(), requestedAt: IsoDateSchema, status: StatusSchema, stopReason: z.string().trim().min(1).max(120).nullable(),
   businessId: z.string().trim().min(1).max(128), sourceIdentity: SourceIdentitySchema, authorizationDigest: DigestSchema,
   authorizationExpiresAt: IsoDateSchema,
-  sourcePolicy: z.object({ policyVersion: z.string().min(1), allowed: z.boolean(), reason: z.string().min(1).max(240), transportReceiptIds: z.array(z.number().int().positive()), transportReceiptDigests: z.array(DigestSchema) }).strict().nullable(),
+  sourcePolicy: PrivateKwSourcePolicyDecisionSchema.nullable(),
   pageSelection: PageSelectionSchema.nullable(), pages: z.array(PageReceiptSchema).max(4),
-  audit: PrivateKwM2HtmlAuditReceiptSchema.nullable(), transportReceiptIds: z.array(z.number().int().positive()),
+  audit: PrivateKwM2HtmlAuditReceiptSchema.nullable(), transportReceipts: z.array(PrivateKwPublicHttpTransportReceiptSchema), transportReceiptIds: z.array(z.number().int().positive()),
   transportReceiptDigests: z.array(DigestSchema), networkRequestCount: z.number().int().nonnegative().max(100),
   networkRequestCap: z.number().int().positive().max(100), providerOperations: z.literal(0), costAuthorizedUsd: z.literal(0),
   authority: AuthoritySchema, operationDigest: DigestSchema,
 }).strict();
 export type PrivateKwM2HtmlEvidenceRequest = z.infer<typeof PrivateKwM2HtmlEvidenceRequestSchema>;
 export type PrivateKwM2WebsiteEvidenceReceipt = z.infer<typeof PrivateKwM2WebsiteEvidenceReceiptSchema>;
-type Store = Pick<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>, "writePrivateKwHtmlEvidence" | "writePrivateKwDerivedFacts">;
+type Store = Pick<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>, "writePrivateKwHtmlEvidence" | "writePrivateKwDerivedFacts" | "reloadPrivateKwHtmlEvidence">;
 export type PrivateKwM2HtmlEvidenceDependencies = {
   transport?: ReturnType<typeof createPrivateKwPublicHttpTransport>;
   store?: Store; receiptStore?: PrivateKwM2HtmlEvidenceReceiptStore; clock?: () => Date;
-  sleep?: (milliseconds: number) => Promise<void>; rootPath?: string;
+  sleep?: (milliseconds: number) => Promise<void>;
 };
 type Identity = z.infer<typeof SourceIdentitySchema> & {
   record: PrivateKwShadowSliceManifest["records"][number]; sourcePlan: PrivateKwImportPlan;
@@ -95,6 +97,12 @@ function canonicalize(value: unknown): string {
   return "{" + Object.keys(object).filter((key) => object[key] !== undefined).sort().map((key) => JSON.stringify(key) + ":" + canonicalize(object[key])).join(",") + "}";
 }
 function digest(value: unknown) { return createHash("sha256").update(canonicalize(value), "utf8").digest("hex"); }
+function operationIdFor(request: PrivateKwM2HtmlEvidenceRequest, identity: Identity) {
+  const hex = digest({ requestId: request.requestId, requestedAt: request.requestedAt, businessId: identity.businessId, sourceIdentityDigest: identity.sourceIdentityDigest, authorizationDigest: identity.chain.authorization.authorizationDigest, workflowVersion: PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION }).slice(0, 32).split("");
+  hex[12] = "5";
+  hex[16] = ((parseInt(hex[16]!, 16) & 3) | 8).toString(16);
+  return `${hex.slice(0, 8).join("")}-${hex.slice(8, 12).join("")}-${hex.slice(12, 16).join("")}-${hex.slice(16, 20).join("")}-${hex.slice(20).join("")}`;
+}
 function host(value: string) { return new URL(value).hostname.toLocaleLowerCase("en-CA"); }
 function assertAuthority(auth: PrivateKwM2ExecutionAuthorization) {
   const a = auth.authority;
@@ -129,21 +137,35 @@ function makePage(pageKind: "HOME" | "SERVICE" | "ABOUT" | "CONTACT", capture: W
   return PageReceiptSchema.parse({ pageKind, requestedUrl: capture.requestedUrl ?? "https://invalid.invalid/", finalUrl: capture.finalUrl, capturedAt: capture.capturedAt, outcome: capture.outcome, statusCode: capture.statusCode, bodyBytes: capture.bodyBytes, contentDigest: capture.outcome === "CAPTURED" ? capture.contentDigest : null, factsDigest: facts ? digest(projectFacts(facts, [], [])) : null, storageOutcome, storageRefs, failureCode: capture.failure?.code ?? null });
 }
 function sourcePolicySummary(policy: PrivateKwSourcePolicyDecision | null) {
-  return policy ? { policyVersion: policy.policyVersion, allowed: policy.allowed, reason: policy.reason, transportReceiptIds: policy.transportReceiptIds, transportReceiptDigests: policy.transportReceiptDigests } : null;
+  return policy ? PrivateKwSourcePolicyDecisionSchema.parse(policy) : null;
 }
 function sourcePolicyTransportReceipts(policy: PrivateKwSourcePolicyDecision, transport: ReturnType<typeof createPrivateKwPublicHttpTransport>) {
   const ids = new Set(policy.transportReceiptIds);
   return transport.takeReceipts().filter((receipt) => ids.has(receipt.requestId));
 }
-function buildReceipt(input: { request: PrivateKwM2HtmlEvidenceRequest; identity: Identity; authorization: PrivateKwM2ExecutionAuthorization; status: z.infer<typeof StatusSchema>; stopReason: string | null; policy: PrivateKwSourcePolicyDecision | null; plan: z.infer<typeof PageSelectionSchema> | null; pages: z.infer<typeof PageReceiptSchema>[]; audit: PrivateKwM2HtmlAuditReceipt | null; transport: ReturnType<typeof createPrivateKwPublicHttpTransport> | undefined; attempts: number }) {
-  const transportReceipts = input.transport?.takeReceipts() ?? [];
-  const transportIds = transportReceipts.map((receipt) => receipt.requestId);
-  const transportDigests = transportReceipts.map((receipt) => {
-    const expected = privateKwPublicHttpTransportReceiptDigest(receipt);
-    if (expected !== receipt.receiptDigest) throw new Error("Transport receipt digest mismatch.");
-    return receipt.receiptDigest;
+function validateTransportLedger(receipts: readonly unknown[], attempts: number, cap: number, policy: PrivateKwSourcePolicyDecision | null) {
+  if (!Number.isSafeInteger(attempts) || attempts !== receipts.length || attempts > cap) throw new Error("TRANSPORT_LEDGER_COUNT_MISMATCH");
+  const parsed = receipts.map((value) => PrivateKwPublicHttpTransportReceiptSchema.parse(value));
+  const ids = parsed.map((receipt) => receipt.requestId);
+  if (new Set(ids).size !== ids.length || ids.some((id, index) => index > 0 && id <= ids[index - 1]!)) throw new Error("TRANSPORT_LEDGER_ORDER_MISMATCH");
+  parsed.forEach((receipt) => {
+    if (receipt.networkRequestCount !== 1 || privateKwPublicHttpTransportReceiptDigest(receipt) !== receipt.receiptDigest) throw new Error("TRANSPORT_LEDGER_DIGEST_MISMATCH");
   });
-  const core = { receiptVersion: PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION, operationId: input.request.requestId, requestId: input.request.requestId, requestedAt: input.request.requestedAt, status: input.status, stopReason: input.stopReason, businessId: input.identity.businessId, sourceIdentity: { businessId: input.identity.businessId, evaluationCandidateId: input.identity.evaluationCandidateId, sourceRecordId: input.identity.sourceRecordId, sourceRunId: input.identity.sourceRunId, sourcePlanDigest: input.identity.sourcePlanDigest, manifestDigest: input.identity.manifestDigest, sourceEvidenceUrl: input.identity.sourceEvidenceUrl, approvedWebsiteUrl: input.identity.approvedWebsiteUrl, sourceCapturedAt: input.identity.sourceCapturedAt, sourceIdentityDigest: input.identity.sourceIdentityDigest }, authorizationDigest: input.authorization.authorizationDigest, authorizationExpiresAt: input.authorization.expiresAt, sourcePolicy: sourcePolicySummary(input.policy), pageSelection: input.plan, pages: input.pages, audit: input.audit, transportReceiptIds: transportIds, transportReceiptDigests: transportDigests, networkRequestCount: input.attempts, networkRequestCap: input.authorization.networkRequestCap, providerOperations: 0 as const, costAuthorizedUsd: 0 as const, authority: input.authorization.authority };
+  if (policy) {
+    if (policy.networkRequestCount !== policy.transportReceiptIds.length || policy.networkRequestCount !== policy.transportReceiptDigests.length || policy.networkRequestCount > attempts) throw new Error("SOURCE_POLICY_LEDGER_COUNT_MISMATCH");
+    policy.transportReceiptIds.forEach((id, index) => {
+      const receipt = parsed[index];
+      if (!receipt || receipt.requestId !== id || receipt.receiptDigest !== policy.transportReceiptDigests[index]) throw new Error("SOURCE_POLICY_LEDGER_MISMATCH");
+    });
+  }
+  return parsed;
+}
+function buildReceipt(input: { request: PrivateKwM2HtmlEvidenceRequest; identity: Identity; authorization: PrivateKwM2ExecutionAuthorization; status: z.infer<typeof StatusSchema>; stopReason: string | null; policy: PrivateKwSourcePolicyDecision | null; plan: z.infer<typeof PageSelectionSchema> | null; pages: z.infer<typeof PageReceiptSchema>[]; audit: PrivateKwM2HtmlAuditReceipt | null; transport: ReturnType<typeof createPrivateKwPublicHttpTransport> | undefined; attempts: number; operationId?: string }) {
+  const transportReceipts = input.transport?.takeReceipts() ?? [];
+  const parsedTransportReceipts = validateTransportLedger(transportReceipts, input.attempts, input.authorization.networkRequestCap, input.policy);
+  const transportIds = parsedTransportReceipts.map((receipt) => receipt.requestId);
+  const transportDigests = parsedTransportReceipts.map((receipt) => receipt.receiptDigest);
+  const core = { receiptVersion: PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION, operationId: input.operationId ?? operationIdFor(input.request, input.identity), requestId: input.request.requestId, requestedAt: input.request.requestedAt, status: input.status, stopReason: input.stopReason, businessId: input.identity.businessId, sourceIdentity: { businessId: input.identity.businessId, evaluationCandidateId: input.identity.evaluationCandidateId, sourceRecordId: input.identity.sourceRecordId, sourceRunId: input.identity.sourceRunId, sourcePlanDigest: input.identity.sourcePlanDigest, manifestDigest: input.identity.manifestDigest, sourceEvidenceUrl: input.identity.sourceEvidenceUrl, approvedWebsiteUrl: input.identity.approvedWebsiteUrl, sourceCapturedAt: input.identity.sourceCapturedAt, sourceIdentityDigest: input.identity.sourceIdentityDigest }, authorizationDigest: input.authorization.authorizationDigest, authorizationExpiresAt: input.authorization.expiresAt, sourcePolicy: sourcePolicySummary(input.policy), pageSelection: input.plan, pages: input.pages, audit: input.audit, transportReceipts: parsedTransportReceipts, transportReceiptIds: transportIds, transportReceiptDigests: transportDigests, networkRequestCount: input.attempts, networkRequestCap: input.authorization.networkRequestCap, providerOperations: 0 as const, costAuthorizedUsd: 0 as const, authority: input.authorization.authority };
   return PrivateKwM2WebsiteEvidenceReceiptSchema.parse({ ...core, operationDigest: digest(core) });
 }
 async function failReceipt(input: { request: PrivateKwM2HtmlEvidenceRequest; identity: Identity; authorization: PrivateKwM2ExecutionAuthorization; reason: string; policy: PrivateKwSourcePolicyDecision | null; transport?: ReturnType<typeof createPrivateKwPublicHttpTransport>; attempts: number; capture?: WebsiteCaptureResult | null; storage?: PrivateKwHtmlEvidenceRef | null }) {
@@ -151,6 +173,52 @@ async function failReceipt(input: { request: PrivateKwM2HtmlEvidenceRequest; ide
   return buildReceipt({ request: input.request, identity: input.identity, authorization: input.authorization, status: "FAILED", stopReason: input.reason, policy: input.policy, plan: null, pages, audit: null, transport: input.transport, attempts: input.attempts });
 }
 function safeCapture(value: unknown) { const parsed = WebsiteCaptureResultSchema.safeParse(value); return parsed.success ? parsed.data : null; }
+function replayReference(page: z.infer<typeof PageReceiptSchema>) {
+  const refs = page.storageRefs;
+  if (page.storageOutcome === "RAW_HTML_ALLOWED") {
+    if (!refs.contentRef || !refs.metadataRef) throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
+    const contentDigest = refs.contentRef.slice(-64); const metadataDigest = refs.metadataRef.slice(-64);
+    return { outcome: "RAW_HTML_ALLOWED" as const, contentRef: refs.contentRef, metadataRef: refs.metadataRef, contentPath: path.join(PRIVATE_KW_EVIDENCE_ROOT, "objects", "sha256", contentDigest.slice(0, 2), `${contentDigest}.html`), metadataPath: path.join(PRIVATE_KW_EVIDENCE_ROOT, "metadata", "sha256", metadataDigest.slice(0, 2), `${metadataDigest}.json`), executionPath: "EXACT_REPLAY" as const };
+  }
+  if (page.storageOutcome === "DERIVED_FACTS_ONLY") {
+    if (!refs.contentRef || !refs.metadataRef || !refs.factsRef) throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
+    const metadataDigest = refs.metadataRef.slice(-64); const factsDigest = refs.factsRef.slice(-64);
+    return { outcome: "DERIVED_FACTS_ONLY" as const, contentRef: refs.contentRef, metadataRef: refs.metadataRef, factsRef: refs.factsRef, metadataPath: path.join(PRIVATE_KW_EVIDENCE_ROOT, "metadata", "sha256", metadataDigest.slice(0, 2), `${metadataDigest}.json`), factsPath: path.join(PRIVATE_KW_EVIDENCE_ROOT, "facts", "sha256", factsDigest.slice(0, 2), `${factsDigest}.json`), rawArtifactRef: null, executionPath: "EXACT_REPLAY" as const };
+  }
+  if (page.storageOutcome === "BLOCKED") {
+    if (!refs.receiptRef) throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
+    const receiptDigest = refs.receiptRef.slice(-64);
+    return { outcome: "BLOCKED" as const, receiptRef: refs.receiptRef, receiptPath: path.join(PRIVATE_KW_EVIDENCE_ROOT, "receipts", "sha256", receiptDigest.slice(0, 2), `${receiptDigest}.json`), blockCode: page.failureCode ?? "REPLAY_BLOCKED", executionPath: "EXACT_REPLAY" as const };
+  }
+  return null;
+}
+async function validateSealedReplay(receipt: PrivateKwM2WebsiteEvidenceReceipt, input: { request: PrivateKwM2HtmlEvidenceRequest; identity: Identity; authorization: PrivateKwM2ExecutionAuthorization; clock: () => Date; store: Store }) {
+  const { operationDigest, ...core } = receipt;
+  if (digest(core) !== operationDigest) throw new Error("REPLAY_OPERATION_DIGEST_MISMATCH");
+  const operationId = operationIdFor(input.request, input.identity);
+  if (receipt.operationId !== operationId || receipt.requestId !== input.request.requestId || receipt.businessId !== input.identity.businessId || receipt.authorizationDigest !== input.authorization.authorizationDigest || receipt.authorizationExpiresAt !== input.authorization.expiresAt || receipt.sourceIdentity.sourceIdentityDigest !== input.identity.sourceIdentityDigest) throw new Error("REPLAY_IDENTITY_MISMATCH");
+  assertPrivateKwM2ApprovalChain({ ...input.identity.chain, phase: "GET", now: input.clock().toISOString() });
+  if (Date.parse(input.authorization.expiresAt) <= input.clock().getTime()) throw new Error("AUTHORIZATION_EXPIRED");
+  const decision = input.authorization.sourceDecisions.find((entry) => entry.businessId === input.identity.businessId)!;
+  const policy = receipt.sourcePolicy ? PrivateKwSourcePolicyDecisionSchema.parse(receipt.sourcePolicy) : null;
+  if (policy && (policy.robotsUrl !== new URL("/robots.txt", input.identity.approvedWebsiteUrl).toString() || policy.termsDecision !== decision.termsDecision || policy.providerOperationsAuthorized !== 0 || policy.costAuthorizedUsd !== 0)) throw new Error("REPLAY_SOURCE_POLICY_MISMATCH");
+  const transport = validateTransportLedger(receipt.transportReceipts, receipt.networkRequestCount, receipt.networkRequestCap, policy);
+  if (transport.map((entry) => entry.requestId).join(",") !== receipt.transportReceiptIds.join(",") || transport.map((entry) => entry.receiptDigest).join(",") !== receipt.transportReceiptDigests.join(",")) throw new Error("REPLAY_TRANSPORT_SET_MISMATCH");
+  if (!policy || receipt.pageSelection?.sourceIdentityDigest !== input.identity.sourceIdentityDigest || receipt.audit?.availability?.sourceIdentityDigest !== input.identity.sourceIdentityDigest) throw new Error("REPLAY_CANONICAL_RECEIPT_MISMATCH");
+  if (receipt.pages.length > 4) throw new Error("REPLAY_PAGE_COUNT_MISMATCH");
+  for (const page of receipt.pages) {
+    if (page.outcome === "CAPTURED") {
+      const reference = replayReference(page);
+      if (!reference) throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
+      const reloaded = await input.store.reloadPrivateKwHtmlEvidence(reference);
+      if (reloaded.outcome !== page.storageOutcome || (reloaded.outcome !== "BLOCKED" && (!reloaded.metadata || reloaded.metadata.businessId !== receipt.businessId || reloaded.metadata.sourceId !== input.identity.sourceRecordId || reloaded.metadata.requestedUrl !== page.requestedUrl || reloaded.metadata.finalUrl !== page.finalUrl || reloaded.metadata.sourcePageUrl !== input.identity.approvedWebsiteUrl || reloaded.metadata.capturedAt !== page.capturedAt || reloaded.metadata.authorizationDigest !== receipt.authorizationDigest || reloaded.metadata.authorizationExpiresAt !== receipt.authorizationExpiresAt || reloaded.metadata.sourcePolicyVersion !== policy.policyVersion || digest(reloaded.metadata.sourcePolicyDecision) !== digest(policy) || digest(reloaded.metadata.transportReceipts) !== digest(transport.slice(0, policy.networkRequestCount)) || reloaded.metadata.retentionDecision !== page.storageOutcome || reloaded.metadata.contentRef !== `kw-html:sha256:${page.contentDigest}`))) throw new Error("REPLAY_DURABLE_METADATA_MISMATCH");
+      if (reloaded.outcome === "RAW_HTML_ALLOWED" && createHash("sha256").update(reloaded.bytes).digest("hex") !== page.contentDigest) throw new Error("REPLAY_CONTENT_DIGEST_MISMATCH");
+      if (reloaded.outcome === "DERIVED_FACTS_ONLY" && digest(reloaded.facts.facts) !== page.factsDigest) throw new Error("REPLAY_FACTS_DIGEST_MISMATCH");
+      if (reloaded.outcome !== "BLOCKED" && reloaded.metadata.parentReceiptDigest !== digest({ identity: receipt.sourceIdentity.sourceIdentityDigest, page: page.pageKind, contentDigest: page.contentDigest })) throw new Error("REPLAY_PARENT_DIGEST_MISMATCH");
+    } else if (page.storageOutcome !== "NONE") throw new Error("REPLAY_FAILED_PAGE_STORAGE");
+  }
+  return receipt;
+}
 
 export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencies: PrivateKwM2HtmlEvidenceDependencies = {}): Promise<PrivateKwM2WebsiteEvidenceReceipt> {
   const request = PrivateKwM2HtmlEvidenceRequestSchema.parse(input);
@@ -163,15 +231,29 @@ export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencie
   const policy = request.researchPolicy === undefined ? undefined : PrivateKwM2ResearchPolicySchema.parse(request.researchPolicy);
   assertAuthority(authorization);
   const identity = deriveIdentity({ businessId: request.businessId, researchPacket: packet, authorization, manifest, sourcePlan, ownerEnvelope, researchPolicy: policy });
-  const receiptStore = dependencies.receiptStore ?? createPrivateKwM2HtmlEvidenceReceiptStore({ rootPath: dependencies.rootPath ?? "data/kw-evaluation/m2-evidence" });
-  const existing = await receiptStore.loadSealed(request.requestId);
+  const operationId = operationIdFor(request, identity);
+  try {
+    assertPrivateKwM2ApprovalChain({ researchPacket: packet, authorization, ownerEnvelope, manifest, sourcePlan, phase: "GET", now: clock().toISOString(), researchPolicy: policy });
+  } catch (error) {
+    if (request.replayMode === "EXACT_REPLAY") {
+      const reason = error instanceof Error && (error.message.includes("expired") || Date.parse(authorization.expiresAt) <= clock().getTime()) ? "AUTHORIZATION_EXPIRED" : "REPLAY_MISMATCH";
+      return buildReceipt({ request, identity, authorization, status: "FAILED", stopReason: reason, policy: null, plan: null, pages: [], audit: null, transport: undefined, attempts: 0, operationId });
+    }
+    throw error;
+  }
+  const receiptStore = dependencies.receiptStore ?? createPrivateKwM2HtmlEvidenceReceiptStore();
+  const replayStore = dependencies.store ?? createPrivateKwLocalHtmlEvidenceStore({ clock });
+  const existing = await receiptStore.loadSealed(operationId);
   if (existing) {
     const parsed = PrivateKwM2WebsiteEvidenceReceiptSchema.parse(existing);
-    if (parsed.operationId !== request.requestId || parsed.sourceIdentity.sourceIdentityDigest !== identity.sourceIdentityDigest) throw new Error("SEALED_RECEIPT_MISMATCH");
-    return parsed;
+    try { return await validateSealedReplay(parsed, { request, identity, authorization, clock, store: replayStore }); }
+    catch (error) {
+      const reason = error instanceof Error && error.message === "AUTHORIZATION_EXPIRED" ? "AUTHORIZATION_EXPIRED" : "REPLAY_MISMATCH";
+      return buildReceipt({ request, identity, authorization, status: "FAILED", stopReason: reason, policy: null, plan: null, pages: [], audit: null, transport: undefined, attempts: 0, operationId });
+    }
   }
   if (request.replayMode === "EXACT_REPLAY") {
-    return buildReceipt({ request, identity, authorization, status: "FAILED", stopReason: "REPLAY_MISSING", policy: null, plan: null, pages: [], audit: null, transport: undefined, attempts: 0 });
+    return buildReceipt({ request, identity, authorization, status: "FAILED", stopReason: "REPLAY_MISSING", policy: null, plan: null, pages: [], audit: null, transport: undefined, attempts: 0, operationId });
   }
   const base = dependencies.transport ?? createPrivateKwPublicHttpTransport({ now: clock });
   let stage: "ROBOTS" | "GET" = "ROBOTS";
@@ -187,8 +269,15 @@ export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencie
       if (attempts >= authorization.networkRequestCap) throw new Error("NETWORK_REQUEST_CAP_EXCEEDED");
       attempts += 1;
       const before = base.takeReceipts().length;
+      const previousId = base.takeReceipts().at(-1)?.requestId ?? 0;
       try { return await base.request(value, init); }
-      finally { if (base.takeReceipts().length !== before + 1) throw new Error("TRANSPORT_RECEIPT_RECONCILIATION_FAILED"); }
+      finally {
+        const receipts = base.takeReceipts();
+        if (receipts.length !== before + 1) throw new Error("TRANSPORT_RECEIPT_RECONCILIATION_FAILED");
+        const receipt = receipts.at(-1)!;
+        if (receipt.requestId <= previousId) throw new Error("TRANSPORT_RECEIPT_ORDER_RECONCILIATION_FAILED");
+        validateTransportLedger([receipt], 1, authorization.networkRequestCap, null);
+      }
     },
     takeReceipts: () => base.takeReceipts(),
   };
@@ -283,7 +372,7 @@ export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencie
   let homeRef: PrivateKwHtmlEvidenceRef | null = null;
   const retentionReviewDate = identity.chain.researchPolicy?.decisions.find((entry) => entry.businessId === identity.businessId)?.retentionReviewDate ?? authorization.expiresAt;
   const metadata = {
-    businessId: identity.businessId, sourceId: identity.sourceRecordId, requestedUrl: homeCapture.requestedUrl!, finalUrl: homeCapture.finalUrl!,
+    businessId: identity.businessId, sourceId: identity.sourceRecordId, requestedUrl: homeCapture.requestedUrl!, sourcePageUrl: identity.approvedWebsiteUrl, finalUrl: homeCapture.finalUrl!,
     redirectChainDigest: digest(homeCapture.redirectChain), captureVersion: homeCapture.captureVersion, transportVersion: "kw-m2-public-transport-v1",
     sourcePolicyVersion: sourcePolicy.policyVersion, capturedAt: homeCapture.capturedAt, parentReceiptDigest: digest({ identity: identity.sourceIdentityDigest, page: "HOME", contentDigest: homeCapture.contentDigest }),
     authorizationDigest: authorization.authorizationDigest, authorizationExpiresAt: authorization.expiresAt, authorizationChain: identity.chain,
@@ -305,11 +394,18 @@ export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencie
   const pageResults: z.infer<typeof PageReceiptSchema>[] = [makePage("HOME", homeCapture, homeFacts, homeRef?.outcome ?? "NONE", homeRef ? refs(homeRef) : { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null })];
   const capturedPages: Array<{ pageKind: "HOME" | "SERVICE" | "ABOUT" | "CONTACT"; capture: WebsiteCaptureResult; facts: HtmlPageFacts }> = [{ pageKind: "HOME", capture: homeCapture, facts: homeFacts }];
   for (const selected of plan.selectedPages.filter((page) => page.pageKind !== "HOME")) {
-    let capture: WebsiteCaptureResult;
+    let capture: WebsiteCaptureResult | null = null;
     try {
       capture = await capturePublicWebsiteDocument(selected.url, { fetch: (value, init) => budget.request(value, init), now: clock });
       if (Date.parse(authorization.expiresAt) <= clock().getTime()) throw new Error("AUTHORIZATION_EXPIRED");
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && (error.message.includes("AUTHORIZATION_EXPIRED") || Date.parse(authorization.expiresAt) <= clock().getTime())) {
+        return failReceipt({ request, identity, authorization, reason: "AUTHORIZATION_EXPIRED", policy: sourcePolicy, transport: budget, attempts, capture });
+      }
+      pageResults.push(PageReceiptSchema.parse({ pageKind: selected.pageKind, requestedUrl: selected.url, finalUrl: null, capturedAt: clock().toISOString(), outcome: "FAILED", statusCode: 0, bodyBytes: 0, contentDigest: null, factsDigest: null, storageOutcome: "NONE", storageRefs: { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null }, failureCode: "SUBPAGE_CAPTURE_FAILED" }));
+      continue;
+    }
+    if (!capture) {
       pageResults.push(PageReceiptSchema.parse({ pageKind: selected.pageKind, requestedUrl: selected.url, finalUrl: null, capturedAt: clock().toISOString(), outcome: "FAILED", statusCode: 0, bodyBytes: 0, contentDigest: null, factsDigest: null, storageOutcome: "NONE", storageRefs: { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null }, failureCode: "SUBPAGE_CAPTURE_FAILED" }));
       continue;
     }
@@ -322,7 +418,7 @@ export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencie
     let pageRef: PrivateKwHtmlEvidenceRef | null = null;
     try {
       assertBefore();
-      const pageMetadata = { ...metadata, requestedUrl: identity.approvedWebsiteUrl, finalUrl: capture.finalUrl!, parentReceiptDigest: digest({ identity: identity.sourceIdentityDigest, page: selected.pageKind, contentDigest: capture.contentDigest }) };
+      const pageMetadata = { ...metadata, requestedUrl: selected.url, sourcePageUrl: identity.approvedWebsiteUrl, finalUrl: capture.finalUrl!, parentReceiptDigest: digest({ identity: identity.sourceIdentityDigest, page: selected.pageKind, contentDigest: capture.contentDigest }) };
       if (retention === "RAW_HTML_ALLOWED") pageRef = await store.writePrivateKwHtmlEvidence({ ...pageMetadata, outcome: "RAW_HTML_ALLOWED", contentType: "text/html", bytes: capture.rawBytes });
       else pageRef = await store.writePrivateKwDerivedFacts({ ...pageMetadata, outcome: "DERIVED_FACTS_ONLY", captureBytes: capture.rawBytes, facts: projectFacts(facts, expectedServices, expectedLocations), rawArtifactRef: null });
     } catch {

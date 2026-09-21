@@ -841,6 +841,9 @@ requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", p
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /createPrivateKwPublicHttpTransport/, "Task4 must use the address-pinned public transport adapter");
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /networkRequestCap/, "Task4 must enforce the approved shared request cap");
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /writePrivateKwHtmlEvidence|writePrivateKwDerivedFacts/, "Task4 must route retention through the canonical local evidence store");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /transportReceipts:\s*z\.array\(PrivateKwPublicHttpTransportReceiptSchema\)/, "Task4 receipt must persist the complete transport receipt chain");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /validateSealedReplay/, "Task4 replay must reload and validate the complete sealed receipt before returning");
+forbidMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /rootPath/, "Task4 workflow must not expose a caller-controlled sealed-receipt root");
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /providerOperations:\s*0|costAuthorizedUsd:\s*0/, "Task4 receipt must report zero provider and cost authority");
 forbidMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /globalThis\.fetch|@cloudflare|D1Database|R2Bucket|better-sqlite3|website-audit-assembly|process\.env|\.prepare\s*\(|\.run\s*\(/i, "Task4 workflow must stay disconnected from providers, databases, runtime fetch, and generic audit assembly");
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-audit.ts", privateKwM2HtmlAudit, /assemblerKind:\s*z\.literal\("HTML_ONLY"\)/, "Task4 audit must carry an explicit HTML-only assembler identity");
@@ -848,6 +851,9 @@ requireMatch("src/lib/revenue-engine/private-kw-m2-html-audit.ts", privateKwM2Ht
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-audit.ts", privateKwM2HtmlAudit, /visibleText:\s*""|visibleText:\s*''/, "Task4 audit snapshots must not persist page text");
 forbidMatch("src/lib/revenue-engine/private-kw-m2-html-audit.ts", privateKwM2HtmlAudit, /classification\s*:\s*z\.enum|rebuildNeedScore\s*:\s*z\.(number|string)|evidenceConfidence\s*:\s*z\.(number|string)/, "Task4 HTML-only audit must not expose ordinary classification or score authority");
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", privateKwM2HtmlReceipt, /open\(file,\s*[\"']wx[\"']\)/, "Task4 sealed receipt publication must be exclusive and no-overwrite");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", privateKwM2HtmlReceipt, /PRIVATE_KW_EVIDENCE_ROOT/, "Task4 sealed receipts must use the approved ignored evidence root");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", privateKwM2HtmlReceipt, /UUID/, "Task4 sealed receipt paths must validate canonical operation IDs");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", privateKwM2HtmlReceipt, /SEALED_RECEIPT_DIGEST_MISMATCH/, "Task4 sealed receipt loader must verify the canonical operation digest");
 forbidMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", privateKwM2HtmlReceipt, /fetch\s*\(|@cloudflare|D1Database|R2Bucket|\.rename\s*\(/i, "Task4 sealed receipts must remain local and provider-free");
 
 if (failures.length > 0) {

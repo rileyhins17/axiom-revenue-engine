@@ -1,14 +1,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
-import os from "node:os";
+import { rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
 import { extractHtmlPageFacts } from "@/lib/revenue-engine/html-page-facts";
 import { WEBSITE_CAPTURE_VERSION, type WebsiteCaptureResult } from "@/lib/revenue-engine/website-capture";
 import { buildPrivateKwM2HtmlAuditReceipt, PrivateKwM2HtmlAuditReceiptSchema } from "@/lib/revenue-engine/private-kw-m2-html-audit";
-import { createPrivateKwM2HtmlEvidenceReceiptStore } from "@/lib/revenue-engine/private-kw-m2-html-evidence-receipt";
+import { createPrivateKwM2HtmlEvidenceReceiptStore, privateKwM2ReceiptCanonicalDigest } from "@/lib/revenue-engine/private-kw-m2-html-evidence-receipt";
 import { createPrivateKwPublicHttpTransport } from "@/lib/revenue-engine/private-kw-public-http-transport";
 import { createPrivateKwLocalHtmlEvidenceStore } from "@/lib/revenue-engine/private-kw-local-html-evidence-store";
 import {
@@ -83,17 +82,23 @@ test("HTML-only projection discards contact and qualification material", async (
 });
 
 test("sealed receipt store is content addressed, exclusive, and tamper rejecting", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "kw-m2-receipt-"));
+  const operationId = "11111111-1111-5111-8111-111111111111";
+  const file = path.join(process.cwd(), "data", "kw-evaluation", "m2-evidence", "sealed", "sha256", operationId.slice(0, 2), operationId + ".json");
+  await rm(path.dirname(file), { recursive: true, force: true });
   try {
-    const store = createPrivateKwM2HtmlEvidenceReceiptStore({ rootPath: root });
-    const receipt = { operationId: "11111111-1111-4111-8111-111111111111", status: "COMPLETE", pages: [] };
+    const store = createPrivateKwM2HtmlEvidenceReceiptStore();
+    const core = { operationId, status: "COMPLETE", pages: [] };
+    const receipt = { ...core, operationDigest: privateKwM2ReceiptCanonicalDigest(core) };
     assert.equal(await store.loadSealed(receipt.operationId), null);
     assert.equal(await store.publishSealed(receipt), "CREATED");
     assert.deepEqual(await store.loadSealed(receipt.operationId), receipt);
     assert.equal(await store.publishSealed({ ...receipt }), "EXACT_REPLAY");
-    await assert.rejects(store.publishSealed({ ...receipt, status: "FAILED" }), /SEALED_RECEIPT_CONFLICT/);
+    await assert.rejects(store.publishSealed({ ...receipt, status: "FAILED" }), /SEALED_RECEIPT_CONFLICT|SEALED_RECEIPT_DIGEST_MISMATCH/);
+    await assert.rejects(store.loadSealed("../escape"), /SEALED_RECEIPT_OPERATION_ID_INVALID/);
+    await writeFile(file, JSON.stringify({ ...receipt, status: "FAILED" }) + "\n", "utf8");
+    await assert.rejects(store.loadSealed(operationId), /SEALED_RECEIPT_DIGEST_MISMATCH|SEALED_RECEIPT_BYTES_MISMATCH/);
   } finally {
-    await rm(root, { recursive: true, force: true });
+    await rm(path.dirname(file), { recursive: true, force: true });
   }
 });
 
@@ -162,59 +167,138 @@ function fakeTransport(onRequest: () => void) {
   });
 }
 
-function fakeEvidenceStore() {
+function fakeEvidenceStore(writes: Array<{ requestedUrl: string; sourcePageUrl?: string }> = []) {
+  type PersistedInput = Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwHtmlEvidence"]>[0] | Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwDerivedFacts"]>[0];
+  const persisted: Array<{ outcome: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY"; input: PersistedInput }> = [];
   const refs = (outcome: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY") => outcome === "RAW_HTML_ALLOWED"
     ? { outcome, contentRef: "kw-html:sha256:" + "c".repeat(64), metadataRef: "kw-html-meta:sha256:" + "d".repeat(64), contentPath: "sealed/content.html", metadataPath: "sealed/metadata.json", executionPath: "CREATED" as const }
     : { outcome, contentRef: "kw-html:sha256:" + "c".repeat(64), metadataRef: "kw-html-meta:sha256:" + "d".repeat(64), factsRef: "kw-html-facts:sha256:" + "e".repeat(64), metadataPath: "sealed/metadata.json", factsPath: "sealed/facts.json", rawArtifactRef: null, executionPath: "CREATED" as const };
   return {
-    writePrivateKwHtmlEvidence: async (input: Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwHtmlEvidence"]>[0]) => input.outcome === "BLOCKED"
+    writePrivateKwHtmlEvidence: async (input: Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwHtmlEvidence"]>[0]) => { writes.push({ requestedUrl: input.requestedUrl, sourcePageUrl: input.sourcePageUrl }); return input.outcome === "BLOCKED"
       ? { outcome: "BLOCKED" as const, receiptRef: "kw-html-receipt:sha256:" + "f".repeat(64), receiptPath: "sealed/blocked.json", blockCode: input.blockCode, executionPath: "CREATED" as const }
-      : refs("RAW_HTML_ALLOWED"),
-    writePrivateKwDerivedFacts: async (input: Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwDerivedFacts"]>[0]) => { void input; return refs("DERIVED_FACTS_ONLY"); },
+      : (persisted.push({ outcome: "RAW_HTML_ALLOWED", input }), refs("RAW_HTML_ALLOWED")); },
+    writePrivateKwDerivedFacts: async (input: Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwDerivedFacts"]>[0]) => { writes.push({ requestedUrl: input.requestedUrl, sourcePageUrl: input.sourcePageUrl }); persisted.push({ outcome: "DERIVED_FACTS_ONLY", input }); return refs("DERIVED_FACTS_ONLY"); },
+    reloadPrivateKwHtmlEvidence: async (reference: unknown) => {
+      void reference;
+      const entry = persisted.shift()!;
+      const bytes = entry.outcome === "RAW_HTML_ALLOWED" ? Buffer.from((entry.input as Extract<PersistedInput, { outcome: "RAW_HTML_ALLOWED" }>).bytes) : Buffer.from((entry.input as Extract<PersistedInput, { outcome: "DERIVED_FACTS_ONLY" }>).captureBytes);
+      const contentDigest = createHash("sha256").update(bytes).digest("hex");
+      const metadata = { ...entry.input, metadataVersion: "private-kw-html-metadata-v1", contentRef: "kw-html:sha256:" + contentDigest, contentByteLength: bytes.byteLength, contentType: "text/html", rightsDecision: "ALLOWED", termsDecision: "REVIEWED", robotsDecision: "ALLOWED", retentionDecision: entry.outcome, legalHold: false, metadataRef: "kw-html-meta:sha256:" + "d".repeat(64) };
+      return entry.outcome === "RAW_HTML_ALLOWED" ? { outcome: entry.outcome, bytes, metadata } as never : { outcome: entry.outcome, facts: { factsVersion: "private-kw-html-facts-v1", contentRef: metadata.contentRef, metadataRef: metadata.metadataRef, rawArtifactRef: null, facts: (entry.input as Extract<PersistedInput, { outcome: "DERIVED_FACTS_ONLY" }>).facts, factsRef: "kw-html-facts:sha256:" + "e".repeat(64) }, metadata } as never;
+    },
+  };
+}
+
+function memoryReceiptStore() {
+  const values = new Map<string, unknown>();
+  return {
+    values,
+    async loadSealed(operationId: string) { return values.get(operationId) ?? null; },
+    async publishSealed(receipt: unknown) {
+      const operationId = (receipt as { operationId: string }).operationId;
+      const existing = values.get(operationId);
+      if (!existing) { values.set(operationId, receipt); return "CREATED" as const; }
+      if (JSON.stringify(existing) !== JSON.stringify(receipt)) throw new Error("SEALED_RECEIPT_CONFLICT");
+      return "EXACT_REPLAY" as const;
+    },
   };
 }
 
 test("fresh workflow seals a bounded local receipt and exact replay performs zero requests", async () => {
   const chain = approvedChain();
-  const root = await mkdtemp(path.join(os.tmpdir(), "kw-m2-workflow-"));
+  const receiptStore = memoryReceiptStore();
+  const writes: Array<{ requestedUrl: string; sourcePageUrl?: string }> = [];
+  const evidenceStore = fakeEvidenceStore(writes);
   let requests = 0;
-  try {
-    const request = { requestId: "22222222-2222-4222-8222-222222222222", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id,
+  const request = { requestId: "22222222-2222-4222-8222-222222222222", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id,
       researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
-    const fresh = await executePrivateKwM2HtmlEvidence(request, { transport: fakeTransport(() => { requests += 1; }), store: fakeEvidenceStore(), rootPath: root, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+    const fresh = await executePrivateKwM2HtmlEvidence(request, { transport: fakeTransport(() => { requests += 1; }), store: evidenceStore, receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
     assert.equal(fresh.status, "COMPLETE");
     assert(fresh.networkRequestCount >= 2);
     assert(fresh.pages.filter((page) => page.outcome === "CAPTURED").every((page) => page.storageOutcome === "RAW_HTML_ALLOWED"));
     assert.equal(JSON.stringify(fresh).includes("NOT_PERSISTED_SUBPAGE"), false);
+    assert.deepEqual(writes.map((write) => write.requestedUrl), fresh.pages.filter((page) => page.outcome === "CAPTURED").map((page) => page.requestedUrl));
+    assert(writes.every((write) => write.sourcePageUrl === chain.sourcePlan.records[0]!.sourceRecord.websiteUrl));
     assert.equal(fresh.providerOperations, 0);
     assert.equal(fresh.costAuthorizedUsd, 0);
+    assert.equal(fresh.sourcePolicy?.robotsUrl, "https://business-1.com/robots.txt");
+    assert.equal(fresh.sourcePolicy?.networkRequestCount, fresh.sourcePolicy?.transportReceiptIds.length);
+    assert.equal(fresh.sourcePolicy?.transportReceiptDigests.length, fresh.sourcePolicy?.transportReceiptIds.length);
+    assert.equal(fresh.sourcePolicy?.providerOperationsAuthorized, 0);
+    assert.equal(fresh.sourcePolicy?.costAuthorizedUsd, 0);
     assert(fresh.pages.every((page) => !JSON.stringify(page).match(/tel:|mailto:|@/i)));
     const beforeReplay = requests;
-    const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), rootPath: root, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+    const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), store: evidenceStore, receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
     assert.deepEqual(replay, fresh);
     assert.equal(requests, beforeReplay);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
+    const tamperedPolicy = structuredClone(fresh) as unknown as { sourcePolicy: { reason: string }; operationDigest?: string } & Record<string, unknown>;
+    tamperedPolicy.sourcePolicy.reason = "schema-valid but untrusted replacement";
+    const tamperedCore = { ...tamperedPolicy };
+    delete tamperedCore.operationDigest;
+    tamperedPolicy.operationDigest = privateKwM2ReceiptCanonicalDigest(tamperedCore);
+    receiptStore.values.set(fresh.operationId, tamperedPolicy);
+    const rejectedPolicy = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), store: evidenceStore, receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+    assert.equal(rejectedPolicy.status, "FAILED");
+    assert.equal(rejectedPolicy.stopReason, "REPLAY_MISMATCH");
+    assert.equal(requests, beforeReplay);
+    receiptStore.values.set(fresh.operationId, fresh);
+    const expiredReplay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), store: evidenceStore, receiptStore, clock: () => new Date("2026-10-01T15:00:00.000Z") });
+    assert.equal(expiredReplay.status, "FAILED");
+    assert.equal(expiredReplay.stopReason, "AUTHORIZATION_EXPIRED");
+    assert.equal(requests, beforeReplay);
+    const tampered = receiptStore.values.get(fresh.operationId) as Record<string, unknown>;
+    tampered.operationDigest = "a".repeat(64);
+    const rejected = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), store: fakeEvidenceStore(), receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+    assert.equal(rejected.status, "FAILED");
+    assert.equal(rejected.stopReason, "REPLAY_MISMATCH");
+    assert.equal(requests, beforeReplay);
 });
 
 test("exact replay fails closed when the sealed receipt is missing and the shared cap stops nested requests", async () => {
   const chain = approvedChain(1);
-  const root = await mkdtemp(path.join(os.tmpdir(), "kw-m2-replay-"));
+  const receiptStore = memoryReceiptStore();
   let requests = 0;
-  try {
-    const request = { requestId: "33333333-3333-4333-8333-333333333333", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id,
+  const request = { requestId: "33333333-3333-4333-8333-333333333333", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id,
       researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy, replayMode: "EXACT_REPLAY" as const };
-    const missing = await executePrivateKwM2HtmlEvidence(request, { rootPath: root, transport: fakeTransport(() => { requests += 1; }), clock: () => new Date("2026-09-21T15:00:00.000Z") });
+    const missing = await executePrivateKwM2HtmlEvidence(request, { receiptStore, store: fakeEvidenceStore(), transport: fakeTransport(() => { requests += 1; }), clock: () => new Date("2026-09-21T15:00:00.000Z") });
     assert.equal(missing.status, "FAILED");
     assert.equal(missing.stopReason, "REPLAY_MISSING");
     assert.equal(requests, 0);
-    const fresh = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "NEW" }, { rootPath: root, store: fakeEvidenceStore(), transport: fakeTransport(() => { requests += 1; }), clock: () => new Date("2026-09-21T15:00:00.000Z") });
+    const fresh = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "NEW" }, { receiptStore, store: fakeEvidenceStore(), transport: fakeTransport(() => { requests += 1; }), clock: () => new Date("2026-09-21T15:00:00.000Z") });
     assert.equal(fresh.status, "FAILED");
     assert.match(fresh.stopReason ?? "", /HOMEPAGE_CAPTURE_FAILED|CAP/);
     assert.equal(fresh.networkRequestCount, 1);
     assert.equal(requests, 1);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
+});
+
+test("expiry after a selected-page body returns in-memory failure without later storage or sealing", async () => {
+  const chain = approvedChain();
+  const receiptStore = memoryReceiptStore();
+  const store = fakeEvidenceStore();
+  let now = new Date("2026-09-21T15:00:00.000Z");
+  let requests = 0;
+  const request = { requestId: "44444444-4444-4444-8444-444444444444", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id,
+    researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const result = await executePrivateKwM2HtmlEvidence(request, {
+    receiptStore, store, clock: () => now,
+    transport: fakeTransport(() => { requests += 1; if (requests === 3) now = new Date("2026-10-01T00:00:00.000Z"); }),
+  });
+  assert.equal(result.status, "FAILED");
+  assert.equal(result.stopReason, "AUTHORIZATION_EXPIRED");
+  assert.equal(requests, 3);
+  assert.equal(receiptStore.values.size, 0);
+});
+
+test("transport ledger rejects a duplicate receipt instead of laundering the global count", async () => {
+  const chain = approvedChain();
+  const base = fakeTransport(() => {});
+  const take = base.takeReceipts;
+  base.takeReceipts = () => {
+    const receipts = take();
+    const last = receipts.at(-1);
+    return last ? [...receipts, last] : receipts;
+  };
+  const request = { requestId: "55555555-5555-4555-8555-555555555555", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id,
+    researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  await assert.rejects(executePrivateKwM2HtmlEvidence(request, { transport: base, store: fakeEvidenceStore(), receiptStore: memoryReceiptStore(), clock: () => new Date("2026-09-21T15:00:00.000Z") }), /TRANSPORT_RECEIPT_RECONCILIATION_FAILED|TRANSPORT_LEDGER_COUNT_MISMATCH/);
 });

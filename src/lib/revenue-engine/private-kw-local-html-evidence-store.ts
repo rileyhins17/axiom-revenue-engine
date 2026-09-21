@@ -57,6 +57,7 @@ export interface PrivateKwEvidenceMetadataInput {
   businessId: string;
   sourceId: string;
   requestedUrl: string;
+  sourcePageUrl?: string;
   finalUrl: string;
   redirectChainDigest: string;
   captureVersion: string;
@@ -113,6 +114,7 @@ const CommonMetadataSchema = z.object({
   businessId: z.string().min(1).max(200),
   sourceId: z.string().min(1).max(200),
   requestedUrl: UrlSchema,
+  sourcePageUrl: UrlSchema.optional(),
   finalUrl: UrlSchema,
   redirectChainDigest: DigestSchema,
   captureVersion: z.string().min(1).max(120),
@@ -125,6 +127,8 @@ const CommonMetadataSchema = z.object({
   parentReceiptDigest: DigestSchema,
   authorizationDigest: DigestSchema,
   authorizationExpiresAt: IsoDateSchema,
+  sourcePolicyDecision: PrivateKwSourcePolicyDecisionSchema.optional(),
+  transportReceipts: z.array(PrivateKwPublicHttpTransportReceiptSchema).optional(),
   retentionDecision: z.enum(["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY"]),
   retainUntil: IsoDateSchema.optional(),
   reviewAt: IsoDateSchema.optional(),
@@ -273,6 +277,7 @@ function assertBranchInput(input: PrivateKwEvidenceMetadataInput & { outcome: st
     businessId: z.string().trim().min(1).max(200),
     sourceId: z.string().trim().min(1).max(200),
     requestedUrl: UrlSchema,
+    sourcePageUrl: UrlSchema.optional(),
     finalUrl: UrlSchema,
     redirectChainDigest: DigestSchema,
     captureVersion: z.string().trim().min(1).max(120),
@@ -322,23 +327,28 @@ function assertBranchInput(input: PrivateKwEvidenceMetadataInput & { outcome: st
   if (parsed.authorizationDigest !== authorization.authorizationDigest || parsed.authorizationExpiresAt !== authorization.expiresAt) {
     throw new Error("Evidence authorization identity must match the exact execution authorization.");
   }
-  if (decision.websiteUrl !== null && parsed.requestedUrl !== decision.websiteUrl) throw new Error("Evidence URL does not match the exact authorized website.");
+  if (parsed.sourcePageUrl && parsed.sourcePageUrl !== decision.websiteUrl) throw new Error("Evidence source page does not match the exact authorized website.");
+  if (decision.websiteUrl !== null && !parsed.sourcePageUrl && parsed.requestedUrl !== decision.websiteUrl) throw new Error("Evidence URL does not match the exact authorized website.");
+  if (decision.websiteUrl !== null && parsed.sourcePageUrl) {
+    const approved = new URL(decision.websiteUrl); const requested = new URL(parsed.requestedUrl); const final = new URL(parsed.finalUrl);
+    if (approved.hostname !== requested.hostname || approved.hostname !== final.hostname) throw new Error("Evidence page URL must remain on the exact authorized host.");
+  }
   if (parsed.outcome === "RAW_HTML_ALLOWED" && (decision.sourceRights !== "PUBLIC_SOURCE_REVIEWED" || decision.termsDecision !== "TERMS_REVIEWED_FOR_FACTS" || decision.robotsDecision !== "ROBOTS_REVIEWED_PUBLIC_ONLY")) {
     throw new Error("RAW_HTML_ALLOWED requires the exact reviewed public-source policy decision.");
   }
   if (authorization.authority.liveSourceAuthorized || authorization.authority.artifactStorageAuthorized || authorization.authority.providerOperationsAuthorized !== 0 || authorization.authority.costAuthorizedUsd !== 0) {
     throw new Error("Evidence authorization contains disallowed authority.");
   }
-  if (parsed.outcome === "RAW_HTML_ALLOWED") assertExactSourcePolicy(parsed, decision, authorization);
+  if (parsed.sourcePolicyDecision !== undefined) assertExactSourcePolicy(parsed, decision, authorization);
   return parsed;
 }
 
-function assertExactSourcePolicy(input: { requestedUrl: string; finalUrl: string; sourcePolicyVersion: string; sourcePolicyDecision?: unknown; transportReceipts?: readonly unknown[] }, decision: PrivateKwM2ExecutionAuthorization["sourceDecisions"][number], authorization: PrivateKwM2ExecutionAuthorization) {
+function assertExactSourcePolicy(input: { requestedUrl: string; sourcePageUrl?: string; finalUrl: string; sourcePolicyVersion: string; sourcePolicyDecision?: unknown; transportReceipts?: readonly unknown[] }, decision: PrivateKwM2ExecutionAuthorization["sourceDecisions"][number], authorization: PrivateKwM2ExecutionAuthorization) {
   const policy = PrivateKwSourcePolicyDecisionSchema.parse(input.sourcePolicyDecision);
   const receipts = (input.transportReceipts ?? []).map((receipt) => PrivateKwPublicHttpTransportReceiptSchema.parse(receipt));
   if (policy.policyVersion !== input.sourcePolicyVersion || !policy.allowed || policy.providerOperationsAuthorized !== 0 || policy.costAuthorizedUsd !== 0) throw new Error("Raw evidence requires an exact allowed zero-cost source-policy decision.");
   if (policy.termsDecision !== decision.termsDecision) throw new Error("Raw evidence terms decision does not match the exact authorization chain.");
-  const approved = new URL(input.requestedUrl);
+  const approved = new URL(input.sourcePageUrl ?? input.requestedUrl);
   const final = new URL(input.finalUrl);
   const expectedRobotsUrl = new URL("/robots.txt", approved).toString();
   if (policy.robotsUrl !== expectedRobotsUrl || approved.hostname !== final.hostname || policy.httpStatus === null || policy.httpStatus < 200 || policy.httpStatus >= 300 || policy.contentDigest === null) throw new Error("Raw evidence source-policy URL, status, or robots proof is incomplete.");
@@ -497,6 +507,7 @@ function metadataCore(input: PrivateKwEvidenceMetadataInput, outcome: "RAW_HTML_
     businessId: input.businessId,
     sourceId: input.sourceId,
     requestedUrl: input.requestedUrl,
+    ...(input.sourcePageUrl ? { sourcePageUrl: input.sourcePageUrl } : {}),
     finalUrl: input.finalUrl,
     redirectChainDigest: input.redirectChainDigest,
     captureVersion: input.captureVersion,
@@ -509,6 +520,8 @@ function metadataCore(input: PrivateKwEvidenceMetadataInput, outcome: "RAW_HTML_
     parentReceiptDigest: input.parentReceiptDigest,
     authorizationDigest: input.authorizationChain.authorization.authorizationDigest,
     authorizationExpiresAt: input.authorizationChain.authorization.expiresAt,
+    ...(input.sourcePolicyDecision ? { sourcePolicyDecision: PrivateKwSourcePolicyDecisionSchema.parse(input.sourcePolicyDecision) } : {}),
+    ...(input.transportReceipts ? { transportReceipts: input.transportReceipts.map((receipt) => PrivateKwPublicHttpTransportReceiptSchema.parse(receipt)) } : {}),
     retentionDecision: outcome,
     ...(outcome === "RAW_HTML_ALLOWED" ? { retainUntil: input.retainUntil } : { reviewAt: input.reviewAt }),
     legalHold: input.legalHold ?? false,
