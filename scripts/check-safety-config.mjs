@@ -109,6 +109,9 @@ const ownerLabelingComponent = await readFile(new URL("../src/components/leads/o
 const stagingConsoleRelease = await readFile(new URL("../src/lib/revenue-engine/staging-console-release.ts", import.meta.url), "utf8");
 const stagingConsoleReleaseVerifier = await readFile(new URL("./verify-staging-console-release.ts", import.meta.url), "utf8");
 const stagingConsoleReleasePacket = await readFile(new URL("../docs/releases/staging/2026-08-28-owner-quality-lab.json", import.meta.url), "utf8");
+const privateKwM2HtmlWorkflow = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", import.meta.url), "utf8");
+const privateKwM2HtmlAudit = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-html-audit.ts", import.meta.url), "utf8");
+const privateKwM2HtmlReceipt = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", import.meta.url), "utf8");
 const stagingMarker = '"staging": {';
 const stagingIndex = wrangler.indexOf(stagingMarker);
 const staging = stagingIndex >= 0 ? wrangler.slice(stagingIndex) : "";
@@ -832,6 +835,20 @@ requireMatch("migrations/0060_artifact_reference_source_writer_guards.sql", arti
 requireMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, /ARTIFACT_REFERENCE_APPEND_ONLY/, "source and control revisions must fail with a stable append-only error");
 forbidMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, /\b(?:INSERT\s+INTO|UPDATE\s+\"[^\"]+\"\s+SET|DELETE\s+FROM)\b/i, "writer-guard migration must not mutate existing rows");
 forbidMatch("migrations/0060_artifact_reference_source_writer_guards.sql", artifactReferenceWriterGuardMigration, /retentionConclusionAuthorized\s*=\s*1|projectionPersistenceAuthorized\s*=\s*1|releaseAuthorized\s*=\s*1|deletionAuthorized\s*=\s*1|providerOperationsAuthorized\s*>\s*0/i, "writer-guard migration must not grant operational authority");
+
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION\s*=\s*[\"']kw-m2-html-evidence-workflow-v1/, "Task4 must expose its versioned HTML-only workflow contract");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /assertPrivateKwM2ApprovalChain/, "Task4 must revalidate the canonical Task1 approval chain before requests");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /createPrivateKwPublicHttpTransport/, "Task4 must use the address-pinned public transport adapter");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /networkRequestCap/, "Task4 must enforce the approved shared request cap");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /writePrivateKwHtmlEvidence|writePrivateKwDerivedFacts/, "Task4 must route retention through the canonical local evidence store");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /providerOperations:\s*0|costAuthorizedUsd:\s*0/, "Task4 receipt must report zero provider and cost authority");
+forbidMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-workflow.ts", privateKwM2HtmlWorkflow, /globalThis\.fetch|@cloudflare|D1Database|R2Bucket|better-sqlite3|website-audit-assembly|process\.env|\.prepare\s*\(|\.run\s*\(/i, "Task4 workflow must stay disconnected from providers, databases, runtime fetch, and generic audit assembly");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-audit.ts", privateKwM2HtmlAudit, /assemblerKind:\s*z\.literal\("HTML_ONLY"\)/, "Task4 audit must carry an explicit HTML-only assembler identity");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-audit.ts", privateKwM2HtmlAudit, /conversionCritical:\s*z\.literal\(false\)/, "Task4 availability proof must never be conversion-critical");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-audit.ts", privateKwM2HtmlAudit, /visibleText:\s*""|visibleText:\s*''/, "Task4 audit snapshots must not persist page text");
+forbidMatch("src/lib/revenue-engine/private-kw-m2-html-audit.ts", privateKwM2HtmlAudit, /classification\s*:\s*z\.enum|rebuildNeedScore\s*:\s*z\.(number|string)|evidenceConfidence\s*:\s*z\.(number|string)/, "Task4 HTML-only audit must not expose ordinary classification or score authority");
+requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", privateKwM2HtmlReceipt, /open\(file,\s*[\"']wx[\"']\)/, "Task4 sealed receipt publication must be exclusive and no-overwrite");
+forbidMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", privateKwM2HtmlReceipt, /fetch\s*\(|@cloudflare|D1Database|R2Bucket|\.rename\s*\(/i, "Task4 sealed receipts must remain local and provider-free");
 
 if (failures.length > 0) {
   console.error("Safety configuration check failed:");
