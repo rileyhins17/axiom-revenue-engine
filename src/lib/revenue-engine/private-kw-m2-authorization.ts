@@ -23,6 +23,19 @@ export const PRIVATE_KW_M2_DATABASE_RECEIPT_VERSION = "kw-m2-database-receipt-v1
 
 const TimestampSchema = z.string().datetime({ offset: true });
 const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
+const EvidenceRetentionSchema = z.enum(["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY", "BLOCKED"]);
+const SourceRightsSchema = z.enum(["PUBLIC_SOURCE_REVIEWED", "PUBLIC_SOURCE_DERIVED"]);
+const TermsDecisionSchema = z.enum(["PUBLIC_REVIEW_ONLY", "TERMS_REVIEWED_FOR_FACTS"]);
+const RobotsDecisionSchema = z.enum(["PREFLIGHT_REQUIRED_BEFORE_FETCH", "ROBOTS_REVIEWED_PUBLIC_ONLY"]);
+const StopConditionSchema = z.enum([
+  "AMBIGUOUS_IDENTITY",
+  "ROBOTS_OR_TERMS_UNCLEAR",
+  "SOURCE_RIGHTS_UNCLEAR",
+  "PERSONAL_DATA_DOMINANT",
+  "STALE_EVIDENCE",
+  "OUT_OF_SCOPE",
+  "RETENTION_NOT_ALLOWED",
+]);
 const AuthoritySchema = z.object({
   liveSourceAuthorized: z.literal(false),
   browserCaptureAuthorized: z.literal(false),
@@ -66,24 +79,16 @@ const ResearchCandidateSchema = z.object({
   niche: z.enum(["ROOFING", "HVAC", "LANDSCAPING"]),
   websiteUrl: z.string().url().nullable(),
   sourceEvidenceUrl: z.string().url(),
-  sourceMethod: z.literal("MANUAL_RESEARCH"),
+  sourceMethod: z.enum(["MANUAL_RESEARCH", "LEGACY_READ_ONLY_EXPORT"]),
   sourceCapturedAt: TimestampSchema,
   sourceReviewedAt: TimestampSchema,
   independenceStatus: z.literal("INDEPENDENT"),
-  sourceRights: z.literal("PUBLIC_SOURCE_REVIEWED"),
-  termsDecision: z.literal("PUBLIC_REVIEW_ONLY"),
-  robotsDecision: z.literal("PREFLIGHT_REQUIRED_BEFORE_FETCH"),
-  evidenceRetention: z.enum(["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY", "BLOCKED"]),
+  sourceRights: SourceRightsSchema,
+  termsDecision: TermsDecisionSchema,
+  robotsDecision: RobotsDecisionSchema,
+  evidenceRetention: EvidenceRetentionSchema,
   retentionReviewDate: TimestampSchema,
-  stopConditions: z.array(z.enum([
-    "AMBIGUOUS_IDENTITY",
-    "ROBOTS_OR_TERMS_UNCLEAR",
-    "SOURCE_RIGHTS_UNCLEAR",
-    "PERSONAL_DATA_DOMINANT",
-    "STALE_EVIDENCE",
-    "OUT_OF_SCOPE",
-    "RETENTION_NOT_ALLOWED",
-  ])).min(1).max(7),
+  stopConditions: z.array(StopConditionSchema).min(1).max(7),
 }).strict();
 
 const ResearchOwnerReviewSchema = z.object({
@@ -150,13 +155,35 @@ export const PrivateKwM2ResearchPacketSchema = z.object({
 
 export type PrivateKwM2ResearchPacket = z.infer<typeof PrivateKwM2ResearchPacketSchema>;
 
+const ResearchPolicyDecisionSchema = z.object({
+  businessId: z.string().trim().min(1).max(128),
+  sourceRights: SourceRightsSchema,
+  termsDecision: TermsDecisionSchema,
+  robotsDecision: RobotsDecisionSchema,
+  evidenceRetention: EvidenceRetentionSchema,
+  retentionReviewDate: TimestampSchema,
+  stopConditions: z.array(StopConditionSchema).min(1).max(7),
+}).strict();
+
+export const PrivateKwM2ResearchPolicySchema = z.object({
+  policyVersion: z.literal("kw-m2-research-policy-v1"),
+  decisions: z.array(ResearchPolicyDecisionSchema).length(10),
+}).strict().superRefine((policy, context) => {
+  const ids = new Set(policy.decisions.map((decision) => decision.businessId));
+  if (ids.size !== policy.decisions.length) {
+    context.addIssue({ code: "custom", path: ["decisions"], message: "Research policy decisions must have unique business IDs." });
+  }
+});
+
+export type PrivateKwM2ResearchPolicy = z.infer<typeof PrivateKwM2ResearchPolicySchema>;
+
 const AuthorizationDecisionSchema = z.object({
   businessId: z.string().trim().min(1).max(128),
   websiteUrl: z.string().url().nullable(),
-  sourceRights: z.literal("PUBLIC_SOURCE_REVIEWED"),
-  termsDecision: z.literal("PUBLIC_REVIEW_ONLY"),
-  robotsDecision: z.literal("PREFLIGHT_REQUIRED_BEFORE_FETCH"),
-  evidenceRetention: z.enum(["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY", "BLOCKED"]),
+  sourceRights: SourceRightsSchema,
+  termsDecision: TermsDecisionSchema,
+  robotsDecision: RobotsDecisionSchema,
+  evidenceRetention: EvidenceRetentionSchema,
   stopConditions: ResearchCandidateSchema.shape.stopConditions,
 }).strict();
 
@@ -321,6 +348,7 @@ export function buildPrivateKwM2ResearchPacket(input: {
   manifest: PrivateKwShadowSliceManifest;
   sourcePlan: PrivateKwImportPlan;
   reviewedAt: string;
+  retentionDecisions?: ReadonlyArray<{ businessId: string; evidenceRetention: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED" }>;
 }): PrivateKwM2ResearchPacket {
   const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifest);
   const sourcePlan = PrivateKwImportPlanSchema.parse(input.sourcePlan);
@@ -328,40 +356,12 @@ export function buildPrivateKwM2ResearchPacket(input: {
   if (manifest.sourceImportId !== sourcePlan.importId || manifest.sourcePlanDigest !== persistencePlan.sourcePlanDigest) {
     throw new Error("The M2 research packet requires the exact source plan bound by the manifest.");
   }
-  const sourceByBusinessId = new Map(sourcePlan.records.map((record) => [record.business.id, record]));
-  const candidates = manifest.records.map((record) => {
-    const source = sourceByBusinessId.get(record.businessId);
-    if (!source || source.evaluationCandidateId !== record.evaluationCandidateId) {
-      throw new Error("The M2 research packet manifest and source plan identities do not match.");
-    }
-    return {
-      businessId: record.businessId,
-      evaluationCandidateId: record.evaluationCandidateId,
-      businessName: record.businessName,
-      city: record.city,
-      niche: record.niche,
-      websiteUrl: record.websiteUrl,
-      sourceEvidenceUrl: record.sourceEvidenceUrl,
-      sourceMethod: "MANUAL_RESEARCH" as const,
-      sourceCapturedAt: record.sourceCapturedAt,
-      sourceReviewedAt: record.sourceReview.reviewedAt,
-      independenceStatus: "INDEPENDENT" as const,
-      sourceRights: "PUBLIC_SOURCE_REVIEWED" as const,
-      termsDecision: "PUBLIC_REVIEW_ONLY" as const,
-      robotsDecision: "PREFLIGHT_REQUIRED_BEFORE_FETCH" as const,
-      evidenceRetention: "DERIVED_FACTS_ONLY" as const,
-      retentionReviewDate: input.reviewedAt,
-      stopConditions: [
-        "AMBIGUOUS_IDENTITY",
-        "ROBOTS_OR_TERMS_UNCLEAR",
-        "SOURCE_RIGHTS_UNCLEAR",
-        "PERSONAL_DATA_DOMINANT",
-        "STALE_EVIDENCE",
-        "OUT_OF_SCOPE",
-        "RETENTION_NOT_ALLOWED",
-      ] as const,
-    };
+  const policy = buildPrivateKwM2ResearchPolicy({
+    manifest,
+    reviewedAt: input.reviewedAt,
+    retentionDecisions: input.retentionDecisions,
   });
+  const candidates = canonicalResearchCandidates(manifest, sourcePlan, policy);
   const core = {
     packetVersion: PRIVATE_KW_M2_RESEARCH_PACKET_VERSION,
     manifestId: manifest.manifestId,
@@ -387,16 +387,49 @@ export function buildPrivateKwM2ResearchPacket(input: {
   return PrivateKwM2ResearchPacketSchema.parse({ ...core, packetId: `kw-m2-research:${packetDigest}`, packetDigest });
 }
 
+export function buildPrivateKwM2ResearchPolicy(input: {
+  manifest: PrivateKwShadowSliceManifest;
+  reviewedAt: string;
+  retentionDecisions?: ReadonlyArray<{ businessId: string; evidenceRetention: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED" }>;
+}): PrivateKwM2ResearchPolicy {
+  const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifest);
+  const requestedRetention = new Map((input.retentionDecisions ?? []).map((decision) => [decision.businessId, decision.evidenceRetention]));
+  if (input.retentionDecisions && (requestedRetention.size !== input.retentionDecisions.length || requestedRetention.size !== manifest.records.length || manifest.records.some((record) => !requestedRetention.has(record.businessId)))) {
+    throw new Error("Retention decisions must cover the exact ten manifest business IDs once.");
+  }
+  return PrivateKwM2ResearchPolicySchema.parse({
+    policyVersion: "kw-m2-research-policy-v1",
+    decisions: manifest.records.map((record) => ({
+      businessId: record.businessId,
+      sourceRights: "PUBLIC_SOURCE_REVIEWED" as const,
+      termsDecision: "PUBLIC_REVIEW_ONLY" as const,
+      robotsDecision: "PREFLIGHT_REQUIRED_BEFORE_FETCH" as const,
+      evidenceRetention: requestedRetention.get(record.businessId) ?? "DERIVED_FACTS_ONLY",
+      retentionReviewDate: input.reviewedAt,
+      stopConditions: [
+        "AMBIGUOUS_IDENTITY",
+        "ROBOTS_OR_TERMS_UNCLEAR",
+        "SOURCE_RIGHTS_UNCLEAR",
+        "PERSONAL_DATA_DOMINANT",
+        "STALE_EVIDENCE",
+        "OUT_OF_SCOPE",
+        "RETENTION_NOT_ALLOWED",
+      ],
+    })),
+  });
+}
+
 export function buildPrivateKwM2ExecutionAuthorization(input: {
   researchPacket: PrivateKwM2ResearchPacket;
   manifest: PrivateKwShadowSliceManifest;
   sourcePlan: PrivateKwImportPlan;
   websitePolicy: { version: string; networkRequestCap: number; expiresAt: string };
+  researchPolicy?: PrivateKwM2ResearchPolicy;
 }): PrivateKwM2ExecutionAuthorization {
   const packet = PrivateKwM2ResearchPacketSchema.parse(input.researchPacket);
   const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifest);
   const sourcePlan = PrivateKwImportPlanSchema.parse(input.sourcePlan);
-  assertPacketSourceChain(packet, manifest, sourcePlan);
+  assertPacketSourceChain(packet, manifest, sourcePlan, input.researchPolicy);
   const core = {
     authorizationVersion: PRIVATE_KW_M2_EXECUTION_AUTHORIZATION_VERSION,
     status: "PENDING" as const,
@@ -435,12 +468,13 @@ export function buildPrivateKwM2OwnerApprovalCandidate(input: {
   authorization: PrivateKwM2ExecutionAuthorization;
   manifest: PrivateKwShadowSliceManifest;
   sourcePlan: PrivateKwImportPlan;
+  researchPolicy?: PrivateKwM2ResearchPolicy;
 }): PrivateKwM2OwnerApprovalEnvelope {
   const packet = PrivateKwM2ResearchPacketSchema.parse(input.researchPacket);
   const authorization = PrivateKwM2ExecutionAuthorizationSchema.parse(input.authorization);
   const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifest);
   const sourcePlan = PrivateKwImportPlanSchema.parse(input.sourcePlan);
-  assertPacketSourceChain(packet, manifest, sourcePlan);
+  assertPacketSourceChain(packet, manifest, sourcePlan, input.researchPolicy);
   if (authorization.researchPacketId !== packet.packetId || authorization.researchPacketDigest !== packet.packetDigest) {
     throw new Error("Owner approval candidate requires the exact pending authorization for the packet.");
   }
@@ -482,6 +516,7 @@ export function recordPrivateKwM2OwnerApproval(
   const pending = PrivateKwM2OwnerApprovalEnvelopeSchema.parse(candidate);
   if (pending.status !== "PENDING") throw new Error("Only a pending owner candidate can be recorded as approved.");
   if (Date.parse(decision.expiresAt) <= Date.parse(decision.reviewedAt)) throw new Error("Owner approval expiry must follow its review time.");
+  if (Date.parse(decision.expiresAt) > Date.parse(pending.expiresAt)) throw new Error("Owner approval expiry cannot exceed execution authorization expiry.");
   const core = {
     ...pending,
     status: "APPROVED" as const,
@@ -530,13 +565,24 @@ export function assertPrivateKwM2ApprovalChain(input: {
   sourcePlan: PrivateKwImportPlan;
   phase: "PREPARE" | "ROBOTS" | "GET" | "ASSESSMENT";
   now?: string;
+  researchPolicy?: PrivateKwM2ResearchPolicy;
 }) {
   const packet = PrivateKwM2ResearchPacketSchema.parse(input.researchPacket);
   const authorization = PrivateKwM2ExecutionAuthorizationSchema.parse(input.authorization);
   const ownerEnvelope = PrivateKwM2OwnerApprovalEnvelopeSchema.parse(input.ownerEnvelope);
   const manifest = PrivateKwShadowSliceManifestSchema.parse(input.manifest);
   const sourcePlan = PrivateKwImportPlanSchema.parse(input.sourcePlan);
-  assertPacketSourceChain(packet, manifest, sourcePlan);
+  assertPacketSourceChain(packet, manifest, sourcePlan, input.researchPolicy);
+  if (authorization.status !== "PENDING") {
+    throw new Error("Execution authorization must remain PENDING until the later execution gate.");
+  }
+  if (Date.parse(ownerEnvelope.expiresAt) > Date.parse(authorization.expiresAt)) {
+    throw new Error("Owner approval expiry cannot exceed execution authorization expiry.");
+  }
+  const now = Date.parse(input.now ?? new Date().toISOString());
+  if (now >= Date.parse(authorization.expiresAt)) {
+    throw new Error("The pending execution authorization is expired.");
+  }
   if (authorization.researchPacketId !== packet.packetId || authorization.researchPacketDigest !== packet.packetDigest || authorization.manifestId !== manifest.manifestId || authorization.manifestDigest !== manifest.manifestDigest || authorization.sourcePlanDigest !== packet.sourcePlanDigest) {
     throw new Error("Execution authorization does not match the exact packet, manifest, or source plan.");
   }
@@ -555,21 +601,80 @@ export function assertPrivateKwM2ApprovalChain(input: {
   if (ownerEnvelope.researchPacketId !== packet.packetId || ownerEnvelope.researchPacketDigest !== packet.packetDigest || ownerEnvelope.executionAuthorizationId !== authorization.authorizationId || ownerEnvelope.executionAuthorizationDigest !== authorization.authorizationDigest || ownerEnvelope.manifestId !== manifest.manifestId || ownerEnvelope.manifestDigest !== manifest.manifestDigest || ownerEnvelope.sourcePlanDigest !== packet.sourcePlanDigest) {
     throw new Error("Owner approval does not match the exact packet and authorization chain.");
   }
+  if (input.phase === "PREPARE" && ownerEnvelope.status !== "PENDING") {
+    throw new Error("Preparation requires the pending owner-envelope candidate.");
+  }
   if (input.phase !== "PREPARE") {
     if (ownerEnvelope.status !== "APPROVED") throw new Error("Robots and website GET require a separately recorded APPROVED owner envelope.");
-    const now = Date.parse(input.now ?? new Date().toISOString());
     if (ownerEnvelope.reviewedAt === null || now < Date.parse(ownerEnvelope.reviewedAt) || now >= Date.parse(ownerEnvelope.expiresAt)) {
       throw new Error("The APPROVED owner envelope is missing a valid review window.");
     }
+  } else if (now >= Date.parse(ownerEnvelope.expiresAt)) {
+    throw new Error("The pending owner-envelope candidate is expired.");
   }
   return true as const;
 }
 
-function assertPacketSourceChain(packet: PrivateKwM2ResearchPacket, manifest: PrivateKwShadowSliceManifest, sourcePlan: PrivateKwImportPlan) {
+function assertPacketSourceChain(packet: PrivateKwM2ResearchPacket, manifest: PrivateKwShadowSliceManifest, sourcePlan: PrivateKwImportPlan, suppliedPolicy?: PrivateKwM2ResearchPolicy) {
   const persistencePlan: PrivateKwPersistencePlan = buildPrivateKwPersistencePlan(sourcePlan);
   if (packet.manifestId !== manifest.manifestId || packet.manifestDigest !== manifest.manifestDigest || packet.sourceImportId !== sourcePlan.importId || packet.sourcePlanDigest !== persistencePlan.sourcePlanDigest || manifest.sourceImportId !== sourcePlan.importId || manifest.sourcePlanDigest !== persistencePlan.sourcePlanDigest) {
     throw new Error("The research packet, manifest, and source plan must share exact durable identities.");
   }
+  const policy = PrivateKwM2ResearchPolicySchema.parse(suppliedPolicy ?? buildPrivateKwM2ResearchPolicy({ manifest, reviewedAt: packet.createdAt }));
+  const expectedCandidates = canonicalResearchCandidates(manifest, sourcePlan, policy);
+  const candidateFields: Array<[keyof PrivateKwM2ResearchPacket["candidates"][number], string]> = [
+    ["websiteUrl", "website URL"],
+    ["sourceEvidenceUrl", "source evidence URL"],
+    ["sourceMethod", "source method"],
+    ["sourceCapturedAt", "captured time"],
+    ["sourceRights", "source rights"],
+    ["termsDecision", "terms"],
+    ["robotsDecision", "robots"],
+    ["evidenceRetention", "retention"],
+    ["retentionReviewDate", "review date"],
+    ["stopConditions", "stop conditions"],
+  ];
+  packet.candidates.forEach((candidate, index) => {
+    const expected = expectedCandidates[index];
+    for (const [field, label] of candidateFields) {
+      if (privateKwM2Digest(candidate[field]) !== privateKwM2Digest(expected![field])) {
+        throw new Error(`Research packet ${label} for ${candidate.businessId} differs from canonical source and policy inputs.`);
+      }
+    }
+  });
+}
+
+function canonicalResearchCandidates(manifest: PrivateKwShadowSliceManifest, sourcePlan: PrivateKwImportPlan, policy: PrivateKwM2ResearchPolicy) {
+  const sourceByBusinessId = new Map(sourcePlan.records.map((record) => [record.business.id, record]));
+  const sourceRunById = new Map(sourcePlan.sourceRuns.map((run) => [run.id, run]));
+  const policyByBusinessId = new Map(policy.decisions.map((decision) => [decision.businessId, decision]));
+  return manifest.records.map((record) => {
+    const source = sourceByBusinessId.get(record.businessId);
+    const sourceRun = source && sourceRunById.get(source.sourceRecord.sourceRunId);
+    const decision = policyByBusinessId.get(record.businessId);
+    if (!source || !sourceRun || !decision || source.evaluationCandidateId !== record.evaluationCandidateId || source.business.canonicalName !== record.businessName || source.location.city !== record.city || source.niche !== record.niche || source.sourceRecord.sourceEvidenceUrl !== record.sourceEvidenceUrl || source.sourceRecord.websiteUrl !== record.websiteUrl || source.sourceRecord.capturedAt !== record.sourceCapturedAt || source.business.independenceStatus !== "INDEPENDENT" || record.independenceStatus !== "INDEPENDENT") {
+      throw new Error(`Research packet canonical source relationship is inconsistent for ${record.businessId}.`);
+    }
+    return {
+      businessId: record.businessId,
+      evaluationCandidateId: record.evaluationCandidateId,
+      businessName: source.business.canonicalName,
+      city: source.location.city,
+      niche: source.niche,
+      websiteUrl: source.sourceRecord.websiteUrl,
+      sourceEvidenceUrl: source.sourceRecord.sourceEvidenceUrl,
+      sourceMethod: sourceRun.adapter,
+      sourceCapturedAt: source.sourceRecord.capturedAt,
+      sourceReviewedAt: record.sourceReview.reviewedAt,
+      independenceStatus: "INDEPENDENT" as const,
+      sourceRights: decision.sourceRights,
+      termsDecision: decision.termsDecision,
+      robotsDecision: decision.robotsDecision,
+      evidenceRetention: decision.evidenceRetention,
+      retentionReviewDate: decision.retentionReviewDate,
+      stopConditions: decision.stopConditions,
+    };
+  });
 }
 
 function zeroAuthority(): PrivateKwM2Authority {

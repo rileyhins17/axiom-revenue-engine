@@ -207,6 +207,7 @@ test("binds pending authorization and rejects copied or changed upstream values"
     manifest,
     sourcePlan,
     phase: "PREPARE",
+    now: "2026-09-05T15:00:00.000Z",
   }), /source decisions|research packet/i);
 });
 
@@ -222,6 +223,7 @@ test("keeps owner approval pending until a separate exact decision records APPRO
     manifest,
     sourcePlan,
     phase: "ROBOTS",
+    now: "2026-09-05T15:00:00.000Z",
   }), /APPROVED|approval/i);
 
   const approved = recordPrivateKwM2OwnerApproval(ownerCandidate, {
@@ -250,6 +252,14 @@ test("keeps owner approval pending until a separate exact decision records APPRO
     dedicatedConfirmation: true,
   }), /digest|candidate|approval/i);
 
+  assert.throws(() => recordPrivateKwM2OwnerApproval(ownerCandidate, {
+    approver: "RILEY",
+    reviewedAt: "2026-09-04T15:00:00.000Z",
+    expiresAt: "2026-09-11T15:00:00.000Z",
+    rationale: "Reviewed the exact synthetic packet and bounded local route.",
+    dedicatedConfirmation: true,
+  }), /expiry|authorization|candidate/i);
+
   const expired = recordPrivateKwM2OwnerApproval(ownerCandidate, {
     approver: "RILEY",
     reviewedAt: "2026-09-03T15:00:00.000Z",
@@ -266,6 +276,92 @@ test("keeps owner approval pending until a separate exact decision records APPRO
     phase: "GET",
     now: "2026-09-05T15:00:00.000Z",
   }), /review window|expired|approval/i);
+});
+
+test("rejects an expired authorization even when a copied owner envelope appears valid, including exact expiry boundaries", () => {
+  const { sourcePlan, manifest, researchPacket, authorization, ownerCandidate } = chainFixture();
+  const approved = recordPrivateKwM2OwnerApproval(ownerCandidate, {
+    approver: "RILEY",
+    reviewedAt: "2026-09-04T15:00:00.000Z",
+    expiresAt: "2026-09-10T15:00:00.000Z",
+    rationale: "Reviewed the exact synthetic packet and bounded local route.",
+    dedicatedConfirmation: true,
+  });
+  const expiredAuthorizationCore = {
+    ...authorization,
+    expiresAt: "2026-09-04T15:00:00.000Z",
+  };
+  const { authorizationId: _authorizationId, authorizationDigest: _authorizationDigest, ...expiredAuthorizationBody } = expiredAuthorizationCore;
+  void _authorizationId;
+  void _authorizationDigest;
+  const expiredAuthorizationDigest = privateKwM2Digest(expiredAuthorizationBody);
+  const expiredAuthorization = {
+    ...expiredAuthorizationBody,
+    authorizationId: `kw-m2-execution:${expiredAuthorizationDigest}`,
+    authorizationDigest: expiredAuthorizationDigest,
+  };
+  assert.throws(() => assertPrivateKwM2ApprovalChain({
+    researchPacket,
+    authorization: expiredAuthorization,
+    ownerEnvelope: approved,
+    manifest,
+    sourcePlan,
+    phase: "GET",
+    now: "2026-09-04T15:00:00.000Z",
+  }), /authorization|expired|review window/i);
+});
+
+test("rebuilds every material candidate field from canonical source and policy inputs", () => {
+  const { sourcePlan, manifest, researchPacket, authorization, ownerCandidate } = chainFixture();
+  const mutations: Array<[string, (candidate: typeof researchPacket.candidates[number]) => typeof candidate]> = [
+    ["website URL", (candidate) => ({ ...candidate, websiteUrl: "https://changed.getaxiom.ca" })],
+    ["source evidence URL", (candidate) => ({ ...candidate, sourceEvidenceUrl: "https://directory.getaxiom.ca/changed" })],
+    ["source method", (candidate) => ({ ...candidate, sourceMethod: "LEGACY_READ_ONLY_EXPORT" })],
+    ["captured time", (candidate) => ({ ...candidate, sourceCapturedAt: "2026-08-31T14:00:00.000Z" })],
+    ["source rights", (candidate) => ({ ...candidate, sourceRights: "PUBLIC_SOURCE_DERIVED" })],
+    ["terms", (candidate) => ({ ...candidate, termsDecision: "TERMS_REVIEWED_FOR_FACTS" })],
+    ["robots", (candidate) => ({ ...candidate, robotsDecision: "ROBOTS_REVIEWED_PUBLIC_ONLY" })],
+    ["retention", (candidate) => ({ ...candidate, evidenceRetention: "RAW_HTML_ALLOWED" })],
+    ["review date", (candidate) => ({ ...candidate, retentionReviewDate: "2026-09-04T15:00:00.000Z" })],
+    ["stop conditions", (candidate) => ({ ...candidate, stopConditions: ["OUT_OF_SCOPE"] })],
+  ];
+  for (const [label, mutate] of mutations) {
+    const mutatedCandidates = researchPacket.candidates.map((candidate, index) => index === 0 ? mutate(candidate) : candidate);
+    const { packetId: _packetId, packetDigest: _packetDigest, ...packetBody } = { ...researchPacket, candidates: mutatedCandidates };
+    void _packetId;
+    void _packetDigest;
+    const packetDigest = privateKwM2Digest(packetBody);
+    const mutatedPacket = {
+      ...packetBody,
+      packetId: `kw-m2-research:${packetDigest}`,
+      packetDigest,
+    };
+    assert.throws(() => assertPrivateKwM2ApprovalChain({
+      researchPacket: mutatedPacket,
+      authorization,
+      ownerEnvelope: ownerCandidate,
+      manifest,
+      sourcePlan,
+      phase: "PREPARE",
+      now: "2026-09-05T15:00:00.000Z",
+    }), new RegExp(label, "i"));
+  }
+});
+
+test("allows each explicit retention decision while preserving the same zero-authority chain", () => {
+  const sourcePlan = sourceFixture();
+  const manifest = manifestFixture(sourcePlan);
+  for (const evidenceRetention of ["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY", "BLOCKED"] as const) {
+    const researchPacket = buildPrivateKwM2ResearchPacket({
+      manifest,
+      sourcePlan,
+      reviewedAt: "2026-09-03T15:00:00.000Z",
+      retentionDecisions: sourcePlan.records.map((record) => ({ businessId: record.business.id, evidenceRetention })),
+    });
+    assert(researchPacket.candidates.every((candidate) => candidate.evidenceRetention === evidenceRetention));
+    assert.equal(researchPacket.authority.sendAuthorized, false);
+    assert.equal(researchPacket.authority.providerOperationsAuthorized, 0);
+  }
 });
 
 test("keeps the mapping policy fixture-only and verifies the database receipt contract", () => {
