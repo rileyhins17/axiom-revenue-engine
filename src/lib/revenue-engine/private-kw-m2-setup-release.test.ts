@@ -7,7 +7,6 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import {
   PRIVATE_KW_M2_DATABASE_RECEIPT_V2,
   PRIVATE_KW_M2_MIGRATION_RANGE,
-  PRIVATE_KW_M2_MIGRATION_FILES,
   PRIVATE_KW_M2_SETUP_RELEASE_VERSION,
   PrivateKwM2DatabaseSetupReceiptSchema,
   PrivateKwM2SetupReleaseEnvelopeSchema,
@@ -15,6 +14,7 @@ import {
   privateKwM2SetupReleaseEnvelopeDigest,
   loadPrivateKwM2SetupReleaseEnvelope,
 } from "./private-kw-m2-setup-release";
+import { PRIVATE_KW_M2_MIGRATION_FILES } from "../../../scripts/private-kw-m2-database";
 
 const migrationManifest = PRIVATE_KW_M2_MIGRATION_FILES.map((filename) => ({ filename, sha256: createHash("sha256").update(execFileSync("git", ["show", `HEAD:migrations/${filename}`])).digest("hex") }));
 const digest = "a".repeat(64);
