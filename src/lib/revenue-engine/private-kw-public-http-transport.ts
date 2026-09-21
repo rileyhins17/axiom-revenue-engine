@@ -60,9 +60,25 @@ export const PrivateKwPublicHttpTransportReceiptSchema = z.object({
   networkRequestCount: z.literal(1),
   errorCode: z.string().optional(),
   acceptedAddressesDigest: Sha256Schema.optional(),
+  receiptDigest: Sha256Schema,
 }).strict();
 
 export type PrivateKwPublicHttpTransportReceipt = z.infer<typeof PrivateKwPublicHttpTransportReceiptSchema>;
+
+function canonicalReceiptValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalReceiptValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => key !== "receiptDigest")
+      .sort(([left], [right]) => left.localeCompare(right, "en-CA"))
+      .map(([key, child]) => [key, canonicalReceiptValue(child)]));
+  }
+  return value;
+}
+
+export function privateKwPublicHttpTransportReceiptDigest(receipt: PrivateKwPublicHttpTransportReceipt) {
+  return createHash("sha256").update(JSON.stringify(canonicalReceiptValue(receipt))).digest("hex");
+}
 
 export type PrivateKwPublicHttpTransportOptions = {
   resolveDns?: PublicDnsResolver;
@@ -141,6 +157,10 @@ function classifyV6(value: bigint): string {
   if (value === BIG_ZERO) return "UNSPECIFIED";
   if (value === BIG_ONE) return "LOOPBACK";
   if ((value >> BIG_THIRTY_TWO) === BIG_FFFF) return classifyV4(Number(value & BigInt(0xffffffff)));
+  if (inV6(value, parseIpv6("100::")!, 64)) return "RESERVED";
+  if (inV6(value, parseIpv6("3ffe::")!, 16)) return "RESERVED";
+  if (inV6(value, parseIpv6("2001:1::")!, 32) || inV6(value, parseIpv6("2001:20::")!, 28) || inV6(value, parseIpv6("2001:30::")!, 28)) return "RESERVED";
+  if ((value >> BigInt(125)) !== BigInt(1)) return "RESERVED";
   if (inV6(value, parseIpv6("fc00::")!, 7)) return "PRIVATE";
   if (inV6(value, parseIpv6("fe80::")!, 10)) return "LINK_LOCAL";
   if (inV6(value, parseIpv6("ff00::")!, 8)) return "MULTICAST";
@@ -231,18 +251,96 @@ function nativeExecutor(request: BoundPublicRequest): Promise<PublicConnectionRe
       agent: false as const,
       ...(request.protocol === "https:" ? { servername: request.servername } : {}),
     };
-    const fail = (error: unknown) => { if (!settled) { settled = true; reject(error); } };
+    let incomingResponse: import("node:http").IncomingMessage | undefined;
+    let removeAbortListener = () => {};
+    const fail = (error: unknown) => { if (!settled) { settled = true; removeAbortListener(); reject(error); } };
     const makeRequest = request.protocol === "https:" ? httpsRequest : httpRequest;
     const nativeRequest: ClientRequest = makeRequest(options, (incoming) => {
+      incomingResponse = incoming;
       const body = Readable.toWeb(incoming) as unknown as ReadableStream<Uint8Array>;
-      const abort = () => incoming.destroy();
+      const abort = () => { removeAbortListener(); incoming.destroy(); nativeRequest.destroy(); };
+      incoming.once("end", removeAbortListener);
+      incoming.once("close", removeAbortListener);
       resolve({ statusCode: incoming.statusCode ?? 0, headers: incoming.headers as Record<string, string | readonly string[]>, body, abort });
     });
     nativeRequest.once("error", fail);
-    const abort = () => { nativeRequest.destroy(); };
+    const abort = () => { fail(abortError()); nativeRequest.destroy(); incomingResponse?.destroy(); };
+    removeAbortListener = () => request.signal.removeEventListener("abort", abort);
     if (request.signal.aborted) abort();
     else request.signal.addEventListener("abort", abort, { once: true });
     nativeRequest.end();
+  });
+}
+
+function abortError() {
+  return new PrivateKwPublicHttpTransportError("ABORTED", "The public request was aborted.");
+}
+
+async function resolveWithAbort(resolveDns: PublicDnsResolver, hostname: string, signal: AbortSignal) {
+  if (signal.aborted) throw abortError();
+  return new Promise<readonly PublicDnsAnswer[]>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => signal.removeEventListener("abort", onAbort);
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(abortError());
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    Promise.resolve().then(() => resolveDns(hostname)).then((answers) => {
+      if (settled) return;
+      if (signal.aborted) onAbort();
+      else { settled = true; cleanup(); resolve(answers); }
+    }, (error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    });
+  });
+}
+
+function wrapResponseBody(response: PublicConnectionResponse, signal: AbortSignal) {
+  const reader = response.body.getReader();
+  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+  let cleaned = false;
+  let aborted = false;
+  let disposed = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    signal.removeEventListener("abort", onAbort);
+  };
+  const onAbort = () => {
+    if (aborted) return;
+    aborted = true;
+    if (!disposed) { disposed = true; response.abort(); }
+    void reader.cancel().catch(() => undefined);
+    controller?.error(abortError());
+  };
+  if (signal.aborted) onAbort();
+  else signal.addEventListener("abort", onAbort, { once: true });
+  return new ReadableStream<Uint8Array>({
+    start(nextController) {
+      controller = nextController;
+      if (aborted) nextController.error(abortError());
+    },
+    async pull(nextController) {
+      try {
+        const next = await reader.read();
+        if (next.done) { cleanup(); nextController.close(); }
+        else nextController.enqueue(next.value);
+      } catch (error) {
+        cleanup();
+        nextController.error(error);
+      }
+    },
+    async cancel(reason) {
+      cleanup();
+      if (!disposed) { disposed = true; response.abort(); }
+      await reader.cancel(reason).catch(() => undefined);
+    },
   });
 }
 
@@ -291,10 +389,11 @@ export function createPrivateKwPublicHttpTransport(options: PrivateKwPublicHttpT
         const details = requestDetails(input, init);
         normalizedUrl = details.parsed.toString();
         hostname = details.parsed.hostname;
-        const answers = await resolveDns(hostname);
+        const answers = await resolveWithAbort(resolveDns, hostname, details.source.signal);
         const classified = classifyAnswers(answers);
         selected = classified.selected;
         acceptedAddressesDigest = digest(classified.digestInput);
+        if (details.source.signal.aborted) throw abortError();
         addressClass = selected.classification;
         const path = `${details.parsed.pathname}${details.parsed.search}` || "/";
         const response = await executeConnection({
@@ -311,15 +410,24 @@ export function createPrivateKwPublicHttpTransport(options: PrivateKwPublicHttpT
           servername: hostname,
           agent: false,
         });
+        if (details.source.signal.aborted) {
+          response.abort();
+          throw abortError();
+        }
         socketOpened = true;
         statusCode = response.statusCode;
-        return new Response(response.body, { status: response.statusCode, headers: safeHeaders(response.headers) });
+        const headers = safeHeaders(response.headers);
+        if (response.statusCode >= 300 || response.statusCode >= 400) {
+          response.abort();
+          return new Response(null, { status: response.statusCode, headers });
+        }
+        return new Response(wrapResponseBody(response, details.source.signal), { status: response.statusCode, headers });
       } catch (error) {
         errorCode = error instanceof PrivateKwPublicHttpTransportError ? error.code : "NETWORK_ERROR";
         throw error;
       } finally {
         const completed = now();
-        receipts.push(PrivateKwPublicHttpTransportReceiptSchema.parse({
+        const receiptWithoutDigest = {
           transportVersion: PRIVATE_KW_PUBLIC_TRANSPORT_VERSION,
           requestId: id,
           normalizedUrl,
@@ -332,11 +440,16 @@ export function createPrivateKwPublicHttpTransport(options: PrivateKwPublicHttpT
           networkRequestCount: 1,
           ...(errorCode ? { errorCode } : {}),
           ...(acceptedAddressesDigest ? { acceptedAddressesDigest } : {}),
-        }));
+        };
+        const receiptValue = PrivateKwPublicHttpTransportReceiptSchema.parse({
+          ...receiptWithoutDigest,
+          receiptDigest: privateKwPublicHttpTransportReceiptDigest(receiptWithoutDigest as PrivateKwPublicHttpTransportReceipt),
+        });
+        receipts.push(Object.freeze(receiptValue));
       }
     },
     takeReceipts() {
-      return receipts.slice();
+      return Object.freeze(receipts.slice());
     },
   };
 }

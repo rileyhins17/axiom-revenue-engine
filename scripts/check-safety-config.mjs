@@ -223,7 +223,7 @@ requireMatch("src/lib/revenue-engine/private-kw-m2-authorization.ts", privateKwM
 for (const moduleName of ["node:http", "node:https", "node:dns/promises", "node:net"]) {
   requireMatch("src/lib/revenue-engine/private-kw-public-http-transport.ts", privateKwM2PublicTransport, new RegExp(`from \\\"${moduleName}\\\"`), `M2 transport must use ${moduleName}`);
 }
-for (const pattern of [/PublicDnsResolver/, /PublicConnectionExecutor/, /address:\s*selected\.address/, /servername:\s*hostname/, /agent:\s*false/, /Connection:\s*"close"/, /Readable\.toWeb/]) {
+for (const pattern of [/PublicDnsResolver/, /PublicConnectionExecutor/, /resolveWithAbort/, /signal\.aborted/, /response\.abort/, /address:\s*selected\.address/, /servername:\s*hostname/, /agent:\s*false/, /Connection:\s*"close"/, /Readable\.toWeb/, /receiptDigest/]) {
   requireMatch("src/lib/revenue-engine/private-kw-public-http-transport.ts", privateKwM2PublicTransport, pattern, `M2 transport is missing required address-pinned native seam ${pattern}`);
 }
 for (const pattern of [/globalThis\.fetch/, /\bfetch\s*\(/, /undici/i, /axios/i, /redirect:\s*[\"']follow[\"']/i, /process\.env/, /D1Database|R2Bucket|Browser|provider|contact|form|send/i]) {
@@ -231,6 +231,9 @@ for (const pattern of [/globalThis\.fetch/, /\bfetch\s*\(/, /undici/i, /axios/i,
 }
 requireMatch("src/lib/revenue-engine/private-kw-source-policy.ts", privateKwM2SourcePolicy, /evaluatePrivateKwRobotsPolicy/, "M2 source policy must expose the robots/terms preflight");
 requireMatch("src/lib/revenue-engine/private-kw-source-policy.ts", privateKwM2SourcePolicy, /transport\.request/, "M2 source policy must use the shared secure transport");
+for (const pattern of [/input\.sleep/, /PRIVATE_KW_SOURCE_POLICY_MAX_ROBOTS_BYTES/, /PRIVATE_KW_SOURCE_POLICY_MAX_REDIRECTS/, /receiptDigestsFor/]) {
+  requireMatch("src/lib/revenue-engine/private-kw-source-policy.ts", privateKwM2SourcePolicy, pattern, `M2 source policy is missing bounded contract ${pattern}`);
+}
 forbidMatch("src/lib/revenue-engine/private-kw-source-policy.ts", privateKwM2SourcePolicy, /capturePublicWebsiteDocument|globalThis\.fetch|\bfetch\s*\(|D1Database|R2Bucket|Browser|\bcontact\b|\bform\b|\bsend\b/i, "M2 source policy must remain bounded and provider/contact free");
 forbidMatch("scripts/record-private-kw-shadow-progress.ts", privateKwShadowSliceProgressCli, /wrangler|--remote|\bdeploy\b|fetch\s*\(|better-sqlite3|D1Database|R2Bucket|@cloudflare/i, "shadow progress recording must not access a database, provider, network, or Cloudflare");
 requireMatch("scripts/record-private-kw-shadow-progress.ts", privateKwShadowSliceProgressCli, /writePrivateKwJson\(files\.output, checkpoint\)/, "shadow progress must create a new ignored no-overwrite checkpoint");

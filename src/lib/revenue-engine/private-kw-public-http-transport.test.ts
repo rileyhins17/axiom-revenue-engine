@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   classifyPublicAddress,
   createPrivateKwPublicHttpTransport,
+  privateKwPublicHttpTransportReceiptDigest,
   type BoundPublicRequest,
 } from "@/lib/revenue-engine/private-kw-public-http-transport";
 import { capturePublicWebsiteDocument } from "@/lib/revenue-engine/website-capture";
@@ -69,6 +70,12 @@ test("accepts mapped public IPv4 but rejects mapped private, loopback, metadata,
     "::ffff:169.254.169.254",
     "::ffff:203.0.113.10",
   ]) {
+    assert.notEqual(classifyPublicAddress(address, 6), "PUBLIC", address);
+  }
+});
+
+test("rejects known special IPv6 ranges and does not default unknown space to public", async () => {
+  for (const address of ["100::1", "3ffe::1", "2001:20::1", "2001:1::1", "2001:30::1", "2002::1", "5000::1"]) {
     assert.notEqual(classifyPublicAddress(address, 6), "PUBLIC", address);
   }
 });
@@ -158,4 +165,59 @@ test("fits the existing bounded capture reader and revalidates a redirect before
   assert.equal(resolution, 2);
   assert.equal(connections, 1);
   assert.equal(transport.takeReceipts().length, 2);
+});
+
+test("does not connect after an abort wins a pending DNS resolution", async () => {
+  let resolveDns!: (answers: readonly { address: string; family: 4 | 6 }[]) => void;
+  const dns = new Promise<readonly { address: string; family: 4 | 6 }[]>((resolve) => { resolveDns = resolve; });
+  let connections = 0;
+  const transport = createPrivateKwPublicHttpTransport({
+    resolveDns: async () => dns,
+    executeConnection: async () => { connections += 1; return response(); },
+    now: () => NOW,
+  });
+  const controller = new AbortController();
+  const pending = transport.request("https://example.com/", { signal: controller.signal });
+  controller.abort();
+  resolveDns([{ address: "93.184.216.34", family: 4 }]);
+  await assert.rejects(pending);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(connections, 0);
+});
+
+test("aborts active response bodies and disposes unconsumed redirects and errors", async () => {
+  let activeAbort = 0;
+  const body = new ReadableStream<Uint8Array>({ pull() {} });
+  const controller = new AbortController();
+  const transport = createPrivateKwPublicHttpTransport({
+    resolveDns: resolverFor([{ address: "93.184.216.34", family: 4 }]),
+    executeConnection: async () => ({ statusCode: 200, headers: { "content-type": "text/html" }, body, abort: () => { activeAbort += 1; } }),
+  });
+  await transport.request("https://example.com/", { signal: controller.signal });
+  controller.abort();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(activeAbort, 1);
+
+  for (const statusCode of [302, 503]) {
+    let disposed = 0;
+    const bounded = createPrivateKwPublicHttpTransport({
+      resolveDns: resolverFor([{ address: "93.184.216.34", family: 4 }]),
+      executeConnection: async () => ({ statusCode, headers: { location: "/next" }, body: new ReadableStream(), abort: () => { disposed += 1; } }),
+    });
+    await bounded.request("https://example.com/", { redirect: "manual" });
+    assert.equal(disposed, 1, `status ${statusCode}`);
+  }
+});
+
+test("receipt digest covers the complete immutable receipt", async () => {
+  const transport = createPrivateKwPublicHttpTransport({
+    resolveDns: resolverFor([{ address: "93.184.216.34", family: 4 }]),
+    executeConnection: async () => response(200),
+    now: () => NOW,
+  });
+  await transport.request("https://example.com/path");
+  const receipt = transport.takeReceipts()[0]!;
+  assert.equal(receipt.receiptDigest, privateKwPublicHttpTransportReceiptDigest(receipt));
+  assert.throws(() => { (receipt as { statusCode?: number }).statusCode = 503; });
+  assert.equal(receipt.statusCode, 200);
 });

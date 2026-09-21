@@ -2,10 +2,16 @@ import { createHash } from "node:crypto";
 
 import { z } from "zod";
 
-import type { PrivateKwPublicHttpTransport } from "@/lib/revenue-engine/private-kw-public-http-transport";
+import {
+  PrivateKwPublicHttpTransportReceiptSchema,
+  privateKwPublicHttpTransportReceiptDigest,
+  type PrivateKwPublicHttpTransport,
+} from "@/lib/revenue-engine/private-kw-public-http-transport";
 import { normalizePublicWebsiteUrl } from "@/lib/revenue-engine/public-website-url";
 
 export const PRIVATE_KW_SOURCE_POLICY_VERSION = "kw-m2-source-policy-v1";
+export const PRIVATE_KW_SOURCE_POLICY_MAX_ROBOTS_BYTES = 128 * 1024;
+export const PRIVATE_KW_SOURCE_POLICY_MAX_REDIRECTS = 3;
 
 export const PrivateKwSourcePolicyDecisionSchema = z.object({
   policyVersion: z.literal(PRIVATE_KW_SOURCE_POLICY_VERSION),
@@ -35,6 +41,7 @@ export type PrivateKwRobotsPolicyInput = {
   transport: PrivateKwPublicHttpTransport;
   now?: () => Date;
   sleep?: (milliseconds: number) => Promise<void>;
+  policyDeadlineAt?: Date;
   maxRobotsBytes?: number;
   maxRedirects?: number;
 };
@@ -83,12 +90,13 @@ function parseRobots(text: string): Group[] {
       sawDirective = true;
     } else if (key === "allow" || key === "disallow") {
       if (!current) throw new Error("robots rule without user-agent");
-      current.rules.push({ kind: key, path: value, source: `${key[0]!.toUpperCase()}${key.slice(1)}: ${value}` });
+      if (value) current.rules.push({ kind: key, path: value, source: `${key[0]!.toUpperCase()}${key.slice(1)}: ${value}` });
       sawDirective = true;
     } else if (key === "crawl-delay") {
       if (!current || !/^\d+(?:\.\d+)?$/.test(value)) throw new Error("robots crawl-delay malformed");
       const delay = Number(value);
       if (!Number.isFinite(delay) || delay > 3600) throw new Error("robots crawl-delay out of range");
+      if (current.crawlDelay !== null) throw new Error("robots crawl-delay duplicated");
       current.crawlDelay = delay;
       sawDirective = true;
     } else {
@@ -112,12 +120,18 @@ function digest(value: string) {
 }
 
 export async function evaluatePrivateKwRobotsPolicy(input: PrivateKwRobotsPolicyInput): Promise<PrivateKwSourcePolicyDecision> {
+  if (input.maxRobotsBytes !== undefined && (!Number.isSafeInteger(input.maxRobotsBytes) || input.maxRobotsBytes <= 0 || input.maxRobotsBytes > PRIVATE_KW_SOURCE_POLICY_MAX_ROBOTS_BYTES)) {
+    throw new Error("maxRobotsBytes is outside the bounded policy limit");
+  }
+  if (input.maxRedirects !== undefined && (!Number.isSafeInteger(input.maxRedirects) || input.maxRedirects < 0 || input.maxRedirects > PRIVATE_KW_SOURCE_POLICY_MAX_REDIRECTS)) {
+    throw new Error("maxRedirects is outside the bounded policy limit");
+  }
   const approved = normalizePublicWebsiteUrl(input.approvedSourceUrl);
   const origin = new URL(approved);
   const robotsUrl = new URL("/robots.txt", origin).toString();
   const now = input.now ?? (() => new Date());
-  const maxBytes = input.maxRobotsBytes ?? 128 * 1024;
-  const maxRedirects = input.maxRedirects ?? 3;
+  const maxBytes = input.maxRobotsBytes ?? PRIVATE_KW_SOURCE_POLICY_MAX_ROBOTS_BYTES;
+  const maxRedirects = input.maxRedirects ?? PRIVATE_KW_SOURCE_POLICY_MAX_REDIRECTS;
   let current = robotsUrl;
   let response: Response | null = null;
   const receiptIds: number[] = [];
@@ -157,18 +171,35 @@ export async function evaluatePrivateKwRobotsPolicy(input: PrivateKwRobotsPolicy
       rules.sort((left, right) => right.path.length - left.path.length || (left.kind === "allow" ? -1 : 1));
       const winning = rules[0];
       matchedRule = winning?.source ?? null;
-      crawlDelaySeconds = selected.groups.map((group) => group.crawlDelay).find((delay): delay is number => delay !== null) ?? null;
+      const delayValues = selected.groups.map((group) => group.crawlDelay).filter((delay): delay is number => delay !== null);
+      if (delayValues.length > 1) throw new Error("robots crawl-delay conflicts across matching groups");
+      crawlDelaySeconds = delayValues[0] ?? null;
       const nextAllowedAt = crawlDelaySeconds === null ? null : new Date(now().getTime() + crawlDelaySeconds * 1000).toISOString();
       const robotsAllowed = !winning || winning.kind === "allow";
       const termsAllowed = input.termsDecision === "TERMS_REVIEWED_FOR_FACTS" || input.termsDecision === "PUBLIC_REVIEW_ONLY";
       reason = !robotsAllowed ? "robots disallows the approved source path" : !termsAllowed ? "terms decision is missing or ambiguous" : "robots allows crawl; terms decision reviewed";
-      const receiptDigests = input.transport.takeReceipts().filter((entry) => receiptIds.includes(entry.requestId)).map((entry) => entry.acceptedAddressesDigest ?? digest(JSON.stringify(entry)));
+      if (robotsAllowed && termsAllowed && crawlDelaySeconds !== null && crawlDelaySeconds > 0) {
+        if (!input.sleep) throw new Error("robots crawl-delay requires a bounded sleep dependency");
+        const sleepMs = crawlDelaySeconds * 1000;
+        if (input.policyDeadlineAt && now().getTime() + sleepMs > input.policyDeadlineAt.getTime()) throw new Error("robots crawl-delay exceeds policy deadline");
+        await input.sleep(sleepMs);
+      }
+      const receiptDigests = receiptDigestsFor(input.transport, receiptIds);
       return PrivateKwSourcePolicyDecisionSchema.parse({ policyVersion: PRIVATE_KW_SOURCE_POLICY_VERSION, robotsUrl, httpStatus, contentDigest, matchedGroup, matchedRule, allowed: robotsAllowed && termsAllowed, crawlDelaySeconds, nextAllowedAt, termsDecision: input.termsDecision, reason, transportReceiptIds: receiptIds, transportReceiptDigests: receiptDigests, networkRequestCount: receiptIds.length, providerOperationsAuthorized: 0, costAuthorizedUsd: 0 });
     }
-  } catch {
-    reason = "robots response malformed or unavailable";
+  } catch (error) {
+    reason = error instanceof Error && error.message ? error.message : "robots response malformed or unavailable";
   }
   const termsAllowed = input.termsDecision === "TERMS_REVIEWED_FOR_FACTS" || input.termsDecision === "PUBLIC_REVIEW_ONLY";
-  const receiptDigests = input.transport.takeReceipts().filter((entry) => receiptIds.includes(entry.requestId)).map((entry) => entry.acceptedAddressesDigest ?? digest(JSON.stringify(entry)));
+  const receiptDigests = receiptDigestsFor(input.transport, receiptIds);
   return PrivateKwSourcePolicyDecisionSchema.parse({ policyVersion: PRIVATE_KW_SOURCE_POLICY_VERSION, robotsUrl, httpStatus, contentDigest, matchedGroup, matchedRule, allowed: false, crawlDelaySeconds, nextAllowedAt: null, termsDecision: input.termsDecision, reason: termsAllowed ? reason : "terms decision is missing or ambiguous", transportReceiptIds: receiptIds, transportReceiptDigests: receiptDigests, networkRequestCount: receiptIds.length, providerOperationsAuthorized: 0, costAuthorizedUsd: 0 });
+}
+
+function receiptDigestsFor(transport: PrivateKwPublicHttpTransport, receiptIds: readonly number[]) {
+  return transport.takeReceipts().filter((entry) => receiptIds.includes(entry.requestId)).map((entry) => {
+    const parsed = PrivateKwPublicHttpTransportReceiptSchema.parse(entry);
+    const expected = privateKwPublicHttpTransportReceiptDigest(parsed);
+    if (parsed.receiptDigest !== expected) throw new Error("transport receipt digest mismatch");
+    return parsed.receiptDigest;
+  });
 }
