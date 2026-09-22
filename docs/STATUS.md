@@ -2,10 +2,10 @@
 
 ## M2 durable partial capture and local research console
 
-**Updated:** 2026-09-21 (America/Toronto). **Verified baseline:** `2d27e2f`,
-recording code checkpoint `b32e7a6`. The current implementation has passed all
-required checks; the following documentation commit records its saved identity.
-M2 remains incomplete and M3 has not started.
+**Updated:** 2026-09-21 (America/Toronto). **Verified code checkpoint:** `ce13dd7`
+(`feat(revenue): add durable local M2 research console`), based on `2d27e2f`.
+All required checks passed. This following documentation commit records the
+verified identity. M2 remains incomplete and M3 has not started.
 
 Supported selected-page HTTP/transport failures now have strict v2 PARTIAL
 receipts. Failed pages carry exact transport witnesses and no content/facts;

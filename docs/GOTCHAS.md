@@ -434,9 +434,10 @@ Retire entries when the architecture makes them impossible.
   GitHub CI and every local release cycle run the commands sequentially.
 - **Affected area:** owner UI acceptance, Next.js development server, OpenNext,
   Wrangler dry runs, Windows/OneDrive workspaces, and local release evidence.
-- **Verifying commit:** `878d0ff`, with the final uninstrumented six-view browser
-  acceptance, streaming regression and complete required checks passing.
-  `6aaf216` introduced the source attribution used to diagnose the failure.
+- **Verifying commit:** `ce13dd7`, with production assets, eight-view browser
+  acceptance, the streaming regression and all required checks passing.
+  `878d0ff` introduced the earlier six-view warmup correction; `6aaf216`
+  introduced the source attribution used to diagnose the failure.
 
 ## BUILD-001 — Local success did not equal Linux/Cloudflare success
 
