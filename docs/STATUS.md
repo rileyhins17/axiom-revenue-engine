@@ -1,14 +1,28 @@
 # Current status — Axiom Revenue Engine
 
-## M2 public research complete; exact-ten owner review pending
+## M2 public research complete; blocked on exact-ten owner review
 
-**Updated:** 2026-09-22 (America/Toronto). **Goal state:** ACTIVE.
+**Updated:** 2026-09-22 (America/Toronto). **Goal state:** BLOCKED.
 **Verified code:** `56c7410`; full verification record: `e55ea5f`.
+**Research checkpoint:** `ebaad1d`.
 Riley's contextual "Continue" approved the prepared C$0 research scope and
 resumed the production goal. The research is complete: **20 businesses
 considered, ten proposed identities prepared, zero completed engine
 assessments**. M2 remains incomplete; M3 has not started. The previous research
 decision blocker below is historical and is superseded by this checkpoint.
+
+The pending exact-ten identity review has now persisted across three consecutive
+goal turns: the research checkpoint that presented the actual candidates, then
+two automatic continuations. The previous continuation was no progress toward
+the build: root and a bounded Luna audit confirmed that necessary offline
+preparation was already complete, without changing the next action. The current
+audit rechecked the saved review/input/plan hashes and confirmed unchanged
+PENDING owner review and disabled authority. There is no live job to wait for.
+The goal is now BLOCKED to stop repeated automatic checks; its full production
+objective is unchanged and unfinished. Resume after the pending owner decision.
+No additional research, code change, test run, provider operation or spend was
+performed by these blocker checks. Current production state remains unverified;
+the existing source defaults and release gates still apply.
 
 The ten proposed businesses cover Kitchener (3), Waterloo (3), Cambridge (4),
 roofing (3), HVAC (5), and landscaping (2). They meet the minimum of two per
