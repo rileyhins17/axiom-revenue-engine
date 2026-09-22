@@ -5,6 +5,26 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## OPS-012 — Overlapping M2 tests can leave a lock that hides browser results
+
+- **Symptom:** the owner browser acceptance or setup suite exits before its
+  assertions with `M2 local setup is already locked by another process`.
+- **Root cause:** the full test suite and owner browser acceptance share the M2
+  local setup lock. An interrupted setup test also left one lock file after its
+  process exited, so a later independent suite inherited the failure.
+- **Proven fix:** run those suites serially. For the observed orphan, root
+  confirmed the lock's exact token, checked its recorded PID was absent, and
+  checked no setup/test process was active before removing that one file. The
+  full suite then passed; a separately run browser acceptance passed after a
+  qualification-fixture correction.
+- **Prevention/test:** `AGENTS.md` now requires `npm test` to exit before
+  `test:owner-ui`, in addition to serializing Next/OpenNext builds. Never clear
+  a live lock or infer staleness from elapsed time alone; inspect its owner.
+- **Affected area:** M2 local database setup, browser acceptance, and checkpoint
+  verification on the shared worktree.
+- **Verifying commit:** `121601f` (serialized verification rule and passing
+  owner workflow code); this ledger entry records the observed cleanup.
+
 ## DATA-011 — A realistic UI fixture bypassed the writer it claimed to represent
 
 - **Symptom:** the owner dossier browser test rendered plausible contact routes,

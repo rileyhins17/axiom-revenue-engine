@@ -1,6 +1,73 @@
 # Current status — Axiom Revenue Engine
 
-## M2 public research complete; blocked on exact-ten owner review
+## Owner qualification correction; M2 remains incomplete
+
+**Updated:** 2026-09-22 (America/Toronto). Local implementation resumed under
+Riley's explicit instruction to return to the engine build. The production goal
+is ACTIVE and unfinished.
+
+**Owner feedback:** Aidan reported that most businesses in the calling handoff
+already have decent websites. The ten businesses were an identity-researched
+evaluation cohort with zero completed engine assessments. Presenting that batch
+for a calling day was a manual handoff error; it did not pass through the runtime
+qualification path. The aggregate feedback does not establish individual labels
+or identity approval for all ten businesses. The earlier handoff receipt remains
+historical evidence, not an endorsed sales worklist.
+
+The subsequent code audit found and corrected a separate connected problem:
+the owner list counted borderline `REVIEW` records as ready, and available
+contacts could appear as manual outreach tasks before qualification. The
+projection and list/dossier now distinguish qualified owner review from unmet
+qualification criteria, refresh work and blocks. Unknown independence cannot
+produce qualified review. Contacts and their evidence remain visible, without
+granting an outreach task. Existing scoring policy, thresholds and send authority
+are unchanged. Healthy sites remain useful negative evaluation cases.
+
+Two bounded Luna agents handled the projection/read model and list/dossier
+respectively; root reviewed the changes, corrected copy and strengthened the
+synthetic cases. AGENTS.md, README and ADR 0023 record the distinction between
+evaluation cohorts and qualified opportunities. **Verified code checkpoint:
+`121601f`** (`fix(revenue): separate qualified leads from research records`).
+Verification: `npm run check:safety`, `npm test` (675 tests: 672 passed, zero
+failed, three expected Windows skips), `npm run typecheck`, `npm run lint`,
+`npm run build:cloudflare`, and
+`npx wrangler deploy --env="" --dry-run --autoconfig false` passed. After all
+builds and the full suite exited, `npm run test:owner-ui` passed on desktop and
+mobile with eight WCAG page scans and zero external requests. Its synthetic
+strong-lead fixture now satisfies the existing evidence-confidence gate; the
+browser failure before that correction exposed a `REVIEW` snapshot, not a
+broken UI policy. The initial full-suite failure was caused by an orphaned M2
+test lock from an interrupted process. Root checked the lock's recorded PID,
+exact token and absence of active setup/test processes before removing that
+one lock; the clean rerun passed. Scratch logs and fixtures were not committed.
+
+**Production and spend:** no deployment, migration, provider activation, prospect
+capture or contact, inbox operation, or new Slack message occurred in this work.
+Live production/account state remains unverified. Source automation defaults
+remain off; zero paid mailboxes, no Workspace, unprovisioned API access and the
+C$50/month ceiling remain unchanged. Incremental engine-provider spend: C$0.
+Wrangler's saved login is expired (`npx wrangler whoami` failed read-only), so
+the configured Cloudflare browser binding does not prove live browser access.
+
+**Remaining blocker and owner decisions:** M2 has zero real engine assessments;
+M3 has not started. The exact-ten identity decision and subsequent source-policy,
+retention, capture and local release gates remain unresolved. The bounded HTML
+path proves availability/HTTPS facts, not visual or mobile website quality; its
+research-only assessment cannot substitute for demonstrated rebuild need.
+
+Next three concrete actions:
+
+1. Record individual owner dispositions on the saved ten-business **evaluation**
+   cohort, including corrections from Aidan's site-quality feedback; do not
+   infer approval or sales readiness from the aggregate comment.
+2. Renew the user-owned Cloudflare login and resolve source-policy, retention,
+   browser execution/storage and cost authorization for the first supervised
+   real site; no real capture occurs by implication from this checkpoint.
+3. Execute and inspect a gated real M2 browser evidence/assessment path, then
+   require a supported website-need decision before any sales handoff. Continue
+   M3-M7 only from verified outputs and their separate release gates.
+
+## Historical: M2 public research and calling handoff
 
 **Updated:** 2026-09-22 (America/Toronto). **Goal state:** BLOCKED.
 **Verified code:** `56c7410`; full verification record: `e55ea5f`.
