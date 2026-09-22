@@ -2,7 +2,9 @@
 
 ## M2 research-only and blocked outcome integration
 
-**Updated:** 2026-09-21 (America/Toronto). **Verified base:** `181a95e`.
+**Updated:** 2026-09-21 (America/Toronto). **Verified code checkpoint:** `b32e7a6`
+(`feat(revenue): integrate research-only M2 terminal outcomes`), based on
+`181a95e`. This following documentation commit records the verified identity.
 This checkpoint extends the actual local HTML assessment runner, with Luna
 implementing bounded synthetic fixtures and the research-report projection;
 root owns the shared parser, ordered integration, review and final verification.
