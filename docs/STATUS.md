@@ -2,9 +2,10 @@
 
 ## Owner browser streaming gate repair
 
-**Updated:** 2026-09-21 (America/Toronto). **Code checkpoint:** this verified
-work cycle, based on `76766b5`; exact commit is recorded in the following status
-update. The previous turn made concrete
+**Updated:** 2026-09-21 (America/Toronto). **Code checkpoint:** `878d0ff`
+(`fix(test): finish route compilation before browser warmup`), based on
+`76766b5`. This following documentation update records that verified identity.
+The previous turn made concrete
 progress by committing the M2 assessment runner and capturing the browser error.
 This cycle resolves that demonstrated verification blocker; M2 is still incomplete.
 
