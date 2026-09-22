@@ -2,9 +2,9 @@
 
 ## M2 real-research preparation and current policy inputs
 
-**Updated:** 2026-09-21 (America/Toronto). **Verified baseline:** `d73df1e`,
-recording code `ce13dd7`. This preparation repair passed all required checks;
-the following documentation commit records its saved code identity.
+**Updated:** 2026-09-21 (America/Toronto). **Verified code checkpoint:** `44b58ae`
+(`fix(revenue): require explicit current M2 policy inputs`), based on `d73df1e`.
+All required checks passed; this documentation commit records the saved identity.
 The previous goal turn made progress by committing the durable local console.
 M2 is still incomplete: zero real businesses evaluated; M3 has not started.
 
