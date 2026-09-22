@@ -20,7 +20,7 @@ import { createPrivateKwShadowSourceWorkflowFixture } from "../src/lib/revenue-e
 
 // Registered in setup.test.ts, so the shared real operation lock has one test process owner.
 // No independent *.test.ts file is used: parallel setup/assessment suites would contend by design.
-async function createRun() {
+async function createRun(captureOptions: NonNullable<Parameters<typeof createPrivateKwM2AssessmentFixture>[0]>[] = [{}, {}, {}]) {
   const token = `m2-assessment-test-${randomUUID()}`;
   const relative = (label: string, extension = "json") => `data/kw-evaluation/${token}-${label}.${extension}`;
   const owned = new Map<string, { dev: bigint; ino: bigint }>();
@@ -44,7 +44,7 @@ async function createRun() {
     }
   };
   const captureTime = new Date(Date.now() - 60_000);
-  const captures = await Promise.all([0, 1, 2].map((businessIndex) => createPrivateKwM2AssessmentFixture({ now: captureTime, businessIndex })));
+  const captures = await Promise.all(captureOptions.map((options, businessIndex) => createPrivateKwM2AssessmentFixture({ ...options, now: captureTime, businessIndex })));
   const chain = captures[0].chain;
   const databasePath = relative("database", "sqlite");
   writeFileSync(databasePath, Buffer.alloc(0), { flag: "wx" }); remember(databasePath);
@@ -119,6 +119,75 @@ async function createRun() {
 }
 
 export function registerM2AssessmentAcceptanceTests() {
+  test("M2 terminal reports preserve research evidence, skip blocked sites and reject unsealed partial captures", async () => {
+    const run = await createRun([
+      { outcome: "RESEARCH_REQUIRED" }, { outcome: "RESEARCH_REQUIRED", retention: "DERIVED_FACTS_ONLY" },
+      { outcome: "ROBOTS_BLOCKED" }, { outcome: "RETENTION_BLOCKED" }, { outcome: "COMPLETE" }, { outcome: "PARTIAL" },
+    ]);
+    try {
+      const baseline = readSetupFile(path.resolve(run.databasePath)).identity;
+      const execute = (index: number, mode: "PREPARE" | "EXECUTE" | "VERIFY" = "PREPARE", dependencies = run.dependencies) =>
+        executePrivateKwM2HtmlAssessment(run.runPath, run.operations[index].businessId, mode, dependencies);
+      const noAssessmentFiles = (index: number) => {
+        for (const key of ["candidatePath", "approvalPath", "progressPath"] as const) assert.equal(existsSync(run.operations[index][key]), false);
+      };
+      let reads = 0;
+      await assert.rejects(execute(0, "PREPARE", { ...run.dependencies, receiptStore: { async loadSealed(id: string) {
+        if (++reads === 2) return null;
+        return run.dependencies.receiptStore.loadSealed(id);
+      } } }), /receipt|RECEIPT/);
+      assert.equal(reads, 2, "terminal publication requires an independent final evidence reload");
+      assert.equal(existsSync(run.operations[0].reportPath), false);
+      assert.deepEqual(readSetupFile(path.resolve(run.databasePath)).identity, baseline);
+      let precedingId = JSON.parse(readFileSync(run.receiptPath, "utf8")).receiptId;
+      for (const index of [0, 1]) {
+        const result = await execute(index);
+        assert.equal(result.status, "RESEARCH_REVIEW");
+        assert("report" in result && result.report);
+        assert.equal(result.insertedRows, 0);
+        assert.equal(result.report.lineage.priorM2CheckpointId, precedingId);
+        precedingId = result.report.reportId;
+        noAssessmentFiles(index);
+        const reportIdentity = readSetupFile(path.resolve(run.operations[index].reportPath)).identity;
+        const replay = await execute(index, "VERIFY");
+        assert.equal(replay.status, "RESEARCH_REVIEW");
+        assert.equal("executionPath" in replay && replay.executionPath, "EXACT_REPLAY");
+        assert.deepEqual(readSetupFile(path.resolve(run.operations[index].reportPath)).identity, reportIdentity);
+        assert.deepEqual(readSetupFile(path.resolve(run.databasePath)).identity, baseline);
+      }
+      const firstReport = readFileSync(run.operations[0].reportPath);
+      writeFileSync(run.operations[0].reportPath, "{\"tampered\":true}");
+      await assert.rejects(execute(1, "VERIFY"), /report|output conflicts/);
+      writeFileSync(run.operations[0].reportPath, firstReport); // restore only synthetic test data
+      unlinkSync(run.operations[1].reportPath);
+      assert.equal((await execute(1, "VERIFY")).status, "RESEARCH_REVIEW");
+      for (const index of [2, 3]) {
+        const result = await execute(index);
+        assert.equal(result.status, "BLOCKED");
+        assert.equal("insertedRows" in result && result.insertedRows, 0);
+        assert("operationId" in result);
+        precedingId = result.operationId;
+        noAssessmentFiles(index);
+        assert.equal(existsSync(run.operations[index].reportPath), false);
+        assert.equal((await execute(index, "VERIFY")).status, "BLOCKED");
+        assert.deepEqual(readSetupFile(path.resolve(run.databasePath)).identity, baseline);
+      }
+      await run.approve(4);
+      assert.equal(JSON.parse(readFileSync(run.operations[4].candidatePath, "utf8")).context.priorM2CheckpointId, precedingId);
+      const complete = await execute(4, "EXECUTE");
+      assert.equal(complete.status, "FRESH_COMMIT");
+      assert.equal("insertedRows" in complete && complete.insertedRows, 8);
+      const after = readSetupFile(path.resolve(run.databasePath)).identity;
+      const expiredClock = () => new Date(Date.now() + 120 * 24 * 60 * 60 * 1000);
+      assert.equal((await executePrivateKwM2HtmlAssessment(run.runPath, run.operations[0].businessId, "VERIFY", { ...run.dependencies, clock: expiredClock })).status, "RESEARCH_REVIEW");
+      assert.equal((await execute(4, "VERIFY")).status, "EXACT_REPLAY");
+      await assert.rejects(execute(5), /M2_WEBSITE_RECEIPT_REPLAY_MISSING/);
+      noAssessmentFiles(5);
+      assert.equal(existsSync(run.operations[5].reportPath), false);
+      assert.deepEqual(readSetupFile(path.resolve(run.databasePath)).identity, after);
+    } finally { run.cleanup(); }
+  });
+
   test("M2 assessment real files: first write, exact replay, second business, restart and expired historical proof", async () => {
     const run = await createRun();
     try {

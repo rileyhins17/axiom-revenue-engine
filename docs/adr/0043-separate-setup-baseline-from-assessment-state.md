@@ -116,9 +116,30 @@ v2 cannot prove when historical setup completed. No migration schema changed.
 
 The integration tests execute actual setup and assessment runners against
 synthetic local files; restart uses a fresh process with independently rebuilt
-fake Task 4 stores. No browser/prospect/provider is contacted. The accepted
-scope is a COMPLETE HTML capture; website-only partial review, owner-console
-integration and the real one-then-ten evaluation remain unfinished.
+fake Task 4 stores. No browser/prospect/provider is contacted. The assessment
+write scope is a COMPLETE HTML capture. Sealed research-required and
+policy-blocked outcomes participate in the same ordered reconstruction without
+adding rows to the reference or actual database. A research report is a
+deterministic projection of independently reloaded evidence, with its own digest
+and the exact previous checkpoint. A blocked outcome uses its existing sealed
+operation identity and blocked witness; it creates no new output file. Later
+assessments bind these terminal identities as their previous checkpoint.
+
+Existing report bytes are compared with the reconstructed projection, never
+trusted as proof. Before report publication the runner reopens the database,
+reloads the source and sealed capture again, and verifies the entire expected
+database plus unchanged physical bytes. A missing report for the requested
+business can be regenerated; conflicting files stop. Read-only terminal replay
+uses the recorded capture request time, checked against the authorization chain
+and trusted clock. It does not extend authority for any new assessment write.
+
+The current Task 4 producer leaves failed-subpage PARTIAL and failed-homepage
+receipts unsealed. They remain explicit no-output failures at this boundary;
+the pure report projection is not a durable failure witness. Persisted partial
+review, owner-console integration and the real one-then-ten evaluation remain
+unfinished. Acceptance covers a mixed sequence of two research-only reports,
+two blocked captures and one approved complete assessment, with missing/tampered
+report and evidence checks, exact replay and unchanged database bytes.
 
 This decision grants no migration, real research, provider, deployment, contact,
 qualification, outreach or spend authority. See STATUS for current verification.

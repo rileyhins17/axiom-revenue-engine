@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import test from "node:test";
+import test, { mock } from "node:test";
 
 import Database from "better-sqlite3";
 
@@ -82,14 +82,14 @@ function canonicalSqlRow(row: Record<string, unknown>) {
 
 async function createFixture() {
   const suffix = `task-4c-${Date.now().toString(36)}`;
-  const now = new Date(Date.now() + 5_000);
+  const now = new Date("2030-01-15T12:34:56.789Z");
   const fixture = await createPrivateKwCurrentWebsiteEvidenceFixture({
     suffix,
     now: new Date(now.getTime() - 3.8 * 60_000),
   });
   const plan = buildPrivateKwPersistencePlan(fixture.source);
   const selected = fixture.source.records[0]!;
-  const assessedAt = new Date(Date.now() + 6_000).toISOString();
+  const assessedAt = now.toISOString();
   const invocation = {
     invocationVersion: PRIVATE_KW_ASSESSMENT_INVOCATION_VERSION,
     sourceImportId: fixture.source.importId,
@@ -154,6 +154,18 @@ async function createFixture() {
     writeFile(files.invocation, `${JSON.stringify(invocation, null, 2)}\n`),
   ]);
 
+  // Exercise the real SQLite writers with one synthetic clock. A five-second
+  // wall-clock lead made interruption/restart fail under parallel test load.
+  // Only this fixture's connection and the exact database clock expressions are
+  // substituted; production chronology checks and every other SQL clause run.
+  const originalPrepare = Database.prototype.prepare;
+  const clock = mock.method(Database.prototype, "prepare", function (this: Database.Database, sql: string) {
+    return originalPrepare.call(this, this.name === fileURLToPath(files.database)
+      ? sql.replaceAll("strftime('%Y-%m-%dT%H:%M:%fZ', 'now')", `'${now.toISOString()}'`)
+        .replaceAll("julianday('now')", `julianday('${now.toISOString()}')`)
+      : sql);
+  });
+
   async function resetDurableState() {
     await Promise.all([
       rm(files.websiteCheckpoint, { force: true }),
@@ -173,6 +185,7 @@ async function createFixture() {
   }
 
   async function cleanup() {
+    clock.mock.restore();
     await Promise.all([
       ...Object.values(files).map((file) => rm(file, { force: true })),
       rm(`${fileURLToPath(files.database)}-shm`, { force: true }),

@@ -45,3 +45,36 @@ test("Task5 fixtures derive timestamps from now and share one chain across busin
   assert.equal(first.chain.ownerEnvelope.expiresAt, "2030-01-24T12:34:56.789Z");
   assert.equal(first.receipt.pages.every((page) => page.capturedAt === now.toISOString()), true);
 });
+
+for (const [outcome, expectedStatus] of [
+  ["RESEARCH_REQUIRED", "RESEARCH_REQUIRED"],
+  ["ROBOTS_BLOCKED", "FAILED"],
+  ["RETENTION_BLOCKED", "FAILED"],
+] as const) {
+  test(`Task5 fixture executes and reloads sealed ${outcome} outcome`, async () => {
+    const fixture = await createPrivateKwM2AssessmentFixture({ outcome });
+    assert.equal(fixture.receipt.status, expectedStatus);
+    assert.equal(fixture.receipt.stopReason, outcome === "ROBOTS_BLOCKED" ? "ROBOTS_OR_TERMS_BLOCKED" : outcome === "RETENTION_BLOCKED" ? "RETENTION_BLOCKED" : null);
+    const reloaded = await reloadPrivateKwM2WebsiteEvidenceReceipt({
+      request: fixture.request,
+      receiptStore: fixture.receiptStore,
+      evidenceStore: fixture.evidenceStore,
+    }, { clock: fixture.clock });
+    assert.deepEqual(reloaded, fixture.receipt);
+    if (outcome === "ROBOTS_BLOCKED" || outcome === "RETENTION_BLOCKED") {
+      assert.equal(fixture.receipt.blockedEvidence?.outcome, "BLOCKED");
+      assert.equal(fixture.receipt.pages.length, 0);
+    }
+  });
+}
+
+test("Task5 fixture leaves PARTIAL and HOMEPAGE_FAILED receipts unsealed", async () => {
+  const partial = await createPrivateKwM2AssessmentFixture({ outcome: "PARTIAL" });
+  assert.equal(partial.receipt.status, "PARTIAL");
+  await assert.rejects(reloadPrivateKwM2WebsiteEvidenceReceipt({ request: partial.request, receiptStore: partial.receiptStore, evidenceStore: partial.evidenceStore }, { clock: partial.clock }), /RECEIPT_REPLAY_MISSING|REPLAY_MISSING/);
+
+  const homepage = await createPrivateKwM2AssessmentFixture({ outcome: "HOMEPAGE_FAILED" });
+  assert.equal(homepage.receipt.status, "FAILED");
+  assert.equal(homepage.receipt.stopReason, "HOMEPAGE_CAPTURE_FAILED");
+  await assert.rejects(reloadPrivateKwM2WebsiteEvidenceReceipt({ request: homepage.request, receiptStore: homepage.receiptStore, evidenceStore: homepage.evidenceStore }, { clock: homepage.clock }), /RECEIPT_REPLAY_MISSING|REPLAY_MISSING/);
+});

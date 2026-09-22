@@ -525,7 +525,7 @@ npm run kw:assess-m2-html -- data/kw-evaluation/assessment-run.json business:rev
 npm run kw:assess-m2-html -- data/kw-evaluation/assessment-run.json business:reviewed-id --verify
 ```
 
-The first command persists a PENDING candidate and the complete evidence context
+For COMPLETE evidence, the first command persists a PENDING candidate and the complete evidence context
 for review. It does not approve itself. Only after an explicit owner review,
 record a decision file with `approvedBy` (`RILEY` or `AIDAN`), `reviewedAt`,
 `rationale`, and `confirmation: "RECORD_LOCAL_HTML_WEBSITE_FIT_ASSESSMENT"`.
@@ -545,7 +545,7 @@ the progress receipt and owner dossier. The dossier displays `UNKNOWN`,
 M2 rows.
 
 `--verify` reconstructs completed evidence at its recorded execution time, so a
-later approval expiry does not erase historical proof. Every fresh write still
+later approval expiry does not erase historical proof. Every fresh assessment write still
 requires current approval. A completed replay leaves database bytes unchanged.
 If the database committed but progress/report publication was interrupted,
 `--verify` can regenerate only the exact missing output after full durable
@@ -554,10 +554,28 @@ set or missing evidence stops execution. The runner never repairs data or
 overwrites an existing output. Initial setup verification remains strict and
 will correctly reject a database that now contains successor assessment writes.
 
-The current assessment path requires a COMPLETE four-page capture. Partial or
-research-required evidence stops before assessment; the separate website-only
-review path and complete exact-ten orchestration remain unfinished. Synthetic
-acceptance is not approval for real capture, setup, assessment or production.
+The assessment write requires a COMPLETE four-page capture. A sealed
+`RESEARCH_REQUIRED` outcome instead publishes an immutable research report at
+`reportPath`, with the missing page kinds, capture limitations, source lineage
+and `UNKNOWN` classification. It creates no candidate, approval, assessment
+rows or progress receipt. Its result is `RESEARCH_REVIEW`; exact replay returns
+`executionPath: "EXACT_REPLAY"`. Report construction makes zero network requests;
+the report records the earlier capture's request count separately.
+
+Sealed robots/terms or retention blocks return `BLOCKED` and the existing
+blocked receipt reference. They create no report, candidate, approval, progress
+or database rows. Research reports and blocked receipts can precede the next
+business in the ordered run. Each is reloaded from its actual source and capture
+evidence; an existing report cannot prove its own accuracy. The next assessment
+binds the research report digest or blocked capture operation digest as its
+previous checkpoint. These outcomes grant no permission to assess or contact.
+
+Task 4 currently leaves failed-subpage `PARTIAL` and failed-homepage receipts
+unsealed. The runner rejects these with `M2_WEBSITE_RECEIPT_REPLAY_MISSING` and
+publishes nothing. Do not manually seal a fixture or manufacture a report to
+bypass this limitation. Durable failed-capture review, owner-console integration
+and complete exact-ten orchestration remain unfinished. Synthetic acceptance is
+not approval for real capture, setup, assessment or production.
 
 ## Weekly owner review (30 minutes)
 

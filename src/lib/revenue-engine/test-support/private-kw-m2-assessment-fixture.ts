@@ -32,7 +32,8 @@ const MANIFEST_CREATED_OFFSET_MS = -19 * 24 * 60 * 60 * 1000;
 const PACKET_REVIEW_OFFSET_MS = -18 * 24 * 60 * 60 * 1000;
 const OWNER_REVIEW_OFFSET_MS = -17 * 24 * 60 * 60 * 1000;
 
-type FixtureRetention = "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY";
+type FixtureRetention = "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY" | "BLOCKED";
+export type PrivateKwM2AssessmentOutcome = "COMPLETE" | "PARTIAL" | "RESEARCH_REQUIRED" | "ROBOTS_BLOCKED" | "RETENTION_BLOCKED" | "HOMEPAGE_FAILED";
 
 function fixtureClock(now: Date | undefined): Date {
   const value = new Date(now ?? NOW);
@@ -145,14 +146,25 @@ function approvedChain(now: Date, retention: FixtureRetention) {
   return { sourcePlan, manifest, researchPacket, authorization, ownerEnvelope, researchPolicy };
 }
 
-function fakeTransport(now: Date) {
+function fakeTransport(now: Date, outcome: PrivateKwM2AssessmentOutcome) {
   return createPrivateKwPublicHttpTransport({
     resolveDns: async () => [{ address: "93.184.216.34", family: 4 as const }],
     executeConnection: async (request) => {
       const url = new URL(request.url);
       const body = url.pathname === "/robots.txt"
-        ? "User-agent: *\nAllow: /\n"
-        : "<!doctype html><html><head><title>Synthetic local business</title></head><body><h1>Synthetic local business</h1><a href=\"/service\">Service</a><a href=\"/about\">About</a><a href=\"/contact\">Contact</a></body></html>";
+        ? (outcome === "ROBOTS_BLOCKED" ? "User-agent: *\nDisallow: /\n" : "User-agent: *\nAllow: /\n")
+        : outcome === "RESEARCH_REQUIRED"
+          ? "<!doctype html><html><head><title>Synthetic local business</title></head><body><h1>Synthetic local business</h1></body></html>"
+          : "<!doctype html><html><head><title>Synthetic local business</title></head><body><h1>Synthetic local business</h1><a href=\"/service\">Service</a><a href=\"/about\">About</a><a href=\"/contact\">Contact</a></body></html>";
+      if (outcome === "PARTIAL" && url.pathname === "/service") throw new Error("SYNTHETIC_SUBPAGE_FAILURE");
+      if (outcome === "HOMEPAGE_FAILED" && url.pathname === "/") {
+        return {
+          statusCode: 503,
+          headers: { "content-type": "text/html" },
+          body: new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode("temporarily unavailable")); controller.close(); } }),
+          abort() {},
+        };
+      }
       const bytes = new TextEncoder().encode(body);
       return {
         statusCode: 200,
@@ -269,14 +281,29 @@ function memoryEvidenceStore() {
     const parsed = reference as { outcome?: string; contentRef?: string; metadataRef?: string; factsRef?: string };
     const key = parsed.outcome === "DERIVED_FACTS_ONLY"
       ? `${parsed.outcome}:${parsed.contentRef}:${parsed.metadataRef}:${parsed.factsRef}`
-      : `${parsed.outcome}:${parsed.contentRef}:${parsed.metadataRef}`;
+      : parsed.outcome === "BLOCKED"
+        ? `${parsed.outcome}:${(parsed as { receiptRef?: string }).receiptRef}`
+        : `${parsed.outcome}:${parsed.contentRef}:${parsed.metadataRef}`;
     const entry = entries.get(key);
     if (!entry) throw new Error("MISSING_MEMORY_EVIDENCE");
     return entry.reloaded;
   };
   const writeHtml: Store["writePrivateKwHtmlEvidence"] = async (input) => {
-    if (input.outcome !== "RAW_HTML_ALLOWED") throw new Error("memory fixture does not persist blocked evidence");
-    return writeRaw(input);
+    if (input.outcome === "RAW_HTML_ALLOWED") return writeRaw(input);
+    const receiptCore = {
+      receiptVersion: "private-kw-html-blocked-receipt-v1" as const,
+      outcome: "BLOCKED" as const,
+      blockCode: input.blockCode,
+      businessId: input.businessId,
+      sourceId: input.sourceId,
+      parentReceiptDigest: input.parentReceiptDigest,
+      capturedAt: input.capturedAt,
+    };
+    const receiptDigest = sha256(canonicalize(receiptCore));
+    const receiptRef = `kw-html-receipt:sha256:${receiptDigest}`;
+    const reference: Extract<PrivateKwHtmlEvidenceRef, { outcome: "BLOCKED" }> = { outcome: "BLOCKED", receiptRef, receiptPath: "memory/receipt.json", blockCode: input.blockCode, executionPath: "CREATED" };
+    entries.set(`${reference.outcome}:${reference.receiptRef}`, { reference, reloaded: { outcome: "BLOCKED", blockCode: input.blockCode, receipt: { ...receiptCore, receiptRef } } });
+    return reference;
   };
   const store: FixtureStore = {
     writePrivateKwHtmlEvidence: writeHtml,
@@ -300,8 +327,9 @@ function memoryReceiptStore() {
   };
 }
 
-export async function createPrivateKwM2AssessmentFixture(options: { retention?: FixtureRetention; businessIndex?: number; now?: Date } = {}) {
-  const retention = options.retention ?? "RAW_HTML_ALLOWED";
+export async function createPrivateKwM2AssessmentFixture(options: { retention?: FixtureRetention; businessIndex?: number; now?: Date; outcome?: PrivateKwM2AssessmentOutcome } = {}) {
+  const outcome = options.outcome ?? "COMPLETE";
+  const retention = options.retention ?? ((outcome === "RETENTION_BLOCKED" || outcome === "ROBOTS_BLOCKED") ? "BLOCKED" : "RAW_HTML_ALLOWED");
   const businessIndex = options.businessIndex ?? 0;
   if (!Number.isInteger(businessIndex) || businessIndex < 0 || businessIndex >= PRIVATE_KW_SHADOW_SLICE_SIZE) throw new Error("Fixture businessIndex is outside the approved ten-business slice.");
   const now = fixtureClock(options.now);
@@ -322,7 +350,7 @@ export async function createPrivateKwM2AssessmentFixture(options: { retention?: 
   const receiptStore = memoryReceiptStore();
   const evidenceStore = memoryEvidenceStore();
   const receipt = await executePrivateKwM2HtmlEvidence(request, {
-    transport: fakeTransport(now),
+    transport: fakeTransport(now, outcome),
     store: evidenceStore,
     receiptStore,
     clock: () => new Date(now),

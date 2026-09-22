@@ -1,5 +1,68 @@
 # Current status — Axiom Revenue Engine
 
+## M2 research-only and blocked outcome integration
+
+**Updated:** 2026-09-21 (America/Toronto). **Verified base:** `181a95e`.
+This checkpoint extends the actual local HTML assessment runner, with Luna
+implementing bounded synthetic fixtures and the research-report projection;
+root owns the shared parser, ordered integration, review and final verification.
+M2 remains incomplete and M3 has not started.
+
+Sealed `RESEARCH_REQUIRED` captures now produce a deterministic private report
+showing source lineage, selected/missing pages and HTML limitations. They remain
+`UNKNOWN`, with zero scores, no channels/contact/consent authority, no assessment
+approval and no database/progress rows. Robots/terms and retention blocks reload
+their existing sealed witnesses and return `BLOCKED`, without new output files.
+Both can precede the next complete assessment in the recorded business order.
+The complete path still requires its separate owner decision and transaction.
+
+Before report publication, the runner independently reloads the source/capture
+on a reopened read-only database and compares the full database with its expected
+state. Reports are immutable canonical outputs. Missing reports can be rebuilt
+from evidence; altered reports cannot supply their own proof or be overwritten.
+An earlier research report can be verified after later approved assessments.
+
+Root review identified that Task 4 deliberately leaves failed-subpage `PARTIAL`
+captures unsealed. Failed homepages are also unsealed. Their actual reload fails
+with `M2_WEBSITE_RECEIPT_REPLAY_MISSING`; this checkpoint preserves that explicit
+no-output failure. The pure partial-report shape is not proof of a saved partial
+workflow. Durable failure witnesses remain unfinished, as do the M2 console and
+the exact-ten owner workflow. No Task 4 production behavior or schema changed.
+
+Required verification passed for this checkpoint. Safety,
+TypeScript, lint, Cloudflare build (2,018 scanned files, zero local secret values),
+deployment dry run (no upload, automation false/zero) and owner UI acceptance
+passed. Browser acceptance measured 479 ms for the list and 871 ms for the
+dossier, widths 1440/390, six WCAG pages and zero external requests. The first
+full suite had 654 tests: 650 passed, one M1 interruption chronology failure and
+three Windows symlink-privilege skips. Root fixed the M1 synthetic fixture's
+five-second wall-clock race by giving its owned SQLite connection and fixture
+one fixed clock, including lease comparisons. Production chronology validation
+is unchanged. The fixed-date fixture failed without the database clock alignment
+and all six interruption stages passed with it. The final full suite passed:
+**654 total, 651 passed, zero failed, three Windows symlink-privilege skips;
+640.9 seconds**. TypeScript and targeted lint also passed after the fixture
+correction. The mixed
+real-file test exercises research reports with both retention modes, two policy
+blocks, a later complete assessment, evidence loss before publication, tampered
+and missing reports, historical replay and rejection of unsealed partial capture.
+The initial run caught predecessor ordering and fresh-approval timestamp issues;
+both were corrected before the verification pass.
+
+No production/staging inspection, real migration, website request, provider call,
+deployment, outreach or spend occurred. Automation remains off or unverified.
+The C$50/month ceiling, zero paid mailboxes and no assumed API credentials remain
+unchanged. No owner decision is needed for the next local implementation work.
+
+The next three concrete actions are:
+
+1. Complete saved failure evidence for partial captures, preserving exact replay
+   and the no-assessment/no-contact boundary.
+2. Integrate complete, research and blocked outcomes into the dedicated M2 owner
+   console and complete the exact-ten orchestration acceptance packet.
+3. Prepare the real one-then-ten evaluation packets for their separate review;
+   no real setup, assessment or capture packet is approved yet.
+
 ## Owner browser streaming gate repair
 
 **Updated:** 2026-09-21 (America/Toronto). **Code checkpoint:** `878d0ff`

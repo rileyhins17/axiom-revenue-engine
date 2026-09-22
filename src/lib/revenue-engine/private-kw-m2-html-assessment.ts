@@ -73,20 +73,12 @@ export const PrivateKwM2HtmlWebsiteSnapshotSchema = z.object({
   browserEvidence: z.literal(false), desktopArtifactRef: z.null(), mobileArtifactRef: z.null(), domArtifactRef: z.null(),
 }).strict();
 
-export function parseM2AssessmentContext(value: unknown) {
+/** Common evidence identity validation. This does not authorize an assessment. */
+export function parseM2EvidenceContext(value: unknown) {
   const context = PrivateKwM2HtmlAssessmentContextSchema.parse(value);
   const { evidence } = context;
   const { operationDigest, ...operation } = evidence;
   if (privateKwM2ReceiptCanonicalDigest(operation) !== operationDigest) throw new Error("HTML operation digest mismatch.");
-  if (evidence.status !== "COMPLETE" || !evidence.audit || !evidence.sourcePolicy || evidence.blockedEvidence
-    || evidence.pages.length !== 4 || evidence.pages.some((page) => page.outcome !== "CAPTURED"
-      || !["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY"].includes(page.storageOutcome) || !page.finalUrl || !page.contentDigest)
-    || new Set(evidence.pages.map((page) => page.pageKind)).size !== 4) {
-    throw new Error("Only complete retained HTML evidence can enter assessment planning.");
-  }
-  if (new Set(evidence.pages.map((page) => page.storageOutcome)).size !== 1) {
-    throw new Error("HTML assessment requires uniform retention across its four pages.");
-  }
   const identity = evidence.sourceIdentity;
   if (context.businessId !== evidence.businessId || context.businessId !== identity.businessId
     || context.evaluationCandidateId !== identity.evaluationCandidateId || context.sourceRecordId !== identity.sourceRecordId
@@ -96,6 +88,21 @@ export function parseM2AssessmentContext(value: unknown) {
     throw new Error("HTML assessment source and authorization lineage mismatch.");
   }
   return freezeM2(context);
+}
+
+export function parseM2AssessmentContext(value: unknown) {
+  const context = parseM2EvidenceContext(value);
+  const { evidence } = context;
+  if (evidence.status !== "COMPLETE" || !evidence.audit || !evidence.sourcePolicy || evidence.blockedEvidence
+    || evidence.pages.length !== 4 || evidence.pages.some((page) => page.outcome !== "CAPTURED"
+      || !["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY"].includes(page.storageOutcome) || !page.finalUrl || !page.contentDigest)
+    || new Set(evidence.pages.map((page) => page.pageKind)).size !== 4) {
+    throw new Error("Only complete retained HTML evidence can enter assessment planning.");
+  }
+  if (new Set(evidence.pages.map((page) => page.storageOutcome)).size !== 1) {
+    throw new Error("HTML assessment requires uniform retention across its four pages.");
+  }
+  return context;
 }
 
 const ApprovalCore = z.object({

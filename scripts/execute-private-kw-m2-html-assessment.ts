@@ -12,12 +12,13 @@ import { PrivateKwShadowSliceManifestSchema } from "../src/lib/revenue-engine/pr
 import { privateKwM2Digest } from "../src/lib/revenue-engine/private-kw-m2-authorization";
 import {
   assertPrivateKwM2HtmlAssessmentApproval, buildPrivateKwM2HtmlAssessmentCandidate, buildPrivateKwM2HtmlAssessmentPlan,
-  m2AssessmentJson, parseM2AssessmentContext, PrivateKwM2HtmlAssessmentApprovalSchema,
-  recordPrivateKwM2HtmlAssessmentApproval, type PrivateKwM2HtmlAssessmentPlan,
+  m2AssessmentJson, parseM2EvidenceContext, PrivateKwM2HtmlAssessmentApprovalSchema,
+  recordPrivateKwM2HtmlAssessmentApproval, type PrivateKwM2HtmlAssessmentPlan, type PrivateKwM2HtmlAssessmentContext,
 } from "../src/lib/revenue-engine/private-kw-m2-html-assessment";
 import { PrivateKwM2HtmlEvidenceRequestSchema } from "../src/lib/revenue-engine/private-kw-m2-html-evidence-schema";
 import { reloadPrivateKwM2WebsiteEvidenceReceipt, type PrivateKwM2WebsiteEvidenceReceiptReloadInput } from "../src/lib/revenue-engine/private-kw-m2-html-evidence-workflow";
 import { projectPrivateKwM2OwnerLeadDetail } from "../src/lib/revenue-engine/private-kw-m2-owner-projection";
+import { buildPrivateKwM2ResearchReport } from "../src/lib/revenue-engine/private-kw-m2-terminal-report";
 import {
   PrivateKwM2SetupReleaseEnvelopeSchema, PrivateKwM2TimedDatabaseSetupReceiptSchema,
   privateKwM2SetupDigest,
@@ -214,6 +215,8 @@ export async function executePrivateKwM2HtmlAssessment(runPath: string, business
     const reference = new Database(backup.bytes);
     const actual = new Database(databasePath, { readonly: true, fileMustExist: true, timeout: 0 });
     const completed = new Map<string, PrivateKwM2HtmlAssessmentPlan>();
+    type Terminal = { context: PrivateKwM2HtmlAssessmentContext; at: Date; report?: ReturnType<typeof buildPrivateKwM2ResearchReport> };
+    const terminals = new Map<string, Terminal>();
     let prior = { id: setup.receiptId, digest: setup.receiptDigest };
     const check = () => { files.check(); assertSetupFileUnchanged(backupPath, backup.identity); };
     const readContext = async (operation: Operation, at: Date, reader = actual, checkpoint = prior, identity = original.identity) => {
@@ -223,16 +226,17 @@ export async function executePrivateKwM2HtmlAssessment(runPath: string, business
       const materialization = files.read(operation.materializationPath);
       const reloadInput = { sourceValue: source, manifestValue: manifest, materializationValue: materialization, businessId: operation.businessId };
       const before = reloadPrivateKwM2SourceMaterialization(reader, reloadInput);
-      // Historical time is used ONLY for a recorded completed row. Its entire plan is independently
-      // reconstructed below and compared to every durable row and the complete expected database.
+      // Historical time proves existing evidence only. Every fresh assessment write separately
+      // checks the current approval; research reports and blocked outcomes cannot authorize rows.
       const evidence = await reloadPrivateKwM2WebsiteEvidenceReceipt({ request, ...dependencies }, { clock: () => at });
+      if (evidence.requestedAt !== request.requestedAt) throw new Error("Evidence request time mismatch.");
       const after = reloadPrivateKwM2SourceMaterialization(reader, reloadInput);
       if (privateKwM2Digest(before) !== privateKwM2Digest(after)) throw new Error("Source materialization changed during HTML reload.");
       const selected = source.records.find((record) => record.business.id === operation.businessId)!;
       const owner = request.ownerEnvelope as { expiresAt: string };
       const expiry = new Date(Math.min(Date.parse(owner.expiresAt), Date.parse(evidence.authorizationExpiresAt))).toISOString();
       check(); assertSetupFileUnchanged(databasePath, identity);
-      return parseM2AssessmentContext({ businessId: operation.businessId, businessName: selected.business.canonicalName,
+      return parseM2EvidenceContext({ businessId: operation.businessId, businessName: selected.business.canonicalName,
         evaluationCandidateId: selected.evaluationCandidateId, sourceRecordId: selected.sourceRecord.id,
         sourceEvidenceUrl: selected.sourceRecord.sourceEvidenceUrl, sourceCapturedAt: selected.sourceRecord.capturedAt,
         sourceMaterializationReceiptId: after.plan.materializationId, sourceMaterializationDigest: after.plan.materializationDigest,
@@ -243,6 +247,17 @@ export async function executePrivateKwM2HtmlAssessment(runPath: string, business
           ownerEnvelope: request.ownerEnvelope, manifest, sourcePlan: source, researchPolicy: request.researchPolicy }),
         setupReceiptId: setup.receiptId, setupReceiptDigest: setup.receiptDigest,
         priorM2CheckpointId: checkpoint.id, priorM2CheckpointDigest: checkpoint.digest, approvalExpiresAt: expiry, evidence });
+    };
+    const assertTerminalOutputs = (operation: Operation, report?: ReturnType<typeof buildPrivateKwM2ResearchReport>) => {
+      const forbidden = [operation.candidatePath, operation.approvalPath, operation.progressPath,
+        ...(!report ? [operation.reportPath] : [])];
+      if (forbidden.some((file) => exists(absolute(file)))) throw new Error("Non-assessment outcome has conflicting assessment output.");
+      if (report && exists(absolute(operation.reportPath))) {
+        files.read(operation.reportPath);
+        if (!readSetupFile(absolute(operation.reportPath)).bytes.equals(Buffer.from(m2AssessmentJson(report) + "\n"))) {
+          throw new Error("Research report conflicts with durable evidence.");
+        }
+      }
     };
     let freshPlan: PrivateKwM2HtmlAssessmentPlan | undefined;
     let prepared: unknown;
@@ -257,9 +272,41 @@ export async function executePrivateKwM2HtmlAssessment(runPath: string, business
       if (rows.length > 10 || new Set(rows.map((row) => row.businessId)).size !== rows.length
         || rows.some((row) => !run.operations.some((op) => op.businessId === row.businessId))) throw new Error("Unexpected completed assessment set.");
       let firstPending: Operation | undefined;
+      let requestedContext: PrivateKwM2HtmlAssessmentContext | undefined;
+      let requestedAt: Date | undefined;
       for (const operation of run.operations) {
         const stored = rows.find((row) => row.businessId === operation.businessId);
-        if (!stored) { firstPending ??= operation; continue; }
+        if (!stored) {
+          const isRequested = operation.businessId === businessId;
+          const hasReport = exists(absolute(operation.reportPath));
+          const operationIndex = run.operations.indexOf(operation);
+          const afterRequested = operationIndex > run.operations.indexOf(requested);
+          const hasLaterAssessment = rows.some((row) => run.operations.findIndex((op) => op.businessId === row.businessId) > operationIndex);
+          if (firstPending || (afterRequested && !hasReport && !hasLaterAssessment)) { firstPending ??= operation; continue; }
+          const request = PrivateKwM2HtmlEvidenceRequestSchema.parse(files.read(operation.requestPath));
+          const historical = !isRequested || hasReport || mode === "VERIFY";
+          const at = historical ? new Date(request.requestedAt) : clock();
+          if (!Number.isFinite(at.getTime()) || at.getTime() > clock().getTime()) throw new Error("Invalid evidence verification time.");
+          const context = await readContext(operation, at);
+          if (context.evidence.status === "COMPLETE") {
+            firstPending = operation;
+            // A stray report file never selects historical time for a fresh assessment approval.
+            if (isRequested) { requestedContext = context; requestedAt = clock(); }
+            continue;
+          }
+          const report = context.evidence.status === "PARTIAL" || context.evidence.status === "RESEARCH_REQUIRED"
+            ? buildPrivateKwM2ResearchReport(context) : undefined;
+          if (!report && (context.evidence.status !== "FAILED" || !context.evidence.blockedEvidence
+            || !["ROBOTS_OR_TERMS_BLOCKED", "RETENTION_BLOCKED"].includes(context.evidence.stopReason ?? ""))) {
+            throw new Error("Only durable research or blocked outcomes can leave assessment review.");
+          }
+          assertTerminalOutputs(operation, report);
+          if (report && !hasReport && !isRequested) { firstPending = operation; continue; }
+          terminals.set(operation.businessId, { context, at, report });
+          prior = report ? { id: report.reportId, digest: report.reportDigest }
+            : { id: context.evidence.operationId, digest: context.evidence.operationDigest };
+          continue;
+        }
         if (firstPending) throw new Error("Assessment completion order does not match its prior checkpoint.");
         const at = new Date(stored.recordedAt);
         if (!Number.isFinite(at.getTime()) || at.getTime() < setupTime || at.getTime() > clock().getTime()) throw new Error("Invalid completed assessment time.");
@@ -277,11 +324,11 @@ export async function executePrivateKwM2HtmlAssessment(runPath: string, business
       expectedBefore = snapshot(reference);
       matchSnapshot(snapshot(actual), expectedBefore);
       if (!rows.length) assertSetupFileUnchanged(databasePath, setup.fileIdentity);
-      if (!completed.has(businessId)) {
+      if (!completed.has(businessId) && !terminals.has(businessId)) {
         if (firstPending?.businessId !== businessId) throw new Error("Complete the next selected business in order.");
         if (mode === "VERIFY") throw new Error("No completed assessment exists to verify.");
-        const at = clock();
-        const context = await readContext(requested, at);
+        const at = requestedAt ?? clock();
+        const context = requestedContext ?? await readContext(requested, at);
         if (mode === "PREPARE") {
           const existing = exists(absolute(requested.candidatePath)) ? files.read(requested.candidatePath) as { candidate?: { assessedAt?: string } } : undefined;
           const assessedAt = existing?.candidate?.assessedAt ?? at.toISOString();
@@ -295,6 +342,34 @@ export async function executePrivateKwM2HtmlAssessment(runPath: string, business
       expectedAfter = snapshot(reference);
     } finally { actual.close(); reference.close(); }
     check(); assertSetupSidecarsAbsent(databasePath); assertSetupFileUnchanged(databasePath, original.identity);
+    const terminal = terminals.get(businessId);
+    if (terminal) {
+      // Reopen and reload durable source/capture immediately before publishing even a research-only
+      // report. Neither its existing bytes nor the first in-memory context are proof of completion.
+      const reader = new Database(databasePath, { readonly: true, fileMustExist: true, timeout: 0 });
+      try {
+        reader.exec("BEGIN");
+        const checkpoint = { id: terminal.context.priorM2CheckpointId, digest: terminal.context.priorM2CheckpointDigest };
+        const context = await readContext(requested, terminal.at, reader, checkpoint);
+        if (m2AssessmentJson(context) !== m2AssessmentJson(terminal.context)) throw new Error("Research evidence changed before publication.");
+        matchSnapshot(snapshot(reader), expectedAfter);
+      } finally { reader.close(); }
+      const finalCheck = () => {
+        check(); assertSetupSidecarsAbsent(databasePath); assertSetupFileUnchanged(databasePath, original.identity);
+        assertTerminalOutputs(requested, terminal.report);
+      };
+      finalCheck();
+      if (!terminal.report) return { status: "BLOCKED" as const, businessId, insertedRows: 0,
+        operationId: terminal.context.evidence.operationId, operationDigest: terminal.context.evidence.operationDigest,
+        stopReason: terminal.context.evidence.stopReason, blockedEvidence: terminal.context.evidence.blockedEvidence,
+        networkRequestCount: 0, providerOperations: 0, costAuthorizedUsd: 0 };
+      const existed = exists(absolute(requested.reportPath));
+      publish(requested.reportPath, terminal.report, finalCheck);
+      if (m2AssessmentJson(files.read(requested.reportPath)) !== m2AssessmentJson(terminal.report)) throw new Error("Research report did not reload exactly.");
+      finalCheck();
+      return { status: "RESEARCH_REVIEW" as const, executionPath: existed ? "EXACT_REPLAY" as const : "CREATED" as const,
+        insertedRows: 0, reportPath: requested.reportPath, report: terminal.report };
+    }
     const reloadAssessment = async (plan: PrivateKwM2HtmlAssessmentPlan, identity: SetupFileIdentity, durable: boolean) => {
       assertSetupSidecarsAbsent(databasePath); assertSetupFileUnchanged(databasePath, identity);
       const reader = new Database(databasePath, { readonly: true, fileMustExist: true, timeout: 0 });
