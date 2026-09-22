@@ -5,6 +5,22 @@
 **Updated:** 2026-09-22 (America/Toronto). **Goal state:** BLOCKED.
 **Verified code:** `56c7410`; full verification record: `e55ea5f`.
 **Research checkpoint:** `ebaad1d`.
+**Internal handoff (September 22):** Riley explicitly requested the ten-business
+list and current circumstances be sent to Aidan in Slack for his manual calling
+today. The DM was sent and read back successfully: all ten businesses, nine
+officially published business numbers, source links, limitations and the pending
+identity-review request were present. Delta's number was not verified and was
+marked unavailable. Two bounded Luna lookups plus root verification used zero
+searches and 14 official-page interactions for this separate, user-requested
+handoff. Concise phone evidence and the exact message/delivery receipt are saved
+privately in `data/kw-evaluation/m2-aidan-slack-handoff-2026-09-22.json` and `.md`.
+Aidan's reading, approval and call outcomes are not yet confirmed. This internal
+message is not an owner identity decision, completed assessment or permission
+for automated outreach. No prospect was contacted by Codex; engine-provider
+spend was C$0. Runtime code, production state and the next three build actions
+below are unchanged. Documentation-only diff checks passed; code tests were
+not repeated for the handoff.
+
 Riley's contextual "Continue" approved the prepared C$0 research scope and
 resumed the production goal. The research is complete: **20 businesses
 considered, ten proposed identities prepared, zero completed engine
