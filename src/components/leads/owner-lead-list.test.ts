@@ -15,7 +15,7 @@ import {
 
 const GENERATED_AT = "2026-08-25T18:00:00.000Z";
 
-function fixtureLead(overrides: Partial<Pick<OwnerLeadProjection, "attention" | "ownerActionable" | "route" | "dataQuality">> = {}): OwnerLeadProjection {
+function fixtureLead(overrides: Partial<Pick<OwnerLeadProjection, "attention" | "ownerActionable" | "route" | "dataQuality" | "qualification">> = {}): OwnerLeadProjection {
   const evidence = [{
     claimId: "claim:mobile-navigation",
     observation: "The mobile navigation is not usable and the page overflows horizontally.",
@@ -123,7 +123,7 @@ function fixtureResponse(leads: OwnerLeadProjection[], options: { rejectedBusine
       returned: leads.length,
       ignoredContactRows,
       rejectedBusinesses,
-      readyForReview: leads.filter((lead) => lead.attention === "READY_FOR_REVIEW" || lead.attention === "REVIEW").length,
+      readyForReview: leads.filter((lead) => lead.attention === "READY_FOR_REVIEW").length,
       needsRefresh: leads.filter((lead) => lead.attention === "NEEDS_REFRESH").length,
       blocked: leads.filter((lead) => lead.attention === "BLOCKED").length,
     },
@@ -160,6 +160,31 @@ test("owner lead list explains priority, separate scores, exact evidence, and a 
   assert.match(html, /Read-only · no outreach permission/);
   assert.doesNotMatch(html, />Send</);
   assert.doesNotMatch(html, />Approve</);
+});
+
+test("owner lead list separates qualified review from leads that still need qualification", () => {
+  const needsQualification = fixtureLead({
+    attention: "REVIEW",
+    ownerActionable: false,
+    qualification: {
+      ...fixtureLead().qualification,
+      failedGates: ["rebuild_need_below_65"],
+    },
+    route: {
+      ...fixtureLead().route,
+      readiness: "RESEARCH_REQUIRED",
+    },
+  });
+  const html = renderToStaticMarkup(createElement(OwnerLeadList, {
+    data: fixtureResponse([fixtureLead(), needsQualification]),
+  }));
+
+  assert.match(html, /Qualified for review/);
+  assert.match(html, /Needs qualification/);
+  assert.match(html, /Qualification criteria remain unmet/);
+  assert.match(html, /Rebuild Need Below 65/);
+  assert.equal(html.match(/page-metric-label">Qualified for review<\/span>[\s\S]*?page-metric-value[^>]*>(\d+)<\/span>/)?.[1], "1");
+  assert.equal(html.match(/page-metric-label">Needs qualification<\/span>[\s\S]*?page-metric-value[^>]*>(\d+)<\/span>/)?.[1], "1");
 });
 
 test("owner lead list keeps refresh and block states explicit and surfaces rejected data", () => {

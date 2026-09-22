@@ -449,7 +449,7 @@ export function seedOwnerLead(database: SqliteDatabase) {
     redirectCount: 5,
     capturedAt,
     desktopArtifactRef: "artifact:sha256:owner-acceptance-desktop",
-    mobileArtifactRef: null,
+    mobileArtifactRef: "artifact:sha256:owner-acceptance-mobile",
     domArtifactRef: "artifact:sha256:owner-acceptance-dom",
     pageSetComplete: true,
     pages: [{
@@ -476,11 +476,11 @@ export function seedOwnerLead(database: SqliteDatabase) {
       statusCode: 404,
     }],
     mobile: {
-      captured: false,
-      horizontalOverflow: null,
-      navigationUsable: null,
-      textReadable: null,
-      minimumTapTargetPx: null,
+      captured: true,
+      horizontalOverflow: true,
+      navigationUsable: false,
+      textReadable: false,
+      minimumTapTargetPx: 18,
     },
   });
   const qualification = qualifyRevenueLead({
@@ -496,6 +496,7 @@ export function seedOwnerLead(database: SqliteDatabase) {
   });
   assert(audit.claims.length >= 3, "Synthetic dossier must contain at least three supported observations.");
   assert(qualification.totalScore >= 70, "Synthetic dossier must remain owner-reviewable.");
+  assert.equal(qualification.band, "PRIORITY", "Synthetic dossier must satisfy every qualification gate.");
 
   const insert = database.transaction(() => {
     database.prepare(`INSERT INTO "RevenueBusiness"

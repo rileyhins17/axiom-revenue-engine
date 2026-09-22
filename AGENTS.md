@@ -44,6 +44,13 @@ messages, or send volume. Lead value, website rebuild need, reachability, timing
 and evidence confidence remain separate and visible. An email address is a
 channel, not proof that a business is qualified.
 
+A research or evaluation cohort is not a sales worklist. Before presenting a
+business as an outreach opportunity, establish website need with current,
+supported observations and satisfy the existing qualification criteria. An
+identity review, published phone number, or research-only disclaimer does not
+replace that assessment. Keep borderline review, incomplete research and
+qualified owner review distinct in both the product and manual handoffs.
+
 Every claim used for qualification or outreach must retain its source URL,
 capture time, method, confidence, and audit version. Never invent client results,
 revenue impact, urgency, familiarity, or case studies. Portfolio concepts are not
@@ -101,6 +108,8 @@ Automated tests must use fakes or mail sinks and must never contact prospects.
 Run `npm run test:owner-ui` only after every Next/OpenNext/Cloudflare build or dry
 run has exited. Those commands share `.next`; running them concurrently can swap
 browser assets mid-request and produce a false intermittent `SyntaxError`.
+Also wait for `npm test` to exit before `test:owner-ui`: both suites use the
+M2 local setup lock, and overlapping runs can fail before browser checks begin.
 Owner acceptance requires the completed production `.next/BUILD_ID` and uses
 `next start`; do not replace it with `next dev` or clear the completed build.
 Longer development runs can evict and rewrite already-warmed shared chunks.

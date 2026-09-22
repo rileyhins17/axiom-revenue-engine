@@ -318,6 +318,52 @@ test("lead dossier renders an owner-first decision, evidence, routes, and factua
   assert.doesNotMatch(html, />Approve</);
 });
 
+test("lead dossier explains that an unqualified review record needs qualification", () => {
+  const base = fixtureDetail();
+  const html = renderToStaticMarkup(createElement(OwnerLeadDetail, {
+    data: {
+      ...base,
+      lead: {
+        ...base.lead,
+        attention: "REVIEW",
+        ownerActionable: false,
+        qualification: {
+          ...base.lead.qualification,
+          failedGates: ["rebuild_need_below_65"],
+        },
+        route: {
+          ...base.lead.route,
+          readiness: "RESEARCH_REQUIRED",
+        },
+      },
+    },
+  }));
+
+  assert.match(html, /Needs qualification/);
+  assert.match(html, /Qualification criteria remain unmet/);
+  assert.match(html, /Rebuild Need Below 65/);
+  assert.doesNotMatch(html, /Why this is a strong lead/);
+});
+
+test("lead dossier distinguishes a healthy site from stale or blocked qualification", () => {
+  for (const [attention, expected] of [
+    ["REVIEW", /No demonstrated website opportunity/],
+    ["NEEDS_REFRESH", /Evidence needs refresh/],
+    ["BLOCKED", /block prevents owner review/],
+  ] as const) {
+    const data = fixtureDetail();
+    data.lead.attention = attention;
+    data.lead.ownerActionable = false;
+    data.lead.audit.classification = "NO_OPPORTUNITY";
+    data.lead.route.readiness = "RESEARCH_REQUIRED";
+    const html = renderToStaticMarkup(createElement(OwnerLeadDetail, { data }));
+
+    assert.match(html, expected);
+    assert.doesNotMatch(html, /Why this is a strong lead|Qualified for review/);
+    if (attention !== "REVIEW") assert.doesNotMatch(html, /No demonstrated website opportunity/);
+  }
+});
+
 test("lead dossier labels an absent owner contact review instead of implying approval", () => {
   const detail = fixtureDetail();
   detail.contactReview = {

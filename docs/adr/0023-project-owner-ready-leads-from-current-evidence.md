@@ -168,3 +168,34 @@ Pagination and materialization can be reconsidered only after measured need.
    shadow-data staging deployment. ADR 0024 keeps the writer private, requires
    an exact sealed receipt, and persists audit/evidence/qualification/assessment
    rows atomically with zero live authority.
+
+## September 22, 2026 clarification: qualification before sales handoff
+
+A manual handoff of ten identity-researched businesses was unsuitable for a
+calling day because their website need had not been assessed. That handoff did
+not traverse the runtime qualification path. The separate code audit found a
+presentation ambiguity: the list counted borderline `REVIEW` records together
+with `READY_FOR_REVIEW`, while a current phone/form/social contact could still
+be labelled a manual task on an unqualified, stale or blocked record.
+
+Keep the existing `revenue-shadow-v3` scores, thresholds, `REVIEW` band and
+evidence gates unchanged. Correct the owner projection and its consumers:
+
+- Only a current `READY_FOR_REVIEW` record with confirmed independence is
+  `ownerActionable` or counted as qualified for review. Unknown independence
+  remains explicit research work.
+- `REVIEW` and `RESEARCH` remain visible as work that needs qualification.
+  Stale and blocked records retain their respective reasons.
+- Preserve contact identities, values and provenance. A non-qualified record
+  exposes a recorded contact with `RESEARCH_REQUIRED` readiness, rather than
+  suggesting that manual outreach is the next task. A fully qualified record
+  retains the existing route choice and separate owner/policy review.
+- Show current qualification failures alongside evidence in the list and
+  dossier. A total score or contact route cannot stand in for website need.
+
+This is a correction to the read-only owner workflow, not a new scoring
+experiment, qualification writer, acquisition provider or outreach permission.
+Synthetic tests must exercise healthy-site, incomplete/borderline, stale,
+blocked, unknown-independence and fully qualified cases, including the list
+summary and rendered dossier. Real market calibration and M2's real evidence
+workflow remain incomplete until separately demonstrated.

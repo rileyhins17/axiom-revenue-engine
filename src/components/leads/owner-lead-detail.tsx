@@ -107,9 +107,29 @@ function locationLine(data: OwnerLeadDetailResponse) {
   return parts.filter(Boolean).join(", ");
 }
 
+function decisionStateCopy(lead: OwnerLeadDetailResponse["lead"]) {
+  if (lead.attention === "READY_FOR_REVIEW" && lead.ownerActionable) {
+    return { label: "Qualified for review", description: "Current evidence supports an owner decision." };
+  }
+  if (lead.attention === "NEEDS_REFRESH") {
+    return { label: "Needs refresh", description: "Evidence needs refresh before website qualification can be trusted." };
+  }
+  if (lead.attention === "BLOCKED") {
+    return { label: "Blocked", description: "A policy, suppression, or business-fit block prevents owner review." };
+  }
+  if (lead.audit.classification === "NO_OPPORTUNITY") {
+    return { label: "Needs qualification", description: "No demonstrated website opportunity appears in the current evidence." };
+  }
+  return { label: "Needs qualification", description: "Qualification criteria remain unmet; review the failed gates before treating this as a sales lead." };
+}
+
 export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
   const lead = data.lead;
-  const description = lead.whyThisLead[0]?.observation
+  const qualifiedForReview = lead.attention === "READY_FOR_REVIEW" && lead.ownerActionable;
+  const decisionState = decisionStateCopy(lead);
+  const description = !qualifiedForReview
+    ? decisionState.description
+    : lead.whyThisLead[0]?.observation
     ?? "The dossier keeps business fit, website need, reachability, timing, and evidence confidence separate so the next decision stays explainable.";
 
   return (
@@ -144,7 +164,7 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
           </a>
         ) : null}
         metrics={[
-          { label: "Priority", value: lead.qualification.totalScore, detail: "/100", tone: "positive" },
+          { label: "Priority", value: lead.qualification.totalScore, detail: "/100", tone: qualifiedForReview ? "positive" : "default" },
           { label: "Rebuild need", value: lead.qualification.scores.rebuildNeed, detail: "/100" },
           { label: "Evidence", value: lead.qualification.scores.evidenceConfidence, detail: "/100" },
           { label: "Best route", value: readableCode(lead.route.channel), detail: lead.route.readiness === "MANUAL_ACTION" ? "manual" : "review" },
@@ -155,9 +175,9 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
         <section aria-labelledby="why-this-lead" className="rounded-2xl border border-white/[0.08] bg-[#0e1014] p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <Sparkles className="size-4 text-emerald-300" aria-hidden="true" />
-            <h2 id="why-this-lead" className="text-sm font-semibold text-white">Why this is a strong lead</h2>
+            <h2 id="why-this-lead" className="text-sm font-semibold text-white">{qualifiedForReview ? "Why this is a strong lead" : "Qualification status"}</h2>
           </div>
-          {lead.whyThisLead.length > 0 ? (
+          {qualifiedForReview && lead.whyThisLead.length > 0 ? (
             <ol className="mt-4 grid gap-3 md:grid-cols-3">
               {lead.whyThisLead.map((claim, index) => (
                 <li key={claim.claimId} className="rounded-xl border border-white/[0.07] bg-black/20 p-4">
@@ -181,7 +201,7 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
             </ol>
           ) : (
             <p className="mt-4 rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4 text-sm leading-6 text-amber-100/80">
-              The current audit does not contain enough supported observations to explain a strong lead. Treat this business as research only.
+              {decisionState.description} The supporting evidence remains available below.
             </p>
           )}
         </section>
@@ -189,8 +209,15 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
         <aside aria-labelledby="decision-state" className="rounded-2xl border border-white/[0.08] bg-[#0e1014] p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 id="decision-state" className="text-sm font-semibold text-white">Decision state</h2>
-            <span className="rounded-full border border-emerald-300/20 bg-emerald-300/[0.06] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
-              {readableCode(lead.attention)}
+            <span className={cn(
+              "rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em]",
+              qualifiedForReview
+                ? "border-emerald-300/20 bg-emerald-300/[0.06] text-emerald-200"
+                : lead.attention === "BLOCKED"
+                  ? "border-rose-300/20 bg-rose-300/[0.06] text-rose-100"
+                  : "border-amber-300/20 bg-amber-300/[0.06] text-amber-100",
+            )}>
+              {decisionState.label}
             </span>
           </div>
           <dl className="mt-4 grid grid-cols-2 gap-2">
@@ -213,6 +240,14 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
               <ul className="mt-2 space-y-1 text-[11px] leading-4 text-amber-100/75">
                 {lead.dataQuality.issues.map((issue) => <li key={issue}>• {readableCode(issue)}</li>)}
               </ul>
+            ) : null}
+            {!qualifiedForReview && lead.qualification.failedGates.length > 0 ? (
+              <div className="mt-3 rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-3">
+                <p className="text-[10px] font-semibold text-amber-100">Qualification gates still open</p>
+                <ul className="mt-2 space-y-1 text-[11px] leading-4 text-amber-100/70">
+                  {lead.qualification.failedGates.map((gate) => <li key={gate}>• {readableCode(gate)}</li>)}
+                </ul>
+              </div>
             ) : null}
           </div>
         </aside>

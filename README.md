@@ -4,6 +4,13 @@ Axiom Web's private system for finding worthwhile local website opportunities, p
 
 ## Current state
 
+The owner Leads view separates businesses that meet the existing qualification
+criteria from records that still need qualification. Only current
+`READY_FOR_REVIEW` records with confirmed business independence count as qualified
+for review. A recorded contact remains visible on other records, without being
+presented as the next manual outreach task. Scores and qualification thresholds are unchanged; even
+a qualified review record grants no outreach or send authority.
+
 The application is in a controlled rebuild. M1 verifies one synthetic business through the real local source, website, eligibility, assessment, owner-dossier, checkpoint and report writers, with exact durable replay. The retained checkpoint is `data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-*`; earlier M1 artifact names are historical. Current implementation work is M2's bounded local HTML route, including the separately gated database setup and recovery runner. Synthetic proof does not establish a live acquisition loop.
 
 The checkpoint is synthetic, offline, and disconnected from providers, network access, contacts, qualification execution, outreach, sending, and spend. Its report records `fixtureOnly=true`, `synthetic=true`, zero network/provider operations, all contact/consent/qualification/outreach/send authority false, `costAuthorizedUsd=0`, and `contactReview.state=NOT_RECORDED`. `localAssessmentMutationAuthorized=true` covers only the explicitly approved local shadow SQLite write. Riley has no OpenAI API keys. Existing adapter code is not a connected service. Jev is an optional later experiment, not a prerequisite for a useful deterministic/manual pilot. Public DNS observed on 2026-09-21 supports Cloudflare root Email Routing MX/SPF and a published Resend verification token, but does not prove active forwarding, a Resend account/key, sender verification, complete DKIM, or send readiness. The target mail route has zero paid mailbox seats: Cloudflare forwards inbound mail to existing owner destinations and a typed Resend outbound/reply adapter remains separately gated.

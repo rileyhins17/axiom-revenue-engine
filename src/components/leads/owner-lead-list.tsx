@@ -32,20 +32,20 @@ const ATTENTION_COPY: Record<
   { label: string; explanation: string; className: string; icon: LucideIcon }
 > = {
   READY_FOR_REVIEW: {
-    label: "Ready to review",
+    label: "Qualified for review",
     explanation: "Current evidence supports an owner decision.",
     className: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
     icon: CheckCircle2,
   },
   REVIEW: {
-    label: "Review",
-    explanation: "Worth a closer owner review before any outreach.",
-    className: "border-sky-400/25 bg-sky-400/10 text-sky-200",
+    label: "Needs qualification",
+    explanation: "Qualification criteria remain unmet; resolve the failed gates before treating this as a sales lead.",
+    className: "border-amber-400/25 bg-amber-400/10 text-amber-100",
     icon: FileSearch,
   },
   RESEARCH: {
-    label: "Research needed",
-    explanation: "Promising signals exist, but the engine needs more proof.",
+    label: "Needs qualification",
+    explanation: "The current evidence does not support an owner review yet.",
     className: "border-violet-400/25 bg-violet-400/10 text-violet-200",
     icon: Search,
   },
@@ -105,8 +105,17 @@ function formattedGeneratedAt(value: string) {
   }).format(new Date(value));
 }
 
+function qualificationStatusMessage(lead: OwnerLeadProjection) {
+  if (lead.attention === "NEEDS_REFRESH") return "Evidence needs refresh before website qualification can be trusted.";
+  if (lead.attention === "BLOCKED") return "A policy, suppression, or business-fit block prevents owner review.";
+  if (lead.audit.classification === "NO_OPPORTUNITY") return "No demonstrated website opportunity appears in the current evidence.";
+  if (lead.attention === "REVIEW") return "Qualification criteria remain unmet; review the failed gates before treating this as a sales lead.";
+  return "Website qualification is incomplete. Research or refresh this business before making a decision.";
+}
+
 export function OwnerLeadList({ data }: { data: OwnerLeadListResponse }) {
   const omittedCount = data.summary.rejectedBusinesses + data.summary.ignoredContactRows;
+  const needsQualificationCount = data.leads.filter((lead) => lead.attention === "REVIEW" || lead.attention === "RESEARCH").length;
 
   return (
     <div className="mx-auto flex max-w-[1500px] flex-col gap-5">
@@ -133,10 +142,16 @@ export function OwnerLeadList({ data }: { data: OwnerLeadListResponse }) {
         }
         metrics={[
           {
-            label: "Ready to review",
+            label: "Qualified for review",
             value: data.summary.readyForReview,
             detail: "owner decisions",
             tone: "positive",
+          },
+          {
+            label: "Needs qualification",
+            value: needsQualificationCount,
+            detail: "do not treat as sales leads",
+            tone: "warning",
           },
           {
             label: "Needs refresh",
@@ -231,7 +246,7 @@ function OwnerLeadCard({ lead, rank }: { lead: OwnerLeadProjection; rank: number
                 </div>
               </div>
               <div className="shrink-0 text-right">
-                <div className="font-mono text-2xl font-semibold tabular-nums text-emerald-300">
+                <div className={cn("font-mono text-2xl font-semibold tabular-nums", lead.ownerActionable ? "text-emerald-300" : "text-zinc-100")}>
                   {lead.qualification.totalScore}
                 </div>
                 <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Priority</div>
@@ -271,9 +286,9 @@ function OwnerLeadCard({ lead, rank }: { lead: OwnerLeadProjection; rank: number
             <section aria-labelledby={`why-${lead.business.businessId}`}>
               <div className="mb-2.5 flex items-center gap-2">
                 <Sparkles className="size-3.5 text-emerald-300" aria-hidden="true" />
-                <h4 id={`why-${lead.business.businessId}`} className="text-xs font-semibold text-zinc-200">Why this lead</h4>
+                <h4 id={`why-${lead.business.businessId}`} className="text-xs font-semibold text-zinc-200">{lead.ownerActionable ? "Why this lead" : "Qualification status"}</h4>
               </div>
-              {lead.whyThisLead.length > 0 ? (
+              {lead.ownerActionable && lead.whyThisLead.length > 0 ? (
                 <ul className="grid gap-2 md:grid-cols-3">
                   {lead.whyThisLead.map((claim) => (
                     <li key={claim.claimId} className="rounded-xl border border-white/[0.07] bg-white/[0.018] p-3">
@@ -297,9 +312,17 @@ function OwnerLeadCard({ lead, rank }: { lead: OwnerLeadProjection; rank: number
                 </ul>
               ) : (
                 <p className="rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-3 text-xs leading-5 text-amber-100/80">
-                  No supported observations are current enough to show. Research or refresh this business before making a decision.
+                  {qualificationStatusMessage(lead)}
                 </p>
               )}
+              {!lead.ownerActionable && lead.qualification.failedGates.length > 0 ? (
+                <div className="mt-3 rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-3">
+                  <p className="text-[10px] font-semibold text-amber-100">Qualification gates still open</p>
+                  <ul className="mt-1.5 space-y-1 text-[11px] leading-4 text-amber-100/70">
+                    {lead.qualification.failedGates.map((gate) => <li key={gate}>• {readableCode(gate)}</li>)}
+                  </ul>
+                </div>
+              ) : null}
             </section>
           </div>
 
@@ -309,7 +332,7 @@ function OwnerLeadCard({ lead, rank }: { lead: OwnerLeadProjection; rank: number
                 <RouteIcon className="size-4 text-emerald-300" aria-hidden="true" />
               </div>
               <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
-                {manualRoute ? "Manual only" : lead.route.readiness === "OWNER_REVIEW" ? "Owner review" : "Research"}
+                {manualRoute ? "Manual only" : lead.route.readiness === "OWNER_REVIEW" ? "Owner review" : "Needs qualification"}
               </span>
             </div>
             <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.17em] text-zinc-600">Best reachable route</p>

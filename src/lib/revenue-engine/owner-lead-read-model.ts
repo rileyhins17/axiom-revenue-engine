@@ -416,7 +416,7 @@ export async function readOwnerLeadList(
       returned: leads.length,
       ignoredContactRows,
       rejectedBusinesses: rejections.length,
-      readyForReview: leads.filter((lead) => lead.attention === "READY_FOR_REVIEW" || lead.attention === "REVIEW").length,
+      readyForReview: leads.filter((lead) => lead.attention === "READY_FOR_REVIEW").length,
       needsRefresh: leads.filter((lead) => lead.attention === "NEEDS_REFRESH").length,
       blocked: leads.filter((lead) => lead.attention === "BLOCKED").length,
     },

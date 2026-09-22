@@ -274,6 +274,29 @@ function selectRoute(contactPoints: OwnerLeadProjectionInput["contactPoints"], p
   });
 }
 
+function holdRouteForOwnerReview(
+  route: z.infer<typeof OwnerLeadRouteSchema>,
+  attention: OwnerLeadProjection["attention"],
+  independenceStatus: OwnerLeadProjectionInput["business"]["independenceStatus"],
+) {
+  if (route.channel === "RESEARCH" || attention === "READY_FOR_REVIEW") return route;
+  const reason = attention === "REVIEW"
+    ? "Qualification gates remain unmet; the recorded contact is retained for research only."
+    : attention === "NEEDS_REFRESH"
+      ? "Evidence needs refresh; the recorded contact is retained for research only."
+      : attention === "BLOCKED"
+        ? "A policy or suppression block remains; the recorded contact is retained for research only."
+        : independenceStatus === "UNKNOWN"
+          ? "Business independence is unverified; the recorded contact is retained for research only."
+          : "Qualification remains research-only; the recorded contact is retained for research only.";
+  return OwnerLeadRouteSchema.parse({
+    ...route,
+    readiness: "RESEARCH_REQUIRED",
+    label: `Recorded ${route.channel.toLowerCase()} route`,
+    reason,
+  });
+}
+
 function evidenceSeverity(input: OwnerLeadProjectionInput, claimId: string) {
   const severity = input.audit.checks.find((check) => check.claimId === claimId)?.severity;
   return severity === "CRITICAL" ? 0 : severity === "IMPORTANT" ? 1 : 2;
@@ -358,15 +381,19 @@ export function projectOwnerLead(value: unknown): OwnerLeadProjection {
   const uniqueIssues = Array.from(new Set(issues)).sort();
   const explicitlyBlocked = currentQualification.band === "DISQUALIFIED";
   const needsRefresh = uniqueIssues.some((issue) => issue !== "independence_unverified");
+  const verifiedIndependent = input.business.independenceStatus === "INDEPENDENT";
   const attention = explicitlyBlocked
     ? "BLOCKED" as const
     : needsRefresh
       ? "NEEDS_REFRESH" as const
-      : currentQualification.band === "PRIORITY"
-        ? "READY_FOR_REVIEW" as const
-        : currentQualification.band === "REVIEW"
-          ? "REVIEW" as const
-          : "RESEARCH" as const;
+      : !verifiedIndependent
+        ? "RESEARCH" as const
+        : currentQualification.band === "PRIORITY"
+          ? "READY_FOR_REVIEW" as const
+          : currentQualification.band === "REVIEW"
+            ? "REVIEW" as const
+            : "RESEARCH" as const;
+  const ownerRoute = holdRouteForOwnerReview(route, attention, input.business.independenceStatus);
   const dataState = needsRefresh
     ? "NEEDS_REFRESH" as const
     : uniqueIssues.length > 0
@@ -393,8 +420,8 @@ export function projectOwnerLead(value: unknown): OwnerLeadProjection {
       failedGates: currentQualification.failedGates,
     },
     attention,
-    ownerActionable: attention === "READY_FOR_REVIEW" || attention === "REVIEW",
-    route,
+    ownerActionable: attention === "READY_FOR_REVIEW",
+    route: ownerRoute,
     whyThisLead: evidence.slice(0, 3),
     evidence,
     dataQuality: { state: dataState, issues: uniqueIssues },

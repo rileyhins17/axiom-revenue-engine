@@ -68,6 +68,52 @@ function weakWebsiteAudit() {
   return auditWebsiteDeterministically(input);
 }
 
+function healthyWebsiteAudit() {
+  return auditWebsiteDeterministically({
+    businessId: BUSINESS_ID,
+    businessName: "KW Roofing",
+    niche: "roofing",
+    expectedServices: ["roofing", "roof repair"],
+    expectedLocations: ["Kitchener", "Waterloo"],
+    sourceEvidenceUrl: "https://source.example/business/kw-roofing",
+    siteState: "CAPTURED",
+    requestedUrl: "https://kwroofing.example",
+    finalUrl: "https://kwroofing.example/",
+    statusCode: 200,
+    redirectCount: 0,
+    capturedAt: "2026-08-22T15:00:00.000Z",
+    desktopArtifactRef: "artifact:sha256:desktop",
+    mobileArtifactRef: "artifact:sha256:mobile",
+    domArtifactRef: "artifact:sha256:dom",
+    pageSetComplete: true,
+    pages: [{
+      kind: "HOME",
+      url: "https://kwroofing.example/",
+      title: "KW Roofing",
+      metaDescription: "Roofing services in Kitchener and Waterloo.",
+      visibleText: "Roofing roof repair Kitchener Waterloo",
+      actions: [{ kind: "PHONE", label: "Call us", href: "tel:+15195550123", visible: true, aboveFold: true }],
+      forms: [{ visible: true, hasSubmitControl: true, disabled: false, actionUrl: "https://kwroofing.example/contact" }],
+      trustSignals: ["CREDENTIAL", "WARRANTY"],
+      structuredDataTypes: ["LocalBusiness"],
+      contentComplete: true,
+      evidenceCoverage: {
+        desktopRenderCaptured: true,
+        actionVisibilityComplete: true,
+        formVisibilityComplete: true,
+      },
+    }],
+    resourceProbes: [],
+    mobile: {
+      captured: true,
+      horizontalOverflow: false,
+      navigationUsable: true,
+      textReadable: true,
+      minimumTapTargetPx: 44,
+    },
+  });
+}
+
 type ContactPoint = OwnerLeadProjectionInput["contactPoints"][number];
 
 function phoneContact(overrides: Partial<ContactPoint> = {}): ContactPoint {
@@ -141,16 +187,18 @@ function ownerInput(options: {
   name?: string;
   contacts?: ContactPoint[];
   blocks?: string[];
+  audit?: OwnerLeadProjectionInput["audit"];
+  businessFit?: number;
   independenceStatus?: OwnerLeadProjectionInput["business"]["independenceStatus"];
   status?: OwnerLeadProjectionInput["business"]["status"];
 } = {}): OwnerLeadProjectionInput {
-  const audit = weakWebsiteAudit();
+  const audit = options.audit ?? weakWebsiteAudit();
   const contacts = options.contacts ?? [phoneContact()];
   const businessId = options.businessId ?? BUSINESS_ID;
   const current = qualifyRevenueLead({
     scores: {
       rebuildNeed: audit.rebuildNeedScore,
-      businessFit: 82,
+      businessFit: options.businessFit ?? 82,
       reachability: 85,
       timing: 60,
       evidenceConfidence: audit.evidenceConfidence,
@@ -217,6 +265,34 @@ test("a strong non-email lead stays valuable and becomes a manual phone review",
   });
 });
 
+test("a healthy current site with a recorded phone remains research-only without block copy", () => {
+  for (const [businessFit, attention] of [[82, "REVIEW"], [20, "RESEARCH"]] as const) {
+    const result = projectOwnerLead(ownerInput({ audit: healthyWebsiteAudit(), businessFit }));
+
+    assert.equal(result.audit.classification, "NO_OPPORTUNITY");
+    assert.equal(result.attention, attention);
+    assert.equal(result.ownerActionable, false);
+    assert.equal(result.route.channel, "PHONE");
+    assert.equal(result.route.contactPointId, "contact:phone");
+    assert.equal(result.route.readiness, "RESEARCH_REQUIRED");
+    assert.match(result.route.reason, /qualification/i);
+    assert.doesNotMatch(result.route.reason, /policy|block/i);
+  }
+});
+
+test("unknown independence stays research-only for priority and review evidence", () => {
+  for (const audit of [weakWebsiteAudit(), healthyWebsiteAudit()]) {
+    const result = projectOwnerLead(ownerInput({ audit, independenceStatus: "UNKNOWN" }));
+
+    assert.equal(result.attention, "RESEARCH");
+    assert.equal(result.ownerActionable, false);
+    assert.equal(result.route.channel, "PHONE");
+    assert.equal(result.route.readiness, "RESEARCH_REQUIRED");
+    assert.match(result.route.reason, /independence is unverified/i);
+    assert(result.dataQuality.issues.includes("independence_unverified"));
+  }
+});
+
 test("verified named email outranks role email and still grants no send authority", () => {
   const role = emailContact({
     contactPointId: "contact:email:role",
@@ -271,6 +347,8 @@ test("stale or future source facts become refresh work instead of an actionable 
   assert.equal(result.ownerActionable, false);
   assert(result.dataQuality.issues.includes("source_record_stale"));
   assert(result.dataQuality.issues.includes("website_audit_stale"));
+  assert.equal(result.route.channel, "PHONE");
+  assert.equal(result.route.readiness, "RESEARCH_REQUIRED");
 
   const future = ownerInput();
   future.business.sourceCapturedAt = "2026-08-26T00:00:00.000Z";
@@ -284,11 +362,15 @@ test("chain and suppressed businesses remain blocked despite strong scores", () 
   const chainResult = projectOwnerLead(chain);
   assert.equal(chainResult.attention, "BLOCKED");
   assert.equal(chainResult.qualification.band, "DISQUALIFIED");
+  assert.equal(chainResult.route.channel, "PHONE");
+  assert.equal(chainResult.route.readiness, "RESEARCH_REQUIRED");
 
   const suppressed = ownerInput({ status: "SUPPRESSED", blocks: ["business_suppressed"] });
   const suppressedResult = projectOwnerLead(suppressed);
   assert.equal(suppressedResult.attention, "BLOCKED");
   assert.equal(suppressedResult.ownerActionable, false);
+  assert.equal(suppressedResult.route.channel, "PHONE");
+  assert.equal(suppressedResult.route.readiness, "RESEARCH_REQUIRED");
 });
 
 test("snapshot drift is visible and deterministic ranking favours current actionable leads", () => {

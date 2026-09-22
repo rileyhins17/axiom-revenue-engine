@@ -149,8 +149,9 @@ test("the D1 reader returns an authenticated-API-safe, read-only owner list", as
   assert.equal(result.leads.length, 1);
   assert.equal(result.leads[0]?.attention, "REVIEW");
   assert.equal(result.leads[0]?.route.channel, "PHONE");
-  assert.equal(result.leads[0]?.ownerActionable, true);
-  assert.equal(result.summary.readyForReview, 1);
+  assert.equal(result.leads[0]?.ownerActionable, false);
+  assert.equal(result.leads[0]?.route.readiness, "RESEARCH_REQUIRED");
+  assert.equal(result.summary.readyForReview, 0);
   assert.equal(result.summary.rejectedBusinesses, 0);
   assert.deepEqual(result.authority, {
     readOnly: true,
