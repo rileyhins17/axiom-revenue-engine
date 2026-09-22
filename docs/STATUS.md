@@ -1,5 +1,65 @@
 # Current status — Axiom Revenue Engine
 
+## Owner browser streaming gate repair
+
+**Updated:** 2026-09-21 (America/Toronto). **Code checkpoint:** this verified
+work cycle, based on `76766b5`; exact commit is recorded in the following status
+update. The previous turn made concrete
+progress by committing the M2 assessment runner and capturing the browser error.
+This cycle resolves that demonstrated verification blocker; M2 is still incomplete.
+
+The failure was reproduced with an external Node filesystem/HTTP probe, outside
+the repository. Next opened the 3,138,186-byte development layout chunk, Webpack
+rewrote the same inode during the read, and the stream ended after 1,179,648 bytes.
+The gzip response completed with HTTP 200 and no Content-Length, and Chromium's
+captured failing source contained that exact prefix. Evidence is retained at
+`output/playwright/owner-ui-27084-1790036664887`, including stream trace and source.
+The initial in-repository probe showed additional rebuilds and was discarded as
+a confounded experiment; only the external probe established the diagnosis.
+
+Owner acceptance now finishes authenticated HTTP preparation of all three owner
+routes before a browser reads their chunks, then waits for each browser warmup's
+`load` event before opening the next route. The full corrected trace has four
+layout rewrites before any browser read, followed by eight complete reads with
+no overlap. Its summary and trace are retained at
+`output/playwright/owner-ui-streaming-evidence-20260921`.
+
+Root diagnosed and integrated the correction. Luna implemented the bounded
+loopback streaming regression, which runs the real warmup function against SSR
+headings and delayed async scripts. The old warmup failed on two premature
+navigations; omitting HTTP preparation separately failed the first-script gate.
+The corrected combined warmup passed. Root corrected map types, removed an
+unnecessary delay and hardened cleanup. The regression now runs inside every
+owner UI acceptance invocation. Runtime app code, provider behavior and browser
+error gates are unchanged; this is a correction to test preparation.
+
+| Required check | Current result |
+|---|---|
+| Safety, TypeScript, lint | PASS |
+| Focused browser-diagnostic unit tests | PASS, 8 tests |
+| Streaming regression | Proven failing before / passing after |
+| Full test suite | PASS, 644 total, 641 passed, 0 failed, 3 Windows symlink-privilege skips; 537.8 seconds |
+| Cloudflare build | PASS, 2,018 files scanned, 0 local secret values |
+| Wrangler deployment dry run | PASS, no upload; autonomy variables false/zero |
+| Owner UI acceptance | Final uninstrumented PASS, list 395 ms, dossier 865 ms, widths 1440/390, 6 WCAG pages, 0 external requests; earlier instrumented PASS proved complete chunk reads |
+
+No production/staging inspection, real migration, provider request, deployment,
+outreach or spend occurred. Automation remains off or unverified. C$50/month and
+zero paid mailboxes remain the limits. M3 has not started. The M2 COMPLETE
+assessment workflow remains at `6aaf216`; partial/research-required terminal
+outcomes, dedicated M2 console integration and exact-ten orchestration remain.
+
+The next three actions are:
+
+1. Complete partial/research-required HTML terminal outcomes and the dedicated
+   M2 owner console view without inventing qualification from incomplete evidence.
+2. Complete exact-ten orchestration and retain a synthetic packet covering
+   complete, research-only and blocked outcomes.
+3. Prepare the real one-then-ten evaluation packets for their separate review;
+   no real setup, assessment or capture packet is approved yet.
+
+## Previous assessment checkpoint
+
 ## M2 complete-capture assessment workflow
 
 **Updated:** 2026-09-21 (America/Toronto). **Code checkpoint:** `6aaf216`

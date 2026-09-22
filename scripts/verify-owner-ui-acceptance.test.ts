@@ -58,7 +58,7 @@ test("warmup diagnostics attach before its first navigation and persist on failu
   const source = await readFile(new URL("./verify-owner-ui-acceptance.ts", import.meta.url), "utf8");
   const newPage = source.indexOf("warmupPage = await context.newPage()");
   const attachment = source.indexOf("attachBrowserDiagnostics(warmupPage", newPage);
-  const firstNavigation = source.indexOf('await warmupPage.goto("/leads"', newPage);
+  const firstNavigation = source.indexOf("await warmOwnerAcceptanceRoutes(warmupPage)", newPage);
   assert(newPage >= 0, "warmup page creation should remain explicit");
   assert(attachment > newPage, "warmup diagnostics should attach after page creation");
   assert(attachment < firstNavigation, "warmup diagnostics must attach before first navigation");

@@ -33,6 +33,7 @@ import { qualifyRevenueLead } from "../src/lib/revenue-engine/qualification";
 import { buildCompleteOwnerLabelingPacketFixture } from "../src/lib/revenue-engine/test-support/owner-labeling-fixture";
 import { auditWebsiteDeterministically } from "../src/lib/revenue-engine/website-audit";
 import { executePrivateKwContactPersistenceForLocalDatabase } from "./private-kw-contact-persistence-executor";
+import { verifyOwnerWarmupStreaming } from "./owner-ui-warmup-streaming.acceptance";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
@@ -943,6 +944,30 @@ async function openMobileDossier(page: Page) {
   ]);
 }
 
+export async function warmOwnerAcceptanceRoutes(page: Page) {
+  // The first streamed SSR response can load layout.js while Next's on-demand
+  // client compilation is rewriting it. Finish route preparation without any
+  // browser reading scripts, then load those scripts before the next navigation.
+  for (const route of ["/leads", `/leads/${FIXTURE_BUSINESS_ID}`, "/leads/evaluation"]) {
+    const response = await page.context().request.get(route);
+    try {
+      assert.equal(response.status(), 200, `Owner route preparation failed: ${route}`);
+      await response.body();
+    } finally {
+      await response.dispose();
+    }
+  }
+  // SSR headings precede async script completion. Starting the next compilation
+  // can rewrite a shared dev chunk while the previous response is still reading it.
+  await page.goto("/leads", { waitUntil: "load" });
+  await page.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
+  await page.goto(`/leads/${FIXTURE_BUSINESS_ID}`, { waitUntil: "load" });
+  await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
+  await page.goto("/leads/evaluation", { waitUntil: "load" });
+  await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
+  await page.locator("[data-quality-lab-ready='true']").waitFor();
+}
+
 async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
   let browser: Browser | null = null;
   let page: Page | null = null;
@@ -955,6 +980,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
   let stage = "startup";
   try {
     browser = await chromium.launch({ headless: true });
+    await verifyOwnerWarmupStreaming(browser, warmOwnerAcceptanceRoutes);
     const context = await browser.newContext({
       baseURL: baseUrl,
       colorScheme: "dark",
@@ -979,13 +1005,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     warmupPage = await context.newPage();
     attachBrowserDiagnostics(warmupPage, () => stage, diagnostics, baseUrl);
     drainScriptDiagnostics.push(await attachBrowserScriptDiagnostics(context, warmupPage, () => stage, diagnostics, outputDirectory));
-    await warmupPage.goto("/leads", { waitUntil: "domcontentloaded" });
-    await warmupPage.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
-    await warmupPage.goto(`/leads/${FIXTURE_BUSINESS_ID}`, { waitUntil: "domcontentloaded" });
-    await warmupPage.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
-    await warmupPage.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
-    await warmupPage.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
-    await warmupPage.locator("[data-quality-lab-ready='true']").waitFor();
+    await warmOwnerAcceptanceRoutes(warmupPage);
     await warmupPage.close();
 
     page = await context.newPage();

@@ -381,37 +381,45 @@ Retire entries when the architecture makes them impossible.
 - **Affected area:** qualification and UI.
 - **Verifying commit:** foundation began at `d5f0e52`; v3 gates pending.
 
-## BUILD-006 — The browser gate inherited or raced incompatible `.next` assets
+## BUILD-006 — Browser warmup streamed a development chunk during its rewrite
 
 - **Symptom:** the authenticated owner UI rendered normally and local requests
   returned 200, but Playwright intermittently reported an empty error or
   `SyntaxError: Invalid or unexpected token` during navigation. A client-side
   route could also render its complete dossier before Next applied the route's
   document title, producing a transient empty-title assertion.
-- **Root cause:** OpenNext and the Next.js development server share `.next`.
-  Concurrent execution can replace a served chunk, while a sequential first
-  development run can briefly inherit production assets left by OpenNext before
-  its development chunks finish replacing them. These are hazards, not a complete
-  explanation of every SyntaxError: a later isolated run with fresh cleanup
-  captured a cleanly truncated development script. Its 1,179,648 bytes exactly
-  matched the prefix of the complete 3,138,186-byte layout chunk. The remaining
-  response/chunk-generation cause is unresolved; simple navigation cancellation
-  did not reproduce the parser failure in a separate loopback experiment.
+- **Root cause:** Next's first streamed SSR page can request a shared development
+  chunk while on-demand compilation rewrites that file in place. An external
+  filesystem/HTTP trace proved a 3,138,186-byte `app/layout.js` read overlapped a
+  same-inode rewrite and ended after 1,179,648 bytes. Compression removed the
+  original Content-Length, so the server completed a valid gzip/200 response
+  containing truncated JavaScript. The captured browser script matched that
+  prefix exactly. This occurred with fresh `.next` assets and no concurrent
+  build. Separate Next/OpenNext builds sharing `.next` remain another hazard.
 - **Proven fix:** let every Next/OpenNext/Cloudflare build and dry run exit before
   starting `npm run test:owner-ui`, then remove only the repository's generated
-  `.next` directory before starting the isolated development server. Compile all
-  measured owner routes in a disposable authenticated page, close it, and use a
-  fresh page for timed/error-audited acceptance. Preserve detailed page-error
+  `.next` directory before starting the isolated development server. First fetch
+  and fully consume all three authenticated owner routes through local HTTP,
+  with no browser reading their scripts. Then warm those routes in a disposable
+  browser page, awaiting `load` before each next navigation; SSR headings alone
+  do not establish async script completion. Close it and use a fresh page for
+  timed/error-audited acceptance. Preserve detailed page-error
   name/message/stack diagnostics; do not suppress syntax errors or blank errors.
   Wait up to five seconds for each exact route title after visible readiness;
   this allows asynchronous metadata application without weakening the expected
   title.
-  These safeguards do not yet fix the separately captured truncated response;
-  retain that browser failure as an open gate rather than treating a passing
-  repeat as proof. See the current STATUS checkpoint and retained diagnostics.
+  After this correction the external trace recorded four layout rewrites before
+  the first browser read and eight complete 3,138,186-byte reads, without overlap.
+  Waiting for browser `load` alone passed but still allowed a rewrite/read overlap;
+  both the HTTP preparation and browser load barrier are required.
 - **Prevention/test:** `AGENTS.md` forbids concurrent execution, and the owner UI
-  acceptance command clears its exact generated `.next` directory, warms every
-  measured route, waits for exact titles, and then proves six fresh-page views.
+  acceptance command clears its exact generated `.next` directory, prepares and
+  warms every measured route, waits for exact titles, and proves six fresh-page
+  views. `owner-ui-warmup-streaming.acceptance.ts` serves delayed async scripts
+  over loopback and executes the actual warmup function. It failed on both early
+  navigations with the former DOMContentLoaded behavior, then passed with the
+  load barrier. It separately requires all three HTTP preparations before the
+  first browser script request. It runs inside every owner UI acceptance invocation.
   Chromium parser/runtime attribution now retains the exact failing source as
   `.js.txt`, script location and event-time stage. Its tests cover delayed source
   capture, attribution and unavailable-source errors. Existing uncaught browser
@@ -419,10 +427,8 @@ Retire entries when the architecture makes them impossible.
   GitHub CI and every local release cycle run the commands sequentially.
 - **Affected area:** owner UI acceptance, Next.js development server, OpenNext,
   Wrangler dry runs, Windows/OneDrive workspaces, and local release evidence.
-- **Verifying commit:** branch HEAD containing the sequential browser-gate rule,
-  exact `.next` cleanup, and six-view Quality Lab acceptance.
-  `6aaf216` adds tested source attribution and records the remaining truncated
-  response failure; it does not claim that failure fixed.
+- **Verifying commit:** the current fix checkpoint recorded in STATUS.
+  `6aaf216` introduced the source attribution used to diagnose the failure.
 
 ## BUILD-001 — Local success did not equal Linux/Cloudflare success
 
