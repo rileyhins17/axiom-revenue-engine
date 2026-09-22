@@ -10,6 +10,12 @@ The checkpoint is synthetic, offline, and disconnected from providers, network a
 
 Start with [STATUS](docs/STATUS.md) for the verified commit, current artifacts, test evidence and blockers. The local setup command, `npm run kw:prepare-m2-database -- <recorded-release-path>`, defaults to preflight. Applying 0069 requires explicit `--apply` and a current recorded setup release; recovery requires a separate recorded rollback release. Follow the [runbook](docs/RUNBOOK.md#m2-local-database-setup-and-recovery). The assessment command, `npm run kw:assess-m2-html -- <run.json> <business-id>`, prepares a separate owner decision from already captured HTML evidence. Its execution and durable verification modes are documented in the [HTML assessment runbook](docs/RUNBOOK.md#m2-local-html-assessment-and-restart). This path produces a private JSON owner dossier with HTML limitations and no contact authority. Production, staging, provider, contact, outreach and spend state remain unknown or off. M2's real one-then-ten evaluation and subsequent milestones are still incomplete.
 
+Preparing a current M2 capture packet requires `--review-policy` with explicit
+dates and the ten source-policy decisions. See the [preparation runbook](docs/RUNBOOK.md#m2-research-scope-and-current-authorization-preparation).
+Preparation cannot approve the packet or infer source rights from a public URL.
+The [initial public-research scope](docs/reviews/2026-09-21-m2-public-research-scope.md)
+is prepared for a separate owner decision.
+
 For sealed evidence that needs more research, the same assessment command saves
 a research report with missing pages and limitations, without an assessment
 approval or database write. Sealed policy blocks return their existing receipt

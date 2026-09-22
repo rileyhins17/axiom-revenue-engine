@@ -1,5 +1,55 @@
 # Current status — Axiom Revenue Engine
 
+## M2 real-research preparation and current policy inputs
+
+**Updated:** 2026-09-21 (America/Toronto). **Verified baseline:** `d73df1e`,
+recording code `ce13dd7`. This preparation repair passed all required checks;
+the following documentation commit records its saved code identity.
+The previous goal turn made progress by committing the durable local console.
+M2 is still incomplete: zero real businesses evaluated; M3 has not started.
+
+The active checkout's evaluation inventory contains only synthetic/test source
+chains. No real exact-ten source plan or owner-reviewed manifest was found.
+The [bounded public-research scope](reviews/2026-09-21-m2-public-research-scope.md)
+is prepared and awaiting the separate owner decision required by ADR 0032:
+up to 20 candidate businesses, 12 searches and 60 page opens, C$0, organization
+facts only, across the three cities and niches. No real research ran this cycle.
+
+Luna's bounded audit found that authorization preparation still hardcoded a
+September 3 review and September 10 expiry. The repair replaces those dates and
+synthetic source-policy defaults with a required strict `--review-policy`
+input: explicit current dates and exactly ten per-business decisions. Pending
+outputs and the fixture-only mapping remain distinct from owner approval and
+the actual assessment policy. Root owns review, integration and verification.
+
+Focused preparation tests passed, including missing/malformed/foreign policy
+decisions, future preparation, expired authorization/retention and invalid
+clock rejection with no output files. Saved outputs retain every explicit
+per-business decision, dates, request cap and pending approval linkage.
+Safety, TypeScript, lint, Cloudflare build (2,022 files, zero secret values) and
+deployment dry run passed. The first full suite reported 645 passed, 14 shared
+setup-lock failures and three expected Windows skips. That run exited and the
+canonical lock was confirmed absent before the fresh full run. The cause of
+that contention is unproven; production locking was not changed. The fresh
+full suite passed: **662 tests, 659 passed, zero failures, three expected Windows
+symlink-privilege skips; 585.0 seconds**. No UI code changed; the previous checkpoint's
+browser evidence is historical, not a fresh browser run for this repair.
+
+No deployment, real capture, migration, inbox operation, outreach, provider
+activation or spend occurred. Production and account state was not refreshed;
+runtime defaults remain off, with no release or activation inferred. The
+C$50/month ceiling and zero paid mailbox decision remain unchanged. The public
+research question is pending; capture, setup and assessment gates are separate.
+
+Next three actions:
+
+1. Obtain the decision on the prepared research scope, then gather the bounded
+   source evidence and present the actual ten candidates for owner review.
+2. Use the reviewed identities and explicit rights/retention decisions to
+   prepare a current exact-ten manifest and pending capture packet.
+3. Prepare the first business's bounded capture invocation and local database
+   release packet; execute only after their applicable owner/release gates.
+
 ## M2 durable partial capture and local research console
 
 **Updated:** 2026-09-21 (America/Toronto). **Verified code checkpoint:** `ce13dd7`

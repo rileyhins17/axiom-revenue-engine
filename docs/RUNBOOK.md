@@ -432,6 +432,58 @@ binding. Together they authorize no database mutation, provider or network
 operation, acquisition, qualification change, consent
 decision, outreach, sending, deployment, remote database, or spend.
 
+## M2 research scope and current authorization preparation
+
+Obtain the separate private research decision before collecting real candidate
+records. The [prepared research scope](reviews/2026-09-21-m2-public-research-scope.md)
+defines the proposed zero-cost manual research operation and remains pending
+until the owner decides. Research notes cannot supply Riley's or Aidan's
+identity, market, niche or independence review. Prepare the source plan from
+actual research evidence and the exact-ten manifest after that recorded review.
+
+The authorization CLI requires an explicit review-policy JSON in addition to
+the source plan and reviewed manifest. Its seven input/output paths must be
+different direct children of ignored `data/kw-evaluation`. It does not infer
+source rights or terms from a public URL, and it no longer uses fixed fixture
+dates. The review file contains:
+
+- `reviewVersion`: `kw-m2-authorization-review-v1`.
+- `preparedAt`: the actual preparation timestamp.
+- `websitePolicy`: an explicit `version`, `networkRequestCap` (1–100), and
+  `expiresAt` later than preparation and still current at execution preparation.
+- `researchPolicy`: the existing `kw-m2-research-policy-v1` policy with exactly
+  one decision for each of the ten manifest business IDs. Each decision records
+  `sourceRights`, `termsDecision`, `robotsDecision`, `evidenceRetention`,
+  `retentionReviewDate` and `stopConditions` from the reviewed source policy.
+
+Every retention-review date must still be current. Unknown or unreviewed rights
+cannot be replaced with fixture defaults. Prepare only once all decisions are
+supported; choose `BLOCKED` where retention is prohibited. A raw-HTML retention
+decision must be explicit and separately supported. The owner must review the
+exact resulting capture scope before any real HTTP request.
+
+```powershell
+npm run kw:prepare-m2-authorization -- --source-plan data/kw-evaluation/source.json --manifest data/kw-evaluation/manifest.json --review-policy data/kw-evaluation/m2-review-policy.json --research-packet data/kw-evaluation/research-packet.json --authorization data/kw-evaluation/authorization.json --owner-approval data/kw-evaluation/owner-candidate.json --mapping-policy data/kw-evaluation/fixture-mapping.json
+```
+
+The four outputs remain a pending research packet, pending execution
+authorization, pending owner-decision candidate and explicitly fixture-only
+mapping artifact. The last artifact is not a production assessment policy; the
+assessment runner uses its separately frozen mapping and approval. This command
+does not record owner approval, open a database, fetch a website, invoke a
+provider or grant spending authority. Reusing the former six-path invocation
+now fails closed instead of silently substituting old dates and synthetic
+source-policy claims. Do not edit an expired packet; prepare a new one with
+current reviewed inputs and obtain its own decision.
+
+The first real capture is one supervised business within the reviewed ten,
+followed by the remaining nine after review. Task 4 currently exposes a service
+entrypoint, not a standalone capture command. Do not invent an `npm` capture
+command or treat the assessment runner as a capture tool. A bounded operator
+invocation must call `executePrivateKwM2HtmlEvidence` with the exact request,
+native evidence store and address-pinned transport after its owner envelope
+exists. The separate database and assessment gates below still apply.
+
 ## M2 local database setup and recovery
 
 The setup command requires an already recorded owner release naming an existing

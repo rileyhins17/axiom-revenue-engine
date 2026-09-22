@@ -49,8 +49,16 @@ command and review.
 
 ## Consequences
 
-The Task 1 CLI is synthetic and local only. It writes four no-overwrite JSON
-artifacts: the research packet, pending authorization, pending owner candidate,
-and fixture-only mapping policy. Task 2, Task 5, Task 6, and Task 8 must consume
+The initial Task 1 CLI used fixed synthetic dates. The current local preparation
+command instead requires a strict review-policy input with actual preparation
+and expiry times and all ten explicit source-policy/retention decisions. It
+rejects future preparation, expired authorization and expired retention review
+before publishing outputs; it cannot infer real source rights from the former
+synthetic defaults. This changes preparation, not owner authority.
+
+It writes four no-overwrite JSON artifacts: the research packet, pending
+authorization, pending owner candidate, and fixture-only mapping policy. That
+mapping remains labelled fixture-only and is not a real assessment approval.
+Task 2, Task 5, Task 6, and Task 8 must consume
 the exact IDs and digests and fail closed on copied, changed, expired, or
 missing artifacts.
