@@ -1,12 +1,12 @@
-# M2 public research scope for owner review
+# M2 approved public research scope and completion record
 
-**Prepared:** 2026-09-21. **State:** PENDING OWNER DECISION.
+**Prepared:** 2026-09-21. **State:** APPROVED FOR THE BOUNDED PUBLIC RESEARCH BELOW.
 **Purpose:** identify the ten real businesses needed for M2. This document is
-a proposed research operation, not a completed source review or an execution
-authorization. The current repository contains synthetic evaluation records;
-no real ten-business source plan or owner-reviewed manifest has been found.
+an approved research operation, not a completed source review or a website
+capture authorization. At approval, the repository contained synthetic evaluation
+records; no real ten-business source plan or owner-reviewed manifest was found.
 
-## The proposed operation
+## The approved operation
 
 Codex may manually inspect public search results and official business pages
 for up to **20 independent businesses**, stopping when it can present ten
@@ -56,13 +56,48 @@ messages, calls, form submissions, inbox sync, deployment or outreach.
 
 ## Decision record
 
-- Owner decision: **pending**.
-- Owner, decision time and exact scope reference: **not recorded**.
-- Next action after approval: perform only the research operation above and
-  return the actual candidate table for review.
+- Owner decision: **approved**. Riley replied “Continue” immediately after the
+  assistant identified this exact scope as the outstanding decision. In that
+  context, the reply authorizes the prepared bounded research operation.
+- Decision recorded: **2026-09-22 09:07:48 UTC**; owner: Riley Hinsperger; scope: this document
+  as prepared in `44b58ae`. The full production goal is active again.
+- This does not record owner review of any candidate or approve later capture,
+  retention, database setup, assessment, deployment, or outreach operations.
+- Research completed: **2026-09-22**. Final totals: **20 distinct businesses,
+  12 search queries, 45 page opens, C$0 engine-provider spend**. Failed opens
+  and find/click operations are included in page-open accounting.
+- Exact-ten owner identity review: **PENDING**. The saved candidate table has
+  been presented; no owner-reviewed selection or manifest exists yet.
+
+## Research result
+
+The private review is saved in ignored storage at
+`data/kw-evaluation/m2-public-research-2026-09-22-review.md`, with source-linked
+claims and observation metadata in the corresponding `-review.json`. Ten
+businesses were selected for owner review and ten others retain explicit
+unselected dispositions. Coverage is Kitchener 3, Waterloo 3, Cambridge 4;
+roofing 3, HVAC 5, landscaping 2. The city/niche minimums are met; eight of nine
+preferred combinations are represented, with Waterloo landscaping absent.
+
+The existing importer prepared `m2-public-research-2026-09-22-plan.json` from
+the saved `-input.json`. Offline schema, deterministic readback, source digest,
+identity, coverage and disabled-authority checks passed and are recorded in
+`-validation.json`. All records are RESEARCH_ONLY; website need remains
+NOT_ASSESSED and completed engine assessments remain zero. Ownership evidence
+is company-reported. The private record retains uncertainty and exclusions;
+the table does not certify operating status, registry ownership or lead value.
+
+Root reconciled agent accounting: two candidates beyond one agent's allocation
+consumed reserved capacity, and one failed-fetch candidate missing from another
+agent's list was restored. The overall 20-candidate cap was met without an
+overrun. Twelve search queries exhaust the approved initial research allowance.
+No further discovery is implied by the unused page-open capacity.
+
+Next action: record the owner's review of these exact ten identities. Research
+approval is complete; capture, raw retention, database setup, assessment and
+outreach permissions are unchanged.
 
 The separate decision is required by [ADR 0032](../adr/0032-bound-the-first-real-business-shadow-slice.md):
 “Populate ten real reviewed source records only after the separate private
-research decision.” The active production goal authorizes continued preparation
-and implementation; it does not supply the missing exact research decision or
-an owner's review of businesses that have not yet been selected.
+research decision.” Riley's contextual continuation supplies this research
+decision; it does not supply an owner's review of businesses not yet selected.

@@ -1,6 +1,90 @@
 # Current status — Axiom Revenue Engine
 
-## M2 blocked on the prepared public-research decision
+## M2 public research complete; exact-ten owner review pending
+
+**Updated:** 2026-09-22 (America/Toronto). **Goal state:** ACTIVE.
+**Verified code:** `56c7410`; full verification record: `e55ea5f`.
+Riley's contextual "Continue" approved the prepared C$0 research scope and
+resumed the production goal. The research is complete: **20 businesses
+considered, ten proposed identities prepared, zero completed engine
+assessments**. M2 remains incomplete; M3 has not started. The previous research
+decision blocker below is historical and is superseded by this checkpoint.
+
+The ten proposed businesses cover Kitchener (3), Waterloo (3), Cambridge (4),
+roofing (3), HVAC (5), and landscaping (2). They meet the minimum of two per
+city and niche and cover eight of nine preferred city/niche combinations;
+Waterloo landscaping remains absent. Identity, location, niche and ownership
+claims retain source URLs, observation times, method, confidence, uncertainty
+and audit version. Ownership is company-reported, not registry verification;
+website/rebuild need is NOT_ASSESSED. Eight proposed identities have high
+research confidence and two have medium confidence because their official
+sites state a city base without an established street address.
+
+Three bounded Luna agents gathered city research. Root verified the selected
+official sources, corrected two service-area assignments to Cambridge business
+locations, resolved one weak ownership claim using a company article, and
+retained ambiguous or inaccessible candidates as unresolved. One agent
+considered eight candidates against a six-candidate allocation; root stopped
+that branch and charged the extra two against reserved capacity. Another
+branch omitted a failed-fetch candidate from its reported list; root restored
+it to the count. Final usage stayed within the approved overall scope:
+**12 search queries, 45 page opens (including unsuccessful and find/click
+operations), 20 distinct candidates, C$0 engine-provider spend**. No further
+searches or candidates are authorized by the exhausted initial research scope.
+
+Saved private artifacts (ignored local files, not committed business data):
+
+- Owner review: `data/kw-evaluation/m2-public-research-2026-09-22-review.md`
+  and the corresponding `-review.json`; ten selected and ten unselected with
+  reasons. The exact list has been presented for owner review; the decision is
+  PENDING, and no owner-approved selection or manifest has been fabricated.
+- Import input and prepared plan: the same prefix with `-input.json` and
+  `-plan.json`. The existing `kw:prepare-import` command completed successfully.
+  All ten businesses remain RESEARCH_ONLY with no contact data. The importer's
+  "40 remaining", `balanced: false` and `readyForAudit: false` describe the
+  later 50-business evaluation target, not a failed ten-business M2 coverage
+  check. Its guards were not changed.
+- Root source corrections and accounting: `-root.json`; city originals remain
+  separate. `-validation.json` records file hashes, the offline result and the
+  exact business/source IDs for a future reviewed selection.
+
+The canonical source-plan digest is
+`02308340af2f467592a99d925d7cf09053729572abecbf7830f62d8a63461ade`.
+The saved review JSON file SHA-256 is
+`4bf0d8c942ee253dcc4dfe965390f53f351373506e8846f4596cbde0c8a9e70c`.
+Retention review is due October 22, 2026; this is a review date, not permission
+for automatic deletion. These files are local to the active production
+worktree; a Git clone alone will not contain the private evidence.
+
+Current verification: the existing input/plan schemas passed; deterministic
+re-preparation exactly matched the saved plan; report and per-candidate claim
+digests matched; ten unique business IDs/domains, source fields, coverage and
+disabled authority were checked by offline readback. Root reviewed the readable
+table against the JSON. No runtime code changed, so the prior 670-test result
+(667 passed, zero failed, three expected Windows skips), safety, typecheck,
+lint, Cloudflare build and dry run remain the code evidence and were not
+repeated for these research/documentation changes. No fresh UI acceptance or
+production verification is claimed.
+
+No engine website capture, raw HTML retention, database setup/migration,
+assessment writes, inbox operation, outreach, deployment, provider activation
+or engine-provider spend occurred. Live production/account state was not
+refreshed. Source automation remains off; zero paid mailboxes, no Workspace,
+unprovisioned API access and the C$50/month ceiling remain unchanged. ADR 0032
+requires Riley's or Aidan's explicit review of the actual identities before
+the exact-ten manifest. Later capture, source-policy/retention and local
+release gates remain separate.
+
+Next three concrete actions:
+
+1. Record the owner's decision on the saved exact-ten review, applying any
+   corrections without inventing approval or relaxing coverage.
+2. Prepare the content-bound manifest and current pending capture packet from
+   the approved identities and explicit source-policy/retention decisions.
+3. Complete the first supervised capture, local setup and assessment under
+   their existing approval/release gates, then produce real owner dossiers.
+
+## Historical: M2 blocked on the prepared public-research decision
 
 **Updated:** 2026-09-22 (America/Toronto). **Goal state:** BLOCKED.
 **Verified code:** `56c7410`; verification record: `e55ea5f`.
