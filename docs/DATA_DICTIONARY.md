@@ -10,7 +10,7 @@ delivery milestone needs them. New conceptual records below are not migrations.
 |---|---|
 | ProviderCapability | Non-secret account/route/model status with separate built, connected, authorized, verified evidence; expiry and environment. M2/M4. |
 | SourceUsePolicy | Field-level permitted use/retention/attribution and terms capture; independently sourced data cannot inherit restricted directory rights. M2. |
-| BudgetReservation / ProviderAttempt | Atomic CAD micro-unit commitments, rate/FX/tax version, worst-case attempt cost, settlement/ambiguous outcome and shared period. Before paid execution. |
+| RevenueCostBudgetPeriod / RevenueCostReservation / RevenueCostAttempt / RevenueCostAttemptEvent / RevenueCostRelease / RevenueCostSettlement | Migration 0070 and a typed D1 boundary implement the inert shared CAD micro-unit hold, attempt, ambiguity, release, and actual-cost contract. A configured Toronto month includes fixed commitments and versioned rate/FX/tax assumptions. No provider uses this boundary yet; account verification, period configuration, D1 migration, actual provider wiring, and release approval remain pending. See [ADR 0044](adr/0044-reserve-cad-cost-before-provider-attempts.md). |
 | DecisionAdvisory | Exact business/evidence/question/model lineage and uncertainty; cannot mutate qualification, consent, verification or action authority. Optional after M3. |
 | SendOutbox / SendAttempt | Exact approved content and gate versions; prepared/reserved/dispatch/accepted/unknown/failure events; no automatic redispatch from unknown. M4. |
 | SuppressionEvent | Minimal durable stop scope/reason/source/time with contact/business mappings; identity changes and imports preserve stops. M4. |

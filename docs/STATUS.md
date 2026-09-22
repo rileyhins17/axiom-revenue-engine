@@ -1,5 +1,59 @@
 # Current status — Axiom Revenue Engine
 
+## Inert CAD cost admission checkpoint; M2 remains at 0/10
+
+**Updated:** 2026-09-22 (America/Toronto). **Verified code commit:** `16d514a`
+(`feat(revenue): add inert CAD cost reservation ledger`). The production goal is
+ACTIVE and unfinished. M1's offline owner workflow remains complete; M2 has
+zero real engine assessments, and M3–M7 and production remain incomplete.
+
+Migration 0070 and `cost-ledger-d1.ts` now provide a provider-independent D1
+reservation/settlement contract in CAD micro-units. A configured Toronto month
+combines fixed commitments, settled actuals and unresolved holds under the
+C$50 cap. The boundary exposes the C$35 warning and stops discretionary new
+cost at C$42.50 or sooner when needed to preserve the essential reserve. An
+attempt replay cannot grant another provider call; unknown outcomes retain
+their hold; settlement records actual overrun. Direct SQL guards and exact
+replay checks are covered by synthetic local tests. See [ADR 0044](adr/0044-reserve-cad-cost-before-provider-attempts.md).
+
+**Verification:** the 11 targeted cost-ledger tests and 21 isolated M2 setup
+tests passed. `npm run check:safety`, `npm run typecheck`, `npm run lint`,
+`npm run build:cloudflare`, and
+`npx wrangler deploy --env="" --dry-run --autoconfig false` passed. The full
+suite then passed (686 tests: 683 passed, zero failed, three expected Windows
+skips). After it exited, `npm run test:owner-ui` passed on desktop and mobile:
+eight WCAG page scans and zero external requests. The first full-suite run was
+blocked by an orphaned setup-test lock containing the test-only
+`other-process` marker. Root verified the exact file, no active setup/test
+process, and no owner PID before removing that one file; the isolated and full
+reruns passed and released the lock. No test contacted a prospect.
+
+**Production, automation and spend:** no migration, provider activation,
+deployment, inbox operation, prospect capture/contact, or new outreach occurred.
+No provider route uses the new ledger; a migration file is not an applied schema.
+Live production/account state is unverified. Autonomous switches remain off;
+there are no OpenAI keys, Google Workspace seats, or paid mailboxes assumed.
+The C$50/month ceiling is unchanged. Incremental engine-provider spend: C$0.
+
+**Blockers and owner decisions:** ten proposed businesses remain an evaluation
+cohort, not approved qualified sales opportunities; Aidan reported that most
+already have decent sites. Individual owner dispositions, current source rights
+and retention, Cloudflare account/browser readiness, exact provider
+price/FX/tax and fixed/prepaid commitments, a staging migration/backup/rollback
+gate, and one supervised real website-need assessment remain unresolved. The
+new boundary alone does not authorize a quote, a paid attempt, or a live job.
+
+Next three concrete actions:
+
+1. Record per-business owner corrections on the ten-business evaluation cohort
+   and retain website-quality uncertainty until each site is assessed.
+2. Verify the specific account/source/cost/storage route and prepare its
+   bounded release, staging migration and backup/rollback evidence; do not
+   configure the ledger from the planning budget alone.
+3. Execute one separately gated real M2 capture and assessment, inspect its
+   evidence and cost receipt, then continue toward ten dossiers only from the
+   verified path.
+
 ## Owner qualification correction; M2 remains incomplete
 
 **Updated:** 2026-09-22 (America/Toronto). Local implementation resumed under

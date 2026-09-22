@@ -144,6 +144,13 @@ verification. Each attempt needs its bounded reservation receipt. Free-tier
 operations still need validated account/quota state, usage evidence and an
 overage stop; a published free allowance is not proof of a free actual run.
 
+An inert D1 reservation/settlement boundary now exists in migration 0070 and
+`src/lib/revenue-engine/cost-ledger-d1.ts` ([ADR 0044](adr/0044-reserve-cad-cost-before-provider-attempts.md)).
+It is not configured or connected to a provider route. Do not treat its local
+tests as a current account quote, a migrated production database, or approval
+to incur a charge. Reconcile fixed/prepaid commitments and verify the exact
+provider receipt before using this control for a live paid operation.
+
 - **C$35 (70%)**: alert with the committed/spent/reserved forecast and remaining
   essential reserve. Review optional work; remain within each approved job cap.
 - **C$42.50 (85%)**: stop all discretionary acquisition and new paid provider
