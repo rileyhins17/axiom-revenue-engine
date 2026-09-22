@@ -1,6 +1,6 @@
 # ADR 0043: Separate setup baseline from assessment state
 
-- Status: accepted design; successor-state runner is not implemented
+- Status: implemented local successor runner; real evaluation and release remain gated
 - Date: 2026-09-21
 - Scope: M2 Task 5 assessment persistence after the Task 8 setup receipt
 
@@ -97,6 +97,28 @@ strict pre-0069 schema gate.
 - Expired approvals can verify historical completed evidence but cannot approve
   a fresh write; changed execution versions cannot be silently adopted.
 
+## Implementation and receipt versions
+
+`scripts/execute-private-kw-m2-html-assessment.ts` implements the bounded local
+runner. Its ordered run artifact names the exact source, manifest, Task 4
+requests, recorded assessment decisions and output paths. The typed planner
+binds progress to the prior checkpoint and every canonical assessment row
+digest; lineage stays acyclic and is inserted last. Exact progress reload and
+fresh database reconstruction precede owner report publication. A caller's SQL,
+plan object or report cannot authorize execution.
+
+Task 8 now emits a v3 setup receipt containing `completedAt`. That timestamp is
+recorded by the actual runner after successful migration/reopen/restore proof
+and checked against the recorded release window and trusted clock. The original
+strict v2 parser remains available, and initial setup verification accepts v2
+without changing its hash or inferring a timestamp. Task 5 requires v3 because
+v2 cannot prove when historical setup completed. No migration schema changed.
+
+The integration tests execute actual setup and assessment runners against
+synthetic local files; restart uses a fresh process with independently rebuilt
+fake Task 4 stores. No browser/prospect/provider is contacted. The accepted
+scope is a COMPLETE HTML capture; website-only partial review, owner-console
+integration and the real one-then-ten evaluation remain unfinished.
+
 This decision grants no migration, real research, provider, deployment, contact,
-qualification, outreach or spend authority. Reader compatibility can be verified
-now; the successor runner remains part of the unfinished Task 5 workflow.
+qualification, outreach or spend authority. See STATUS for current verification.

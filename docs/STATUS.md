@@ -1,5 +1,105 @@
 # Current status — Axiom Revenue Engine
 
+## M2 complete-capture assessment workflow
+
+**Updated:** 2026-09-21 (America/Toronto). **Code checkpoint:** this work cycle,
+based on `20ab6a6`; exact commit identity is recorded in the following status
+update. Assessment verification passed; the owner-browser gate remains open.
+The previous code checkpoint is `52f9009`.
+
+The local COMPLETE HTML path now connects actual recorded source rows, Task 4
+receipt/artifact reload, a separate owner assessment decision, one transactional
+canonical write, immutable lineage, progress and an owner JSON dossier.
+`npm run kw:assess-m2-html` defaults to preparing the decision. Execution never
+approves itself. Source rows reload on both sides of HTML evidence reload;
+evidence reauthenticates immediately before writing and after database reopen.
+
+The successor runner implements ADR 0043: reconstruct the full expected state
+in memory from the immutable backup, exact approved migration and authenticated
+completed assessments, then compare every table, including legacy/non-Revenue
+data. It rejects incomplete or unrelated changes. An exact replay leaves the
+database bytes unchanged. Missing post-commit progress/report files can be
+regenerated only after durable reconstruction; conflicts are never overwritten.
+The progress seed binds the previous checkpoint and every assessment row digest.
+
+Setup now emits a v3 receipt with a trusted completion timestamp after successful
+migration, reopen and restore proof. Historical assessment verification requires
+that timed receipt and checks setup/assessment approvals at their recorded times.
+Later expiry permits historical verification but cannot authorize a fresh write.
+The initial setup verifier retains strict v2 support and exact baseline hashes;
+it does not infer a timestamp or accept successor drift. No schema changed.
+
+The owner projection exposes page facts, provenance, retained evidence references
+and HTML limitations. It forces UNKNOWN/non-qualifying classification, RESEARCH,
+zero scores, no routes/channels, and NOT_RECORDED/UNASSESSED contact review. This
+is a private JSON dossier; the ordinary owner console still excludes M2 rows.
+
+Root owns the runner, integration tests and final verification. Luna supplied
+the bounded source reloader, Task 4 fixture, timed receipt contract and owner
+projection, and reviewed the combined boundary. Review found and corrected
+second-business selection, fixture type errors, missing snapshot evidence refs,
+mixed retention acceptance and missing final evidence reloads. Targeted acceptance
+now passes first write, exact replay, second business, fresh-process restart,
+expired historical proof, pre-write evidence loss, post-commit evidence loss,
+transaction rollback and interrupted output recovery. These tests use real local
+setup/assessment runners with synthetic data and fake Task 4 stores.
+
+| Required check | Current result |
+|---|---|
+| Safety, TypeScript, lint | PASS |
+| Full test suite | PASS, 644 total, 641 passed, 0 failed, 3 Windows symlink-privilege skips; 555.5 seconds |
+| Cloudflare build | PASS, 2,018 files scanned, 0 local secret values |
+| Wrangler deployment dry run | PASS, no upload; autonomy variables remain false/zero |
+| Owner UI acceptance | FAIL, intermittent truncated development chunk; one diagnostic repeat passed, the next reproduced and captured the failure |
+
+This checkpoint saves the local assessment workflow and browser investigation;
+it does not complete M2 or establish release readiness. The browser error also
+occurred after all builds/dry runs exited and after fresh `.next` cleanup, so
+concurrent builds are not a sufficient explanation. Chromium attribution captured
+`/_next/static/chunks/app/layout.js`: 1,179,648 bytes, an exact prefix of the
+complete 3,138,186-byte generated file, ending inside a string. The retained
+artifact is `output/playwright/owner-ui-9236-1790035521594` (captured scripts use
+`.js.txt` so malformed evidence is not linted as source). New diagnostics retain
+the failing script, location and event-time stage while preserving the existing
+console/page-error failure gates.
+
+A separate loopback experiment reproduced the empty-stack SyntaxError when the
+server ended a response normally at that incomplete prefix. Simple navigation
+cancellation did not reproduce it. The reason Next delivered the short script
+is not yet proven; a later passing run does not resolve this blocker. No runtime
+or navigation workaround has been applied. The next browser investigation is
+response completion/length and development chunk replacement timing.
+Local Next source inspection found `serve-static.js` delegates to a file stream,
+and enabled compression removes Content-Length. A file change between stat and
+streaming could therefore produce a clean short response, but the actual rewrite
+has not been observed. Capture Content-Encoding/Content-Length, stream completion
+and chunk size/mtime together before changing delivery behavior.
+
+The abandoned test lock named PID 37128. A live process inventory proved that
+owner absent; the exact lock was preserved as
+`data/kw-evaluation/.m2-0069-setup.lock.stale-37128-20260921233432` before continuing.
+Setup and assessment acceptance are registered in one test file so the full
+suite does not create artificial contention on their shared operation lock.
+
+No real setup/assessment approval, real migration, prospect request, provider
+action, deployment, email or paid spend occurred. Production/staging were not
+inspected; automation remains off or unverified. C$50/month and zero paid
+mailboxes remain the limits. M2 remains incomplete; M3 has not started.
+The retained M1 fresh4 database, website checkpoint and owner report SHA-256
+values still match the prior verified checkpoint.
+
+The next three actions are:
+
+1. Resolve the captured owner-UI truncated-response failure and repeat the
+   isolated browser gate with retained attribution if it fails.
+2. Complete the website-only review branch for partial/research-required HTML
+   results and integrate the dedicated M2 owner view into the console.
+3. Complete exact-ten orchestration and retain a synthetic evaluation packet,
+   including research-only/blocked outcomes, before preparing the separately
+   approved real one-then-ten evaluation; no real packet is approved yet.
+
+## Prior legacy/M2 reader compatibility checkpoint
+
 **Updated:** 2026-09-21 (America/Toronto). **Work cycle:** M2 Task 5 legacy/M2
 reader compatibility. The verified code checkpoint is `52f9009`
 (`fix(revenue): isolate HTML evidence from legacy assessments`), based on

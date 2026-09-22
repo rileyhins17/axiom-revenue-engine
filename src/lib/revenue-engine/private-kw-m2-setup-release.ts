@@ -10,6 +10,7 @@ import { PRIVATE_KW_M2_MIGRATION_FILES } from "../../../scripts/private-kw-m2-da
 
 export const PRIVATE_KW_M2_SETUP_RELEASE_VERSION = "kw-m2-local-0069-release-v1" as const;
 export const PRIVATE_KW_M2_DATABASE_RECEIPT_V2 = "kw-m2-database-receipt-v2" as const;
+export const PRIVATE_KW_M2_DATABASE_RECEIPT_V3 = "kw-m2-database-receipt-v3" as const;
 export const PRIVATE_KW_M2_MIGRATION_RANGE = "0054-0069" as const;
 
 const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
@@ -130,8 +131,7 @@ const BackupRestoreSchema = z.object({
   }
 });
 
-export const PrivateKwM2DatabaseSetupReceiptSchema = z.object({
-  receiptVersion: z.literal(PRIVATE_KW_M2_DATABASE_RECEIPT_V2),
+const DatabaseSetupReceiptShape = {
   receiptId: z.string().regex(/^kw-m2-database:[a-f0-9]{64}$/),
   receiptDigest: Sha256Schema,
   databasePath: RelativeDataPathSchema.refine((value) => value.endsWith(".sqlite")),
@@ -145,7 +145,18 @@ export const PrivateKwM2DatabaseSetupReceiptSchema = z.object({
   preMigrationFileIdentity: FileIdentitySchema,
   backupRestore: BackupRestoreSchema,
   authority: AuthoritySchema,
-}).strict().superRefine((receipt, context) => {
+};
+
+function validateDatabaseSetupReceipt(receipt: {
+  receiptId: string;
+  receiptDigest: string;
+  migrationManifest: Array<{ filename: string; sha256: string }>;
+  authority: { setupReleaseEnvelopeId: string; setupReleaseEnvelopeDigest: string };
+  setupReleaseEnvelopeId: string;
+  setupReleaseEnvelopeDigest: string;
+  backupRestore: { backupPath: string };
+  databasePath: string;
+}, context: z.RefinementCtx) {
   const { receiptId: _id, receiptDigest: _digest, ...core } = receipt;
   void _id;
   void _digest;
@@ -166,9 +177,27 @@ export const PrivateKwM2DatabaseSetupReceiptSchema = z.object({
   if (receipt.backupRestore.backupPath === receipt.databasePath) {
     context.addIssue({ code: "custom", path: ["backupRestore", "backupPath"], message: "Backup path must differ from the database path." });
   }
-});
+}
+
+export const PrivateKwM2DatabaseSetupReceiptSchema = z.object({
+  receiptVersion: z.literal(PRIVATE_KW_M2_DATABASE_RECEIPT_V2),
+  ...DatabaseSetupReceiptShape,
+}).strict().superRefine(validateDatabaseSetupReceipt);
+
+/** A setup receipt whose completion time is independently recorded after reopen and proof. */
+export const PrivateKwM2TimedDatabaseSetupReceiptSchema = z.object({
+  receiptVersion: z.literal(PRIVATE_KW_M2_DATABASE_RECEIPT_V3),
+  completedAt: TimestampSchema,
+  ...DatabaseSetupReceiptShape,
+}).strict().superRefine(validateDatabaseSetupReceipt);
 
 export type PrivateKwM2DatabaseSetupReceipt = z.infer<typeof PrivateKwM2DatabaseSetupReceiptSchema>;
+export type PrivateKwM2TimedDatabaseSetupReceipt = z.infer<typeof PrivateKwM2TimedDatabaseSetupReceiptSchema>;
+export const PrivateKwM2DatabaseSetupReceiptAnySchema = z.union([
+  PrivateKwM2DatabaseSetupReceiptSchema,
+  PrivateKwM2TimedDatabaseSetupReceiptSchema,
+]);
+export type PrivateKwM2DatabaseSetupReceiptAny = z.infer<typeof PrivateKwM2DatabaseSetupReceiptAnySchema>;
 export type PrivateKwM2BackupRestoreEvidence = PrivateKwM2DatabaseSetupReceipt["backupRestore"];
 
 export function privateKwM2BackupRestoreEvidenceDigest(

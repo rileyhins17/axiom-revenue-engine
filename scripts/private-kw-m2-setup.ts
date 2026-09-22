@@ -8,9 +8,10 @@ import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 
 import {
-  loadPrivateKwM2SetupReleaseEnvelope, loadPrivateKwM2RollbackReleaseEnvelope, PrivateKwM2DatabaseSetupReceiptSchema,
+  loadPrivateKwM2SetupReleaseEnvelope, loadPrivateKwM2RollbackReleaseEnvelope, PrivateKwM2DatabaseSetupReceiptAnySchema,
+  PrivateKwM2TimedDatabaseSetupReceiptSchema,
   privateKwM2SetupDigest, readPrivateKwM2SetupJson,
-  type PrivateKwM2SetupReleaseEnvelope, type PrivateKwM2DatabaseSetupReceipt,
+  type PrivateKwM2SetupReleaseEnvelope, type PrivateKwM2DatabaseSetupReceiptAny,
 } from "../src/lib/revenue-engine/private-kw-m2-setup-release";
 import {
   assertSetupAbsent, assertSetupDirectory, assertSetupFileUnchanged, assertSetupSidecarsAbsent,
@@ -296,8 +297,14 @@ async function publishSetupJson(preflight: PrivateKwM2SetupPreflight, target: st
 
 async function verifySetupUnderLock(preflight: PrivateKwM2SetupPreflight) {
   await reloadSessionApproval(preflight);
-  const receipt = PrivateKwM2DatabaseSetupReceiptSchema.parse(await readPrivateKwM2SetupJson(preflight.envelope.receiptPath));
+  const receipt = PrivateKwM2DatabaseSetupReceiptAnySchema.parse(await readPrivateKwM2SetupJson(preflight.envelope.receiptPath));
   const envelope = preflight.envelope;
+  if (receipt.receiptVersion === "kw-m2-database-receipt-v3") {
+    const completedAt = Date.parse(receipt.completedAt);
+    if (completedAt < Date.parse(envelope.reviewedAt) || completedAt >= Date.parse(envelope.expiresAt) || completedAt > Date.now()) {
+      throw new Error("M2 setup receipt completion is outside the approved release window.");
+    }
+  }
   if (receipt.databasePath !== envelope.databasePath || receipt.backupRestore.backupPath !== envelope.backupPath
     || receipt.setupReleaseEnvelopeId !== envelope.envelopeId || receipt.setupReleaseEnvelopeDigest !== envelope.envelopeDigest
     || receipt.migrationsCommit !== envelope.repositoryCommit
@@ -315,7 +322,7 @@ async function verifySetupUnderLock(preflight: PrivateKwM2SetupPreflight) {
   return receipt;
 }
 
-export async function verifyPrivateKwM2Setup(preflight: PrivateKwM2SetupPreflight): Promise<PrivateKwM2DatabaseSetupReceipt> {
+export async function verifyPrivateKwM2Setup(preflight: PrivateKwM2SetupPreflight): Promise<PrivateKwM2DatabaseSetupReceiptAny> {
   return withSetupOperation(preflight, () => verifySetupUnderLock(preflight));
 }
 
@@ -368,8 +375,14 @@ export async function applyPrivateKwM2Setup(preflight: PrivateKwM2SetupPreflight
         restoreDrillVerified: true as const, logicalSnapshotDigest: backup.source.contentDigest,
       };
       const envelope = preflight.envelope;
+      await reloadSessionApproval(preflight);
+      const completedAt = new Date().toISOString();
+      if (Date.parse(completedAt) < Date.parse(envelope.reviewedAt) || Date.parse(completedAt) >= Date.parse(envelope.expiresAt) || Date.parse(completedAt) > Date.now()) {
+        throw new Error("M2 setup completion is outside the approved release window.");
+      }
       const core = {
-        receiptVersion: "kw-m2-database-receipt-v2" as const,
+        receiptVersion: "kw-m2-database-receipt-v3" as const,
+        completedAt,
         databasePath: envelope.databasePath, fileIdentity: post.fileIdentity,
         setupReleaseEnvelopeId: envelope.envelopeId, setupReleaseEnvelopeDigest: envelope.envelopeDigest,
         migrationRange: envelope.migrationRange, migrationManifest: envelope.migrationManifest,
@@ -385,7 +398,7 @@ export async function applyPrivateKwM2Setup(preflight: PrivateKwM2SetupPreflight
         },
       };
       const receiptDigest = privateKwM2SetupDigest(core);
-      const receipt = PrivateKwM2DatabaseSetupReceiptSchema.parse({ ...core, receiptId: `kw-m2-database:${receiptDigest}`, receiptDigest });
+      const receipt = PrivateKwM2TimedDatabaseSetupReceiptSchema.parse({ ...core, receiptId: `kw-m2-database:${receiptDigest}`, receiptDigest });
       assertSetupFileUnchanged(preflight.databasePath, post.fileIdentity);
       assertSetupFileUnchanged(preflight.backupPath, backup.backup.fileIdentity);
       await publishSetupJson(preflight, preflight.receiptPath, receipt, () => {

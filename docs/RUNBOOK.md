@@ -493,6 +493,72 @@ fails verification against the restored database. See
 The runner has been exercised only on synthetic fixtures. Real database setup
 and downstream M2 execution still require their recorded release gates.
 
+New setup executions issue a **v3 receipt** with a trusted `completedAt` captured
+after migration, reopen verification and the restore drill. Its time must fall
+within the recorded release window. The strict initial setup verifier still
+accepts existing v2 receipts; it never invents their execution time. The HTML
+assessment runner requires v3 so historical setup can be verified after release
+expiry. Do not edit or upgrade an existing receipt by hand.
+
+## M2 local HTML assessment and restart
+
+This local command consumes completed Task 4 evidence and an existing, separately
+approved v3 setup. It performs no source creation, real website request, database
+migration, provider call or outreach. It writes only the canonical HTML evidence,
+fixed RESEARCH projection, assessment receipt and final immutable lineage. HTML
+capture does not establish visual quality, mobile usability, qualification,
+contact readiness or consent.
+
+Record a private run JSON with `runVersion: "kw-m2-html-assessment-run-v1"`,
+`setupReleasePath`, `sourcePlanPath`, `manifestPath`, and an ordered `operations`
+array. Each operation names one approved manifest business and has `businessId`,
+`materializationPath`, `requestPath`, `candidatePath`, `approvalPath`,
+`progressPath` and `reportPath`. Every JSON path must be a distinct direct child
+of `data/kw-evaluation`. The source/manifest and Task 4 request must have exact
+matching identities. At most ten businesses can enter the run, in its recorded
+order; the first supervised business must complete before the next.
+
+```powershell
+npm run kw:assess-m2-html -- data/kw-evaluation/assessment-run.json business:reviewed-id
+npm run kw:assess-m2-html -- data/kw-evaluation/assessment-run.json business:reviewed-id --record-decision data/kw-evaluation/assessment-decision.json
+npm run kw:assess-m2-html -- data/kw-evaluation/assessment-run.json business:reviewed-id --execute
+npm run kw:assess-m2-html -- data/kw-evaluation/assessment-run.json business:reviewed-id --verify
+```
+
+The first command persists a PENDING candidate and the complete evidence context
+for review. It does not approve itself. Only after an explicit owner review,
+record a decision file with `approvedBy` (`RILEY` or `AIDAN`), `reviewedAt`,
+`rationale`, and `confirmation: "RECORD_LOCAL_HTML_WEBSITE_FIT_ASSESSMENT"`.
+The decision command binds that choice to the exact candidate. `--execute`
+independently rechecks the recorded decision, source rows, Task 4 artifacts,
+backup and entire expected database before one transaction. No copy of an
+in-memory success result substitutes for those checks.
+
+The runner holds the same local lock as setup/recovery. It reconstructs the
+expected database in memory from the exact backup, migration and authenticated
+completed assessments, including unrelated tables and every legacy row. It
+reloads source rows on both sides of HTML reload, reauthenticates before writing,
+and reconstructs the assessment on a fresh read-only handle before publishing
+the progress receipt and owner dossier. The dossier displays `UNKNOWN`,
+`NON_QUALIFYING_HTML_ONLY`, zero scores, `RESEARCH`, no channels/routes, and
+`NOT_RECORDED` contact review. The ordinary legacy console does not select these
+M2 rows.
+
+`--verify` reconstructs completed evidence at its recorded execution time, so a
+later approval expiry does not erase historical proof. Every fresh write still
+requires current approval. A completed replay leaves database bytes unchanged.
+If the database committed but progress/report publication was interrupted,
+`--verify` can regenerate only the exact missing output after full durable
+verification. A conflicting output, changed database, copied file, partial row
+set or missing evidence stops execution. The runner never repairs data or
+overwrites an existing output. Initial setup verification remains strict and
+will correctly reject a database that now contains successor assessment writes.
+
+The current assessment path requires a COMPLETE four-page capture. Partial or
+research-required evidence stops before assessment; the separate website-only
+review path and complete exact-ten orchestration remain unfinished. Synthetic
+acceptance is not approval for real capture, setup, assessment or production.
+
 ## Weekly owner review (30 minutes)
 
 1. Handle qualified replies and overdue opportunities.

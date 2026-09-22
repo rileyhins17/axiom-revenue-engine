@@ -6,6 +6,7 @@ import { lstat, mkdir, readFile, readdir, rmdir, symlink, unlink, writeFile } fr
 import { describe, it, mock } from "node:test";
 import path from "node:path";
 import Database from "better-sqlite3";
+import { registerM2AssessmentAcceptanceTests } from "./private-kw-m2-html-assessment.acceptance";
 
 import { PRIVATE_KW_M2_MIGRATION_FILES } from "./private-kw-m2-database";
 import { applyCanonicalPrivateKwMigrations } from "./private-kw-database";
@@ -14,6 +15,7 @@ import { applyPrivateKwM2Setup, backupPrivateKwM2Database, PRIVATE_KW_M2_SETUP_L
 import { inspectSetupSnapshot, readSetupFile } from "./private-kw-m2-snapshot";
 
 const root = path.resolve("data/kw-evaluation");
+registerM2AssessmentAcceptanceTests();
 const token = `${process.pid}-${Date.now()}`;
 const envelopePath = `data/kw-evaluation/m2-preflight-test-${token}.json`;
 const databasePath = path.join(root, `m2-preflight-database-${token}.sqlite`);
@@ -226,6 +228,9 @@ describe("private KW M2 setup preflight", () => {
       try {
         const result = firstRun;
         assert.equal(result.status, "APPLIED");
+        assert.equal(result.receipt.receiptVersion, "kw-m2-database-receipt-v3");
+        assert.ok(Date.parse(result.receipt.completedAt) >= Date.parse(session.envelope.reviewedAt));
+        assert.ok(Date.parse(result.receipt.completedAt) <= Date.parse(session.envelope.expiresAt));
         assert.equal(result.receipt.migrationRange, "0054-0069");
         assert.equal(result.receipt.authority.runtimeSendAuthorized, false);
         const after = await readFile(backupFixtureDatabasePath);
@@ -234,6 +239,22 @@ describe("private KW M2 setup preflight", () => {
         assert.equal((await applyPrivateKwM2Setup(session)).status, "REPLAYED");
         assert.deepEqual(await readFile(backupFixtureDatabasePath), after);
         assert.deepEqual(await readFile(backupFixtureReceiptPath), receiptBytes);
+        const missingTimestamp = JSON.parse(receiptBytes.toString("utf8")) as Record<string, unknown>;
+        delete missingTimestamp.completedAt;
+        await unlink(backupFixtureReceiptPath);
+        await writeFile(backupFixtureReceiptPath, JSON.stringify(missingTimestamp), { flag: "wx" });
+        await assert.rejects(verifyPrivateKwM2Setup(session), /Invalid|receipt|completed/i);
+        await unlink(backupFixtureReceiptPath);
+        const forged = JSON.parse(receiptBytes.toString("utf8")) as Record<string, unknown>;
+        forged.completedAt = "2020-01-01T00:00:00.000Z";
+        delete forged.receiptId;
+        delete forged.receiptDigest;
+        const forgedDigest = privateKwM2SetupDigest(forged);
+        await writeFile(backupFixtureReceiptPath, JSON.stringify({ ...forged, receiptId: `kw-m2-database:${forgedDigest}`, receiptDigest: forgedDigest }), { flag: "wx" });
+        await assert.rejects(verifyPrivateKwM2Setup(session), /outside the approved release window/);
+        await unlink(backupFixtureReceiptPath);
+        await writeFile(backupFixtureReceiptPath, receiptBytes, { flag: "wx" });
+        await rememberCreated(backupFixtureReceiptPath);
         const database = new Database(backupFixtureDatabasePath, { readonly: true });
         try {
           assert.equal((database.prepare('SELECT count(*) AS count FROM "BackupProbe"').get() as { count: number }).count, 2);

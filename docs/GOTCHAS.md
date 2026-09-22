@@ -391,9 +391,12 @@ Retire entries when the architecture makes them impossible.
 - **Root cause:** OpenNext and the Next.js development server share `.next`.
   Concurrent execution can replace a served chunk, while a sequential first
   development run can briefly inherit production assets left by OpenNext before
-  its development chunks finish replacing them. Even after cleanup, Next dev
-  compiles linked routes on demand; automatic route prefetch can therefore
-  replace a development chunk while the measured page is already executing.
+  its development chunks finish replacing them. These are hazards, not a complete
+  explanation of every SyntaxError: a later isolated run with fresh cleanup
+  captured a cleanly truncated development script. Its 1,179,648 bytes exactly
+  matched the prefix of the complete 3,138,186-byte layout chunk. The remaining
+  response/chunk-generation cause is unresolved; simple navigation cancellation
+  did not reproduce the parser failure in a separate loopback experiment.
 - **Proven fix:** let every Next/OpenNext/Cloudflare build and dry run exit before
   starting `npm run test:owner-ui`, then remove only the repository's generated
   `.next` directory before starting the isolated development server. Compile all
@@ -403,9 +406,16 @@ Retire entries when the architecture makes them impossible.
   Wait up to five seconds for each exact route title after visible readiness;
   this allows asynchronous metadata application without weakening the expected
   title.
+  These safeguards do not yet fix the separately captured truncated response;
+  retain that browser failure as an open gate rather than treating a passing
+  repeat as proof. See the current STATUS checkpoint and retained diagnostics.
 - **Prevention/test:** `AGENTS.md` forbids concurrent execution, and the owner UI
   acceptance command clears its exact generated `.next` directory, warms every
   measured route, waits for exact titles, and then proves six fresh-page views.
+  Chromium parser/runtime attribution now retains the exact failing source as
+  `.js.txt`, script location and event-time stage. Its tests cover delayed source
+  capture, attribution and unavailable-source errors. Existing uncaught browser
+  errors continue to fail acceptance.
   GitHub CI and every local release cycle run the commands sequentially.
 - **Affected area:** owner UI acceptance, Next.js development server, OpenNext,
   Wrangler dry runs, Windows/OneDrive workspaces, and local release evidence.

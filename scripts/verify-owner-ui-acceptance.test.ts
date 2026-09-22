@@ -6,11 +6,38 @@ import test from "node:test";
 
 import {
   attachBrowserDiagnostics,
+  attachBrowserScriptDiagnostics,
   cssTimeToMilliseconds,
   isAllowedOwnerAcceptanceUrl,
   reportBrowserAcceptanceFailure,
   writeBrowserDiagnostics,
 } from "./verify-owner-ui-acceptance";
+
+type FakeCdpEvent = Record<string, unknown>;
+type FakeCdpSession = {
+  on: (event: string, listener: (value: FakeCdpEvent) => void) => FakeCdpSession;
+  send: (method: string, params?: Record<string, unknown>) => Promise<{ scriptSource?: string }>;
+  listeners: Map<string, (value: FakeCdpEvent) => void>;
+};
+
+function fakeCdpPage(initialUrl: string, source: (scriptId: string) => Promise<string>) {
+  const listeners = new Map<string, (value: FakeCdpEvent) => void>();
+  const session: FakeCdpSession = {
+    listeners,
+    on(event, listener) {
+      listeners.set(event, listener);
+      return session;
+    },
+    async send(method, params) {
+      if (method === "Debugger.getScriptSource") return { scriptSource: await source(String(params?.scriptId)) };
+      return {};
+    },
+  };
+  let currentUrl = initialUrl;
+  const page = { url: () => currentUrl };
+  const context = { newCDPSession: async () => session };
+  return { context: context as never, page: page as never, session, setUrl: (url: string) => { currentUrl = url; } };
+}
 
 test("owner UI browser networking is restricted to the exact loopback origin", () => {
   const baseUrl = "http://127.0.0.1:8787";
@@ -115,6 +142,75 @@ test("browser diagnostics retain event-time stage and all supported event detail
   ]);
   assert.equal(diagnostics[1]?.name, "TypeError");
   assert.match(diagnostics[1]?.stack ?? "", /page boom/);
+});
+
+test("script diagnostics capture source success/failure with event-time attribution and URL fallback", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "owner-ui-script-diagnostics-"));
+  try {
+    const fixture = fakeCdpPage("http://127.0.0.1:8787/leads", async (scriptId) => {
+      if (scriptId === "failed-script") throw new Error("synthetic source unavailable");
+      return "console.log('captured source');\n";
+    });
+    const diagnostics: Parameters<typeof attachBrowserDiagnostics>[2] = [];
+    let stage = "owner route warmup";
+    const drain = await attachBrowserScriptDiagnostics(fixture.context, fixture.page, () => stage, diagnostics, directory);
+
+    fixture.session.listeners.get("Debugger.scriptFailedToParse")?.({
+      scriptId: "good-script", url: "http://127.0.0.1:8787/_next/static/chunk.js", startLine: 4, startColumn: 2,
+    });
+    stage = "mobile leads";
+    fixture.setUrl("http://127.0.0.1:8787/leads");
+    fixture.session.listeners.get("Runtime.exceptionThrown")?.({ exceptionDetails: {
+      scriptId: "failed-script", url: "", lineNumber: 9, columnNumber: 3,
+      exception: { description: "SyntaxError: Invalid or unexpected token" }, text: "SyntaxError",
+    } });
+    await drain();
+
+    assert.equal(diagnostics.length, 2);
+    assert.deepEqual(diagnostics[0], {
+      capturedAt: diagnostics[0]!.capturedAt,
+      stage: "owner route warmup",
+      kind: "script-parse-error",
+      url: "http://127.0.0.1:8787/_next/static/chunk.js",
+      scriptId: "good-script",
+      lineNumber: 4,
+      columnNumber: 2,
+      message: "Chromium failed to parse this script",
+      sourceArtifact: "owner-ui-script-1.js.txt",
+    });
+    assert.equal(await readFile(join(directory, "owner-ui-script-1.js.txt"), "utf8"), "console.log('captured source');\n");
+    assert.equal(diagnostics[1]!.stage, "mobile leads");
+    assert.equal(diagnostics[1]!.kind, "runtime-exception");
+    assert.equal(diagnostics[1]!.url, "http://127.0.0.1:8787/leads");
+    assert.equal(diagnostics[1]!.lineNumber, 9);
+    assert.equal(diagnostics[1]!.columnNumber, 3);
+    assert.equal(diagnostics[1]!.sourceCaptureError, "synthetic source unavailable");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("script diagnostic drain waits for pending source artifacts", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "owner-ui-script-drain-"));
+  try {
+    let releaseSource!: (value: string) => void;
+    const sourceReady = new Promise<string>((resolve) => { releaseSource = resolve; });
+    const fixture = fakeCdpPage("http://127.0.0.1:8787/leads", async () => sourceReady);
+    const diagnostics: Parameters<typeof attachBrowserDiagnostics>[2] = [];
+    const drain = await attachBrowserScriptDiagnostics(fixture.context, fixture.page, () => "desktop leads", diagnostics, directory);
+    fixture.session.listeners.get("Debugger.scriptFailedToParse")?.({ scriptId: "delayed-script", url: "http://127.0.0.1:8787/_next/chunk.js", startLine: 1, startColumn: 0 });
+
+    let drained = false;
+    const waiting = drain().then(() => { drained = true; });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(drained, false);
+    releaseSource("delayed source");
+    await waiting;
+    assert.equal(drained, true);
+    assert.equal(await readFile(join(directory, "owner-ui-script-1.js.txt"), "utf8"), "delayed source");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("failure reporting writes captured diagnostics before rethrowing with the measured URL", async () => {

@@ -6,15 +6,18 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 
 import {
   PRIVATE_KW_M2_DATABASE_RECEIPT_V2,
+  PRIVATE_KW_M2_DATABASE_RECEIPT_V3,
   PRIVATE_KW_M2_MIGRATION_RANGE,
   PRIVATE_KW_M2_SETUP_RELEASE_VERSION,
   PrivateKwM2DatabaseSetupReceiptSchema,
+  PrivateKwM2TimedDatabaseSetupReceiptSchema,
   PrivateKwM2RollbackReleaseEnvelopeSchema,
   PrivateKwM2SetupReleaseEnvelopeSchema,
   privateKwM2DatabaseSetupReceiptDigest,
   privateKwM2BackupRestoreEvidenceDigest,
   privateKwM2RollbackReleaseEnvelopeDigest,
   privateKwM2SetupReleaseEnvelopeDigest,
+  privateKwM2SetupDigest,
   readPrivateKwM2SetupJson,
   loadPrivateKwM2RollbackReleaseEnvelope,
   loadPrivateKwM2SetupReleaseEnvelope,
@@ -158,6 +161,34 @@ describe("private KW M2 setup release contract", () => {
     assert.equal(PrivateKwM2DatabaseSetupReceiptSchema.safeParse({ ...valid, backupRestore: { ...core.backupRestore, logicalSnapshotDigest: undefined } }).success, false);
     assert.equal(PrivateKwM2DatabaseSetupReceiptSchema.safeParse({ ...valid, backupRestore: { ...core.backupRestore, evidenceDigest: "c".repeat(64) } }).success, false);
     assert.equal(PrivateKwM2DatabaseSetupReceiptSchema.safeParse({ ...valid, backupRestore: { ...core.backupRestore, backupPath: core.databasePath } }).success, false);
+  });
+
+  it("requires a v3 completion timestamp and binds it to the receipt identity", () => {
+    const envelopeId = `kw-m2-local-0069-release:${digest}`;
+    const core = {
+      receiptVersion: PRIVATE_KW_M2_DATABASE_RECEIPT_V3,
+      completedAt: "2026-09-21T12:00:00.000Z",
+      databasePath: "data/kw-evaluation/m2.sqlite", fileIdentity: identity,
+      setupReleaseEnvelopeId: envelopeId, setupReleaseEnvelopeDigest: digest,
+      migrationRange: PRIVATE_KW_M2_MIGRATION_RANGE, migrationManifest,
+      migrationsCommit: "b".repeat(40), schemaDigest: digest,
+      preMigrationFileIdentity: identity, backupRestore: backupRestoreCore(),
+      authority: {
+        localOnly: true as const, localSchemaMutationPerformed: true as const,
+        setupReleaseEnvelopeId: envelopeId, setupReleaseEnvelopeDigest: digest,
+        remoteMigrationAuthorized: false as const, runtimeQualificationAuthorized: false as const,
+        runtimeContactAuthorized: false as const, runtimeOutreachAuthorized: false as const,
+        runtimeSendAuthorized: false as const, deploymentAuthorized: false as const,
+        providerOperationsAuthorized: 0 as const, costAuthorizedUsd: 0 as const,
+      },
+    };
+    const receiptDigest = privateKwM2SetupDigest(core);
+    const valid = { ...core, receiptId: `kw-m2-database:${receiptDigest}`, receiptDigest };
+    assert.equal(PrivateKwM2TimedDatabaseSetupReceiptSchema.safeParse(valid).success, true);
+    assert.equal(PrivateKwM2TimedDatabaseSetupReceiptSchema.safeParse({ ...valid, completedAt: undefined }).success, false);
+    assert.equal(PrivateKwM2TimedDatabaseSetupReceiptSchema.safeParse({ ...valid, completedAt: "2020-01-01T00:00:00.000Z" }).success, false);
+    assert.equal(PrivateKwM2TimedDatabaseSetupReceiptSchema.safeParse({ ...valid, receiptDigest: "c".repeat(64) }).success, false);
+    assert.equal(PrivateKwM2DatabaseSetupReceiptSchema.safeParse(valid).success, false);
   });
 
   it("derives the current commit and migration bytes independently and enforces the review window", async () => {

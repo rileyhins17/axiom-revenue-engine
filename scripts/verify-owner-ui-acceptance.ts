@@ -71,12 +71,17 @@ type AcceptanceResult = {
 export type BrowserDiagnostic = {
   capturedAt: string;
   stage: string;
-  kind: "console-error" | "page-error" | "request-failed" | "http-error";
+  kind: "console-error" | "page-error" | "request-failed" | "http-error" | "script-parse-error" | "runtime-exception";
   url: string;
   message: string;
   name?: string;
   stack?: string | null;
   status?: number;
+  scriptId?: string;
+  lineNumber?: number;
+  columnNumber?: number;
+  sourceArtifact?: string;
+  sourceCaptureError?: string;
 };
 
 export function attachBrowserDiagnostics(
@@ -128,6 +133,43 @@ export function attachBrowserDiagnostics(
       status,
     });
   });
+}
+
+/** Chromium can omit the script URL and stack from a Playwright pageerror.
+ * Capture parser/runtime attribution and the exact failing source before navigation loses it. */
+export async function attachBrowserScriptDiagnostics(context: BrowserContext, page: Page,
+  getStage: () => string, diagnostics: BrowserDiagnostic[], outputDirectory: string) {
+  const session = await context.newCDPSession(page);
+  const pending: Promise<void>[] = [];
+  const capture = (kind: "script-parse-error" | "runtime-exception", details: {
+    scriptId?: string; url?: string; lineNumber?: number; columnNumber?: number; message: string;
+  }) => {
+    const diagnostic: BrowserDiagnostic = { capturedAt: new Date().toISOString(), stage: getStage(), kind,
+      ...details, url: details.url || page.url() };
+    diagnostics.push(diagnostic);
+    if (details.scriptId) {
+      const filename = `owner-ui-script-${diagnostics.length}.js.txt`;
+      pending.push((async () => {
+        try {
+          const result = await session.send("Debugger.getScriptSource", { scriptId: details.scriptId! });
+          if (Buffer.byteLength(result.scriptSource) > 5_000_000) throw new Error("Failing script exceeded diagnostic size limit.");
+          await writeFile(join(outputDirectory, filename), result.scriptSource, { flag: "wx" });
+          diagnostic.sourceArtifact = filename;
+        } catch (error) { diagnostic.sourceCaptureError = error instanceof Error ? error.message : String(error); }
+      })());
+    }
+  };
+  session.on("Debugger.scriptFailedToParse", (details) => capture("script-parse-error", {
+    scriptId: details.scriptId, url: details.url, lineNumber: details.startLine, columnNumber: details.startColumn,
+    message: "Chromium failed to parse this script",
+  }));
+  session.on("Runtime.exceptionThrown", ({ exceptionDetails: details }) => capture("runtime-exception", {
+    scriptId: details.scriptId, url: details.url, lineNumber: details.lineNumber, columnNumber: details.columnNumber,
+    message: details.exception?.description ?? details.text,
+  }));
+  await session.send("Runtime.enable");
+  await session.send("Debugger.enable");
+  return async () => { await Promise.all(pending); };
 }
 
 export async function writeBrowserDiagnostics(
@@ -907,6 +949,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
   let warmupPage: Page | null = null;
   const externalRequests: string[] = [];
   const diagnostics: BrowserDiagnostic[] = [];
+  const drainScriptDiagnostics: Array<() => Promise<void>> = [];
   const ownerLabelingPacket = buildCompleteOwnerLabelingPacketFixture();
   const firstEvaluationBusiness = ownerLabelingPacket.entries[0]!.businessName;
   let stage = "startup";
@@ -935,6 +978,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     stage = "owner route warmup";
     warmupPage = await context.newPage();
     attachBrowserDiagnostics(warmupPage, () => stage, diagnostics, baseUrl);
+    drainScriptDiagnostics.push(await attachBrowserScriptDiagnostics(context, warmupPage, () => stage, diagnostics, outputDirectory));
     await warmupPage.goto("/leads", { waitUntil: "domcontentloaded" });
     await warmupPage.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
     await warmupPage.goto(`/leads/${FIXTURE_BUSINESS_ID}`, { waitUntil: "domcontentloaded" });
@@ -946,6 +990,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
 
     page = await context.newPage();
     attachBrowserDiagnostics(page, () => stage, diagnostics, baseUrl);
+    drainScriptDiagnostics.push(await attachBrowserScriptDiagnostics(context, page, () => stage, diagnostics, outputDirectory));
 
     stage = "desktop leads";
     const listStart = performance.now();
@@ -1062,6 +1107,9 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await assertReducedMotion(page, "mobile quality lab");
 
     assert.deepEqual(externalRequests, [], "The owner acceptance browser attempted an external request.");
+    await Promise.all(drainScriptDiagnostics.map((drain) => drain()));
+    // CDP events attribute failures; caught/revoked exceptions are not new acceptance gates.
+    // Preserve the existing uncaught pageerror and console-error gates.
     const browserErrors = diagnostics.filter((diagnostic) => diagnostic.kind === "console-error" || diagnostic.kind === "page-error");
     const badResponses = diagnostics.filter((diagnostic) => diagnostic.kind === "http-error");
     assert.deepEqual(browserErrors, [], `Browser errors: ${browserErrors.map((diagnostic) => `${diagnostic.stage} ${diagnostic.kind}: ${diagnostic.message}`).join(" | ")}`);
@@ -1076,6 +1124,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
       externalRequests: externalRequests.length,
     } satisfies AcceptanceResult;
   } catch (error) {
+    await Promise.all(drainScriptDiagnostics.map((drain) => drain()));
     if (page) await page.screenshot({ path: join(outputDirectory, "owner-ui-failure.png"), fullPage: true }).catch(() => undefined);
     return await reportBrowserAcceptanceFailure({
       error,
