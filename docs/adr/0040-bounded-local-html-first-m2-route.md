@@ -62,3 +62,18 @@ mapping remains labelled fixture-only and is not a real assessment approval.
 Task 2, Task 5, Task 6, and Task 8 must consume
 the exact IDs and digests and fail closed on copied, changed, expired, or
 missing artifacts.
+
+## Bounded operator invocation
+
+The capture command wraps the existing Task 4 service for exactly one private
+request file. Default preflight reads and validates pending or approved inputs;
+only explicit execution with a current approved envelope can reach transport
+and evidence writes. Verification calls the existing durable reload boundary
+directly and cannot fall back to capture. The wrapper introduces no new approval
+semantics, retention policy, provider, database migration or automatic trigger.
+
+A dedicated local capture lock prevents overlapping operator executions without
+changing the setup/assessment lock. Its owner releases only the same regular
+file identity it acquired. An unexpected lock is a stop condition, not permission
+to remove another process's file. The first-business review and subsequent
+exact-ten evaluation remain owner workflows, not a background batch loop.

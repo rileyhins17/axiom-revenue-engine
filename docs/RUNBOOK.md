@@ -477,12 +477,48 @@ source-policy claims. Do not edit an expired packet; prepare a new one with
 current reviewed inputs and obtain its own decision.
 
 The first real capture is one supervised business within the reviewed ten,
-followed by the remaining nine after review. Task 4 currently exposes a service
-entrypoint, not a standalone capture command. Do not invent an `npm` capture
-command or treat the assessment runner as a capture tool. A bounded operator
-invocation must call `executePrivateKwM2HtmlEvidence` with the exact request,
-native evidence store and address-pinned transport after its owner envelope
-exists. The separate database and assessment gates below still apply.
+followed by the remaining nine after review. Prepare one immutable request JSON
+containing its request ID, actual request time, business ID and exact research
+packet, authorization, owner envelope, manifest, source plan and research policy.
+Keep it as a direct child of ignored `data/kw-evaluation`, at most 5 MiB. Do not
+substitute the fixture mapping for the actual research policy. A pending owner
+candidate is suitable only for preflight; real capture requires the separately
+recorded approved envelope. The operator command accepts one request per run:
+
+```powershell
+npm run kw:capture-m2-html -- data/kw-evaluation/capture-request.json
+npm run kw:capture-m2-html -- data/kw-evaluation/capture-request.json --execute
+npm run kw:capture-m2-html -- data/kw-evaluation/capture-request.json --verify
+```
+
+The default is preflight. It checks the saved request and current approval chain
+and distinguishes a pending owner decision from inputs ready for capture. It
+does not fetch robots or pages, retain evidence, or approve anything. Input
+readiness does not prove website accessibility or successful capture.
+
+Only `--execute` calls the existing HTML evidence workflow. It uses the native
+address-pinned transport and immutable local evidence stores, checks source
+policy before page capture, and retains the existing request/page limits. It
+rejects future request times and requires `replayMode: "NEW"`. Repeating a
+completed exact request reloads its sealed evidence without repeating network
+work. A dedicated `data/kw-evaluation/.m2-html-capture.lock` prevents simultaneous operator
+captures; release removes only the same owned regular file. Do not remove or
+replace another operation's lock to force progress.
+
+`--verify` directly reloads sealed evidence, without a capture fallback or any
+network request. Current authorization and retention checks remain in force;
+verification does not renew expiry. The compact result separates request
+attempts made during this invocation (`currentRequestCount`) from the saved
+capture's historical count (`recordedNetworkRequestCount`). Preflight, verify
+and completed exact replay report zero current requests. A failed result exits unsuccessfully;
+blocked, partial and research-required outcomes remain explicit and cannot be
+treated as qualification or permission to contact anyone. Preserve valid saved
+evidence after a failure instead of deleting it as compensation.
+
+No command mode creates an owner approval, changes a database, enables a
+provider or deploys anything. The separate database and assessment gates below
+still apply; the assessment command consumes this saved evidence and is not a
+capture tool.
 
 ## M2 local database setup and recovery
 

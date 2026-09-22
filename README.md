@@ -13,6 +13,10 @@ Start with [STATUS](docs/STATUS.md) for the verified commit, current artifacts, 
 Preparing a current M2 capture packet requires `--review-policy` with explicit
 dates and the ten source-policy decisions. See the [preparation runbook](docs/RUNBOOK.md#m2-research-scope-and-current-authorization-preparation).
 Preparation cannot approve the packet or infer source rights from a public URL.
+The one-request capture command, `npm run kw:capture-m2-html -- <request.json>`,
+defaults to preflight. Explicit `--execute` requires the recorded capture
+approval; `--verify` reloads saved evidence without network access. Its input and
+operating limits are in the same preparation runbook.
 The [initial public-research scope](docs/reviews/2026-09-21-m2-public-research-scope.md)
 is prepared for a separate owner decision.
 

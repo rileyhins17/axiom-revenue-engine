@@ -35,6 +35,7 @@
     "staging:verify-console-release": "tsx scripts/verify-staging-console-release.ts",
     "kw:prepare-import": "tsx scripts/prepare-private-kw-import.ts",
     "kw:prepare-m2-authorization": "tsx scripts/prepare-private-kw-m2-authorization.ts",
+    "kw:capture-m2-html": "tsx scripts/capture-private-kw-m2-html.ts",
     "kw:prepare-m2-database": "tsx scripts/private-kw-m2-setup.ts",
     "kw:assess-m2-html": "tsx scripts/execute-private-kw-m2-html-assessment.ts",
     "kw:plan-persistence": "tsx scripts/plan-private-kw-persistence.ts",

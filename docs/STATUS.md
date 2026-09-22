@@ -1,5 +1,55 @@
 # Current status — Axiom Revenue Engine
 
+## M2 one-request HTML capture command
+
+**Updated:** 2026-09-21 (America/Toronto). **Base checkpoint:** `d482fc2`.
+The capture command is implemented and all required checks passed. Its code
+commit is recorded in the following documentation checkpoint. The prior
+checkpoint verified current policy inputs.
+M2 remains incomplete: **zero real businesses evaluated; M3 has not started**.
+
+`npm run kw:capture-m2-html -- <request.json>` provides one operator invocation
+over the existing HTML evidence workflow. Default preflight checks the exact
+saved request and reports pending or ready inputs. Explicit `--execute` requires
+the current approved chain, rechecks it under an exclusive local capture lock,
+and uses the existing native transport and immutable evidence stores. `--verify`
+calls durable reload directly. A completed exact replay makes zero new requests;
+the output separates current attempts from recorded historical requests.
+
+Eight focused tests passed. They cover pending/approved preflight, rejected
+future/expired/forged/mismatched/non-NEW execution, lock ownership, exact replay,
+and unsuccessful CLI exit for failed capture. Synthetic evidence saved through
+the native stores was reloaded in a fresh process with DNS, sockets, HTTP and
+fetch disabled; request bytes, receipt identity and historical counts survived.
+Synthetic native evidence remains in ignored storage. No real website was used
+as a test. Luna supplied the implementation/test draft and an independent review;
+root corrected current-request counting, lock cleanup, and integrated the CLI.
+
+Full verification passed: **670 tests, 667 passed, zero failures, three expected
+Windows symlink-privilege skips; 585.2 seconds**. The final eight focused tests,
+safety configuration, TypeScript, lint, Cloudflare build and deployment dry run
+also passed. The build scanned 2,022 files with zero local secret values. The
+dry run retained autonomous intake/queue/send off and zero sending caps. No
+browser UI code changed; no new browser acceptance result is claimed for this
+command.
+
+No real research/capture, production deployment, migration, inbox operation,
+outreach, provider activation or engine-provider spend occurred. Production and
+account state was not refreshed. Runtime automation remains off in source; the
+C$50/month ceiling and zero-paid-mailbox decision remain unchanged. The
+[public-research scope](reviews/2026-09-21-m2-public-research-scope.md) is still
+pending the owner decision required by ADR 0032. Capture, local setup and
+assessment retain their separate existing gates. The production goal is active.
+
+Next three actions:
+
+1. Obtain the pending research-scope decision, then inspect the bounded public
+   sources and present the actual ten candidates for owner identity review.
+2. Prepare the current exact-ten manifest and capture packet from those reviewed
+   identities and explicit source-policy/retention decisions.
+3. Use the new command for the first supervised capture after its exact approval,
+   then complete the separately gated local setup and assessment workflow.
+
 ## M2 real-research preparation and current policy inputs
 
 **Updated:** 2026-09-21 (America/Toronto). **Verified code checkpoint:** `44b58ae`
