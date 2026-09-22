@@ -1,5 +1,34 @@
 # Current status — Axiom Revenue Engine
 
+## M2 blocked on the prepared public-research decision
+
+**Updated:** 2026-09-22 (America/Toronto). **Goal state:** BLOCKED.
+**Verified code:** `56c7410`; verification record: `e55ea5f`.
+The previous goal turn made progress by completing and committing the capture
+command. A bounded Luna audit and root review found no further necessary M2
+implementation work before obtaining the real source records. The same pending
+research decision was confirmed in three consecutive goal turns, beginning with
+the question issued on September 21 at 23:07 Eastern. Automatic continuation is
+blocked at that decision; the full production objective remains unfinished.
+
+The [prepared C$0 scope](reviews/2026-09-21-m2-public-research-scope.md) still has
+no owner answer. ADR 0032 explicitly requires the separate private research
+decision before populating the ten real reviewed records. No approval is inferred
+from elapsed time, the production goal, or successful synthetic tests. M2 still
+has zero real businesses evaluated; M3 has not started. No production/account
+inspection, research, capture, migration, deployment, provider activation,
+outreach or engine-provider spend occurred in this audit. The C$50/month ceiling,
+zero-paid-mailbox decision and automation-off source configuration remain.
+
+This is a documentation-only blocker record. The verified tests/build/dry run
+below remain the evidence for unchanged code; they were not repeated. Resume
+after the pending scope decision, then complete these three actions:
+
+1. Perform the approved bounded public research and present ten actual candidates.
+2. Obtain identity/source-policy review and prepare the exact manifest and packet.
+3. Complete the first supervised capture and local assessment after their existing
+   approval and release gates.
+
 ## M2 one-request HTML capture command
 
 **Updated:** 2026-09-21 (America/Toronto). **Verified code checkpoint:** `56c7410`
