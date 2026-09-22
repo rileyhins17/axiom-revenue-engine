@@ -2,10 +2,11 @@
 
 ## M2 one-request HTML capture command
 
-**Updated:** 2026-09-21 (America/Toronto). **Base checkpoint:** `d482fc2`.
-The capture command is implemented and all required checks passed. Its code
-commit is recorded in the following documentation checkpoint. The prior
-checkpoint verified current policy inputs.
+**Updated:** 2026-09-21 (America/Toronto). **Verified code checkpoint:** `56c7410`
+(`feat(revenue): add bounded M2 HTML capture command`), based on `d482fc2`.
+The capture command is implemented and all required checks passed. This
+documentation checkpoint records its saved identity. The prior checkpoint
+verified current policy inputs.
 M2 remains incomplete: **zero real businesses evaluated; M3 has not started**.
 
 `npm run kw:capture-m2-html -- <request.json>` provides one operator invocation
