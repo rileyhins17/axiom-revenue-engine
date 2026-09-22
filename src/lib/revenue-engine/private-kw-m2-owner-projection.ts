@@ -8,7 +8,7 @@ import {
   type PrivateKwM2HtmlAssessmentPlan,
   m2AssessmentJson,
 } from "@/lib/revenue-engine/private-kw-m2-html-assessment";
-import { privateKwM2ReceiptCanonicalDigest } from "@/lib/revenue-engine/private-kw-m2-html-evidence-receipt";
+import { privateKwM2ReceiptCanonicalDigest } from "@/lib/revenue-engine/private-kw-m2-canonical";
 import { PrivateKwM2WebsiteEvidenceReceiptSchema } from "@/lib/revenue-engine/private-kw-m2-html-evidence-schema";
 
 const DigestSchema = z.string().regex(/^[a-f0-9]{64}$/);

@@ -146,7 +146,7 @@ function approvedChain(now: Date, retention: FixtureRetention) {
   return { sourcePlan, manifest, researchPacket, authorization, ownerEnvelope, researchPolicy };
 }
 
-function fakeTransport(now: Date, outcome: PrivateKwM2AssessmentOutcome) {
+export function createPrivateKwM2AssessmentFixtureTransport(now: Date, outcome: PrivateKwM2AssessmentOutcome = "COMPLETE") {
   return createPrivateKwPublicHttpTransport({
     resolveDns: async () => [{ address: "93.184.216.34", family: 4 as const }],
     executeConnection: async (request) => {
@@ -350,7 +350,7 @@ export async function createPrivateKwM2AssessmentFixture(options: { retention?: 
   const receiptStore = memoryReceiptStore();
   const evidenceStore = memoryEvidenceStore();
   const receipt = await executePrivateKwM2HtmlEvidence(request, {
-    transport: fakeTransport(now, outcome),
+    transport: createPrivateKwM2AssessmentFixtureTransport(now, outcome),
     store: evidenceStore,
     receiptStore,
     clock: () => new Date(now),

@@ -101,6 +101,9 @@ Automated tests must use fakes or mail sinks and must never contact prospects.
 Run `npm run test:owner-ui` only after every Next/OpenNext/Cloudflare build or dry
 run has exited. Those commands share `.next`; running them concurrently can swap
 browser assets mid-request and produce a false intermittent `SyntaxError`.
+Owner acceptance requires the completed production `.next/BUILD_ID` and uses
+`next start`; do not replace it with `next dev` or clear the completed build.
+Longer development runs can evict and rewrite already-warmed shared chunks.
 Before browser warmup, finish authenticated local HTTP preparation of every
 owner route. Then await each warmup page's `load` event before opening another
 route: an SSR heading does not prove async script completion. Keep the delayed

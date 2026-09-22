@@ -47,6 +47,7 @@ test("Task5 fixtures derive timestamps from now and share one chain across busin
 });
 
 for (const [outcome, expectedStatus] of [
+  ["PARTIAL", "PARTIAL"],
   ["RESEARCH_REQUIRED", "RESEARCH_REQUIRED"],
   ["ROBOTS_BLOCKED", "FAILED"],
   ["RETENTION_BLOCKED", "FAILED"],
@@ -68,10 +69,10 @@ for (const [outcome, expectedStatus] of [
   });
 }
 
-test("Task5 fixture leaves PARTIAL and HOMEPAGE_FAILED receipts unsealed", async () => {
+test("Task5 fixture leaves HOMEPAGE_FAILED receipts unsealed", async () => {
   const partial = await createPrivateKwM2AssessmentFixture({ outcome: "PARTIAL" });
   assert.equal(partial.receipt.status, "PARTIAL");
-  await assert.rejects(reloadPrivateKwM2WebsiteEvidenceReceipt({ request: partial.request, receiptStore: partial.receiptStore, evidenceStore: partial.evidenceStore }, { clock: partial.clock }), /RECEIPT_REPLAY_MISSING|REPLAY_MISSING/);
+  assert.equal(partial.receiptStore.values.size, 1);
 
   const homepage = await createPrivateKwM2AssessmentFixture({ outcome: "HOMEPAGE_FAILED" });
   assert.equal(homepage.receipt.status, "FAILED");

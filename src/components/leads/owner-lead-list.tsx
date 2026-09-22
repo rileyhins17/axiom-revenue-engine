@@ -122,9 +122,14 @@ export function OwnerLeadList({ data }: { data: OwnerLeadListResponse }) {
           </span>
         }
         actions={
+          <>
+          <Button asChild variant="outline" size="sm">
+            <Link href={"/leads/m2" as Route} prefetch={false}>Open research console <ArrowUpRight aria-hidden="true" /></Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/leads/evaluation">Open Quality Lab <ArrowUpRight aria-hidden="true" /></Link>
           </Button>
+          </>
         }
         metrics={[
           {

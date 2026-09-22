@@ -128,7 +128,10 @@ test("planning rejects pending, expired, changed-source and non-complete evidenc
   assert.equal(privateKwM2ReceiptCanonicalDigest(evidence), operationDigest);
   const partial = { ...evidence, status: "PARTIAL" };
   assert.throws(() => parseM2AssessmentContext({ ...context,
-    evidence: { ...partial, operationDigest: privateKwM2ReceiptCanonicalDigest(partial) } }), /complete retained HTML evidence/);
+    evidence: { ...partial, operationDigest: privateKwM2ReceiptCanonicalDigest(partial) } }), /v2 durable failure witness/);
+  const versionedPartial = { ...partial, receiptVersion: "kw-m2-html-evidence-workflow-v2" };
+  assert.throws(() => parseM2AssessmentContext({ ...context,
+    evidence: { ...versionedPartial, operationDigest: privateKwM2ReceiptCanonicalDigest(versionedPartial) } }), /complete retained HTML evidence/);
   const mixed = { ...evidence, pages: evidence.pages.map((page, index) => index === 1
     ? { ...page, storageOutcome: "DERIVED_FACTS_ONLY" } : page) };
   assert.throws(() => parseM2AssessmentContext({ ...context,

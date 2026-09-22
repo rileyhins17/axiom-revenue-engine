@@ -176,6 +176,22 @@ function fakeTransport(onRequest: () => void, robotsBody = "User-agent: *\\nAllo
   });
 }
 
+function pageFailureTransport(failure: "HTTP503" | "STREAM" | "FETCH_FAILED") {
+  return createPrivateKwPublicHttpTransport({
+    resolveDns: async () => [{ address: "93.184.216.34", family: 4 as const }],
+    executeConnection: async (request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/service" && failure === "HTTP503") return { statusCode: 503, headers: { "content-type": "text/html" }, body: new ReadableStream<Uint8Array>({ start(controller) { controller.close(); } }), abort() {} };
+      if (url.pathname === "/service" && failure === "STREAM") return { statusCode: 200, headers: { "content-type": "text/html" }, body: new ReadableStream<Uint8Array>({ start(controller) { controller.error(new Error("synthetic stream failure")); } }), abort() {} };
+      if (url.pathname === "/service" && failure === "FETCH_FAILED") throw new Error("synthetic transport failure");
+      const body = url.pathname === "/robots.txt" ? "User-agent: *\nAllow: /\n" : "<!doctype html><html><body><h1>Roof repair</h1><a href=\"/service\">Services</a><a href=\"/about\">About</a><a href=\"/contact\">Contact</a></body></html>";
+      const bytes = new TextEncoder().encode(body);
+      return { statusCode: 200, headers: { "content-type": url.pathname === "/robots.txt" ? "text/plain" : "text/html" }, body: new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(bytes); controller.close(); } }), abort() {} };
+    },
+    now: () => new Date("2026-09-21T15:00:00.000Z"),
+  });
+}
+
 function fakeEvidenceStore(writes: Array<{ requestedUrl: string; sourcePageUrl?: string }> = []) {
   type PersistedInput = Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwHtmlEvidence"]>[0] | Parameters<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>["writePrivateKwDerivedFacts"]>[0];
   const persisted: Array<{ outcome: "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY"; input: PersistedInput }> = [];
@@ -449,6 +465,95 @@ test("exact replay fails closed when the sealed receipt is missing and the share
     assert.match(fresh.stopReason ?? "", /HOMEPAGE_CAPTURE_FAILED|CAP/);
     assert.equal(fresh.networkRequestCount, 1);
     assert.equal(requests, 1);
+});
+
+test("seals and replays an HTTP 503 selected-page PARTIAL with zero network on replay", async () => {
+  const chain = approvedChain();
+  const receiptStore = memoryReceiptStore();
+  const evidenceStore = fakeEvidenceStore();
+  const request = { requestId: "56565656-5656-4565-8565-565656565656", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const fresh = await executePrivateKwM2HtmlEvidence(request, { transport: pageFailureTransport("HTTP503"), store: evidenceStore, receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(fresh.status, "PARTIAL");
+  assert.equal(fresh.receiptVersion, "kw-m2-html-evidence-workflow-v2");
+  const failed = fresh.pages.find((page) => page.pageKind === "SERVICE")!;
+  assert.equal(failed.failureCode, "HTTP_STATUS");
+  assert.equal(failed.statusCode, 503);
+  assert.deepEqual(failed.storageRefs, { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null });
+  assert.equal(failed.failedPageTransportReceiptIds?.length, 1);
+  let replayRequests = 0;
+  const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { replayRequests += 1; throw new Error("network must not run"); }), store: evidenceStore, receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.deepEqual(replay, fresh);
+  assert.equal(replayRequests, 0);
+});
+
+test("seals a selected-page transport error only with its ordered error witness", async () => {
+  const chain = approvedChain();
+  const receiptStore = memoryReceiptStore();
+  const request = { requestId: "56565656-5656-4565-8565-565656565657", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const fresh = await executePrivateKwM2HtmlEvidence(request, { transport: pageFailureTransport("FETCH_FAILED"), store: fakeEvidenceStore(), receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(fresh.status, "PARTIAL");
+  const failed = fresh.pages.find((page) => page.pageKind === "SERVICE")!;
+  assert.equal(failed.failureCode, "FETCH_FAILED");
+  assert.equal(failed.failedPageTransportReceiptIds?.length, 1);
+  assert.equal(fresh.transportReceipts.find((entry) => entry.requestId === failed.failedPageTransportReceiptIds![0])?.errorCode !== undefined, true);
+  assert.equal(receiptStore.values.size, 1);
+});
+
+test("keeps a selected-page stream failure unsealed without a transport error witness", async () => {
+  const chain = approvedChain();
+  const receiptStore = memoryReceiptStore();
+  const request = { requestId: "57575757-5757-4575-8575-575757575757", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const failed = await executePrivateKwM2HtmlEvidence(request, { transport: pageFailureTransport("STREAM"), store: fakeEvidenceStore(), receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(failed.status, "FAILED");
+  assert.equal(failed.stopReason, "SUBPAGE_CAPTURE_FAILED");
+  assert.equal(receiptStore.values.size, 0);
+});
+
+test("rejects rehashed PARTIAL witness tampering and mixed storage failure stays unsealed", async () => {
+  const chain = approvedChain();
+  const request = { requestId: "58585858-5858-4585-8585-585858585858", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id, researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  for (const mutate of [
+    (page: Record<string, unknown>) => { delete page.failedPageTransportReceiptIds; },
+    (page: Record<string, unknown>) => { page.failedPageTransportReceiptIds = [999]; },
+    (page: Record<string, unknown>) => { page.failedPageTransportReceiptIds = [3, 3]; },
+    (page: Record<string, unknown>) => { page.failedPageTransportReceiptIds = [1]; },
+    (page: Record<string, unknown>) => { page.failedPageTransportReceiptIds = [3, 4]; },
+    (page: Record<string, unknown>) => { page.failureCode = "UNSUPPORTED_FAILURE"; },
+    (page: Record<string, unknown>) => { page.requestedUrl = "https://other.example/service"; },
+  ]) {
+    const receiptStore = memoryReceiptStore();
+    const fresh = await executePrivateKwM2HtmlEvidence(request, { transport: pageFailureTransport("HTTP503"), store: fakeEvidenceStore(), receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+    const tampered = structuredClone(fresh) as unknown as MutableReceipt;
+    mutate((tampered.pages as Array<Record<string, unknown>>).find((page) => page.pageKind === "SERVICE")!);
+    redigestReceipt(tampered);
+    receiptStore.values.set(fresh.operationId, tampered as unknown as PrivateKwM2WebsiteEvidenceReceipt);
+    const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { throw new Error("network must not run"); }), store: fakeEvidenceStore(), receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+    assert.equal(replay.status, "FAILED");
+    assert.equal(replay.stopReason, "REPLAY_MISMATCH");
+  }
+  for (const mutateReceipt of [
+    (receipt: MutableReceipt) => { receipt.audit = null; },
+    (receipt: MutableReceipt) => { (receipt.pages as Array<Record<string, unknown>>).find((page) => page.pageKind === "HOME")!.outcome = "FAILED"; },
+  ]) {
+    const receiptStore = memoryReceiptStore();
+    const fresh = await executePrivateKwM2HtmlEvidence(request, { transport: pageFailureTransport("HTTP503"), store: fakeEvidenceStore(), receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+    const tampered = structuredClone(fresh) as unknown as MutableReceipt;
+    mutateReceipt(tampered);
+    redigestReceipt(tampered);
+    receiptStore.values.set(fresh.operationId, tampered as unknown as PrivateKwM2WebsiteEvidenceReceipt);
+    const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { throw new Error("network must not run"); }), store: fakeEvidenceStore(), receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+    assert.equal(replay.status, "FAILED");
+    assert.equal(replay.stopReason, "REPLAY_MISMATCH");
+  }
+  const mixedStore = fakeEvidenceStore();
+  let writes = 0;
+  const storageFailureStore = { ...mixedStore, writePrivateKwHtmlEvidence: async (input: Parameters<typeof mixedStore.writePrivateKwHtmlEvidence>[0]) => { writes += 1; if (writes === 2) throw new Error("STORE_CONFLICT"); return mixedStore.writePrivateKwHtmlEvidence(input); } };
+  const mixedReceiptStore = memoryReceiptStore();
+  const mixed = await executePrivateKwM2HtmlEvidence({ ...request, requestId: "59595959-5959-4595-8595-595959595959" }, { transport: pageFailureTransport("HTTP503"), store: storageFailureStore, receiptStore: mixedReceiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(mixed.status, "FAILED");
+  assert.equal(mixed.stopReason, "STORE_CONFLICT");
+  assert.equal(mixed.pages.some((page) => page.failedPageTransportReceiptIds !== undefined), false);
+  assert.equal(mixedReceiptStore.values.size, 0);
 });
 
 test("expiry after a selected-page body returns in-memory failure without later storage or sealing", async () => {

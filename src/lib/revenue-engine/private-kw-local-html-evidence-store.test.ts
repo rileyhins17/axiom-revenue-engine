@@ -1,12 +1,12 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { lstat, link, readFile, readdir, rename, symlink, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  PRIVATE_KW_EVIDENCE_ROOT,
-  createPrivateKwLocalHtmlEvidenceStore,
+  PRIVATE_KW_EVIDENCE_ROOT as DEFAULT_PRIVATE_KW_EVIDENCE_ROOT,
+  createPrivateKwLocalHtmlEvidenceStore as createNativePrivateKwLocalHtmlEvidenceStore,
   type PrivateKwEvidenceMetadataInput,
 } from "./private-kw-local-html-evidence-store";
 import { preparePrivateKwImport, PRIVATE_KW_IMPORT_VERSION } from "./private-kw-import";
@@ -27,6 +27,11 @@ import { privateKwPublicHttpTransportReceiptDigest } from "./private-kw-public-h
 const HTML = Buffer.from("<!doctype html><html><title>Roofing</title><body>public facts</body></html>");
 const NOW = "2026-09-21T12:00:00.000Z";
 const PARENT = "a".repeat(64);
+const PRIVATE_KW_EVIDENCE_ROOT = path.join(path.dirname(DEFAULT_PRIVATE_KW_EVIDENCE_ROOT), `m2-evidence-test-${randomUUID()}`);
+
+function createPrivateKwLocalHtmlEvidenceStore(options: Parameters<typeof createNativePrivateKwLocalHtmlEvidenceStore>[0] = {}) {
+  return createNativePrivateKwLocalHtmlEvidenceStore({ ...options, rootPath: options.rootPath ?? PRIVATE_KW_EVIDENCE_ROOT });
+}
 
 const AUTHORITY = {
   liveSourceAuthorized: false,
@@ -219,6 +224,8 @@ function baseMetadata(overrides: Partial<PrivateKwEvidenceMetadataInput> = {}): 
     transportVersion: "public-http-v1",
     sourcePolicyVersion: proof.sourcePolicyDecision?.policyVersion ?? "kw-m2-source-policy-v1",
     capturedAt: NOW,
+    statusCode: 200,
+    redirectCount: 0,
     parentReceiptDigest: PARENT,
     ...proof,
     ...overrides,
@@ -244,6 +251,9 @@ function facts() {
 }
 
 async function cleanRoot() {
+  assert.notEqual(PRIVATE_KW_EVIDENCE_ROOT, DEFAULT_PRIVATE_KW_EVIDENCE_ROOT);
+  assert.equal(path.dirname(path.resolve(PRIVATE_KW_EVIDENCE_ROOT)), path.dirname(DEFAULT_PRIVATE_KW_EVIDENCE_ROOT));
+  assert.match(path.basename(PRIVATE_KW_EVIDENCE_ROOT), /^m2-evidence-test-[0-9a-f-]{36}$/);
   await rm(PRIVATE_KW_EVIDENCE_ROOT, { recursive: true, force: true });
 }
 
@@ -282,6 +292,8 @@ test("writes and reloads raw HTML with content and metadata identities", async (
   assert.equal(reloaded.outcome, "RAW_HTML_ALLOWED");
   assert.deepEqual(reloaded.bytes, HTML);
   assert.equal(reloaded.metadata.contentType, "text/html");
+  assert.equal(reloaded.metadata.statusCode, 200);
+  assert.equal(reloaded.metadata.redirectCount, 0);
   assert.deepEqual(reloaded.metadata.sourcePolicyDecision, input.sourcePolicyDecision);
   assert.equal(reloaded.metadata.transportReceipts?.length, 1);
 });
@@ -329,6 +341,8 @@ test("pathless read-only reload covers derived facts without exposing raw bytes"
   const after = await snapshot();
   assert.equal(reloaded.outcome, "DERIVED_FACTS_ONLY");
   assert.deepEqual(reloaded.facts.facts, facts());
+  assert.equal(reloaded.metadata.statusCode, 200);
+  assert.equal(reloaded.metadata.redirectCount, 0);
   assert.equal("bytes" in reloaded, false);
   assert.deepEqual(after, before);
 });
@@ -440,6 +454,66 @@ test("raw storage accepts only the exact copied Task2 policy and receipt chain",
   }), /receipt|transport|chain/i);
   await assert.rejects(store.writePrivateKwHtmlEvidence({ ...valid, rightsDecision: "ALLOWED" } as never), /unrecognized|unknown|strict/i);
   await store.writePrivateKwHtmlEvidence(valid);
+});
+
+test("HTTP metadata bounds are retained for both branches and reject invalid values", async () => {
+  const store = createPrivateKwLocalHtmlEvidenceStore();
+  const raw = {
+    ...baseMetadata({ retentionDecision: "RAW_HTML_ALLOWED", retainUntil: "2026-10-21T12:00:00.000Z" }),
+    outcome: "RAW_HTML_ALLOWED" as const,
+    contentType: "text/html" as const,
+    bytes: HTML,
+  };
+  await assert.rejects(store.writePrivateKwHtmlEvidence({ ...raw, statusCode: 600 }), /statusCode|expected|invalid/i);
+  await assert.rejects(store.writePrivateKwHtmlEvidence({ ...raw, redirectCount: -1 }), /redirectCount|expected|invalid/i);
+  const rawRef = await store.writePrivateKwHtmlEvidence(raw);
+  assert(rawRef.outcome === "RAW_HTML_ALLOWED");
+  const rawReload = await store.reloadPrivateKwHtmlEvidenceReadOnly({ outcome: "RAW_HTML_ALLOWED", contentRef: rawRef.contentRef, metadataRef: rawRef.metadataRef });
+  assert(rawReload.outcome === "RAW_HTML_ALLOWED");
+  assert.equal(rawReload.metadata.statusCode, 200);
+  assert.equal(rawReload.metadata.redirectCount, 0);
+
+  const derived = await store.writePrivateKwDerivedFacts({
+    ...baseMetadata({ retentionDecision: "DERIVED_FACTS_ONLY", reviewAt: "2026-09-28T12:00:00.000Z" }),
+    outcome: "DERIVED_FACTS_ONLY" as const,
+    captureBytes: HTML,
+    facts: facts(),
+    rawArtifactRef: null,
+  });
+  assert.equal(derived.outcome, "DERIVED_FACTS_ONLY");
+  const derivedReload = await store.reloadPrivateKwHtmlEvidenceReadOnly({ outcome: "DERIVED_FACTS_ONLY", contentRef: derived.contentRef, metadataRef: derived.metadataRef, factsRef: derived.factsRef });
+  assert.equal(derivedReload.outcome, "DERIVED_FACTS_ONLY");
+  assert.equal(derivedReload.metadata.statusCode, 200);
+  assert.equal(derivedReload.metadata.redirectCount, 0);
+});
+
+test("native policy denial records only a bound no-content witness for any authorized retention", async () => {
+  const store = createPrivateKwLocalHtmlEvidenceStore();
+  for (const retention of ["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY", "BLOCKED"] as const) {
+    const metadata = baseMetadata({ retentionDecision: retention });
+    const proof = sourcePolicyProof(metadata.requestedUrl, metadata.authorizationChain.authorization.sourceDecisions[0]!.termsDecision);
+    const denied = { ...proof.sourcePolicyDecision, allowed: false, matchedRule: "Disallow: /", reason: "robots disallows capture" };
+    const input = { ...metadata, ...proof, sourcePolicyDecision: denied,
+      retentionDecision: "BLOCKED" as const, outcome: "BLOCKED" as const, blockCode: "ROBOTS_OR_TERMS_BLOCKED" };
+    const saved = await store.writePrivateKwHtmlEvidence(input);
+    assert(saved.outcome === "BLOCKED");
+    const loaded = await store.reloadPrivateKwHtmlEvidenceReadOnly({ outcome: "BLOCKED", receiptRef: saved.receiptRef });
+    assert(loaded.outcome === "BLOCKED");
+    assert.equal(loaded.blockCode, "ROBOTS_OR_TERMS_BLOCKED");
+    assert.equal((await snapshot()).some((name) => /(^|[/\\])(objects|facts|metadata)([/\\]|$)/.test(name)), false);
+    await assert.rejects(store.writePrivateKwHtmlEvidence({ ...input, businessId: "not-authorized" }), /business|authorization/i);
+    await assert.rejects(store.writePrivateKwHtmlEvidence({ ...input, sourcePolicyDecision: { ...denied, robotsUrl: "https://wrong.example/robots.txt" } }), /URL|proof/i);
+    await assert.rejects(store.writePrivateKwHtmlEvidence({ ...input, transportReceipts: [] }), /receipt|count/i);
+    await assert.rejects(store.writePrivateKwHtmlEvidence({ ...input, transportReceipts: [{ ...proof.transportReceipts[0]!, receiptDigest: "0".repeat(64) }] }), /receipt|chain/i);
+    await assert.rejects(store.writePrivateKwHtmlEvidence({ ...input, blockCode: "RETENTION_BLOCKED" }), /retention|allowed|blocked/i);
+    if (retention === "RAW_HTML_ALLOWED") {
+      await assert.rejects(store.writePrivateKwHtmlEvidence({ ...metadata, ...proof, sourcePolicyDecision: denied,
+        outcome: "RAW_HTML_ALLOWED", contentType: "text/html", bytes: HTML }), /allowed|blocked/i);
+    } else if (retention === "DERIVED_FACTS_ONLY") {
+      await assert.rejects(store.writePrivateKwDerivedFacts({ ...metadata, ...proof, sourcePolicyDecision: denied,
+        outcome: "DERIVED_FACTS_ONLY", captureBytes: HTML, facts: facts(), rawArtifactRef: null }), /allowed|blocked/i);
+    }
+  }
 });
 
 test("raw storage rejects redigested error receipts, wrong paths, host mismatches, and bad ordering", async () => {

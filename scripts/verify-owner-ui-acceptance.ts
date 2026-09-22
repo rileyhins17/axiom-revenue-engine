@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -34,6 +34,8 @@ import { buildCompleteOwnerLabelingPacketFixture } from "../src/lib/revenue-engi
 import { auditWebsiteDeterministically } from "../src/lib/revenue-engine/website-audit";
 import { executePrivateKwContactPersistenceForLocalDatabase } from "./private-kw-contact-persistence-executor";
 import { verifyOwnerWarmupStreaming } from "./owner-ui-warmup-streaming.acceptance";
+import { createM2OwnerConsoleFixture } from "./m2-owner-console-fixture";
+import { readSetupFile } from "./private-kw-m2-snapshot";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
@@ -45,6 +47,7 @@ const TEST_AUTH_SECRET = "owner-ui-acceptance-only-secret-00000000000000000000";
 const AXE_PATH = createRequire(import.meta.url).resolve("axe-core/axe.min.js");
 const OWNER_LIST_BUDGET_MS = 10_000;
 const OWNER_DOSSIER_BUDGET_MS = 15_000;
+const OWNER_M2_BUDGET_MS = 15_000;
 const OWNER_TITLE_TIMEOUT_MS = 5_000;
 
 type SqliteDatabase = InstanceType<typeof Database>;
@@ -63,6 +66,7 @@ type AxeViolation = {
 type AcceptanceResult = {
   desktopListReadyMs: number;
   desktopDossierReadyMs: number;
+  desktopM2ReadyMs: number;
   desktopWidth: number;
   mobileWidth: number;
   pagesScanned: number;
@@ -615,7 +619,7 @@ export function seedOwnerLead(database: SqliteDatabase) {
   });
 }
 
-function startNextServer(baseUrl: string, databasePath: string, logLines: string[]) {
+function startNextServer(baseUrl: string, databasePath: string, logLines: string[], m2RunPath: string) {
   const port = new URL(baseUrl).port;
   const nextBinary = join(REPOSITORY_ROOT, "node_modules", "next", "dist", "bin", "next");
   const childEnvironment: Record<string, string | undefined> = {};
@@ -641,7 +645,9 @@ function startNextServer(baseUrl: string, databasePath: string, logLines: string
     APP_BASE_URL: baseUrl,
     AGENT_SHARED_SECRET: "",
     AUTH_ALLOWED_EMAILS: FIXTURE_EMAIL,
-    AUTH_ADMIN_EMAILS: "",
+    AUTH_ADMIN_EMAILS: FIXTURE_EMAIL,
+    AXIOM_M2_LOCAL_REVIEW_ENABLED: "1",
+    AXIOM_M2_LOCAL_REVIEW_RUN: m2RunPath,
     AUTH_ALLOWED_ORIGINS: baseUrl,
     AUTONOMOUS_INTAKE_ENABLED: "false",
     AUTONOMOUS_QUEUE_ENABLED: "false",
@@ -660,7 +666,7 @@ function startNextServer(baseUrl: string, databasePath: string, logLines: string
     NEXT_TELEMETRY_DISABLED: "1",
     OPENAI_API_KEY: "",
   });
-  const child = spawn(process.execPath, [nextBinary, "dev", "--webpack", "-H", "127.0.0.1", "-p", port], {
+  const child = spawn(process.execPath, [nextBinary, "start", "-H", "127.0.0.1", "-p", port], {
     cwd: REPOSITORY_ROOT,
     // Generated Cloudflare globals intentionally narrow production env values.
     // This isolated child uses explicit synthetic values instead.
@@ -718,6 +724,16 @@ async function authenticate(context: BrowserContext, baseUrl: string) {
   });
   const body = await response.text();
   assert.equal(response.ok(), true, `Fixture sign-up failed (${response.status()}): ${body.slice(0, 300)}`);
+  // The signup hook promotes the stored owner after the initial session was
+  // created. Sign in again so the fixture tests a current admin session.
+  await context.clearCookies();
+  const signIn = await context.request.post(`${baseUrl}/api/auth/sign-in/email`, {
+    data: { email: FIXTURE_EMAIL, password: FIXTURE_PASSWORD },
+    headers: { origin: baseUrl },
+  });
+  assert.equal(signIn.ok(), true, `Fixture sign-in failed (${signIn.status()}).`);
+  const signedIn = await signIn.json() as { user?: { role?: string } };
+  assert.equal(signedIn.user?.role, "admin", "Owner acceptance requires the freshly promoted admin role.");
   const cookies = await context.cookies(baseUrl);
   assert(cookies.some((cookie) => cookie.name.includes("session")), "Fixture authentication did not set a session cookie.");
 }
@@ -944,11 +960,11 @@ async function openMobileDossier(page: Page) {
   ]);
 }
 
-export async function warmOwnerAcceptanceRoutes(page: Page) {
+export async function warmOwnerAcceptanceRoutes(page: Page, extraRoutes: string[] = []) {
   // The first streamed SSR response can load layout.js while Next's on-demand
   // client compilation is rewriting it. Finish route preparation without any
   // browser reading scripts, then load those scripts before the next navigation.
-  for (const route of ["/leads", `/leads/${FIXTURE_BUSINESS_ID}`, "/leads/evaluation"]) {
+  for (const route of ["/leads", `/leads/${FIXTURE_BUSINESS_ID}`, "/leads/evaluation", ...extraRoutes]) {
     const response = await page.context().request.get(route);
     try {
       assert.equal(response.status(), 200, `Owner route preparation failed: ${route}`);
@@ -965,10 +981,35 @@ export async function warmOwnerAcceptanceRoutes(page: Page) {
   await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
   await page.goto("/leads/evaluation", { waitUntil: "load" });
   await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
-  await page.locator("[data-quality-lab-ready='true']").waitFor();
+  await page.locator("[data-quality-lab-ready='true']:visible").waitFor();
+  for (const route of extraRoutes) await page.goto(route, { waitUntil: "load" });
 }
 
-async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
+async function assertM2Review(page: Page, fixture: Awaited<ReturnType<typeof createM2OwnerConsoleFixture>>, label: string) {
+  await page.getByRole("heading", { level: 1, name: "Local research console" }).waitFor();
+  await assertOwnerPageTitle(page, "M2 Local Review | Axiom Revenue Engine");
+  const businesses = page.getByRole("list", { name: "M2 businesses", exact: true }).locator(":scope > li");
+  assert.equal(await businesses.count(), 10, `${label} must account for all ten businesses.`);
+  const expected = ["Assessment saved", "Research review", "Blocked", "Blocked", "Assessment saved",
+    "Research review", "Assessment saved", "Assessment saved", "Assessment saved", "Research review"];
+  for (const [index, business] of fixture.selected.entries()) {
+    const entry = businesses.nth(index);
+    await entry.getByRole("heading", { name: business.businessName, exact: true }).waitFor();
+    await entry.getByText(expected[index]!, { exact: true }).waitFor();
+    await entry.getByText("Next step:", { exact: true }).waitFor();
+    assert.equal(await entry.getByRole("link", { name: "Source", exact: true }).count(), 1);
+  }
+  await businesses.nth(9).getByText("FAILED", { exact: true }).waitFor();
+  assert.equal(await page.locator("[data-owner-content] input[type='file'], [data-owner-content] form").count(), 0);
+  await assertReadOnlyOwnerSurface(page, label);
+  await assertResponsive(page, label);
+  await assertReducedMotion(page, label);
+  // Include expanded evidence details in accessibility coverage.
+  await businesses.first().getByText("Limitations and retention", { exact: true }).click();
+  await assertWcag(page, label);
+}
+
+async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2Fixture: Awaited<ReturnType<typeof createM2OwnerConsoleFixture>>) {
   let browser: Browser | null = null;
   let page: Page | null = null;
   let warmupPage: Page | null = null;
@@ -998,15 +1039,36 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     });
     await authenticate(context, baseUrl);
 
-    // Next dev compiles route chunks on demand. Compile every owner acceptance
-    // route in a disposable page before attaching the measured/error-audited
-    // page so route prefetch cannot replace a chunk during the real run.
+    // Warm immutable production assets before the measured run. The separate
+    // streaming regression still exercises development route-preparation order.
     stage = "owner route warmup";
     warmupPage = await context.newPage();
     attachBrowserDiagnostics(warmupPage, () => stage, diagnostics, baseUrl);
     drainScriptDiagnostics.push(await attachBrowserScriptDiagnostics(context, warmupPage, () => stage, diagnostics, outputDirectory));
-    await warmOwnerAcceptanceRoutes(warmupPage);
+    await warmOwnerAcceptanceRoutes(warmupPage, ["/leads/m2"]);
     await warmupPage.close();
+
+    stage = "M2 authentication gate";
+    const anonymous = await browser.newContext({ baseURL: baseUrl, serviceWorkers: "block" });
+    await anonymous.route("**/*", async (route) => {
+      const url = route.request().url();
+      if (isAllowedOwnerAcceptanceUrl(url, baseUrl)) await route.continue();
+      else { externalRequests.push(url); await route.abort("blockedbyclient"); }
+    });
+    const anonymousPage = await anonymous.newPage();
+    const anonymousErrors: string[] = [];
+    anonymousPage.on("pageerror", (error) => anonymousErrors.push(error.message));
+    // Next's streaming redirect can have HTTP 200 with a client redirect marker.
+    // Verify the actual destination and absence of data, not a non-streaming status.
+    const anonymousResponse = await anonymous.request.get("/leads/m2", { maxRedirects: 0 });
+    const anonymousBody = await anonymousResponse.text();
+    for (const business of m2Fixture.selected) assert(!anonymousBody.includes(business.businessName), "Unauthenticated M2 response exposed a business.");
+    await anonymousResponse.dispose();
+    await anonymousPage.goto("/leads/m2", { waitUntil: "load" });
+    await anonymousPage.waitForURL("**/sign-in");
+    assert.equal(await anonymousPage.getByRole("list", { name: "M2 businesses", exact: true }).count(), 0);
+    assert.deepEqual(anonymousErrors, [], "Unauthenticated redirect raised a script error.");
+    await anonymous.close();
 
     page = await context.newPage();
     attachBrowserDiagnostics(page, () => stage, diagnostics, baseUrl);
@@ -1048,9 +1110,9 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     stage = "desktop quality lab";
     await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
-    await page.locator("[data-quality-lab-ready='true']").waitFor();
+    await page.locator("[data-quality-lab-ready='true']:visible").waitFor();
     await assertOwnerPageTitle(page, "Quality Lab | Axiom Revenue Engine");
-    await page.getByLabel("Choose owner-review checkpoint").setInputFiles({
+    await page.locator("input[aria-label='Choose owner-review checkpoint']:visible:enabled").setInputFiles({
       name: "owner-labeling-checkpoint.json",
       mimeType: "application/json",
       buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
@@ -1081,8 +1143,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
 
     stage = "desktop quality lab resume";
     await page.reload({ waitUntil: "domcontentloaded" });
-    await page.locator("[data-quality-lab-ready='true']").waitFor();
-    await page.getByLabel("Choose owner-review checkpoint").setInputFiles({
+    await page.locator("[data-quality-lab-ready='true']:visible").waitFor();
+    await page.locator("input[aria-label='Choose owner-review checkpoint']:visible:enabled").setInputFiles({
       name: "owner-labeling-checkpoint.json",
       mimeType: "application/json",
       buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
@@ -1090,6 +1152,15 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await page.getByText("Verified the exact checkpoint and restored this browser's draft.").waitFor();
     assert.equal(await page.getByRole("button", { name: /^Strong/ }).getAttribute("aria-pressed"), "true");
     assert.equal(await page.getByRole("checkbox", { name: "Good commercial fit" }).isChecked(), true);
+
+    stage = "desktop M2 research console";
+    const m2Start = performance.now();
+    await page.goto("/leads/m2", { waitUntil: "domcontentloaded" });
+    await page.getByRole("list", { name: "M2 businesses", exact: true }).waitFor();
+    const desktopM2ReadyMs = Math.round(performance.now() - m2Start);
+    assert(desktopM2ReadyMs <= OWNER_M2_BUDGET_MS, `The durable M2 review exceeded ${OWNER_M2_BUDGET_MS} ms.`);
+    await assertM2Review(page, m2Fixture, "desktop M2 review");
+    await page.screenshot({ path: join(outputDirectory, "m2-review-desktop.png"), fullPage: true });
 
     stage = "mobile leads";
     await page.setViewportSize({ width: 390, height: 844 });
@@ -1114,8 +1185,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     stage = "mobile quality lab";
     await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
-    await page.locator("[data-quality-lab-ready='true']").waitFor();
-    await page.getByLabel("Choose owner-review checkpoint").setInputFiles({
+    await page.locator("[data-quality-lab-ready='true']:visible").waitFor();
+    await page.locator("input[aria-label='Choose owner-review checkpoint']:visible:enabled").setInputFiles({
       name: "owner-labeling-checkpoint.json",
       mimeType: "application/json",
       buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
@@ -1125,6 +1196,11 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await assertWcag(page, "mobile quality lab");
     await assertResponsive(page, "mobile quality lab");
     await assertReducedMotion(page, "mobile quality lab");
+
+    stage = "mobile M2 research console";
+    await page.goto("/leads/m2", { waitUntil: "domcontentloaded" });
+    await assertM2Review(page, m2Fixture, "mobile M2 review");
+    await page.screenshot({ path: join(outputDirectory, "m2-review-mobile.png"), fullPage: true });
 
     assert.deepEqual(externalRequests, [], "The owner acceptance browser attempted an external request.");
     await Promise.all(drainScriptDiagnostics.map((drain) => drain()));
@@ -1138,9 +1214,10 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     return {
       desktopListReadyMs,
       desktopDossierReadyMs,
+      desktopM2ReadyMs,
       desktopWidth,
       mobileWidth,
-      pagesScanned: 6,
+      pagesScanned: 8,
       externalRequests: externalRequests.length,
     } satisfies AcceptanceResult;
   } catch (error) {
@@ -1160,6 +1237,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
 }
 
 async function run() {
+  const buildId = await readFile(join(REPOSITORY_ROOT, ".next", "BUILD_ID"), "utf8").catch(() => "");
+  assert(buildId.trim(), "Owner UI acceptance requires a completed production build. Run npm run build:cloudflare first.");
   await mkdir(OUTPUT_ROOT, { recursive: true });
   const outputDirectory = join(OUTPUT_ROOT, `owner-ui-${process.pid}-${Date.now()}`);
   await mkdir(outputDirectory, { recursive: true });
@@ -1169,19 +1248,24 @@ async function run() {
   let server: ChildProcess | null = null;
   let success = false;
   let result: AcceptanceResult | null = null;
+  let m2Fixture: Awaited<ReturnType<typeof createM2OwnerConsoleFixture>> | null = null;
   try {
     await applyMigrations(database);
     seedOwnerLead(database);
     database.close();
+    m2Fixture = await createM2OwnerConsoleFixture();
+    const m2DatabaseIdentity = readSetupFile(resolve(m2Fixture.databasePath)).identity;
     const port = await freeLoopbackPort();
     const baseUrl = `http://127.0.0.1:${port}`;
-    // OpenNext leaves production assets in `.next`. A fresh Next dev server can
-    // briefly serve those files beside newly compiled development chunks, so
-    // clear only this repository's generated Next directory before startup.
-    await rm(join(REPOSITORY_ROOT, ".next"), { recursive: true, force: true });
-    server = startNextServer(baseUrl, databasePath, serverLogs);
+    // Use the completed build unchanged: development page eviction can rewrite
+    // layout.js during longer owner workflows even after initial route warmup.
+    server = startNextServer(baseUrl, databasePath, serverLogs, m2Fixture.runPath);
     await waitForServer(baseUrl, server);
-    result = await runBrowserAcceptance(baseUrl, outputDirectory);
+    result = await runBrowserAcceptance(baseUrl, outputDirectory, m2Fixture);
+    assert.deepEqual(readSetupFile(resolve(m2Fixture.databasePath)).identity, m2DatabaseIdentity, "Browser inspection must leave the M2 database unchanged.");
+    for (const name of ["m2-review-desktop.png", "m2-review-mobile.png"]) {
+      await copyFile(join(outputDirectory, name), join(OUTPUT_ROOT, name));
+    }
     success = true;
   } catch (error) {
     await writeFile(join(outputDirectory, "next-server.log"), `${serverLogs.join("\n")}\n`, "utf8");
@@ -1190,12 +1274,14 @@ async function run() {
   } finally {
     if (database.open) database.close();
     await stopServer(server);
+    await m2Fixture?.cleanup();
     if (success) await rm(outputDirectory, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
   assert(result, "Owner UI acceptance completed without a result.");
   console.log("Owner UI acceptance passed.");
   console.log(`Desktop list ready: ${result.desktopListReadyMs} ms (budget ${OWNER_LIST_BUDGET_MS} ms)`);
   console.log(`Desktop dossier ready: ${result.desktopDossierReadyMs} ms (budget ${OWNER_DOSSIER_BUDGET_MS} ms)`);
+  console.log(`Desktop M2 review ready: ${result.desktopM2ReadyMs} ms (budget ${OWNER_M2_BUDGET_MS} ms)`);
   console.log(`Responsive widths: desktop ${result.desktopWidth}px, mobile ${result.mobileWidth}px`);
   console.log(`WCAG pages scanned: ${result.pagesScanned}; external requests: ${result.externalRequests}`);
 }

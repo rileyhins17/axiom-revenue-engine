@@ -555,7 +555,7 @@ overwrites an existing output. Initial setup verification remains strict and
 will correctly reject a database that now contains successor assessment writes.
 
 The assessment write requires a COMPLETE four-page capture. A sealed
-`RESEARCH_REQUIRED` outcome instead publishes an immutable research report at
+`RESEARCH_REQUIRED` or supported `PARTIAL` outcome instead publishes an immutable research report at
 `reportPath`, with the missing page kinds, capture limitations, source lineage
 and `UNKNOWN` classification. It creates no candidate, approval, assessment
 rows or progress receipt. Its result is `RESEARCH_REVIEW`; exact replay returns
@@ -569,13 +569,67 @@ business in the ordered run. Each is reloaded from its actual source and capture
 evidence; an existing report cannot prove its own accuracy. The next assessment
 binds the research report digest or blocked capture operation digest as its
 previous checkpoint. These outcomes grant no permission to assess or contact.
+The native store accepts a complete denied robots-policy witness for the exact
+business even when its previously authorized retention was raw or derived. That
+branch stores only the denial receipt. It still requires the canonical robots
+URL, successful policy response, exact transport ledger and current approval
+chain; raw/derived page storage continues to require an allowed policy.
 
-Task 4 currently leaves failed-subpage `PARTIAL` and failed-homepage receipts
-unsealed. The runner rejects these with `M2_WEBSITE_RECEIPT_REPLAY_MISSING` and
-publishes nothing. Do not manually seal a fixture or manufacture a report to
-bypass this limitation. Durable failed-capture review, owner-console integration
-and complete exact-ten orchestration remain unfinished. Synthetic acceptance is
-not approval for real capture, setup, assessment or production.
+Task 4 seals a v2 `PARTIAL` receipt only when each failed selected page has an
+exact ordered transport witness for an HTTP error or transport failure. The
+homepage and retained successful pages must still reload and verify. Failed
+pages carry no content/facts references and cannot authorize an assessment.
+Body-stream failures without a transport error witness, unsupported redirects,
+failed homepages, storage conflicts and expired capture authority remain
+unsealed. Reload rejects them with `M2_WEBSITE_RECEIPT_REPLAY_MISSING`; it never
+manufactures a report. Existing COMPLETE/research/blocked receipts retain v1.
+
+## M2 local owner research console
+
+The admin-only `/leads/m2` page presents the saved local run as assessments,
+research reviews, policy blocks, pending work or unavailable evidence. Source
+links, page outcomes, capture times, retention and HTML limitations remain
+visible. Every selected business is accounted for in the recorded order.
+An assessment saved here still means UNKNOWN qualification and zero scores.
+
+Configure an existing run in the local Node server's ignored environment file:
+
+```dotenv
+AXIOM_M2_LOCAL_REVIEW_ENABLED=1
+AXIOM_M2_LOCAL_REVIEW_RUN=data/kw-evaluation/assessment-run.json
+```
+
+Restart that local server and sign in with an existing admin account. The Leads
+page links to the research console. Do not change `DATABASE_PATH` to the M2
+shadow database: normal app authentication and the research database are
+separate. The fixed server-configured run path is restricted to a direct JSON
+child of `data/kw-evaluation`. The browser cannot choose paths or upload reports.
+The bridge is disabled by default and refuses all Cloudflare binding contexts.
+It requires the repository's local Node runtime, `tsx`, Git and native SQLite.
+
+For the same verification without the browser:
+
+```powershell
+npm run kw:assess-m2-html -- data/kw-evaluation/assessment-run.json --inspect
+```
+
+Inspection reconstructs the whole expected database and independently reloads
+the canonical evidence. It creates only a transient owned operation lock; it
+never prepares or approves an assessment, changes rows, or publishes missing
+reports. Missing capture evidence is shown as unavailable and subsequent work
+as pending. Corrupt evidence, conflicting files or unexpected database changes
+fail the entire inspection. An existing operation lock also makes review
+unavailable; finish or investigate that operation before retrying. Do not delete
+a live operation's lock or substitute unverified report JSON.
+
+The browser acceptance seeds ten synthetic businesses through real native
+source, setup, capture and assessment writers using fake HTTP transport. A fresh
+CLI process and the authenticated server then reload the default evidence stores.
+Synthetic acceptance counts as zero real businesses. The real one-then-ten
+capture/setup/assessment evaluation and production release remain separate gates.
+Storage unit tests use unique `m2-evidence-test-<UUID>` sibling directories with
+bounded cleanup. They must never clear the default `m2-evidence` directory,
+which the console and native restart verification use.
 
 ## Weekly owner review (30 minutes)
 

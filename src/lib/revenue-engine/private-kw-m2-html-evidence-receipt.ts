@@ -1,20 +1,8 @@
-import { createHash } from "node:crypto";
 import { lstat, mkdir, open, realpath } from "node:fs/promises";
 import path from "node:path";
 import { PRIVATE_KW_EVIDENCE_ROOT } from "@/lib/revenue-engine/private-kw-local-html-evidence-store";
 import { PrivateKwM2WebsiteEvidenceReceiptSchema, type PrivateKwM2WebsiteEvidenceReceipt } from "@/lib/revenue-engine/private-kw-m2-html-evidence-schema";
-
-function canonicalize(value: unknown): string {
-  if (value === undefined) return "null";
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return "[" + value.map(canonicalize).join(",") + "]";
-  const object = value as Record<string, unknown>;
-  return "{" + Object.keys(object).filter((key) => object[key] !== undefined).sort().map((key) => JSON.stringify(key) + ":" + canonicalize(object[key])).join(",") + "}";
-}
-
-function digest(value: string) {
-  return createHash("sha256").update(value, "utf8").digest("hex");
-}
+import { privateKwM2Canonicalize, privateKwM2ReceiptCanonicalDigest } from "@/lib/revenue-engine/private-kw-m2-canonical";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const TEST_ROOT = /^m2-receipt-test-[a-z0-9-]+$/;
@@ -84,7 +72,7 @@ function parseReceipt(bytes: Buffer) {
   const value = parsed as Record<string, unknown>;
   if (typeof value.operationDigest !== "string") throw new Error("SEALED_RECEIPT_DIGEST_MISSING");
   const { operationDigest, ...core } = value;
-  if (digest(canonicalize(core)) !== operationDigest) throw new Error("SEALED_RECEIPT_DIGEST_MISMATCH");
+  if (privateKwM2ReceiptCanonicalDigest(core) !== operationDigest) throw new Error("SEALED_RECEIPT_DIGEST_MISMATCH");
   return PrivateKwM2WebsiteEvidenceReceiptSchema.parse(parsed);
 }
 
@@ -102,7 +90,7 @@ export function createPrivateKwM2HtmlEvidenceReceiptStore(options: { rootPath?: 
       try {
         if (!await ensureSafeDirectoryChain(root, path.dirname(file), false)) return null;
         const { bytes, parsed } = await readVerifiedReceipt(file);
-        if (canonicalize(parsed) + "\n" !== bytes.toString("utf8")) throw new Error("SEALED_RECEIPT_BYTES_MISMATCH");
+        if (privateKwM2Canonicalize(parsed) + "\n" !== bytes.toString("utf8")) throw new Error("SEALED_RECEIPT_BYTES_MISMATCH");
         if ((parsed as { operationId: string }).operationId !== operationId) throw new Error("SEALED_RECEIPT_OPERATION_ID_MISMATCH");
         return parsed;
       } catch (error) {
@@ -116,7 +104,7 @@ export function createPrivateKwM2HtmlEvidenceReceiptStore(options: { rootPath?: 
       }
       const operationId = (receipt as { operationId: string }).operationId;
       operationPath(root, operationId);
-      const bytes = Buffer.from(canonicalize(receipt) + "\n", "utf8");
+      const bytes = Buffer.from(privateKwM2Canonicalize(receipt) + "\n", "utf8");
       parseReceipt(bytes);
       await assertSafeRoot(root, true);
       const file = operationPath(root, operationId);
@@ -132,18 +120,16 @@ export function createPrivateKwM2HtmlEvidenceReceiptStore(options: { rootPath?: 
           await handle.close();
         }
         const { bytes: publishedBytes, parsed: published } = await readVerifiedReceipt(file);
-        if (canonicalize(published) + "\n" !== publishedBytes.toString("utf8") || publishedBytes.toString("utf8") !== bytes.toString("utf8")) throw new Error("SEALED_RECEIPT_BYTES_MISMATCH");
+        if (privateKwM2Canonicalize(published) + "\n" !== publishedBytes.toString("utf8") || publishedBytes.toString("utf8") !== bytes.toString("utf8")) throw new Error("SEALED_RECEIPT_BYTES_MISMATCH");
         return "CREATED";
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
         const { parsed: existing } = await readVerifiedReceipt(file);
-        if (canonicalize(existing) !== canonicalize(receipt)) throw new Error("SEALED_RECEIPT_CONFLICT");
+        if (privateKwM2Canonicalize(existing) !== privateKwM2Canonicalize(receipt)) throw new Error("SEALED_RECEIPT_CONFLICT");
         return "EXACT_REPLAY";
       }
     },
   };
 }
 
-export function privateKwM2ReceiptCanonicalDigest(value: unknown) {
-  return digest(canonicalize(value));
-}
+export { privateKwM2ReceiptCanonicalDigest } from "@/lib/revenue-engine/private-kw-m2-canonical";

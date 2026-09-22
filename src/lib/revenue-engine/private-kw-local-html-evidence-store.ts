@@ -288,6 +288,8 @@ function assertBranchInput(input: PrivateKwEvidenceMetadataInput & { outcome: st
     transportVersion: z.string().trim().min(1).max(120),
     sourcePolicyVersion: z.string().trim().min(1).max(120),
     capturedAt: IsoDateSchema,
+    statusCode: CommonMetadataSchema.shape.statusCode,
+    redirectCount: CommonMetadataSchema.shape.redirectCount,
     parentReceiptDigest: DigestSchema,
     authorizationDigest: DigestSchema,
     authorizationExpiresAt: IsoDateSchema,
@@ -327,7 +329,12 @@ function assertBranchInput(input: PrivateKwEvidenceMetadataInput & { outcome: st
   const authorization = PrivateKwM2ExecutionAuthorizationSchema.parse(chain.authorization);
   const decision = authorization.sourceDecisions.find((candidate) => candidate.businessId === parsed.businessId);
   if (!decision || authorization.businessIds.indexOf(parsed.businessId) < 0) throw new Error("Evidence business is absent from the exact execution authorization.");
-  if (decision.evidenceRetention !== parsed.outcome) throw new Error("Evidence outcome does not match the exact authorized retention decision.");
+  // A denial witness contains no captured content. A later robots denial may
+  // therefore stop an otherwise approved raw/derived capture, without expanding it.
+  const policyDenial = parsed.outcome === "BLOCKED" && parsed.blockCode === "ROBOTS_OR_TERMS_BLOCKED"
+    && parsed.sourcePolicyDecision !== undefined
+    && PrivateKwSourcePolicyDecisionSchema.parse(parsed.sourcePolicyDecision).allowed === false;
+  if (decision.evidenceRetention !== parsed.outcome && !policyDenial) throw new Error("Evidence outcome does not match the exact authorized retention decision.");
   if (parsed.authorizationDigest !== authorization.authorizationDigest || parsed.authorizationExpiresAt !== authorization.expiresAt) {
     throw new Error("Evidence authorization identity must match the exact execution authorization.");
   }
@@ -343,14 +350,14 @@ function assertBranchInput(input: PrivateKwEvidenceMetadataInput & { outcome: st
   if (authorization.authority.liveSourceAuthorized || authorization.authority.artifactStorageAuthorized || authorization.authority.providerOperationsAuthorized !== 0 || authorization.authority.costAuthorizedUsd !== 0) {
     throw new Error("Evidence authorization contains disallowed authority.");
   }
-  if (parsed.sourcePolicyDecision !== undefined) assertExactSourcePolicy(parsed, decision, authorization);
+  if (parsed.sourcePolicyDecision !== undefined) assertExactSourcePolicy(parsed, decision, authorization, !policyDenial);
   return parsed;
 }
 
-function assertExactSourcePolicy(input: { requestedUrl: string; sourcePageUrl?: string; finalUrl: string; sourcePolicyVersion: string; sourcePolicyDecision?: unknown; transportReceipts?: readonly unknown[] }, decision: PrivateKwM2ExecutionAuthorization["sourceDecisions"][number], authorization: PrivateKwM2ExecutionAuthorization) {
+function assertExactSourcePolicy(input: { requestedUrl: string; sourcePageUrl?: string; finalUrl: string; sourcePolicyVersion: string; sourcePolicyDecision?: unknown; transportReceipts?: readonly unknown[] }, decision: PrivateKwM2ExecutionAuthorization["sourceDecisions"][number], authorization: PrivateKwM2ExecutionAuthorization, expectedAllowed = true) {
   const policy = PrivateKwSourcePolicyDecisionSchema.parse(input.sourcePolicyDecision);
   const receipts = (input.transportReceipts ?? []).map((receipt) => PrivateKwPublicHttpTransportReceiptSchema.parse(receipt));
-  if (policy.policyVersion !== input.sourcePolicyVersion || !policy.allowed || policy.providerOperationsAuthorized !== 0 || policy.costAuthorizedUsd !== 0) throw new Error("Raw evidence requires an exact allowed zero-cost source-policy decision.");
+  if (policy.policyVersion !== input.sourcePolicyVersion || policy.allowed !== expectedAllowed || policy.providerOperationsAuthorized !== 0 || policy.costAuthorizedUsd !== 0) throw new Error("Evidence requires an exact zero-cost source-policy decision matching its allowed or blocked outcome.");
   if (policy.termsDecision !== decision.termsDecision) throw new Error("Raw evidence terms decision does not match the exact authorization chain.");
   const approved = new URL(input.sourcePageUrl ?? input.requestedUrl);
   const final = new URL(input.finalUrl);
@@ -380,8 +387,11 @@ function assertExactSourcePolicy(input: { requestedUrl: string; sourcePageUrl?: 
 
 export function resolvePrivateKwEvidenceRoot(value = "data/kw-evaluation/m2-evidence") {
   const resolved = path.resolve(REPOSITORY_ROOT, value);
-  if (!samePath(path.dirname(resolved), PRIVATE_KW_EVIDENCE_PARENT) || path.basename(resolved) !== "m2-evidence") {
-    throw new Error("Private KW evidence root must be the direct child data/kw-evaluation/m2-evidence.");
+  const basename = path.basename(resolved);
+  const isDefaultRoot = basename === "m2-evidence";
+  const isIsolatedTestRoot = /^m2-evidence-test-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(basename);
+  if (!samePath(path.dirname(resolved), PRIVATE_KW_EVIDENCE_PARENT) || (!isDefaultRoot && !isIsolatedTestRoot)) {
+    throw new Error("Private KW evidence root must be the direct child data/kw-evaluation/m2-evidence or an isolated m2-evidence-test-<UUID> sibling.");
   }
   return resolved;
 }

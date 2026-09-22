@@ -19,6 +19,7 @@ import { PrivateKwM2HtmlEvidenceRequestSchema } from "../src/lib/revenue-engine/
 import { reloadPrivateKwM2WebsiteEvidenceReceipt, type PrivateKwM2WebsiteEvidenceReceiptReloadInput } from "../src/lib/revenue-engine/private-kw-m2-html-evidence-workflow";
 import { projectPrivateKwM2OwnerLeadDetail } from "../src/lib/revenue-engine/private-kw-m2-owner-projection";
 import { buildPrivateKwM2ResearchReport } from "../src/lib/revenue-engine/private-kw-m2-terminal-report";
+import { LocalM2OwnerConsoleSchema } from "../src/lib/revenue-engine/m2-owner-console-contract";
 import {
   PrivateKwM2SetupReleaseEnvelopeSchema, PrivateKwM2TimedDatabaseSetupReceiptSchema,
   privateKwM2SetupDigest,
@@ -170,12 +171,12 @@ export function reloadPrivateKwM2HtmlAssessmentProgress(value: unknown, verified
 }
 
 export async function executePrivateKwM2HtmlAssessment(runPath: string, businessId: string,
-  mode: "PREPARE" | "EXECUTE" | "VERIFY" = "PREPARE", dependencies: Dependencies = {}) {
+  mode: "PREPARE" | "EXECUTE" | "VERIFY" | "INSPECT" = "PREPARE", dependencies: Dependencies = {}) {
   return withAssessmentLock(async (checkLock) => {
     const clock = dependencies.clock ?? (() => new Date());
     const files = inputs(checkLock);
     const run = PrivateKwM2AssessmentRunSchema.parse(files.read(runPath));
-    const requested = run.operations.find((operation) => operation.businessId === businessId);
+    const requested = mode === "INSPECT" ? run.operations.at(-1) : run.operations.find((operation) => operation.businessId === businessId);
     if (!requested) throw new Error("Business is outside this bounded assessment run.");
     const source = PrivateKwImportPlanSchema.parse(files.read(run.sourcePlanPath));
     const manifest = PrivateKwShadowSliceManifestSchema.parse(files.read(run.manifestPath));
@@ -217,6 +218,7 @@ export async function executePrivateKwM2HtmlAssessment(runPath: string, business
     const completed = new Map<string, PrivateKwM2HtmlAssessmentPlan>();
     type Terminal = { context: PrivateKwM2HtmlAssessmentContext; at: Date; report?: ReturnType<typeof buildPrivateKwM2ResearchReport> };
     const terminals = new Map<string, Terminal>();
+    const unavailable = new Set<string>();
     let prior = { id: setup.receiptId, digest: setup.receiptDigest };
     const check = () => { files.check(); assertSetupFileUnchanged(backupPath, backup.identity); };
     const readContext = async (operation: Operation, at: Date, reader = actual, checkpoint = prior, identity = original.identity) => {
@@ -277,17 +279,24 @@ export async function executePrivateKwM2HtmlAssessment(runPath: string, business
       for (const operation of run.operations) {
         const stored = rows.find((row) => row.businessId === operation.businessId);
         if (!stored) {
-          const isRequested = operation.businessId === businessId;
+          const isRequested = operation.businessId === requested.businessId;
           const hasReport = exists(absolute(operation.reportPath));
           const operationIndex = run.operations.indexOf(operation);
           const afterRequested = operationIndex > run.operations.indexOf(requested);
           const hasLaterAssessment = rows.some((row) => run.operations.findIndex((op) => op.businessId === row.businessId) > operationIndex);
           if (firstPending || (afterRequested && !hasReport && !hasLaterAssessment)) { firstPending ??= operation; continue; }
           const request = PrivateKwM2HtmlEvidenceRequestSchema.parse(files.read(operation.requestPath));
-          const historical = !isRequested || hasReport || mode === "VERIFY";
+          const historical = mode === "INSPECT" || !isRequested || hasReport || mode === "VERIFY";
           const at = historical ? new Date(request.requestedAt) : clock();
           if (!Number.isFinite(at.getTime()) || at.getTime() > clock().getTime()) throw new Error("Invalid evidence verification time.");
-          const context = await readContext(operation, at);
+          let context: PrivateKwM2HtmlAssessmentContext;
+          try { context = await readContext(operation, at); }
+          catch (error) {
+            // A missing capture can be shown as unavailable, but schema, identity, artifact or
+            // database contradictions fail the entire inspection. Never hide a corrupt receipt.
+            if (mode !== "INSPECT" || !(error instanceof Error) || error.message !== "M2_WEBSITE_RECEIPT_REPLAY_MISSING") throw error;
+            unavailable.add(operation.businessId); firstPending = operation; continue;
+          }
           if (context.evidence.status === "COMPLETE") {
             firstPending = operation;
             // A stray report file never selects historical time for a fresh assessment approval.
@@ -301,7 +310,7 @@ export async function executePrivateKwM2HtmlAssessment(runPath: string, business
             throw new Error("Only durable research or blocked outcomes can leave assessment review.");
           }
           assertTerminalOutputs(operation, report);
-          if (report && !hasReport && !isRequested) { firstPending = operation; continue; }
+          if (report && !hasReport && !isRequested && mode !== "INSPECT") { firstPending = operation; continue; }
           terminals.set(operation.businessId, { context, at, report });
           prior = report ? { id: report.reportId, digest: report.reportDigest }
             : { id: context.evidence.operationId, digest: context.evidence.operationDigest };
@@ -324,7 +333,7 @@ export async function executePrivateKwM2HtmlAssessment(runPath: string, business
       expectedBefore = snapshot(reference);
       matchSnapshot(snapshot(actual), expectedBefore);
       if (!rows.length) assertSetupFileUnchanged(databasePath, setup.fileIdentity);
-      if (!completed.has(businessId) && !terminals.has(businessId)) {
+      if (mode !== "INSPECT" && !completed.has(businessId) && !terminals.has(businessId)) {
         if (firstPending?.businessId !== businessId) throw new Error("Complete the next selected business in order.");
         if (mode === "VERIFY") throw new Error("No completed assessment exists to verify.");
         const at = requestedAt ?? clock();
@@ -342,6 +351,29 @@ export async function executePrivateKwM2HtmlAssessment(runPath: string, business
       expectedAfter = snapshot(reference);
     } finally { actual.close(); reference.close(); }
     check(); assertSetupSidecarsAbsent(databasePath); assertSetupFileUnchanged(databasePath, original.identity);
+    if (mode === "INSPECT") {
+      // Inspection never prepares, approves, inserts or republishes missing output. Its only
+      // transient file is the same owned operation lock used by setup and assessment writers.
+      const result = LocalM2OwnerConsoleSchema.parse({
+        status: "VERIFIED_LOCAL", verifiedAt: clock().toISOString(), manifestId: manifest.manifestId,
+        manifestSize: 10, selectedCount: run.operations.length,
+        entries: run.operations.map((operation) => {
+          const record = source.records.find((entry) => entry.business.id === operation.businessId)!;
+          const plan = completed.get(operation.businessId);
+          const terminal = terminals.get(operation.businessId);
+          return { businessId: operation.businessId, businessName: record.business.canonicalName,
+            sourceUrl: record.sourceRecord.sourceEvidenceUrl,
+            status: plan ? "COMPLETE" : terminal?.report ? "RESEARCH_REVIEW" : terminal ? "BLOCKED" : unavailable.has(operation.businessId) ? "UNAVAILABLE" : "PENDING",
+            reason: plan ? null : terminal?.report ? "More website research is required. No assessment was approved."
+              : terminal ? terminal.context.evidence.stopReason : unavailable.has(operation.businessId)
+                ? "No verifiable saved capture is available. Capture or failure evidence needs review."
+                : "This business has not completed the ordered local assessment workflow.",
+            detail: plan ? projectPrivateKwM2OwnerLeadDetail(plan) : null, research: terminal?.report ?? null };
+        }),
+      });
+      check(); assertSetupFileUnchanged(databasePath, original.identity);
+      return result;
+    }
     const terminal = terminals.get(businessId);
     if (terminal) {
       // Reopen and reload durable source/capture immediately before publishing even a research-only
@@ -456,7 +488,11 @@ export async function recordPrivateKwM2HtmlAssessmentDecision(runPath: string, b
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [runPath, businessId, option, decisionPath, ...extra] = process.argv.slice(2);
   const main = async () => {
-    if (!runPath || !businessId || extra.length || (decisionPath && option !== "--record-decision")) throw new Error("Usage: <run.json> <business-id> [--execute | --verify | --record-decision <decision.json>]");
+    if (!runPath || !businessId || extra.length || (decisionPath && option !== "--record-decision")) throw new Error("Usage: <run.json> <business-id> [--execute | --verify | --record-decision <decision.json>] or <run.json> --inspect");
+    if (businessId === "--inspect") {
+      if (option || decisionPath) throw new Error("Inspection does not accept mutation options.");
+      return executePrivateKwM2HtmlAssessment(runPath, "", "INSPECT");
+    }
     if (option === "--record-decision") {
       if (!decisionPath) throw new Error("A recorded explicit operator decision is required.");
       const decision = JSON.parse(readSetupFile(absolute(decisionPath), 25_000).bytes.toString("utf8"));

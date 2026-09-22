@@ -381,7 +381,7 @@ Retire entries when the architecture makes them impossible.
 - **Affected area:** qualification and UI.
 - **Verifying commit:** foundation began at `d5f0e52`; v3 gates pending.
 
-## BUILD-006 — Browser warmup streamed a development chunk during its rewrite
+## BUILD-006 — Development chunk rewrites can truncate browser scripts
 
 - **Symptom:** the authenticated owner UI rendered normally and local requests
   returned 200, but Playwright intermittently reported an empty error or
@@ -395,11 +395,17 @@ Retire entries when the architecture makes them impossible.
   original Content-Length, so the server completed a valid gzip/200 response
   containing truncated JavaScript. The captured browser script matched that
   prefix exactly. This occurred with fresh `.next` assets and no concurrent
-  build. Separate Next/OpenNext builds sharing `.next` remain another hazard.
+  build. The longer M2 run reproduced this after warmup: Chromium captured an
+  exact 327,680-byte prefix of the same 3,138,186-byte layout chunk during mobile
+  navigation. Initial warmup alone does not protect later development page
+  eviction/recompilation. Separate Next/OpenNext builds sharing `.next` remain
+  another hazard.
 - **Proven fix:** let every Next/OpenNext/Cloudflare build and dry run exit before
-  starting `npm run test:owner-ui`, then remove only the repository's generated
-  `.next` directory before starting the isolated development server. First fetch
-  and fully consume all three authenticated owner routes through local HTTP,
+  starting `npm run test:owner-ui`. The current gate requires the completed
+  production `.next/BUILD_ID` and serves it with `next start`, preserving immutable
+  built assets throughout the longer workflow. It never clears that build or
+  starts a development compiler. First fetch
+  and fully consume all authenticated owner routes through local HTTP,
   with no browser reading their scripts. Then warm those routes in a disposable
   browser page, awaiting `load` before each next navigation; SSR headings alone
   do not establish async script completion. Close it and use a fresh page for
@@ -408,13 +414,14 @@ Retire entries when the architecture makes them impossible.
   Wait up to five seconds for each exact route title after visible readiness;
   this allows asynchronous metadata application without weakening the expected
   title.
-  After this correction the external trace recorded four layout rewrites before
+  With the earlier three-route warmup correction, the external trace recorded four layout rewrites before
   the first browser read and eight complete 3,138,186-byte reads, without overlap.
   Waiting for browser `load` alone passed but still allowed a rewrite/read overlap;
-  both the HTTP preparation and browser load barrier are required.
+  both the HTTP preparation and browser load barrier were required. Production
+  assets now remove the later eviction/rewrite path as well.
 - **Prevention/test:** `AGENTS.md` forbids concurrent execution, and the owner UI
-  acceptance command clears its exact generated `.next` directory, prepares and
-  warms every measured route, waits for exact titles, and proves six fresh-page
+  acceptance command requires the completed build, prepares and
+  warms every measured route, waits for exact titles, and checks eight fresh-page
   views. `owner-ui-warmup-streaming.acceptance.ts` serves delayed async scripts
   over loopback and executes the actual warmup function. It failed on both early
   navigations with the former DOMContentLoaded behavior, then passed with the

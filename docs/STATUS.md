@@ -1,5 +1,70 @@
 # Current status — Axiom Revenue Engine
 
+## M2 durable partial capture and local research console
+
+**Updated:** 2026-09-21 (America/Toronto). **Verified baseline:** `2d27e2f`,
+recording code checkpoint `b32e7a6`. The current implementation has passed all
+required checks; the following documentation commit records its saved identity.
+M2 remains incomplete and M3 has not started.
+
+Supported selected-page HTTP/transport failures now have strict v2 PARTIAL
+receipts. Failed pages carry exact transport witnesses and no content/facts;
+replay rejects altered witnesses and missing homepage/audit proof. A new
+admin-only local research console derives its view from the actual assessment
+runner's read-only INSPECT mode. It lists saved assessments, research reviews,
+policy blocks and unfinished work, with page evidence and a next review step.
+The bridge is disabled by default and in Cloudflare binding contexts. Inspection
+never approves assessments, publishes missing reports or changes database rows.
+It derives all ten entries from native saved evidence in a fresh CLI process.
+
+Integration exposed concrete issues beyond the in-memory fixtures:
+the native store's input schema omitted HTTP status/redirect metadata that its
+stored schema already supported; policy-denial receipts incorrectly required an
+allowed policy; and the console imported native filesystem code through a shared
+digest helper. The fixes preserve stored formats and digest semantics. Denial
+receipts still require the exact current approval chain and complete transport
+witness, and cannot retain page content. Storage tests now use unique UUID
+directories and bounded cleanup; they no longer delete the default evidence root.
+
+The longer browser workflow reproduced a truncated development layout chunk
+after warmup (327,680 bytes, an exact prefix of the 3,138,186-byte file). Owner
+acceptance now serves the completed production build with `next start` and keeps
+the existing streaming regression. It checks actual unauthenticated redirection
+and absence of business data, then signs the promoted fixture owner in again to
+avoid its stale signup role. Upload selectors target the visible enabled control.
+Uncaught browser errors remain failures.
+
+Production-mode owner acceptance passed: **list 378 ms, dossier 87 ms, M2 review
+4,617 ms; widths 1440/390; eight WCAG views; zero external requests**. The test
+proved five saved assessments, three research reviews (including a partial page)
+and two policy blocks, all with source links and next steps. M2 database bytes and
+identity stayed unchanged across review. Screenshots are retained at
+`output/playwright/m2-review-desktop.png` and `m2-review-mobile.png`.
+
+Safety, TypeScript, lint, the Cloudflare build (2,022 files, zero local secret
+values) and deployment dry run (no upload, autonomy false/zero) passed. The first
+full suite had 662 tests: 657 passed, two stale test assertions failed, and three
+Windows symlink-privilege skips. Both assertions were corrected; the focused
+rerun passed all 11 tests. The final full suite passed: **662 tests, 659 passed,
+zero failures, three expected Windows symlink-privilege skips; 589.1 seconds**.
+Focused PARTIAL tests passed 28, native storage 26 plus one expected Windows skip,
+and the bridge default-deny/path-boundary test passed.
+
+No production/staging inspection, real migration/capture, paid provider operation,
+deployment, outreach or spend occurred. Runtime automation is off or unverified.
+The C$50/month ceiling and zero paid mailboxes remain unchanged. No owner decision
+is needed for this local checkpoint. Real capture/setup/assessment packets
+remain unapproved. Luna owns bounded repairs; root owns integration and final checks.
+
+The next three concrete actions are:
+
+1. Prepare the exact real one-business capture, setup and assessment review packet
+   using the saved console workflow and current source/retention evidence.
+2. After its separate approval, execute and review that one business, then prepare
+   the remaining businesses in the exact-ten evaluation with measured owner time.
+3. Complete M2's real evidence gate before starting M3's labelled quality gate.
+   Synthetic software proof counts as zero real evaluated businesses.
+
 ## M2 research-only and blocked outcome integration
 
 **Updated:** 2026-09-21 (America/Toronto). **Verified code checkpoint:** `b32e7a6`

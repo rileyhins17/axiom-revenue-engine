@@ -25,7 +25,7 @@ import { buildPrivateKwM2HtmlAuditReceipt, type PrivateKwM2HtmlAuditReceipt } fr
 import { createPrivateKwM2HtmlEvidenceReceiptStore, privateKwM2ReceiptCanonicalDigest, type PrivateKwM2HtmlEvidenceReceiptStore } from "@/lib/revenue-engine/private-kw-m2-html-evidence-receipt";
 import {
   BlockedEvidenceSchema, PageReceiptSchema, PageSelectionSchema, PrivateKwM2HtmlEvidenceRequestSchema,
-  PrivateKwM2WebsiteEvidenceReceiptSchema, PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION, SourceIdentitySchema, StatusSchema,
+  PrivateKwM2WebsiteEvidenceReceiptSchema, PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION, PRIVATE_KW_M2_HTML_EVIDENCE_PARTIAL_WORKFLOW_VERSION, SourceIdentitySchema, StatusSchema,
   type PrivateKwM2HtmlEvidenceRequest, type PrivateKwM2WebsiteEvidenceReceipt,
 } from "@/lib/revenue-engine/private-kw-m2-html-evidence-schema";
 export {
@@ -97,8 +97,9 @@ function projectFacts(facts: HtmlPageFacts, expectedServices: string[], expected
 function refs(value: PrivateKwHtmlEvidenceRef) {
   return { contentRef: "contentRef" in value ? value.contentRef : null, metadataRef: "metadataRef" in value ? value.metadataRef : null, factsRef: "factsRef" in value ? value.factsRef : null, receiptRef: "receiptRef" in value ? value.receiptRef : null };
 }
-function makePage(pageKind: "HOME" | "SERVICE" | "ABOUT" | "CONTACT", capture: WebsiteCaptureResult, facts: HtmlPageFacts | null, storageOutcome: z.infer<typeof PageReceiptSchema>["storageOutcome"], storageRefs: z.infer<typeof PageReceiptSchema>["storageRefs"]) {
-  return PageReceiptSchema.parse({ pageKind, requestedUrl: capture.requestedUrl ?? "https://invalid.invalid/", finalUrl: capture.finalUrl, capturedAt: capture.capturedAt, outcome: capture.outcome, statusCode: capture.statusCode, redirectCount: capture.redirectCount, bodyBytes: capture.bodyBytes, contentDigest: capture.outcome === "CAPTURED" ? capture.contentDigest : null, factsDigest: facts ? digest(projectFacts(facts, [], [])) : null, storageOutcome, storageRefs, failureCode: capture.failure?.code ?? null });
+function makePage(pageKind: "HOME" | "SERVICE" | "ABOUT" | "CONTACT", capture: WebsiteCaptureResult, facts: HtmlPageFacts | null, storageOutcome: z.infer<typeof PageReceiptSchema>["storageOutcome"], storageRefs: z.infer<typeof PageReceiptSchema>["storageRefs"], failedPageTransportReceiptIds?: number[]) {
+  const failedWitness = failedPageTransportReceiptIds?.length ? { failedPageTransportReceiptIds } : {};
+  return PageReceiptSchema.parse({ pageKind, requestedUrl: capture.requestedUrl ?? "https://invalid.invalid/", finalUrl: capture.finalUrl, capturedAt: capture.capturedAt, outcome: capture.outcome, statusCode: capture.statusCode, redirectCount: capture.redirectCount, bodyBytes: capture.bodyBytes, contentDigest: capture.outcome === "CAPTURED" ? capture.contentDigest : null, factsDigest: facts ? digest(projectFacts(facts, [], [])) : null, storageOutcome, storageRefs, failureCode: capture.failure?.code ?? null, ...failedWitness });
 }
 function sourcePolicySummary(policy: PrivateKwSourcePolicyDecision | null) {
   return policy ? PrivateKwSourcePolicyDecisionSchema.parse(policy) : null;
@@ -131,12 +132,20 @@ function validateTransportLedger(receipts: readonly unknown[], attempts: number,
   }
   return parsed;
 }
+function failedPageTransportWitnessIds(page: z.infer<typeof PageReceiptSchema>, receipts: readonly z.infer<typeof PrivateKwPublicHttpTransportReceiptSchema>[], policy: PrivateKwSourcePolicyDecision | null) {
+  if (page.outcome === "CAPTURED" || !page.failureCode) return [];
+  const policyIds = new Set(policy?.transportReceiptIds ?? []);
+  const candidates = receipts.filter((receipt) => receipt.requestId > 0 && !policyIds.has(receipt.requestId) && receipt.normalizedUrl === page.requestedUrl);
+  if (page.failureCode === "HTTP_STATUS") return candidates.filter((receipt) => receipt.statusCode === page.statusCode && receipt.statusCode >= 400).map((receipt) => receipt.requestId);
+  if (page.failureCode === "FETCH_FAILED" || page.failureCode === "TIMEOUT") return candidates.filter((receipt) => receipt.errorCode !== undefined && receipt.statusCode === undefined).map((receipt) => receipt.requestId);
+  return [];
+}
 function buildReceipt(input: { request: PrivateKwM2HtmlEvidenceRequest; identity: Identity; authorization: PrivateKwM2ExecutionAuthorization; status: z.infer<typeof StatusSchema>; stopReason: string | null; policy: PrivateKwSourcePolicyDecision | null; plan: z.infer<typeof PageSelectionSchema> | null; pages: z.infer<typeof PageReceiptSchema>[]; audit: PrivateKwM2HtmlAuditReceipt | null; blockedEvidence?: z.infer<typeof BlockedEvidenceSchema> | null; transport: ReturnType<typeof createPrivateKwPublicHttpTransport> | undefined; attempts: number; operationId?: string }) {
   const transportReceipts = input.transport?.takeReceipts() ?? [];
   const parsedTransportReceipts = validateTransportLedger(transportReceipts, input.attempts, input.authorization.networkRequestCap, input.policy);
   const transportIds = parsedTransportReceipts.map((receipt) => receipt.requestId);
   const transportDigests = parsedTransportReceipts.map((receipt) => receipt.receiptDigest);
-  const core = { receiptVersion: PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION, operationId: input.operationId ?? operationIdFor(input.request, input.identity), requestId: input.request.requestId, requestedAt: input.request.requestedAt, status: input.status, stopReason: input.stopReason, businessId: input.identity.businessId, sourceIdentity: { businessId: input.identity.businessId, evaluationCandidateId: input.identity.evaluationCandidateId, sourceRecordId: input.identity.sourceRecordId, sourceRunId: input.identity.sourceRunId, sourcePlanDigest: input.identity.sourcePlanDigest, manifestDigest: input.identity.manifestDigest, sourceEvidenceUrl: input.identity.sourceEvidenceUrl, approvedWebsiteUrl: input.identity.approvedWebsiteUrl, sourceCapturedAt: input.identity.sourceCapturedAt, sourceIdentityDigest: input.identity.sourceIdentityDigest }, authorizationDigest: input.authorization.authorizationDigest, authorizationExpiresAt: input.authorization.expiresAt, sourcePolicy: sourcePolicySummary(input.policy), pageSelection: input.plan, pages: input.pages, audit: input.audit, blockedEvidence: input.blockedEvidence ?? null, transportReceipts: parsedTransportReceipts, transportReceiptIds: transportIds, transportReceiptDigests: transportDigests, networkRequestCount: input.attempts, networkRequestCap: input.authorization.networkRequestCap, providerOperations: 0 as const, costAuthorizedUsd: 0 as const, authority: input.authorization.authority };
+  const core = { receiptVersion: input.status === "PARTIAL" ? PRIVATE_KW_M2_HTML_EVIDENCE_PARTIAL_WORKFLOW_VERSION : PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION, operationId: input.operationId ?? operationIdFor(input.request, input.identity), requestId: input.request.requestId, requestedAt: input.request.requestedAt, status: input.status, stopReason: input.stopReason, businessId: input.identity.businessId, sourceIdentity: { businessId: input.identity.businessId, evaluationCandidateId: input.identity.evaluationCandidateId, sourceRecordId: input.identity.sourceRecordId, sourceRunId: input.identity.sourceRunId, sourcePlanDigest: input.identity.sourcePlanDigest, manifestDigest: input.identity.manifestDigest, sourceEvidenceUrl: input.identity.sourceEvidenceUrl, approvedWebsiteUrl: input.identity.approvedWebsiteUrl, sourceCapturedAt: input.identity.sourceCapturedAt, sourceIdentityDigest: input.identity.sourceIdentityDigest }, authorizationDigest: input.authorization.authorizationDigest, authorizationExpiresAt: input.authorization.expiresAt, sourcePolicy: sourcePolicySummary(input.policy), pageSelection: input.plan, pages: input.pages, audit: input.audit, blockedEvidence: input.blockedEvidence ?? null, transportReceipts: parsedTransportReceipts, transportReceiptIds: transportIds, transportReceiptDigests: transportDigests, networkRequestCount: input.attempts, networkRequestCap: input.authorization.networkRequestCap, providerOperations: 0 as const, costAuthorizedUsd: 0 as const, authority: input.authorization.authority };
   return PrivateKwM2WebsiteEvidenceReceiptSchema.parse({ ...core, operationDigest: digest(core) });
 }
 async function failReceipt(input: { request: PrivateKwM2HtmlEvidenceRequest; identity: Identity; authorization: PrivateKwM2ExecutionAuthorization; reason: string; policy: PrivateKwSourcePolicyDecision | null; transport?: ReturnType<typeof createPrivateKwPublicHttpTransport>; attempts: number; capture?: WebsiteCaptureResult | null; storage?: PrivateKwHtmlEvidenceRef | null; blockedEvidence?: z.infer<typeof BlockedEvidenceSchema> | null }) {
@@ -192,8 +201,8 @@ function validateReplayShape(receipt: PrivateKwM2WebsiteEvidenceReceipt, authori
   if (receipt.status === "FAILED" ? !receipt.stopReason : receipt.stopReason !== null) throw new Error("REPLAY_STATUS_REASON_MISMATCH");
   if (receipt.status === "COMPLETE" && (!selection || selection.status !== "READY" || captured.length !== pages.length || !receipt.audit)) throw new Error("REPLAY_COMPLETE_STATUS_MISMATCH");
   if (receipt.status === "RESEARCH_REQUIRED" && (!selection || selection.status !== "PARTIAL")) throw new Error("REPLAY_RESEARCH_STATUS_MISMATCH");
-  if (receipt.status === "PARTIAL" && (!selection || captured.length === pages.length)) throw new Error("REPLAY_PARTIAL_STATUS_MISMATCH");
-  if (selection?.status === "READY" && (receipt.status !== "COMPLETE" || captured.length !== pages.length)) throw new Error("REPLAY_READY_SELECTION_MISMATCH");
+  if (receipt.status === "PARTIAL" && (!selection || captured.length === pages.length || !receipt.audit || !captured.some((page) => page.pageKind === "HOME"))) throw new Error("REPLAY_PARTIAL_STATUS_MISMATCH");
+  if (selection?.status === "READY" && (receipt.status !== "COMPLETE" && receipt.status !== "PARTIAL" || receipt.status === "COMPLETE" && captured.length !== pages.length)) throw new Error("REPLAY_READY_SELECTION_MISMATCH");
   if (selection?.status === "PARTIAL" && receipt.status !== "RESEARCH_REQUIRED" && receipt.status !== "PARTIAL") throw new Error("REPLAY_PARTIAL_SELECTION_MISMATCH");
   if (receipt.status === "FAILED" && !receipt.stopReason) throw new Error("REPLAY_FAILURE_REASON_MISSING");
   if (receipt.audit) {
@@ -231,6 +240,21 @@ async function validateSealedReplay(receipt: PrivateKwM2WebsiteEvidenceReceipt, 
   if (policy && (policy.robotsUrl !== new URL("/robots.txt", input.identity.approvedWebsiteUrl).toString() || policy.termsDecision !== decision.termsDecision || policy.providerOperationsAuthorized !== 0 || policy.costAuthorizedUsd !== 0)) throw new Error("REPLAY_SOURCE_POLICY_MISMATCH");
   const transport = validateTransportLedger(receipt.transportReceipts, receipt.networkRequestCount, receipt.networkRequestCap, policy);
   if (transport.map((entry) => entry.requestId).join(",") !== receipt.transportReceiptIds.join(",") || transport.map((entry) => entry.receiptDigest).join(",") !== receipt.transportReceiptDigests.join(",")) throw new Error("REPLAY_TRANSPORT_SET_MISMATCH");
+  const policyIds = new Set(policy?.transportReceiptIds ?? []);
+  const usedFailedIds = new Set<number>();
+  receipt.pages.filter((page) => page.outcome !== "CAPTURED").forEach((page) => {
+    const ids = page.failedPageTransportReceiptIds ?? [];
+    const canonicalIds = failedPageTransportWitnessIds(page, transport, policy);
+    if (canonicalIds.length === 0 || ids.length !== canonicalIds.length || ids.some((id, index) => id !== canonicalIds[index])) throw new Error("REPLAY_FAILED_PAGE_TRANSPORT_WITNESS_MISMATCH");
+    if (receipt.receiptVersion !== PRIVATE_KW_M2_HTML_EVIDENCE_PARTIAL_WORKFLOW_VERSION || ids.length === 0 || ids.some((id, index) => index > 0 && id <= ids[index - 1]! || policyIds.has(id) || usedFailedIds.has(id))) throw new Error("REPLAY_FAILED_PAGE_TRANSPORT_WITNESS_MISMATCH");
+    ids.forEach((id) => usedFailedIds.add(id));
+    const witnesses = ids.map((id) => transport.find((entry) => entry.requestId === id));
+    if (witnesses.some((entry) => !entry) || witnesses[0]!.normalizedUrl !== page.requestedUrl) throw new Error("REPLAY_FAILED_PAGE_TRANSPORT_URL_MISMATCH");
+    const terminal = witnesses.at(-1)!;
+    if (page.failureCode === "HTTP_STATUS" && (terminal.statusCode !== page.statusCode || terminal.statusCode < 400)) throw new Error("REPLAY_FAILED_PAGE_HTTP_WITNESS_MISMATCH");
+    if ((page.failureCode === "FETCH_FAILED" || page.failureCode === "TIMEOUT") && (!terminal.errorCode || terminal.statusCode !== undefined)) throw new Error("REPLAY_FAILED_PAGE_ERROR_WITNESS_MISMATCH");
+  });
+  if (receipt.pages.some((page) => page.outcome === "CAPTURED" && page.failedPageTransportReceiptIds !== undefined)) throw new Error("REPLAY_CAPTURED_PAGE_TRANSPORT_WITNESS_MISMATCH");
   validateReplayShape(receipt, input.authorization, { takeReceipts: () => transport } as unknown as ReturnType<typeof createPrivateKwPublicHttpTransport>);
   if (!policy || (receipt.pageSelection && receipt.pageSelection.sourceIdentityDigest !== input.identity.sourceIdentityDigest) || (receipt.audit?.availability && receipt.audit.availability.sourceIdentityDigest !== input.identity.sourceIdentityDigest)) throw new Error("REPLAY_CANONICAL_RECEIPT_MISMATCH");
   if (receipt.blockedEvidence) {
@@ -536,7 +560,7 @@ export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencie
     if (isAuthorizationExpired(error, authorization, clock)) return failReceipt({ request, identity, authorization, reason: "AUTHORIZATION_EXPIRED", policy: sourcePolicy, transport: budget, attempts, capture: homeCapture });
     return failReceipt({ request, identity, authorization, reason: "STORE_CONFLICT", policy: sourcePolicy, transport: budget, attempts, capture: homeCapture });
   }
-  const pageResults: z.infer<typeof PageReceiptSchema>[] = [makePage("HOME", homeCapture, homeFacts, homeRef?.outcome ?? "NONE", homeRef ? refs(homeRef) : { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null })];
+  let pageResults: z.infer<typeof PageReceiptSchema>[] = [makePage("HOME", homeCapture, homeFacts, homeRef?.outcome ?? "NONE", homeRef ? refs(homeRef) : { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null })];
   const capturedPages: Array<{ pageKind: "HOME" | "SERVICE" | "ABOUT" | "CONTACT"; capture: WebsiteCaptureResult; facts: HtmlPageFacts }> = [{ pageKind: "HOME", capture: homeCapture, facts: homeFacts }];
   let unsealedFailure = false;
   for (const selected of plan.selectedPages.filter((page) => page.pageKind !== "HOME")) {
@@ -577,11 +601,24 @@ export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencie
     }
     pageResults.push(makePage(selected.pageKind, capture, facts, pageRef?.outcome ?? "NONE", pageRef ? refs(pageRef) : { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null }));
   }
+  const transportLedger = validateTransportLedger(budget.takeReceipts(), attempts, authorization.networkRequestCap, sourcePolicy);
+  pageResults = pageResults.map((page) => {
+    const witnessIds = failedPageTransportWitnessIds(page, transportLedger, sourcePolicy);
+    return witnessIds.length ? PageReceiptSchema.parse({ ...page, failedPageTransportReceiptIds: witnessIds }) : page;
+  });
   const audit = buildPrivateKwM2HtmlAuditReceipt({ sourceIdentityDigest: identity.sourceIdentityDigest, businessId: identity.businessId, businessName: identity.record.businessName, niche: identity.record.niche, expectedServices, expectedLocations, sourceEvidenceUrl: identity.record.sourceEvidenceUrl, pages: capturedPages });
   const failedSubpage = pageResults.some((page) => page.pageKind !== "HOME" && page.outcome !== "CAPTURED");
-  const status = storageFailure ? "FAILED" : failedSubpage ? "PARTIAL" : plan.status === "PARTIAL" ? "RESEARCH_REQUIRED" : "COMPLETE";
-  const receipt = buildReceipt({ request, identity, authorization, status, stopReason: storageFailure ? "STORE_CONFLICT" : null, policy: sourcePolicy, plan, pages: pageResults, audit, transport: budget, attempts });
-  if (unsealedFailure) return receipt;
+  const durablePartial = failedSubpage && pageResults.filter((page) => page.pageKind !== "HOME" && page.outcome !== "CAPTURED").every((page) => page.failedPageTransportReceiptIds?.length);
+  const status = storageFailure ? "FAILED" : failedSubpage && durablePartial ? "PARTIAL" : failedSubpage ? "FAILED" : plan.status === "PARTIAL" ? "RESEARCH_REQUIRED" : "COMPLETE";
+  if (status !== "PARTIAL") {
+    pageResults = pageResults.map((page) => {
+      const sanitized = { ...page };
+      delete sanitized.failedPageTransportReceiptIds;
+      return sanitized;
+    });
+  }
+  const receipt = buildReceipt({ request, identity, authorization, status, stopReason: storageFailure ? "STORE_CONFLICT" : status === "FAILED" && failedSubpage ? "SUBPAGE_CAPTURE_FAILED" : null, policy: sourcePolicy, plan, pages: pageResults, audit, transport: budget, attempts });
+  if ((unsealedFailure && !durablePartial) || status !== "PARTIAL" && failedSubpage) return receipt;
   await receiptStore.publishSealed(receipt);
   return receipt;
 }

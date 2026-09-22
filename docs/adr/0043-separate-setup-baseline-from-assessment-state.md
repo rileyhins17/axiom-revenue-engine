@@ -133,13 +133,30 @@ business can be regenerated; conflicting files stop. Read-only terminal replay
 uses the recorded capture request time, checked against the authorization chain
 and trusted clock. It does not extend authority for any new assessment write.
 
-The current Task 4 producer leaves failed-subpage PARTIAL and failed-homepage
-receipts unsealed. They remain explicit no-output failures at this boundary;
-the pure report projection is not a durable failure witness. Persisted partial
-review, owner-console integration and the real one-then-ten evaluation remain
-unfinished. Acceptance covers a mixed sequence of two research-only reports,
-two blocked captures and one approved complete assessment, with missing/tampered
-report and evidence checks, exact replay and unchanged database bytes.
+Task 4 now uses a v2 receipt exclusively for supported PARTIAL captures. Every
+failed selected page binds its exact ordered transport witness; replay compares
+the whole witness set with the canonical ledger selection and requires a saved
+homepage and audit. Supported HTTP/transport failures preserve no page content
+or facts. Stream/redirect failures without that witness, failed homepages,
+storage conflicts and expiry remain unsealed. COMPLETE, research-required and
+policy-blocked receipts retain v1. Operation identity remains stable, so a new
+version cannot silently replace an existing sealed operation.
+
+The dedicated admin-only `/leads/m2` page calls the same runner's INSPECT mode
+through a Node-only bridge. It starts a bounded CLI subprocess with one fixed
+server-configured run path; it accepts no browser paths or reports. Cloudflare
+binding contexts and a missing local opt-in disable the bridge. This does not
+make the local SQLite setup receipt portable to D1 or change legacy projections.
+
+INSPECT authenticates existing approvals, canonical source/evidence and the
+entire reconstructed database before rendering derived views. It does not
+prepare candidates, approve, insert or republish files. Its only transient
+output is the owned operation lock. Missing capture evidence is explicit, while
+contradictory saved evidence fails the entire view. It exposes all selected
+businesses exactly once, with pending successors when ordered work is unfinished.
+The native-file ten-business fixture exercises the actual stores and fresh CLI
+reload; the browser covers complete, research, blocked and partial entries.
+The real one-then-ten evaluation remains unfinished.
 
 This decision grants no migration, real research, provider, deployment, contact,
 qualification, outreach or spend authority. See STATUS for current verification.

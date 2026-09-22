@@ -8,14 +8,24 @@ The application is in a controlled rebuild. M1 verifies one synthetic business t
 
 The checkpoint is synthetic, offline, and disconnected from providers, network access, contacts, qualification execution, outreach, sending, and spend. Its report records `fixtureOnly=true`, `synthetic=true`, zero network/provider operations, all contact/consent/qualification/outreach/send authority false, `costAuthorizedUsd=0`, and `contactReview.state=NOT_RECORDED`. `localAssessmentMutationAuthorized=true` covers only the explicitly approved local shadow SQLite write. Riley has no OpenAI API keys. Existing adapter code is not a connected service. Jev is an optional later experiment, not a prerequisite for a useful deterministic/manual pilot. Public DNS observed on 2026-09-21 supports Cloudflare root Email Routing MX/SPF and a published Resend verification token, but does not prove active forwarding, a Resend account/key, sender verification, complete DKIM, or send readiness. The target mail route has zero paid mailbox seats: Cloudflare forwards inbound mail to existing owner destinations and a typed Resend outbound/reply adapter remains separately gated.
 
-Start with [STATUS](docs/STATUS.md) for the verified commit, current artifacts, test evidence and blockers. The local setup command, `npm run kw:prepare-m2-database -- <recorded-release-path>`, defaults to preflight. Applying 0069 requires explicit `--apply` and a current recorded setup release; recovery requires a separate recorded rollback release. Follow the [runbook](docs/RUNBOOK.md#m2-local-database-setup-and-recovery). The assessment command, `npm run kw:assess-m2-html -- <run.json> <business-id>`, prepares a separate owner decision from already captured HTML evidence. Its execution and durable verification modes are documented in the [HTML assessment runbook](docs/RUNBOOK.md#m2-local-html-assessment-and-restart). This path produces a private JSON owner dossier with HTML limitations and no contact authority. Production, staging, provider, contact, outreach and spend state remain unknown or off. M2's real one-then-ten evaluation, owner-console integration and subsequent milestones are still incomplete.
+Start with [STATUS](docs/STATUS.md) for the verified commit, current artifacts, test evidence and blockers. The local setup command, `npm run kw:prepare-m2-database -- <recorded-release-path>`, defaults to preflight. Applying 0069 requires explicit `--apply` and a current recorded setup release; recovery requires a separate recorded rollback release. Follow the [runbook](docs/RUNBOOK.md#m2-local-database-setup-and-recovery). The assessment command, `npm run kw:assess-m2-html -- <run.json> <business-id>`, prepares a separate owner decision from already captured HTML evidence. Its execution and durable verification modes are documented in the [HTML assessment runbook](docs/RUNBOOK.md#m2-local-html-assessment-and-restart). This path produces a private JSON owner dossier with HTML limitations and no contact authority. Production, staging, provider, contact, outreach and spend state remain unknown or off. M2's real one-then-ten evaluation and subsequent milestones are still incomplete.
 
 For sealed evidence that needs more research, the same assessment command saves
 a research report with missing pages and limitations, without an assessment
 approval or database write. Sealed policy blocks return their existing receipt
-and allow the ordered run to continue. Failed-subpage and failed-homepage captures
-currently remain unsealed and stop without a report. See the assessment runbook
-for those boundaries; the dedicated M2 owner console is still unfinished.
+and allow the ordered run to continue. Selected-page HTTP failures and transport
+errors now retain strict v2 partial receipts and research reports. Failed
+homepages, unsupported stream/redirect failures and storage conflicts remain
+unsealed and stop without a report.
+
+The admin-only `/leads/m2` research console independently verifies saved local
+evidence and shows each selected business, page failures and next review step.
+It is disabled by default and unavailable on Cloudflare. A Node server with an
+existing approved local run can set `AXIOM_M2_LOCAL_REVIEW_ENABLED=1` and
+`AXIOM_M2_LOCAL_REVIEW_RUN=data/kw-evaluation/<run>.json`. The equivalent read-only
+CLI is `npm run kw:assess-m2-html -- data/kw-evaluation/<run>.json --inspect`.
+Neither view approves assessments or publishes missing reports. See the
+[console runbook](docs/RUNBOOK.md#m2-local-owner-research-console) for setup and limits.
 
 ## Read the plan
 
@@ -69,7 +79,7 @@ npm run build:cloudflare
 npx wrangler deploy --env="" --dry-run --autoconfig false
 ```
 
-Run `npm run test:owner-ui` only after all build/dry-run commands exit; they share `.next`. Use fake providers, isolated databases and mail sinks. Local results, exact-commit Linux CI, staging smoke and production evidence are separate gates. See STATUS for the current results; a successful build does not cancel failing tests.
+Run `npm run test:owner-ui` only after all build/dry-run commands exit; they share `.next`. The test requires the completed production build and starts it with `next start` against synthetic databases; it does not start a development compiler. Use fake providers, isolated databases and mail sinks. Local results, exact-commit Linux CI, staging smoke and production evidence are separate gates. See STATUS for the current results; a successful build does not cancel failing tests.
 
 ## Deployment and data safety
 

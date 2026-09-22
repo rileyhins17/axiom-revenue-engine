@@ -3,7 +3,7 @@ import { z } from "zod";
 import { privateKwM2Digest } from "./private-kw-m2-authorization";
 import { PrivateKwM2HtmlAuditReceiptSchema } from "./private-kw-m2-html-audit";
 import { PageReceiptSchema, SourceIdentitySchema, PrivateKwM2WebsiteEvidenceReceiptSchema } from "./private-kw-m2-html-evidence-schema";
-import { privateKwM2ReceiptCanonicalDigest } from "./private-kw-m2-html-evidence-receipt";
+import { privateKwM2ReceiptCanonicalDigest } from "./private-kw-m2-canonical";
 
 const Digest = z.string().regex(/^[a-f0-9]{64}$/);
 const Id = z.string().min(1).max(200);
