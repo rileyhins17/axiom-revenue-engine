@@ -43,6 +43,13 @@ price/FX/tax and fixed/prepaid commitments, a staging migration/backup/rollback
 gate, and one supervised real website-need assessment remain unresolved. The
 new boundary alone does not authorize a quote, a paid attempt, or a live job.
 
+An [internal founder calling recap](research/2026-09-22-founder-calling-feedback.md)
+adds a separate commercial signal: Aidan reported 18 extension/export call
+attempts and no closes, including no-site businesses that did not want more
+demand. Follow-up labels and the possible RoofSaver name match need review.
+These were not Revenue Engine operations and do not supply an individual M2
+identity decision, website assessment, or targeting-policy change.
+
 Next three concrete actions:
 
 1. Record per-business owner corrections on the ten-business evaluation cohort
