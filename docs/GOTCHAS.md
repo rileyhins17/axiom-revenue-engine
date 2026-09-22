@@ -421,6 +421,8 @@ Retire entries when the architecture makes them impossible.
   Wrangler dry runs, Windows/OneDrive workspaces, and local release evidence.
 - **Verifying commit:** branch HEAD containing the sequential browser-gate rule,
   exact `.next` cleanup, and six-view Quality Lab acceptance.
+  `6aaf216` adds tested source attribution and records the remaining truncated
+  response failure; it does not claim that failure fixed.
 
 ## BUILD-001 — Local success did not equal Linux/Cloudflare success
 

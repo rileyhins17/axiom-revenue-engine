@@ -2,9 +2,10 @@
 
 ## M2 complete-capture assessment workflow
 
-**Updated:** 2026-09-21 (America/Toronto). **Code checkpoint:** this work cycle,
-based on `20ab6a6`; exact commit identity is recorded in the following status
-update. Assessment verification passed; the owner-browser gate remains open.
+**Updated:** 2026-09-21 (America/Toronto). **Code checkpoint:** `6aaf216`
+(`feat(revenue): persist local HTML assessment checkpoints`), based on
+`20ab6a6`. Assessment verification passed; the owner-browser gate remains open.
+This following documentation update records the committed checkpoint identity.
 The previous code checkpoint is `52f9009`.
 
 The local COMPLETE HTML path now connects actual recorded source rows, Task 4
