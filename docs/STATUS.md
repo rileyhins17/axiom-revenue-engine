@@ -1,5 +1,60 @@
 # Current status — Axiom Revenue Engine
 
+## Today owner-workflow redesign checkpoint; production goal remains open
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified code commit:** `a3cb019`
+(`feat(revenue): make Today an owner decision workspace`). This is a local
+owner-UI checkpoint, not an M2 exit gate or production release. M1's synthetic
+offline flow remains complete; M2 has
+**0/10 real engine assessments**; M3–M7 and production remain incomplete.
+
+Today now leads owners through the weekly safety, business review, human-action
+and learning routine with plain-language cards and a direct Business Review
+action. The main screen shows an unverified email route and distinguishes a
+reported emergency stop from a failed status read. Replies and follow-ups show
+unavailable states instead of invented zeroes, and bounded list counts use `+`
+when a query limit may hide more items. The old send and intake telemetry is
+closed under Advanced system details and withheld when critical reads fail.
+The shell no longer displays a hard-coded `prod` badge, static `Safety gated`
+badges, or legacy lead-score navigation counts. It no longer polls the legacy
+stats endpoint for those badges. No runtime gate or provider route changed.
+
+**Verification:** `npm run check:safety`, `npm test -- --test-concurrency=1`
+(729 tests: 726 passed, zero failed, three expected Windows skips),
+`npm run typecheck`, `npm run lint`, `npm run build:cloudflare`,
+`npx wrangler deploy --env="" --dry-run --autoconfig false`, and
+`git diff --check` passed. The full suite began before the final cosmetic
+contrast and sidebar cleanup; final typecheck, lint, build, dry run and browser
+acceptance covered those edits. `npm run test:owner-ui` passed after every
+build and dry run exited: desktop list 226 ms, dossier 113 ms, M2 review
+5,171 ms, 1440 px and 390 px layouts, 11 WCAG scans, synthetic task and stop
+checks, and zero external requests. Current local visual artifacts are
+`output/playwright/today-desktop.png` and `output/playwright/today-mobile.png`
+(ignored, not committed). No prospect was used in tests.
+
+**Production, automation and spend:** no deployment, remote migration,
+provider activation, live inbox operation, prospect capture, contact, send or
+external outreach occurred. Live production remains unverified. Autonomous
+intake, queue, follow-up and send remain off. The C$50/month ceiling is
+unchanged and incremental engine-provider spend is C$0. No paid mailbox or
+Google Workspace is assumed.
+
+**Owner decisions and blockers:** Riley/Aidan still need to review each of the
+ten proposed business identities/dispositions and the source-specific rights
+and retention for the first supervised M2 request. M2 needs real evidence and
+owner assessments; the zero-paid-mailbox reply path, Cloudflare owner access,
+private legacy snapshot, staging backup, migration, rollback and release gates
+remain separate. This UI does not authorize outreach.
+
+Next three concrete actions:
+
+1. Record the exact ten M2 business keep/replace, city, niche and independence
+   decisions, including the two access-blocked sites.
+2. Prepare the source-use and retention packet for one supervised real M2
+   capture and assessment; inspect its evidence and cost before the rest.
+3. Verify the zero-paid-mailbox reply route and private history snapshot under
+   their separate gates, then stage backup and rollback proof before release.
+
 ## Business Review redesign checkpoint; production goal remains open
 
 **Updated:** 2026-09-22 (America/Toronto). **Verified code commit:** `5219871`
