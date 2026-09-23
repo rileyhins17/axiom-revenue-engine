@@ -339,6 +339,15 @@ deployment, or a migration.
    npm run kw:materialize-source-workflow -- --source-plan data/kw-evaluation/plan.json --materialization data/kw-evaluation/materialization.json --database data/kw-evaluation/shadow.sqlite
    ```
 
+   When Codex makes this reversible local decision under Riley's delegation,
+   use the separate v2 input from [ADR 0053](adr/0053-record-codex-delegated-local-source-workflow-decision.md),
+   not the owner v1 confirmation. Record `reviewer: CODEX`, `delegatedBy:
+   RILEY`, the exact chat quote and digest, task reference, narrowly bound
+   source/candidate/audit digests, and explicit zero external authority. Do
+   not prepare this file until the selected business has a real, supported
+   deterministic audit input. The v2 path does not relax the separate website
+   source-rights, capture, assessment, or release gates.
+
 4. Expect `FRESH_COMMIT` once and `EXACT_REPLAY` on an unchanged retry. The
    command must report a sealed workflow receipt but no assessment. Stop on a
    hidden identity collision, stale approval, deterministic-input drift,

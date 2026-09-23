@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -11,6 +12,10 @@ import {
 import {
   PRIVATE_KW_SOURCE_WORKFLOW_APPROVAL_CONFIRMATION,
   PRIVATE_KW_SOURCE_WORKFLOW_MATERIALIZATION_VERSION,
+  PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_APPROVAL_VERSION,
+  PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_MATERIALIZATION_VERSION,
+  PRIVATE_KW_CODEX_SOURCE_WORKFLOW_APPROVAL_SCOPE,
+  PRIVATE_KW_CODEX_SOURCE_WORKFLOW_DELEGATION_QUOTE,
   buildPrivateKwSourceWorkflowMaterializationPlan,
   privateKwSourceWorkflowDigest,
   verifyPrivateKwSourceWorkflowPreflight,
@@ -122,6 +127,44 @@ function materializationInput(
   } satisfies PrivateKwSourceWorkflowMaterializationInput;
 }
 
+function codexDelegatedMaterializationInput(source = sourcePlan(), overrides: Record<string, unknown> = {}) {
+  const ownerInput = materializationInput(source);
+  const instructionQuote = PRIVATE_KW_CODEX_SOURCE_WORKFLOW_DELEGATION_QUOTE;
+  const instructionSha256 = createHash("sha256").update(instructionQuote, "utf8").digest("hex");
+  const delegated = {
+    ...ownerInput,
+    materializationVersion: PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_MATERIALIZATION_VERSION,
+    deploymentAuthorized: false,
+    approval: {
+      approvalVersion: PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_APPROVAL_VERSION,
+      decision: "APPROVED_FOR_LOCAL_SOURCE_WORKFLOW_MATERIALIZATION",
+      reviewer: "CODEX",
+      delegatedBy: "RILEY",
+      medium: "CODEX_CHAT",
+      instructionQuote,
+      instructionSha256,
+      conversationRef: "01a0c1de-dd92-7d33-827b-8aadccd47412",
+      scope: PRIVATE_KW_CODEX_SOURCE_WORKFLOW_APPROVAL_SCOPE,
+      sourcePlanDigest: ownerInput.sourcePlanDigest,
+      businessId: ownerInput.businessId,
+      evaluationCandidateId: ownerInput.evaluationCandidateId,
+      auditInputDigest: ownerInput.auditInputDigest,
+      reviewedAt: REVIEWED_AT,
+      rationale: "Synthetic test provenance only; no approval artifact is created.",
+      captureAuthorized: false,
+      contactDiscoveryAuthorized: false,
+      contactVerificationAuthorized: false,
+      outreachAuthorized: false,
+      sendAuthorized: false,
+      deploymentAuthorized: false,
+      providerOperationsAuthorized: 0,
+      costAuthorizedUsd: 0,
+    },
+    ...overrides,
+  };
+  return delegated;
+}
+
 test("builds one deterministic owner-approved source and sealed-workflow materialization", () => {
   const source = sourcePlan();
   const input = materializationInput(source);
@@ -204,4 +247,66 @@ test("preflight rejects multiple identity matches even when one row is exact", (
     verifyPrivateKwSourceWorkflowPreflight(business, [exact, { ...exact, id: "business:hidden-collision" }]),
     { state: "CONFLICT", matches: false },
   );
+});
+
+test("builds the narrowly scoped Codex-delegated v2 plan with exact bound provenance", () => {
+  const source = sourcePlan();
+  const input = codexDelegatedMaterializationInput(source);
+  const plan = buildPrivateKwSourceWorkflowMaterializationPlan(source, input);
+  assert.equal(plan.materializationVersion, PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_MATERIALIZATION_VERSION);
+  assert.equal(plan.authority.deploymentAuthorized, false);
+  assert.equal(plan.authority.captureAuthorized, false);
+  assert.equal(plan.authority.contactDiscoveryAuthorized, false);
+  assert.equal(plan.authority.contactVerificationAuthorized, false);
+  assert.equal(plan.authority.outreachAuthorized, false);
+  assert.equal(plan.authority.sendAuthorized, false);
+  assert.equal(plan.authority.providerOperationsAuthorized, 0);
+  assert.equal(plan.authority.costAuthorizedUsd, 0);
+  const receipt = plan.records.at(-1);
+  assert.equal(receipt?.entity, "MATERIALIZATION_RECEIPT");
+  const materialization = JSON.parse(String(receipt?.expected.materializationJson));
+  assert.equal(materialization.approval.reviewer, "CODEX");
+  assert.equal(materialization.approval.delegatedBy, "RILEY");
+  assert.equal(materialization.approval.conversationRef, "01a0c1de-dd92-7d33-827b-8aadccd47412");
+  assert.equal(materialization.approval.sourcePlanDigest, plan.sourcePlanDigest);
+  assert.equal(materialization.approval.auditInputDigest, plan.auditInputDigest);
+  assert.equal(materialization.authority.deploymentAuthorized, false);
+  assert.equal(plan.summary.contactRows, 0);
+  assert.equal(plan.summary.outreachRows, 0);
+});
+
+test("rejects delegated provenance tampering, authority expansion, and digest drift", () => {
+  const source = sourcePlan();
+  const base = codexDelegatedMaterializationInput(source);
+  const approval = base.approval as Record<string, unknown>;
+  const reject = (candidate: Record<string, unknown>) => assert.throws(
+    () => buildPrivateKwSourceWorkflowMaterializationPlan(source, candidate),
+  );
+
+  reject({ ...base, approval: { ...approval, instructionSha256: "f".repeat(64) } });
+  const fabricatedQuote = "Riley delegates local source and workflow approval to Codex.";
+  reject({
+    ...base,
+    approval: {
+      ...approval,
+      instructionQuote: fabricatedQuote,
+      instructionSha256: createHash("sha256").update(fabricatedQuote, "utf8").digest("hex"),
+    },
+  });
+  reject({ ...base, approval: { ...approval, reviewer: "RILEY" } });
+  reject({ ...base, approval: { ...approval, delegatedBy: "AIDAN" } });
+  reject({ ...base, approval: { ...approval, medium: "OWNER_UI" } });
+  reject({ ...base, approval: { ...approval, scope: "CAPTURE" } });
+  reject({ ...base, approval: { ...approval, conversationRef: "not-a-thread-id" } });
+  reject({ ...base, approval: { ...approval, conversationRef: "00000000-0000-4000-8000-000000000000" } });
+  reject({ ...base, approval: { ...approval, sourcePlanDigest: "f".repeat(64) } });
+  reject({ ...base, approval: { ...approval, evaluationCandidateId: "evaluation-candidate:other" } });
+  reject({ ...base, approval: { ...approval, auditInputDigest: "f".repeat(64) } });
+  reject({ ...base, deploymentAuthorized: undefined });
+  reject({ ...base, deploymentAuthorized: true });
+  reject({ ...base, unexpected: true });
+  reject({ ...base, materializationVersion: PRIVATE_KW_SOURCE_WORKFLOW_MATERIALIZATION_VERSION });
+
+  const owner = materializationInput(source);
+  reject({ ...owner, materializationVersion: PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_MATERIALIZATION_VERSION });
 });

@@ -16,12 +16,22 @@ import {
 
 export const PRIVATE_KW_SOURCE_WORKFLOW_MATERIALIZATION_VERSION =
   "kw-private-source-workflow-materialization-v1";
+export const PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_MATERIALIZATION_VERSION =
+  "kw-private-codex-source-workflow-materialization-v2";
 export const PRIVATE_KW_REVIEWED_EVIDENCE_WORKFLOW_VERSION =
   "kw-private-reviewed-evidence-workflow-v1";
 export const PRIVATE_KW_SOURCE_WORKFLOW_TARGET_SCHEMA_VERSION =
   "0064_local_source_workflow_materializations";
 export const PRIVATE_KW_SOURCE_WORKFLOW_APPROVAL_CONFIRMATION =
   "I APPROVE THIS LOCAL SOURCE AND WORKFLOW MATERIALIZATION";
+export const PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_APPROVAL_VERSION =
+  "kw-private-codex-source-workflow-approval-v2";
+export const PRIVATE_KW_CODEX_SOURCE_WORKFLOW_APPROVAL_SCOPE =
+  "LOCAL_SOURCE_WORKFLOW_MATERIALIZATION";
+export const PRIVATE_KW_CODEX_SOURCE_WORKFLOW_APPROVAL_CONVERSATION_REF =
+  "01a0c1de-dd92-7d33-827b-8aadccd47412";
+export const PRIVATE_KW_CODEX_SOURCE_WORKFLOW_DELEGATION_QUOTE =
+  "IM NOT DOING THE REVIEW AND DECISIONS YOU CAN DONIT YOURSELF";
 
 const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 const TimestampSchema = z.string().datetime({ offset: true });
@@ -40,7 +50,7 @@ const MaterializationEntitySchema = z.enum([
   "MATERIALIZATION_RECEIPT",
 ]);
 
-const PrivateKwSourceWorkflowApprovalSchema = z.object({
+const PrivateKwSourceWorkflowOwnerApprovalSchema = z.object({
   decision: z.literal("APPROVED_FOR_LOCAL_SOURCE_WORKFLOW_MATERIALIZATION"),
   reviewedBy: z.enum(["RILEY", "AIDAN"]),
   reviewedAt: TimestampSchema,
@@ -48,8 +58,47 @@ const PrivateKwSourceWorkflowApprovalSchema = z.object({
   confirmation: z.literal(PRIVATE_KW_SOURCE_WORKFLOW_APPROVAL_CONFIRMATION),
 }).strict();
 
+const PrivateKwSourceWorkflowCodexDelegatedApprovalSchema = z.object({
+  approvalVersion: z.literal(PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_APPROVAL_VERSION),
+  decision: z.literal("APPROVED_FOR_LOCAL_SOURCE_WORKFLOW_MATERIALIZATION"),
+  reviewer: z.literal("CODEX"),
+  delegatedBy: z.literal("RILEY"),
+  medium: z.literal("CODEX_CHAT"),
+  instructionQuote: z.literal(PRIVATE_KW_CODEX_SOURCE_WORKFLOW_DELEGATION_QUOTE),
+  instructionSha256: Sha256Schema,
+  conversationRef: z.literal(PRIVATE_KW_CODEX_SOURCE_WORKFLOW_APPROVAL_CONVERSATION_REF),
+  scope: z.literal(PRIVATE_KW_CODEX_SOURCE_WORKFLOW_APPROVAL_SCOPE),
+  sourcePlanDigest: Sha256Schema,
+  businessId: z.string().trim().min(1).max(128),
+  evaluationCandidateId: z.string().trim().min(1).max(128),
+  auditInputDigest: Sha256Schema,
+  reviewedAt: TimestampSchema,
+  rationale: z.string().trim().min(10).max(500),
+  captureAuthorized: z.literal(false),
+  contactDiscoveryAuthorized: z.literal(false),
+  contactVerificationAuthorized: z.literal(false),
+  outreachAuthorized: z.literal(false),
+  sendAuthorized: z.literal(false),
+  deploymentAuthorized: z.literal(false),
+  providerOperationsAuthorized: z.literal(0),
+  costAuthorizedUsd: z.literal(0),
+}).strict().superRefine((approval, context) => {
+  const actualDigest = createHash("sha256").update(approval.instructionQuote, "utf8").digest("hex");
+  if (approval.instructionSha256 !== actualDigest) {
+    context.addIssue({ code: "custom", path: ["instructionSha256"], message: "Delegation quote SHA-256 does not match the exact instruction text." });
+  }
+});
+
+const PrivateKwSourceWorkflowApprovalSchema = z.union([
+  PrivateKwSourceWorkflowOwnerApprovalSchema,
+  PrivateKwSourceWorkflowCodexDelegatedApprovalSchema,
+]);
+
 export const PrivateKwSourceWorkflowMaterializationInputSchema = z.object({
-  materializationVersion: z.literal(PRIVATE_KW_SOURCE_WORKFLOW_MATERIALIZATION_VERSION),
+  materializationVersion: z.enum([
+    PRIVATE_KW_SOURCE_WORKFLOW_MATERIALIZATION_VERSION,
+    PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_MATERIALIZATION_VERSION,
+  ]),
   sourceImportId: z.string().trim().min(8).max(128),
   sourcePlanDigest: Sha256Schema,
   businessId: z.string().trim().min(1).max(128),
@@ -72,7 +121,31 @@ export const PrivateKwSourceWorkflowMaterializationInputSchema = z.object({
   sendAuthorized: z.literal(false),
   providerOperationsAuthorized: z.literal(0),
   costAuthorizedUsd: z.literal(0),
-}).strict();
+  deploymentAuthorized: z.literal(false).optional(),
+}).strict().superRefine((input, context) => {
+  if ("reviewer" in input.approval) {
+    const approval = input.approval;
+    if (input.materializationVersion !== PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_MATERIALIZATION_VERSION) {
+      context.addIssue({ code: "custom", path: ["materializationVersion"], message: "Codex delegation requires its versioned local materialization contract." });
+    }
+    const bindings: Array<[string, string, string]> = [
+      ["sourcePlanDigest", approval.sourcePlanDigest, input.sourcePlanDigest],
+      ["businessId", approval.businessId, input.businessId],
+      ["evaluationCandidateId", approval.evaluationCandidateId, input.evaluationCandidateId],
+      ["auditInputDigest", approval.auditInputDigest, input.auditInputDigest],
+    ];
+    for (const [field, approved, actual] of bindings) {
+      if (approved !== actual) {
+        context.addIssue({ code: "custom", path: ["approval", field], message: `Delegated approval must bind the exact ${field}.` });
+      }
+    }
+    if (input.deploymentAuthorized !== false) {
+      context.addIssue({ code: "custom", path: ["deploymentAuthorized"], message: "Delegated local approval must explicitly deny deployment authority." });
+    }
+  } else if (input.materializationVersion !== PRIVATE_KW_SOURCE_WORKFLOW_MATERIALIZATION_VERSION) {
+    context.addIssue({ code: "custom", path: ["materializationVersion"], message: "The owner approval path requires its v1 materialization contract." });
+  }
+});
 
 export type PrivateKwSourceWorkflowMaterializationInput = z.infer<
   typeof PrivateKwSourceWorkflowMaterializationInputSchema
@@ -113,10 +186,14 @@ const MaterializationAuthoritySchema = z.object({
   sendAuthorized: z.literal(false),
   providerOperationsAuthorized: z.literal(0),
   costAuthorizedUsd: z.literal(0),
+  deploymentAuthorized: z.literal(false).optional(),
 }).strict();
 
 export const PrivateKwSourceWorkflowMaterializationPlanSchema = z.object({
-  materializationVersion: z.literal(PRIVATE_KW_SOURCE_WORKFLOW_MATERIALIZATION_VERSION),
+  materializationVersion: z.enum([
+    PRIVATE_KW_SOURCE_WORKFLOW_MATERIALIZATION_VERSION,
+    PRIVATE_KW_CODEX_DELEGATED_SOURCE_WORKFLOW_MATERIALIZATION_VERSION,
+  ]),
   targetSchemaVersion: z.literal(PRIVATE_KW_SOURCE_WORKFLOW_TARGET_SCHEMA_VERSION),
   materializationId: z.string().regex(/^kw-materialization:[a-f0-9]{64}$/),
   materializationDigest: Sha256Schema,
@@ -419,6 +496,7 @@ export function buildPrivateKwSourceWorkflowMaterializationPlan(
       sendAuthorized: false,
       providerOperationsAuthorized: 0,
       costAuthorizedUsd: 0,
+      ...("reviewer" in input.approval ? { deploymentAuthorized: false as const } : {}),
     },
   };
   const receiptDigest = fingerprint(receipt);
@@ -615,6 +693,7 @@ export function buildPrivateKwSourceWorkflowMaterializationPlan(
       sendAuthorized: false,
       providerOperationsAuthorized: 0,
       costAuthorizedUsd: 0,
+      ...("reviewer" in input.approval ? { deploymentAuthorized: false as const } : {}),
     },
   } as const;
   const materializationDigest = fingerprint(materializationCore);
