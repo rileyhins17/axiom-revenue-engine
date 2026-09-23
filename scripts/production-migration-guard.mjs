@@ -1,3 +1,3 @@
-console.error("Remote production migration is intentionally guarded.");
-console.error("Use the protected migration procedure after a verified D1 export and rollback rehearsal.");
+console.error("Production migration is blocked: the current default config targets the legacy production D1.");
+console.error("Use a separately reviewed isolated target only after a current export and restore rehearsal.");
 process.exitCode = 1;

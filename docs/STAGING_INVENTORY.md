@@ -12,7 +12,9 @@ preceding 24 hours at inspection time.
 
 Read-only D1 queries showed about 950 kB, 39 user-facing tables, 55 migration
 receipts ending at `0055_outreach_human_approval.sql`, and two user rows: one
-`admin` and one `system`. The automation-setting row was `enabled=0`, with
+`admin` and one `system`. A later read-only table count found one `Account`
+row. The sign-in page loaded, but no credential was submitted; account rows do
+not prove that an owner can sign in. The automation-setting row was `enabled=0`, with
 global, emergency, intake, and follow-up pauses all `1`. This confirms an
 admin bootstrap exists but does not prove that its owner can currently sign in.
 No export, restore drill, new migration, secret read, or deployment occurred.

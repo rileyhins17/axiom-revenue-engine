@@ -19,6 +19,21 @@ if (
 const nextConfig: NextConfig = {
   typedRoutes: true,
 
+  // Next's file tracer can otherwise copy ignored local research and SQLite
+  // checkpoints into the deployable server bundle when routes use fs.
+  outputFileTracingExcludes: {
+    "/*": [
+      "./data/**/*",
+      "./backups/**/*",
+      "./output/**/*",
+      "./.superpowers/**/*",
+      "./.claude/**/*",
+      "./.wrangler/**/*",
+      "./.vercel/**/*",
+      "./.git/**/*",
+    ],
+  },
+
   // Keep native / heavy server-only packages out of the webpack bundle.
   serverExternalPackages: [
     "playwright",

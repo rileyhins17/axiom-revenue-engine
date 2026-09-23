@@ -1,5 +1,46 @@
 # Current status — Axiom Revenue Engine
 
+## Release-path and private-bundle safety checkpoint — verification in progress
+
+**Updated:** 2026-09-23 (America/Toronto). **Candidate branch:**
+`codex/revenue-engine-production`, draft [PR #9](https://github.com/rileyhins17/axiom-revenue-engine/pull/9).
+This checkpoint is not a live release or production-readiness claim. Daybreak
+Blue found that the protected production workflow could use an older main
+commit's raw deploy alias against the legacy production D1. The candidate now
+blocks both production deploy and migration commands before Wrangler, requires
+the current main tip in the protected workflow, and calls the guard directly.
+Until this change is merged, the old `main` workflow remains unsafe to dispatch.
+
+A Luna audit then found ignored local evaluation data in a generated staging
+bundle: 3,645 files, including 104 SQLite databases. Nothing was uploaded.
+The candidate now uses Next trace exclusions and rejects any final Cloudflare
+bundle containing private workspace paths or local database/key files. The
+synthetic sanitizer test passes and the deliberately contaminated local bundle
+fails with a count-only error. On this Windows worktree, Next still traces
+private files despite the exclusion setting; a clean release checkout and an
+exact-code Linux build are the next verification. Never bypass the sanitizer.
+
+The 0055-to-0074 staging schema procedure and offline checksum-pinned export
+rehearsal are prepared. Synthetic migration/row-preservation and export-guard
+tests pass, but no current staging export, restore or remote migration exists.
+Staging and legacy production Workers, D1 data, provider state and all autonomy
+stops are unchanged. No prospect was contacted, no email sent, and no paid
+service enabled; incremental spend is C$0 against the C$50/month ceiling. The
+ten identity decisions remain saved; M2 remains 0/10 real website assessments,
+M3 remains 0/50 judged dossiers, and no provider-permitted cold first-touch or
+verified inbound reply route is connected. **The full Revenue Engine is not
+production-ready.**
+
+Next three concrete actions:
+
+1. Commit the candidate, verify it in a clean checkout and Linux CI, inspect
+   the exact upload bundle for zero private files, and merge the safety guards.
+2. Restore authorized Cloudflare release access, export/checksum the current
+   isolated staging D1, and rehearse its exact 0055-to-0074 upgrade locally.
+3. Under the separate staging release gate, verify sign-in and synthetic owner
+   flows; then resolve real source, reply and lawful first-touch gates before
+   any production cutover or outreach.
+
 ## Security candidate verified; live release still gated
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**

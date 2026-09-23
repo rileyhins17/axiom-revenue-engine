@@ -46,13 +46,13 @@ jobs:
           BACKUP_REFERENCE: ${{ inputs.backup_reference }}
         run: node scripts/validate-release-inputs.mjs "$RELEASE_SHA" "$BACKUP_REFERENCE"
 
-      - name: Require the exact release commit on main
+      - name: Require the current main commit
         env:
           RELEASE_SHA: ${{ inputs.release_sha }}
         run: |
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
           git fetch origin main --no-tags
-          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          test "$RELEASE_SHA" = "$(git rev-parse origin/main)"
 
       - uses: actions/setup-node@v4
         with:
@@ -75,5 +75,5 @@ jobs:
           printf 'Release SHA: %s\n' "$RELEASE_SHA"
           printf 'Backup reference: %s\n' "$BACKUP_REFERENCE"
 
-      - name: Deploy approved build
-        run: npm run deploy:production
+      - name: Confirm production deployment remains blocked
+        run: node scripts/production-deploy-guard.mjs

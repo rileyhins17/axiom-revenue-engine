@@ -117,6 +117,9 @@ const privateKwM2HtmlWorkflow = await readFile(new URL("../src/lib/revenue-engin
 const privateKwM2HtmlSchema = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-html-evidence-schema.ts", import.meta.url), "utf8");
 const privateKwM2HtmlAudit = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-html-audit.ts", import.meta.url), "utf8");
 const privateKwM2HtmlReceipt = await readFile(new URL("../src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", import.meta.url), "utf8");
+const productionDeployWorkflow = await readFile(new URL("../.github/workflows/deploy-production.yml", import.meta.url), "utf8");
+const nextConfig = await readFile(new URL("../next.config.ts", import.meta.url), "utf8");
+const bundleSanitizer = await readFile(new URL("./sanitize-cloudflare-bundle.mjs", import.meta.url), "utf8");
 const stagingMarker = '"staging": {';
 const stagingIndex = wrangler.indexOf(stagingMarker);
 const staging = stagingIndex >= 0 ? wrangler.slice(stagingIndex) : "";
@@ -184,8 +187,19 @@ requireMatch("src/lib/env.ts", envSource, /AUTONOMOUS_QUEUE_ENABLED:\s*environme
 requireMatch("src/lib/env.ts", envSource, /AUTONOMOUS_SEND_ENABLED:\s*environmentBoolean\(false\)/, "send must default false");
 requireMatch("src/lib/env.ts", envSource, /AUTONOMOUS_DAILY_LEAD_INTAKE_CAP:\s*z\.coerce\.number\(\)\.int\(\)\.nonnegative\(\)\.default\(0\)/, "intake cap must accept and default to zero");
 requireMatch("package.json", packageJson, /"deploy"\s*:\s*"node scripts\/production-deploy-guard\.mjs"/, "plain npm run deploy must be guarded");
+requireMatch("package.json", packageJson, /"deploy:production"\s*:\s*"node scripts\/production-deploy-guard\.mjs"/, "production deploy must remain blocked until a verified isolated production target exists");
+requireMatch(".github/workflows/deploy-production.yml", productionDeployWorkflow, /run:\s*node scripts\/production-deploy-guard\.mjs/, "the protected workflow must invoke the production guard directly");
+requireMatch(".github/workflows/deploy-production.yml", productionDeployWorkflow, /test "\$RELEASE_SHA" = "\$\(git rev-parse origin\/main\)"/, "the protected workflow must reject older main ancestors before running their release scripts");
+for (const line of productionDeployWorkflow.split(/\r?\n/)) {
+  if (/\bwrangler\s+deploy\b/.test(line) && !line.includes("--dry-run")) {
+    failures.push(".github/workflows/deploy-production.yml: direct Wrangler upload bypasses the guarded production deploy command");
+  }
+}
 requireMatch("package.json", packageJson, /"db:migrate:remote"\s*:\s*"node scripts\/production-migration-guard\.mjs"/, "plain remote migration must be guarded");
+requireMatch("package.json", packageJson, /"db:migrate:production"\s*:\s*"node scripts\/production-migration-guard\.mjs"/, "production migration must remain blocked until an isolated target and verified backup exist");
 requireMatch("package.json", packageJson, /"build:cloudflare"\s*:\s*"[^"]*sanitize-cloudflare-bundle\.mjs"/, "Cloudflare builds must remove local env values and scan for secrets");
+requireMatch("next.config.ts", nextConfig, /outputFileTracingExcludes\s*:/, "Next tracing must exclude ignored private workspace paths");
+requireMatch("scripts/sanitize-cloudflare-bundle.mjs", bundleSanitizer, /private workspace files/, "Cloudflare builds must reject copied private workspace files");
 requireMatch("package.json", packageJson, /"cf:engine:typegen:check"\s*:\s*"[^"]*--env-file wrangler\.typegen\.env/, "engine binding generation must ignore local env files");
 requireMatch("package.json", packageJson, /"cf:engine:dry-run"\s*:/, "CI must dry-run the inert engine bundle");
 requireMatch("package.json", packageJson, /scripts\/\*\*\/\*\.test\.ts/, "TypeScript script tests must run in the complete test gate");

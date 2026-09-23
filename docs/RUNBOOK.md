@@ -9,6 +9,13 @@
 > Future simplified owner operations must preserve these authority boundaries
 > until separately reviewed implementations replace them.
 
+The current production dispatch is deliberately blocked by
+[ADR 0055](adr/0055-block-default-production-release-against-legacy-d1.md):
+the default console configuration still binds the legacy production D1. Step 8
+below is a future release gate, not a runnable deployment instruction for this
+candidate. Do not dispatch the old workflow on `main` while the guard remains
+unmerged.
+
 ## Emergency stop
 
 1. Use the visible emergency stop in System/Outreach.
@@ -34,7 +41,10 @@
 2. Confirm every autonomous default is off and `npm run check:safety` passes.
 3. Back up D1 before any remote migration; record export location and checksum.
 4. Run test, typecheck, lint, the secret-sanitizing Cloudflare build, and Wrangler
-   dry run on Linux CI. A bundle secret-scan failure is a hard stop.
+   dry run on Linux CI. Build from a clean release checkout after local tests
+   have exited; tests can create private temporary files during Next tracing.
+   A bundle secret or private-file scan failure is a hard stop. See
+   [ADR 0056](adr/0056-exclude-private-local-files-from-cloudflare-build.md).
 5. Deploy staging; use test providers/mail sinks only.
 6. Exercise owner flows, workflow retry/idempotency, cost stop, and rollback.
 7. Record exact versions/config/resources and obtain production approval.
@@ -51,6 +61,11 @@
 - Backfill with repeatable commands; preserve historical uncertainty explicitly.
 - Reconcile lead, send, reply, suppression, opportunity, client, and cost totals.
 - Keep legacy tables/resources through the 30-day stability window.
+
+For the current isolated staging 0055-to-0074 upgrade, follow
+[`runbooks/STAGING_SCHEMA_0055_TO_0074.md`](runbooks/STAGING_SCHEMA_0055_TO_0074.md).
+The older console-only staging release packet cannot authorize that database
+change.
 
 ## Review legacy contact history offline before v2 outreach
 

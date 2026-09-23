@@ -36,13 +36,30 @@ async function listFiles(directory) {
     const entryPath = path.join(directory, entry.name);
     if (entry.isDirectory()) files.push(...(await listFiles(entryPath)));
     else if (entry.isFile()) files.push(entryPath);
+    else if (entry.isSymbolicLink()) throw new Error("Cloudflare bundle contains a symbolic link");
   }
 
   return files;
 }
 
+function isPrivateWorkspaceFile(outputRoot, filePath) {
+  const segments = path.relative(outputRoot, filePath).split(path.sep).map((segment) => segment.toLowerCase());
+  if (segments.some((segment) => ["backups", "kw-evaluation", ".superpowers", ".claude", ".wrangler", ".vercel", ".git"].includes(segment))) {
+    return true;
+  }
+  if (segments.includes("server-functions") && segments.some((segment) => ["data", "output"].includes(segment))) {
+    return true;
+  }
+  return /\.(?:sqlite|db|pem)$/i.test(filePath);
+}
+
 export async function sanitizeCloudflareBundle(outputDirectory = ".open-next") {
   const absoluteOutput = path.resolve(outputDirectory);
+  const bundleFiles = await listFiles(absoluteOutput);
+  const privateCount = bundleFiles.filter((filePath) => isPrivateWorkspaceFile(absoluteOutput, filePath)).length;
+  if (privateCount > 0) {
+    throw new Error(`Cloudflare bundle contains ${privateCount} private workspace files`);
+  }
   const compiledEnvPath = path.join(absoluteOutput, "cloudflare", "next-env.mjs");
   const compiledSource = await readFile(compiledEnvPath, "utf8");
   const compiled = parseCompiledEnvironment(compiledSource);
@@ -62,7 +79,7 @@ export async function sanitizeCloudflareBundle(outputDirectory = ".open-next") {
   await writeFile(compiledEnvPath, emptyCompiledEnvironment, { encoding: "utf8", mode: 0o600 });
 
   const leaks = [];
-  for (const filePath of await listFiles(absoluteOutput)) {
+  for (const filePath of bundleFiles) {
     const content = await readFile(filePath);
     const relativePath = path.relative(process.cwd(), filePath);
 
@@ -80,7 +97,7 @@ export async function sanitizeCloudflareBundle(outputDirectory = ".open-next") {
     throw new Error(`Cloudflare bundle secret scan failed:\n${[...new Set(leaks)].map((leak) => `- ${leak}`).join("\n")}`);
   }
 
-  return { filesScanned: (await listFiles(absoluteOutput)).length, sensitiveValuesRemoved: sensitiveValues.size };
+  return { filesScanned: bundleFiles.length, sensitiveValuesRemoved: sensitiveValues.size };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

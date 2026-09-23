@@ -5,33 +5,25 @@ import test from "node:test";
 import {
   isTransientCloudBrowserError,
   runCloudScrapeWorker,
-  shouldDisableLegacyCloudCrawler,
   shouldSkipCloudMapsDetailPages,
   shouldUseExistingLeadForScrapeDedupe,
 } from "./cloud-scrape-worker";
 
-test("deployed Cloudflare Browser Rendering cannot run the legacy crawler", () => {
-  assert.equal(shouldDisableLegacyCloudCrawler(), true);
-});
-
-test("legacy cloud crawler entry point never claims a job", async () => {
+test("legacy cloud crawler is inert under every binding configuration", async () => {
   assert.deepEqual(await runCloudScrapeWorker(), {
     claimed: false,
     reason: "Legacy browser crawler is disabled",
   });
 });
 
-test("cloud worker checks the production crawler block before loading scrape policy or claiming work", () => {
+test("cloud worker cannot read bindings, environment, jobs, or providers", () => {
   const source = readFileSync(new URL("./cloud-scrape-worker.ts", import.meta.url), "utf8");
   const entrypoint = source.slice(source.indexOf("export async function runCloudScrapeWorker()"));
-  const block = entrypoint.indexOf("shouldDisableLegacyCloudCrawler()");
-  const bindings = entrypoint.indexOf("const bindings = getCloudflareBindings()");
-  const environment = entrypoint.indexOf("const env = getServerEnv()");
-  const claim = entrypoint.indexOf("claimCloudJob(");
-  assert.ok(block >= 0);
-  assert.ok(bindings > block);
-  assert.ok(environment > block);
-  assert.ok(claim > environment);
+  const body = entrypoint.slice(0, entrypoint.indexOf("\n}"));
+  assert.doesNotMatch(
+    body,
+    /getCloudflareBindings|getServerEnv|getAutomationSettings|claimCloudJob|executeScrapeJob|launchAutomationBrowser/,
+  );
 });
 
 test("archived empty scrape ghosts do not block a future quality scrape", () => {

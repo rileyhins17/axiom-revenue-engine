@@ -24,6 +24,12 @@ omits lead/contact contents, authentication tokens, secret values, and message
 bodies. Re-verify live state before a release because this document is a
 checkpoint, not a monitoring system.
 
+The unreleased `codex/revenue-engine-production` candidate blocks both default
+production deploy and production migration commands because the default console
+binding names the legacy D1. That protection is not active on `main` until the
+guard change is merged. The old protected workflow must not be dispatched as a
+test or treated as a verified release path.
+
 ## Cloudflare resources
 
 - Account: Aidan's Cloudflare account, ID

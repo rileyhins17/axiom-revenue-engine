@@ -1,6 +1,5 @@
 import { writeAuditEvent } from "@/lib/audit";
 import { evaluateAutomationSafety } from "@/lib/automation-safety";
-import { getCloudflareBindings } from "@/lib/cloudflare";
 import { generateDedupeKey } from "@/lib/dedupe";
 import { getServerEnv } from "@/lib/env";
 import { getAutomationSettings, updateAutomationSettings } from "@/lib/outreach-automation";
@@ -160,10 +159,6 @@ async function claimCloudJob(workerName: string) {
 
 export function shouldSkipCloudMapsDetailPages(env: Pick<ReturnType<typeof getServerEnv>, "CLOUD_SCRAPE_DETAIL_PAGES_ENABLED">) {
   return !env.CLOUD_SCRAPE_DETAIL_PAGES_ENABLED;
-}
-
-export function shouldDisableLegacyCloudCrawler() {
-  return true;
 }
 
 export function isTransientCloudBrowserError(message: string) {
@@ -402,37 +397,5 @@ async function runClaimedJob(job: ScrapeJobRecord, existingDedupeKeys: string[])
 export async function runCloudScrapeWorker() {
   // The legacy crawler cannot safely pin DNS across browser redirects. Keep
   // this entry point inert until a separately reviewed capture path replaces it.
-  if (shouldDisableLegacyCloudCrawler()) {
-    return { claimed: false, reason: "Legacy browser crawler is disabled" };
-  }
-  const bindings = getCloudflareBindings();
-  if (!bindings?.BROWSER) {
-    return { claimed: false, reason: "Browser Rendering binding unavailable" };
-  }
-
-  const env = getServerEnv();
-  if (!env.CLOUD_SCRAPE_ENABLED) {
-    return { claimed: false, reason: "Cloud scrape disabled" };
-  }
-
-  let settings;
-  try {
-    settings = await getAutomationSettings();
-  } catch {
-    return { claimed: false, reason: "Database safety policy unavailable" };
-  }
-
-  const safety = evaluateAutomationSafety({ env, phase: "intake", settings });
-  if (!safety.allowed) return { claimed: false, reason: safety.reason };
-
-  const workerName = env.CLOUD_SCRAPE_WORKER_NAME || DEFAULT_CLOUD_WORKER_NAME;
-  const job = await claimCloudJob(workerName);
-  if (!job) {
-    return { claimed: false, reason: "No pending scrape job" };
-  }
-
-  const existingDedupeKeys = await getExistingDedupeKeys();
-  await runClaimedJob(job, existingDedupeKeys);
-
-  return { claimed: true, jobId: job.id };
+  return { claimed: false, reason: "Legacy browser crawler is disabled" };
 }

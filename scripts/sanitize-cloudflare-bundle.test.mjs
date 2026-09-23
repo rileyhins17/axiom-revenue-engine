@@ -69,3 +69,24 @@ test("sanitizer blocks recognizable secret material without a source env value",
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("sanitizer rejects ignored private data even when it contains no recognizable secret", async () => {
+  for (const privatePath of [
+    ["server-functions", "default", "data", "kw-evaluation", "fixture.sqlite"],
+    ["server-functions", "default", "backups", "staging", "export.sql"],
+    ["server-functions", "default", "output", "fixture.json"],
+  ]) {
+    const root = await createBundle();
+    try {
+      const file = path.join(root, ...privatePath);
+      await mkdir(path.dirname(file), { recursive: true });
+      await writeFile(file, "synthetic fixture only");
+      await assert.rejects(
+        () => sanitizeCloudflareBundle(root),
+        /private workspace files/,
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
