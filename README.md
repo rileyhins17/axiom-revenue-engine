@@ -67,6 +67,13 @@ The intended navigation is Today, Leads, Outreach, Revenue and System. Leads/dos
 
 A lead should answer: who is this, what is actually wrong, why is it worth attention, what is uncertain, how may we contact them, and who acts next? Reachability is separate from account quality. Only verified email may eventually automate; the zero-paid-mailbox target uses Cloudflare inbound forwarding to existing owner destinations and a separately gated Resend outbound route. Cloudflare forwarding cannot itself send custom-domain replies; M4 must prove the human-triggered provider reply flow or a separately reviewed owner-only send-as route. Calls, forms and social DMs remain manual.
 
+The current v2 dossier source also includes a manual owner-task panel. On a
+current business, an authenticated owner can save an action with Riley or Aidan
+and a Toronto due time, then mark it complete or cancel it. Task records require
+migration 0071 in the app database; without it the panel reports unavailable
+while the evidence dossier remains readable. Saving a task does not approve a
+contact, send a message, schedule automation, or satisfy M4 mail/reply gates.
+
 ## Local development
 
 Read `AGENTS.md` and the required documents before changes. Use Node.js 22+, npm and the pinned project dependencies. Install with `npm ci` only when needed. Create ignored local configuration from the value-free examples; local auth needs a suitable `BETTER_AUTH_SECRET`. Provider API keys are optional for fixture development and must not be supplied merely to run tests.

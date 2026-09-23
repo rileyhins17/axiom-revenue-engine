@@ -133,7 +133,7 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
     ?? "The dossier keeps business fit, website need, reachability, timing, and evidence confidence separate so the next decision stays explainable.";
 
   return (
-    <div className="mx-auto flex max-w-[1500px] flex-col gap-5">
+    <div data-owner-readonly-dossier className="mx-auto flex max-w-[1500px] flex-col gap-5">
       <Link
         href="/leads"
         className="v2-focus-ring inline-flex min-h-9 w-fit items-center gap-2 rounded-lg px-1 text-xs font-semibold text-zinc-400 hover:text-white"
@@ -150,7 +150,7 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
         status={
           <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/20 bg-amber-300/[0.07] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-100">
             <ShieldCheck className="size-3" aria-hidden="true" />
-            Read-only dossier
+            Evidence read-only
           </span>
         }
         actions={lead.business.websiteUrl ? (

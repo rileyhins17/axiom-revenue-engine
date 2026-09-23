@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { OwnerLeadDetail, OwnerLeadDetailUnavailable } from "@/components/leads/owner-lead-detail";
+import { OwnerTaskPanel } from "@/components/leads/owner-task-panel";
 import { getDatabase } from "@/lib/cloudflare";
 import {
   readOwnerLeadDetail,
@@ -31,5 +32,12 @@ export default async function LeadDetailPage({
   }
   if (!detail) notFound();
 
-  return <OwnerLeadDetail data={detail} />;
+  return (
+    <div className="space-y-5">
+      <OwnerLeadDetail data={detail} />
+      <div className="mx-auto max-w-[1500px]">
+        <OwnerTaskPanel businessId={identity} />
+      </div>
+    </div>
+  );
 }

@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
+import { randomUUID } from "node:crypto";
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import Database from "better-sqlite3";
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { chromium, type Browser, type BrowserContext, type Page, type Route } from "playwright";
 
 import {
   REVENUE_CONTACT_DISCOVERY_VERSION,
@@ -274,11 +275,15 @@ async function applyMigrations(database: SqliteDatabase) {
     .sort((left, right) => left.localeCompare(right));
   assert(migrations.length >= 60 && migrations.at(-1)?.startsWith("0068_"),
     "The owner fixture must use the complete pre-M2 migration history through 0068.");
+  const ownerTasksMigration = "0071_revenue_owner_tasks.sql";
+  assert((await readdir(migrationsDirectory)).includes(ownerTasksMigration), "The synthetic owner fixture requires migration 0071 for task acceptance.");
 
   database.pragma("foreign_keys = ON");
   for (const migration of migrations) {
     database.exec(await readFile(join(migrationsDirectory, migration), "utf8"));
   }
+  // The contact writer used by seedOwnerLead verifies this exact baseline.
+  // Add the independent owner-task tables only after that seed completes.
 }
 
 function fixtureTimestamp(offsetMilliseconds: number) {
@@ -802,11 +807,22 @@ async function assertResponsive(page: Page, label: string) {
   return width.clientWidth;
 }
 
-async function assertReadOnlyOwnerSurface(page: Page, label: string) {
-  const unsafe = await page.locator("[data-owner-content] button, [data-owner-content] form, [data-owner-content] a[href^='mailto:'], [data-owner-content] a[href^='tel:']").count();
+async function assertReadOnlyOwnerSurface(page: Page, label: string, scopeSelector = "[data-owner-content]") {
+  const scope = page.locator(scopeSelector);
+  assert.equal(await scope.count(), 1, `${label} must expose exactly one read-only content scope (${scopeSelector}).`);
+  const unsafe = await scope.locator("button, form, a[href^='mailto:'], a[href^='tel:']").count();
   assert.equal(unsafe, 0, `${label} unexpectedly exposes a mutation or direct-contact control.`);
   assert.equal(await page.locator("main#main-content").count(), 1, `${label} must have one main landmark.`);
   assert.equal(await page.locator("h1").count(), 1, `${label} must have one primary heading.`);
+}
+
+function torontoDateTimeInput(daysAhead = 7) {
+  const date = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1_000);
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date).map(({ type, value }) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day}T12:00`;
 }
 
 async function assertReducedMotion(page: Page, label: string) {
@@ -1049,13 +1065,36 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await warmOwnerAcceptanceRoutes(warmupPage, ["/leads/m2"]);
     await warmupPage.close();
 
-    stage = "M2 authentication gate";
+    stage = "owner-task authentication gate";
     const anonymous = await browser.newContext({ baseURL: baseUrl, serviceWorkers: "block" });
     await anonymous.route("**/*", async (route) => {
       const url = route.request().url();
       if (isAllowedOwnerAcceptanceUrl(url, baseUrl)) await route.continue();
       else { externalRequests.push(url); await route.abort("blockedbyclient"); }
     });
+    const taskApiPath = `/api/v1/leads/${encodeURIComponent(FIXTURE_BUSINESS_ID)}/tasks`;
+    const anonymousTasksResponse = await anonymous.request.get(taskApiPath, { maxRedirects: 0 });
+    assert.equal(anonymousTasksResponse.status(), 401,
+      `Anonymous owner-task listing must return HTTP 401, got ${anonymousTasksResponse.status()}.`);
+    const anonymousTasksBody = await anonymousTasksResponse.text();
+    assert(!anonymousTasksBody.includes("Tri-City Roofing Fixture") && !anonymousTasksBody.includes("owner-acceptance"),
+      "Anonymous owner-task listing exposed fixture business data.");
+    await anonymousTasksResponse.dispose();
+    const anonymousCreateResponse = await anonymous.request.post(taskApiPath, {
+      maxRedirects: 0,
+      data: {
+        operation: "CREATE",
+        idempotencyKey: randomUUID(),
+        owner: "RILEY",
+        action: "Unauthenticated owner-task acceptance probe",
+        dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000).toISOString(),
+      },
+    });
+    assert.equal(anonymousCreateResponse.status(), 401,
+      `Anonymous owner-task creation must return HTTP 401, got ${anonymousCreateResponse.status()}.`);
+    await anonymousCreateResponse.dispose();
+
+    stage = "M2 authentication gate";
     const anonymousPage = await anonymous.newPage();
     const anonymousErrors: string[] = [];
     anonymousPage.on("pageerror", (error) => anonymousErrors.push(error.message));
@@ -1070,6 +1109,21 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     assert.equal(await anonymousPage.getByRole("list", { name: "M2 businesses", exact: true }).count(), 0);
     assert.deepEqual(anonymousErrors, [], "Unauthenticated redirect raised a script error.");
     await anonymous.close();
+
+    stage = "owner-task same-origin gate";
+    const authenticatedTasks = await context.request.get(taskApiPath);
+    assert.equal(authenticatedTasks.status(), 200, "An authenticated owner must be able to read saved tasks.");
+    await authenticatedTasks.dispose();
+    const crossSiteCreate = await context.request.post(taskApiPath, {
+      headers: { Origin: "https://untrusted.example.invalid" },
+      data: {
+        operation: "CREATE", idempotencyKey: randomUUID(), owner: "RILEY",
+        action: "Cross-site request must not create a task", dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000).toISOString(),
+      },
+    });
+    assert.equal(crossSiteCreate.status(), 403, "An authenticated cross-site task mutation must be rejected.");
+    assert.equal((await crossSiteCreate.json() as { code?: string }).code, "ORIGIN_REJECTED");
+    await crossSiteCreate.dispose();
 
     page = await context.newPage();
     attachBrowserDiagnostics(page, () => stage, diagnostics, baseUrl);
@@ -1104,9 +1158,82 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await assertOwnerPageTitle(page, "Lead dossier | Axiom Revenue Engine");
     assert((await page.getByRole("link", { name: "Inspect proof" }).count()) >= 3, "The dossier must expose at least three inspectable observations.");
     await assertWcag(page, "desktop dossier");
-    await assertReadOnlyOwnerSurface(page, "desktop dossier");
+    await assertReadOnlyOwnerSurface(page, "desktop dossier", "[data-owner-readonly-dossier]");
     await assertResponsive(page, "desktop dossier");
     await assertReducedMotion(page, "desktop dossier");
+
+    stage = "desktop owner-task creation";
+    await page.getByRole("heading", { level: 2, name: "Owner tasks" }).waitFor();
+    await page.getByText("No saved owner tasks for this business yet.", { exact: true }).waitFor();
+    const taskAction = "Review the synthetic website evidence";
+    await page.getByRole("textbox", { name: "Next action" }).fill(taskAction);
+    await page.getByRole("combobox", { name: "Owner" }).selectOption("RILEY");
+    await page.getByLabel("Due time (Toronto)").fill(torontoDateTimeInput());
+    const createKeys: string[] = [];
+    const taskRoutePattern = "**/api/v1/leads/**/tasks";
+    const simulateLostCreateResponse = async (route: Route) => {
+      if (new URL(route.request().url()).pathname !== taskApiPath || route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      const command = JSON.parse(route.request().postData() ?? "{}") as { operation?: string; idempotencyKey?: string };
+      if (command.operation !== "CREATE") {
+        await route.continue();
+        return;
+      }
+      assert.equal(typeof command.idempotencyKey, "string", "Owner task mutation needs an idempotency key.");
+      createKeys.push(command.idempotencyKey!);
+      if (createKeys.length === 1) {
+        const accepted = await route.fetch();
+        const responseBody = await accepted.json().catch(() => null) as { code?: string } | null;
+        assert.equal(accepted.status(), 200,
+          `The first task creation must save before its response is lost (code ${responseBody?.code ?? "none"}; request origin ${route.request().headers()["origin"] ?? "missing"}; request host ${route.request().headers()["host"] ?? "missing"}; fetch site ${route.request().headers()["sec-fetch-site"] ?? "missing"}; URL origin ${new URL(route.request().url()).origin}).`);
+        await accepted.dispose();
+        await route.abort("failed");
+      } else {
+        await route.continue();
+      }
+    };
+    await page.route(taskRoutePattern, simulateLostCreateResponse);
+    await page.getByRole("button", { name: "Save task" }).click();
+    await page.locator("p[role='status']").filter({ hasText: /fetch|network|task change/i }).waitFor();
+    await page.getByRole("button", { name: "Save task" }).click();
+    const ownerTaskList = page.getByRole("list", { name: "Saved owner tasks" });
+    const createdTaskRow = ownerTaskList.locator("li").filter({ hasText: taskAction });
+    await createdTaskRow.waitFor({ state: "visible" });
+    await createdTaskRow.getByText("Riley", { exact: true }).waitFor();
+    await createdTaskRow.getByText("Open", { exact: true }).waitFor();
+    await page.getByText("Task saved.", { exact: true }).waitFor();
+    assert.equal(createKeys.length, 2, "The owner must make exactly one controlled retry after a lost response.");
+    assert.equal(createKeys[1], createKeys[0], "A retry after an uncertain accepted create must reuse its idempotency key.");
+    await page.unroute(taskRoutePattern, simulateLostCreateResponse);
+    await assertWcag(page, "desktop owner tasks");
+
+    stage = "desktop owner-task persistence after reload";
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 2, name: "Owner tasks" }).waitFor();
+    const persistedTaskRow = page.getByRole("list", { name: "Saved owner tasks" }).locator("li").filter({ hasText: taskAction });
+    await persistedTaskRow.waitFor({ state: "visible" });
+    assert.equal(await page.getByRole("list", { name: "Saved owner tasks" }).locator("li").count(), 1,
+      "The uncertain accepted create and safe retry must persist one task only.");
+    await persistedTaskRow.getByText("Riley", { exact: true }).waitFor();
+    await persistedTaskRow.getByText("Open", { exact: true }).waitFor();
+
+    stage = "desktop owner-task completion";
+    await persistedTaskRow.getByRole("button", { name: `Complete task: ${taskAction}` }).click();
+    await page.getByText("Task saved.", { exact: true }).waitFor();
+    await persistedTaskRow.getByText("Completed", { exact: true }).waitFor();
+    assert.equal(await persistedTaskRow.getByRole("button", { name: `Complete task: ${taskAction}` }).count(), 0,
+      "A completed task must no longer expose the completion action.");
+
+    stage = "desktop owner-task terminal state after reload";
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 2, name: "Owner tasks" }).waitFor();
+    const completedTaskRow = page.getByRole("list", { name: "Saved owner tasks" }).locator("li").filter({ hasText: taskAction });
+    await completedTaskRow.waitFor({ state: "visible" });
+    await completedTaskRow.getByText("Completed", { exact: true }).waitFor();
+    assert.equal(await completedTaskRow.getByRole("button", { name: /^(Complete|Cancel) task:/ }).count(), 0,
+      "A terminal task must not expose completion or cancellation actions after reload.");
 
     stage = "desktop quality lab";
     await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
@@ -1177,8 +1304,9 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await openMobileDossier(page);
     await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Contact review not recorded" }).waitFor();
+    await page.getByRole("list", { name: "Saved owner tasks" }).getByText("Completed", { exact: true }).waitFor();
     await assertWcag(page, "mobile dossier");
-    await assertReadOnlyOwnerSurface(page, "mobile dossier");
+    await assertReadOnlyOwnerSurface(page, "mobile dossier", "[data-owner-readonly-dossier]");
     await assertResponsive(page, "mobile dossier");
     await assertReducedMotion(page, "mobile dossier");
     await assertMobileNavigationClear(page);
@@ -1207,7 +1335,15 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await Promise.all(drainScriptDiagnostics.map((drain) => drain()));
     // CDP events attribute failures; caught/revoked exceptions are not new acceptance gates.
     // Preserve the existing uncaught pageerror and console-error gates.
-    const browserErrors = diagnostics.filter((diagnostic) => diagnostic.kind === "console-error" || diagnostic.kind === "page-error");
+    const intentionalLostResponse = diagnostics.filter((diagnostic) =>
+      diagnostic.kind === "console-error" &&
+      diagnostic.stage === "desktop owner-task creation" &&
+      diagnostic.url === `${baseUrl}${taskApiPath}` &&
+      diagnostic.message === "Failed to load resource: net::ERR_FAILED");
+    assert.equal(intentionalLostResponse.length, 1, "The retry exercise must account for exactly one deliberately lost local response.");
+    const browserErrors = diagnostics.filter((diagnostic) =>
+      (diagnostic.kind === "console-error" || diagnostic.kind === "page-error") &&
+      !intentionalLostResponse.includes(diagnostic));
     const badResponses = diagnostics.filter((diagnostic) => diagnostic.kind === "http-error");
     assert.deepEqual(browserErrors, [], `Browser errors: ${browserErrors.map((diagnostic) => `${diagnostic.stage} ${diagnostic.kind}: ${diagnostic.message}`).join(" | ")}`);
     assert.deepEqual(badResponses, [], `Local server failures: ${badResponses.map((diagnostic) => `${diagnostic.status} ${diagnostic.url}`).join(" | ")}`);
@@ -1218,7 +1354,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
       desktopM2ReadyMs,
       desktopWidth,
       mobileWidth,
-      pagesScanned: 8,
+      pagesScanned: 9,
       externalRequests: externalRequests.length,
     } satisfies AcceptanceResult;
   } catch (error) {
@@ -1253,6 +1389,7 @@ async function run() {
   try {
     await applyMigrations(database);
     seedOwnerLead(database);
+    database.exec(await readFile(join(REPOSITORY_ROOT, "migrations", "0071_revenue_owner_tasks.sql"), "utf8"));
     database.close();
     m2Fixture = await createM2OwnerConsoleFixture();
     const m2DatabaseIdentity = readSetupFile(resolve(m2Fixture.databasePath)).identity;
@@ -1283,6 +1420,7 @@ async function run() {
   console.log(`Desktop list ready: ${result.desktopListReadyMs} ms (budget ${OWNER_LIST_BUDGET_MS} ms)`);
   console.log(`Desktop dossier ready: ${result.desktopDossierReadyMs} ms (budget ${OWNER_DOSSIER_BUDGET_MS} ms)`);
   console.log(`Desktop M2 review ready: ${result.desktopM2ReadyMs} ms (budget ${OWNER_M2_BUDGET_MS} ms)`);
+  console.log("Owner task lifecycle: lost-response retry, create, reload, complete, reload verified; anonymous and cross-site API writes rejected.");
   console.log(`Responsive widths: desktop ${result.desktopWidth}px, mobile ${result.mobileWidth}px`);
   console.log(`WCAG pages scanned: ${result.pagesScanned}; external requests: ${result.externalRequests}`);
 }

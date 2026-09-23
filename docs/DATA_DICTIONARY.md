@@ -14,7 +14,8 @@ delivery milestone needs them. New conceptual records below are not migrations.
 | DecisionAdvisory | Exact business/evidence/question/model lineage and uncertainty; cannot mutate qualification, consent, verification or action authority. Optional after M3. |
 | SendOutbox / SendAttempt | Exact approved content and gate versions; prepared/reserved/dispatch/accepted/unknown/failure events; no automatic redispatch from unknown. M4. |
 | SuppressionEvent | Minimal durable stop scope/reason/source/time with contact/business mappings; identity changes and imports preserve stops. M4. |
-| OwnerAction | Accountable owner, next action, due time, capacity/backlog and completion/reassignment history. M4 onward. |
+| RevenueOwnerTask / RevenueOwnerTaskTerminalEvent | Migration 0071 and a typed D1 boundary implement a manual business-scoped owner action, Toronto-displayed due time, and immutable completion/cancellation. The authenticated console uses it only on current v2 dossiers. No scheduler, contact/outreach authority, reassignment history, or reply linkage is implemented. See [ADR 0045](adr/0045-keep-owner-next-actions-manual-and-business-scoped.md). |
+| OwnerAction | The broader M4/M6 contract still needs accountable next action across contacts, replies and opportunities, capacity/backlog, reassignment history, and overdue review. |
 | CommercialOutcome | Opportunity transition, owner-confirmed signed value, invoice, collected cash, refund and handoff as distinct referenced events. M4/M6. |
 
 | Record | Meaning |
