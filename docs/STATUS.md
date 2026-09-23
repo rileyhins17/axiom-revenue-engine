@@ -1,5 +1,39 @@
 # Current status — Axiom Revenue Engine
 
+## The engine now finds, checks and shortlists businesses by itself (local)
+
+**Updated:** 2026-09-23 (America/Toronto) by Claude Code. Local, unpushed.
+
+Per Riley's direction, businesses are found by the engine, not by an agent
+([ADR 0060](adr/0060-automatic-discovery-and-website-check.md)):
+
+- **Automatic website check** (`engine-site-capture-v1`): headless desktop and
+  phone homepage views, derived signals only. Graded against the 50-case
+  answer key: Codex's audit v4 agrees on 33/49 and caught **0/8** strong
+  prospects; the new `engine-lead-rules-v5-experiment` agrees on **42/49
+  (86%)**, catching 7/8 strong prospects and 7/8 non-targets (holdout 14/15,
+  not pristine). `npx tsx scripts/grade-engine-website-check.ts` then
+  `scripts/regrade-engine-lead-rules.ts` reproduce it.
+- **Discovery:** OpenStreetMap found 1/50 known businesses and was rejected.
+  A default-off Google Places adapter with 30-per-run / 200-per-month caps is
+  built and tested with fakes only. **No real Places request has been made**;
+  it needs the owner's key (packet item 5).
+- **Weekly loop:** `scripts/engine-weekly-run.ts` (discover, check, sort,
+  save). Exercised with the research candidate file: 55 in, 8 prospects, 33
+  fine, 9 non-targets, 5 not loadable. The local `/leads/m2` page opens with
+  "Prospects found by the engine".
+
+Verification: focused tests (places 6/6, rules 6/6, M3 4/4, website-need 6/6),
+typecheck, lint and safety pass. Full suite and clean-build checks are rerun
+at the next checkpoint. Spend C$0. No contact, send, deploy, migration or
+provider account change occurred.
+
+**Next three concrete actions:** (1) once the owner creates the Places key,
+run the first real discovery and grade coverage against the answer key;
+(2) add owner confirm/dismiss on each prospect so their decisions become new
+labels; (3) resolve the call route (DNCL) and reply route (Email Routing) so a
+confirmed prospect can become a conversation.
+
 ## M3 answer key complete; next is automatic discovery and website checking
 
 **Updated:** 2026-09-23 (America/Toronto) by Claude Code. Local, unpushed.

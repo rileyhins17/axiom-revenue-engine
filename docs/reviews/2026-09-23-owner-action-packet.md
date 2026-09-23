@@ -54,6 +54,26 @@ currently reaches anyone.
 - **Not included:** any call. Calling still needs the owner-confirmed lead
   list and call controls.
 
+## 5. Create a Google Places key so the engine can find businesses (about 15 minutes)
+
+- **Why:** the engine now finds, checks and shortlists businesses by itself, but
+  it needs a source of local businesses. OpenStreetMap knew only 1 of our 50
+  test businesses. Google Places returns each business's website.
+- **Cost:** expected **C$0**. Each request is a Text Search Enterprise event,
+  and Google gives 1,000 free per month. A weekly sweep uses about 27. The
+  engine hard-stops at 30 per run and 200 per month; even with no free tier
+  that caps out at about US$5.60 (about C$8) a month.
+- **How:** in Google Cloud console, create a project "axiom-revenue-engine";
+  link a billing account (Google requires one even for free usage); enable
+  **Places API (New)** only; create an API key restricted to **Places API
+  (New)**; under Quotas set "SearchText requests per day" to **40**; add a
+  budget alert at **C$5**. Then put the key in the local ignored `.env.local`
+  as `AXIOM_GOOGLE_PLACES_KEY=...` and add `AXIOM_PLACES_DISCOVERY_ENABLED=1`.
+  Do not paste the key into chat or Git.
+- **After:** Claude runs `npx tsx scripts/engine-weekly-run.ts --places` and
+  reports what it found and the request count.
+- **Rollback:** delete the key or disable the API; the engine switch defaults off.
+
 ## Current lead evidence (for context, no action needed)
 
 Ten saved businesses have been reviewed on desktop and phone: **2** look worth

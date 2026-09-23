@@ -233,6 +233,6 @@ export function businessDisplayName(url: string, siteTitle?: string | null, site
   if (siteName && !generic.test(siteName.trim()) && overlap(siteName) > 0) return siteName.trim();
   const parts = (siteTitle ?? "").split(/\s[|–—:-]\s|\s\|\s?|\s?\|\s/).map((part) => part.trim()).filter((part) => part && !generic.test(part));
   const best = parts.map((part) => ({ part, score: overlap(part) })).sort((left, right) => right.score - left.score)[0];
-  if (best && best.score > 0) return best.part.replace(/^www./i, "").slice(0, 80);
+  if (best && best.score > 0) return best.part.replace(/^www\./i, "").slice(0, 80);
   return host;
 }
