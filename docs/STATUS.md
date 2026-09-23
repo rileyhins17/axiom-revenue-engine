@@ -13,8 +13,8 @@ the current main tip in the protected workflow, and calls the guard directly.
 The minimal legacy-main safety hotfix was separately verified and merged as
 [`e5da196`](https://github.com/rileyhins17/axiom-revenue-engine/pull/10).
 `main` has no production deployment workflow; its former raw deploy and remote
-migration aliases now stop before Wrangler. The broader candidate still needs
-its own exact-commit validation and release gates.
+migration aliases now stop before Wrangler. The broader candidate passed its
+exact-commit CI; live release gates remain open.
 
 A Luna audit then found ignored local evaluation data in a generated staging
 bundle: 3,645 files, including 104 SQLite databases. Nothing was uploaded.
@@ -35,8 +35,17 @@ safety, focused production-guard tests, typecheck and lint also passed;
 Never bypass the sanitizer. This verifies code and synthetic flows only.
 
 The 0055-to-0074 staging schema procedure and offline checksum-pinned export
-rehearsal are prepared. Synthetic migration/row-preservation and export-guard
-tests pass, but no current staging export, restore or remote migration exists.
+rehearsal are prepared. A separate [pending migration-and-console packet](releases/staging/2026-09-23-migration-console-pending.json)
+now pins `cf2cb47`, the ordered 19 migration blobs, staging Worker/D1 target,
+CI run 118, exact-commit staging no-upload dry run, and the observed rollback
+Worker version. Its Git-only verifier passed eight focused tests and printed
+canonical SHA-256 `1cf2ec39d471281c76d8e52caf99245d2f09c1114f7c1b81bd9da40cfe5fd66e`;
+the previously pending docs-only CI [run 119](https://github.com/rileyhins17/axiom-revenue-engine/actions/runs/35903014126)
+also passed. A scoped Cloudflare API-token route is documented in the staging
+runbook, but no release token is connected. Synthetic migration/row-preservation
+and export-guard tests pass; no current staging export, restore or remote
+migration exists. All live packet gates and release authorities remain pending
+or false. The packet is an immutable baseline, not a release approval.
 Staging and legacy production Workers, D1 data, provider state and all autonomy
 stops are unchanged. No prospect was contacted, no email sent, and no paid
 service enabled; incremental spend is C$0 against the C$50/month ceiling. The
@@ -47,10 +56,10 @@ production-ready.**
 
 Next three concrete actions:
 
-1. Restore authorized Cloudflare release access, export/checksum the current
+1. Restore scoped Cloudflare release access, export/checksum the current
    isolated staging D1, and rehearse its exact 0055-to-0074 upgrade locally.
-2. Prepare the exact staging release packet and, under its separate release
-   gate, verify authenticated sign-in and synthetic owner flows after upgrade.
+2. Bind fresh remote evidence and a separate exact release gate to the packet;
+   then migrate/deploy staging and verify authenticated synthetic owner flows.
 3. Resolve current source rights, real website assessment and dossier gates,
    inbound reply proof, and a lawful permitted first-touch route before any
    production cutover or outreach.

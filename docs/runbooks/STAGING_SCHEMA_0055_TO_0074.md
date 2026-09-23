@@ -24,6 +24,20 @@ are outside this procedure. See [staging inventory](../STAGING_INVENTORY.md),
    database for this operation. Use `wrangler d1 info` and a read-only
    `d1 execute --remote --command` to confirm the current ledger is exactly
    55 receipts, ending at 0055, and the database stops remain engaged.
+   Use a short-lived account-owned API token through `CLOUDFLARE_API_TOKEN`
+   and `CLOUDFLARE_ACCOUNT_ID` when granular access is available. Start with
+   D1 Read for inventory and export; Cloudflare does not document the export
+   endpoint's exact permission, so test that scope and escalate only if the
+   export is denied. Remote migrations require D1 write/edit access. Scope
+   the Worker deploy token to the existing staging Worker with Worker Editor;
+   no route permission is needed unless routes or custom domains change.
+   Confirm the token UI's actual D1 resource scope before relying on a
+   database-specific restriction. Keep tokens out of Git, logs and screenshots;
+   revoke them after the release window. See Cloudflare's
+   [Wrangler authorization](https://developers.cloudflare.com/workers/authorization/),
+   [Worker scope](https://developers.cloudflare.com/workers/authorization/workers/),
+   [system environment variables](https://developers.cloudflare.com/workers/wrangler/system-environment-variables/),
+   and [D1 export API](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/export/).
 3. Set `$privateExportSql` to an absolute path under ignored
    `backups/staging/` and export the **current** staging database there; record
    UTC, file size and SHA-256 with `Get-FileHash`.
@@ -73,6 +87,12 @@ are outside this procedure. See [staging inventory](../STAGING_INVENTORY.md),
    D1 migration. Obtain the exact applicable migration approval before the
    remote apply; the older console-only staging packet explicitly excludes
    migrations.
+   The current [pending packet](../releases/staging/2026-09-23-migration-console-pending.json)
+   pins the exact candidate and all 19 migration blobs but deliberately leaves
+   every live gate pending. Run its Git-only verifier, record the printed
+   SHA-256, and create a separate release record for the fresh export,
+   rehearsal and approval evidence. Do not edit the pending packet into an
+   apparent approval or use the older console-only packet for migrations.
 
 ## Approved-window execution and verification
 

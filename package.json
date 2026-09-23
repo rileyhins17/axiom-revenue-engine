@@ -33,6 +33,7 @@
     "cf:engine:dev": "wrangler dev --config wrangler.engine.jsonc --local --env-file wrangler.typegen.env",
     "cf:engine:dry-run": "wrangler deploy --config wrangler.engine.jsonc --dry-run --autoconfig false",
     "staging:verify-console-release": "tsx scripts/verify-staging-console-release.ts",
+    "staging:verify-migration-console-release": "tsx scripts/verify-staging-migration-console-release.ts",
     "kw:prepare-import": "tsx scripts/prepare-private-kw-import.ts",
     "kw:prepare-m2-authorization": "tsx scripts/prepare-private-kw-m2-authorization.ts",
     "kw:capture-m2-html": "tsx scripts/capture-private-kw-m2-html.ts",
