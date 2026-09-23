@@ -1,5 +1,57 @@
 # Current status — Axiom Revenue Engine
 
+## Provider-policy correction and delegated M2 research; production goal remains open
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
+`aaafdc5`; **planning correction commit:** `e212981`. The app's manual
+observed-reply slice remains locally verified as recorded below. The current
+[Resend Acceptable Use Policy](https://resend.com/legal/acceptable-use) bars
+unsolicited cold outreach and requires explicit opt-in. [Cloudflare Email
+Service's FAQ](https://developers.cloudflare.com/email-service/reference/faq/)
+states outbound is intended for transactional mail. Accordingly no provider is
+selected for cold first-touch email, regardless of its published free tier.
+Cloudflare Email Routing remains the zero-paid-mailbox inbound target only;
+Resend is a conditional future opt-in/transactional route if the exact use is
+permitted. Manual owner-managed calling/tasks are the available prospecting
+path once their separate rules and approvals are met. The master, delivery,
+operating, provider/budget, owner-context and README plans now reflect this.
+
+**M2 identity evidence:** Riley delegated ten individual decisions to Codex.
+The private source-linked review recommends keeping M2-01 through M2-09 for
+identity evaluation and replacing M2-10 TriCity, whose Cambridge service area
+does not establish a Cambridge base. The company's own
+[Jaro's Property Maintenance homepage](https://www.jarospropertymaintenance.ca/)
+states Cambridge landscaping, a Cambridge address and family ownership; it is
+a supported replacement identity, not a qualified lead or website-need finding.
+The bounded follow-up used 5 queries, 8 page opens, 6 businesses and C$0; its
+one no-new-evidence repeat is recorded in the
+[scope disposition](reviews/2026-09-23-m2-cambridge-followup-research-proposal.md).
+Comfort Air's identity has fresh official-site support, but its earlier capture
+access block remains unresolved; the executable cohort may need the existing
+Service 1st HVAC alternate. No ten-case delegated ledger or executable manifest
+has yet been saved. M2 is still **0/10 real assessments**; M3 is still **0/50
+real judged dossiers**.
+
+**Production, automation and spend:** no deployment, remote migration,
+provider activation, live capture, prospect contact, or email occurred.
+Production and account routing remain unverified; autonomous intake, queue,
+follow-up, and send are off. The C$50/month ceiling remains and incremental
+provider spend is C$0. The source-rights/retention, one supervised capture,
+legacy-contact reconciliation, live reply route, backup/rollback, and release
+gates are open. No decision is attributed to Riley or Aidan personally.
+
+Next three concrete actions:
+
+1. Save the ten delegated decisions in a strict Codex-attributed private ledger
+   bound to the exact refreshed packet and source plan; replace the blocked
+   M2-06 and unsupported-location M2-10 for an executable ten if supported.
+2. Review rights and retention for the exact selection, then prepare the one
+   supervised real-capture packet and obtain its separate recorded gate before
+   any network capture or M2 assessment.
+3. Finish manual sales/reply and legacy-contact readiness while researching a
+   policy-permitted zero-paid-mailbox email route; cold email stays off under
+   the current Resend/Cloudflare policies.
+
 ## Manual observed-reply checkpoint; production goal remains open
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
