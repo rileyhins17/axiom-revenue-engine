@@ -19,6 +19,20 @@ if (
 const nextConfig: NextConfig = {
   typedRoutes: true,
 
+  // Keep ignored local datasets and checkpoints out of deployable server traces.
+  outputFileTracingExcludes: {
+    "/*": [
+      "./data/**/*",
+      "./backups/**/*",
+      "./output/**/*",
+      "./.superpowers/**/*",
+      "./.claude/**/*",
+      "./.wrangler/**/*",
+      "./.vercel/**/*",
+      "./.git/**/*",
+    ],
+  },
+
   // Keep native / heavy server-only packages out of the webpack bundle.
   serverExternalPackages: [
     "playwright",
