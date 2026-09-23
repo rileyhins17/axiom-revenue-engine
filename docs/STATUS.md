@@ -1,5 +1,68 @@
 # Current status — Axiom Revenue Engine
 
+## Local M2 observation checkpoint and repository exposure hold
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified local application
+commit:** `a969f10` on `codex/revenue-engine-production`; it is deliberately
+**not pushed** while GitHub reports this repository as public. The current
+tracked `docs/OWNER_CONTEXT.md` expressly says it is private, and a historical
+SQLite WAL blob contains email-like data. The [count-only exposure check](reviews/2026-09-23-public-repository-exposure-check.md)
+records the evidence and limits. A targeted history scan found no obvious
+credential prefixes, but it cannot certify absence of secrets. GitHub reported
+zero forks and no Pages site. Repository visibility change is awaiting the
+owner's answer; no GitHub setting or history was changed.
+
+This local commit adds an optional, collapsed manual website-observation
+control **only** to the verified local M2 Business Review. A saved note binds
+the exact selected identity and page URL, records server time, method,
+confidence, audit version and named owner, and is immutable across reloads.
+The cloud view does not load its local-only endpoint. Every note remains
+`UNKNOWN / RESEARCH` with zero scores and no qualification, contact, consent,
+outreach, send, provider, deploy or spend authority. No real note or assessment
+was recorded. The separate [source disposition](reviews/2026-09-23-m2-manual-facts-only-source-disposition.md)
+finds eight current sites conditionally suitable in principle for a narrowly
+scoped human facts-only observation; two recorded 403 sites and Service 1st
+remain held. No source has been cleared for raw HTML retention or automated
+fetch. The ten delegated identity decisions remain saved; M2 remains **0/10
+real website assessments** and M3 **0/50 judged dossiers**.
+
+The exact local commit passed 10 focused synthetic tests, the full suite
+(865 tests: 860 passed, zero failed, five skipped), safety, typecheck and lint
+(zero errors, three known unused-code warnings). A fresh clean checkout built
+the Cloudflare bundle with 1,769 scanned files and zero local secret values
+removed; default and isolated-staging no-upload Wrangler dry runs passed. The
+owner browser acceptance passed 17 page scans at desktop and mobile widths,
+owner-task retry/reload, and zero external requests. A reused verification
+folder's bundle was correctly rejected because earlier tests left 43 private
+files there; the fresh checkout establishes the clean exact-commit result.
+[CI run 121](https://github.com/rileyhins17/axiom-revenue-engine/actions/runs/35907330796)
+passed for the preceding pushed documentation commit `d30db0c`.
+
+The separate [first-touch review](reviews/2026-09-23-first-touch-channel-route.md)
+finds owner-led manual business-to-business calls the lowest-cost candidate,
+conditional on the owners' existing phone plans and **verified free National
+DNCL registration plus calling controls**. Axiom's registration is unknown,
+so this is not a launch-ready calling route. Resend Free remains opt-in or
+transactional only, Cloudflare forwarding remains inbound only, and no
+provider-permitted cold-email sender or verified reply path is connected.
+
+The isolated staging Worker and D1, legacy production Worker and D1, provider
+accounts, and all autonomy stops remain unchanged. No export, restore,
+migration, deployment, live send, prospect contact or paid operation occurred.
+Incremental spend remains **C$0** against the C$50/month ceiling. Full
+production readiness remains open.
+
+Next three concrete actions:
+
+1. Resolve GitHub visibility, verify it anonymously, and classify the old WAL
+   and other history before any coordinated cleanup or further internal push.
+2. With scoped Cloudflare access, export/checksum the current isolated staging
+   D1 and rehearse 0055-to-0074 against its exact rows; bind fresh evidence and
+   the separate migration/release gate before a staging apply or deploy.
+3. Resolve source-specific M2 authorization and blocked replacements, collect
+   real website assessments and judged dossiers, then verify National DNCL
+   registration/call controls and an inbound reply route before outreach.
+
 ## Release-path and private-bundle safety checkpoint — exact candidate verified
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
