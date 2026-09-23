@@ -69,7 +69,7 @@ The current sequence is one complete offline dossier, ten reviewed real-business
 
 ## Owner experience
 
-The intended navigation is Today, Leads, Outreach, Revenue and System. Leads/dossier and a file-based Quality Lab already exist in source; other areas still include legacy or future functionality. Each page must distinguish available, blocked, stale, empty and unavailable states.
+The owner navigation is Today, Leads, Outreach, Revenue and System. The main owner surfaces now use plain-language decision cards; advanced legacy records remain available where useful. A Business Review link appears only for an admin, because the saved-research console is admin-only. Each page must distinguish available, blocked, stale, empty and unavailable states.
 
 Today presents the owners' weekly review as four plain-language steps: check
 safety, review businesses, handle human actions and learn from outcomes. Business
@@ -79,6 +79,17 @@ they counted approved business decisions. Today must not present Gmail OAuth as 
 selected zero-paid-mailbox design. Missing critical status reads are shown as
 unavailable to the owner; a dashboard warning is not a runtime stop or proof
 that provider readiness has been checked.
+
+Leads presents the old scored ranking as a closed advanced preview, with Business
+Review as the admin owner's primary research action. A score or suggested contact
+route is not a contact decision. Outreach starts with business evidence and
+manual next steps, and labels the mail route unverified; it does not surface
+legacy Gmail connection or send controls. Revenue distinguishes recorded
+recurring estimates from cash received. Settings reads emergency state without
+activating or synchronizing mailbox records, shows an unknown state when the
+read fails, and does not offer Gmail OAuth. Only an admin can change the stop;
+the unknown state permits an engage request but never a clear request. These
+owner screens do not authorize outbound work.
 
 A lead should answer: who is this, what is actually wrong, why is it worth attention, what is uncertain, how may we contact them, and who acts next? Reachability is separate from account quality. Only verified email may eventually automate; the zero-paid-mailbox target uses Cloudflare inbound forwarding to existing owner destinations and a separately gated Resend outbound route. Cloudflare forwarding cannot itself send custom-domain replies; M4 must prove the human-triggered provider reply flow or a separately reviewed owner-only send-as route. Calls, forms and social DMs remain manual.
 

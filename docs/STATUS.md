@@ -1,5 +1,63 @@
 # Current status — Axiom Revenue Engine
 
+## Owner workflow UI checkpoint; production goal remains open
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified code commit:** `0cf76f5`
+(`feat(revenue): unify owner workflows across the console`). This is a local
+owner-UI checkpoint, not an M2 exit gate or a
+production release. M1's synthetic offline flow remains complete; M2 has
+**0/10 real engine assessments**; M3–M7 and production remain incomplete.
+
+Today, Leads, Outreach, Revenue and System now lead with plain-language owner
+decisions in a consistent warm, light layout. Leads makes the historical score
+list an advanced read-only preview and labels its dossier as a legacy score;
+Business Review remains admin-only and is never equated with contact approval.
+Outreach starts with business evidence and human work, shows the intended
+Cloudflare/Resend mail-and-reply route as unverified, and removes legacy Gmail,
+queue and send controls from the owner view. Revenue separates entered monthly
+estimates from collected cash and no longer shows every empty stage on a phone.
+Settings no longer synchronizes or activates legacy Gmail mailbox rows during
+a page read. Its failed emergency-state read shows **Could not verify** and
+cannot clear the stop; a verified clear requires explicit owner confirmation.
+Non-admins see access notes instead of dead Business Review or stop controls.
+Critical read failures are unavailable, never invented zeroes or a claim that
+live automation has stopped.
+
+**Verification:** `npm run check:safety`, `npm test -- --test-concurrency=1`
+(730 tests: 727 passed, zero failed, three expected Windows skips),
+`npm run typecheck`, `npm run lint`, `npm run build:cloudflare`,
+`npx wrangler deploy --env="" --dry-run --autoconfig false`, and
+`git diff --check` passed. The final `npm run test:owner-ui` ran only after
+the build, dry run and full suite exited. It passed the synthetic owner task
+and stop flows, 1440 px and 390 px layouts, 17 WCAG scans and zero external
+requests. Desktop Leads loaded in 867 ms, dossier in 834 ms and Business Review
+in 4,746 ms, each within its acceptance budget. Two earlier browser runs
+exposed a loading-state race in the acceptance script; the final run waits for
+the owner page and targets its visible disclosure. No prospect was used in tests.
+
+**Production, automation and spend:** no deployment, remote migration,
+provider activation, live inbox operation, prospect capture, contact, send or
+external outreach occurred. Live production remains unverified. Autonomous
+intake, queue, follow-up and send remain off. The C$50/month ceiling is
+unchanged and incremental engine-provider spend is C$0. No paid mailbox or
+Google Workspace is assumed.
+
+**Owner decisions and blockers:** Riley/Aidan still need the per-business
+identity/disposition decisions for the proposed ten, plus source-specific
+rights and retention for the first supervised M2 request. M2 needs real
+evidence and owner assessments. The zero-paid-mailbox reply route, Cloudflare
+owner access, private legacy snapshot, staging backup, migration, rollback
+and release gates remain separate; this UI authorizes none of them.
+
+Next three concrete actions:
+
+1. Record the exact ten M2 business keep/replace, city, niche and independence
+   decisions, including the two access-blocked sites.
+2. Prepare the source-use and retention packet for one supervised real M2
+   capture and assessment; inspect its evidence and cost before the rest.
+3. Verify the zero-paid-mailbox reply route and private history snapshot under
+   their separate gates, then stage backup and rollback proof before release.
+
 ## Today owner-workflow redesign checkpoint; production goal remains open
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified code commit:** `a3cb019`
