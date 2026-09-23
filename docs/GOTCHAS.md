@@ -642,17 +642,41 @@ Retire entries when the architecture makes them impossible.
 - **Affected area:** all Cloudflare builds, previews, dry runs, and deployments.
 - **Verifying commit:** `ab5621c`.
 
-## DEPLOY-001 — Required reviewers are unavailable on this private repo plan
+## BUILD-005 — A reused build checkout can trace ignored private evaluation files
+
+- **Symptom:** the exact `a969f10` Cloudflare build in a previously used
+  verification worktree stopped after bundling with `43 private workspace
+  files`; no upload occurred. The same commit in a new checkout scanned 1,769
+  bundle files and passed, as did both no-upload Wrangler dry runs.
+- **Root cause:** the reused checkout had ignored `data/` artifacts from prior
+  local verification. Next/OpenNext traced those files into its bundle despite
+  their Git ignore state. A clean Git index is not a clean build workspace.
+- **Proven fix:** build the same immutable commit in a genuinely new checkout
+  without local evaluation data; retain the fail-closed bundle sanitizer.
+- **Prevention/test:** inspect ignored local artifacts when a bundle fails,
+  then use a fresh release checkout. Do not suppress or bypass the sanitizer;
+  its synthetic test rejects private files even when they contain no
+  recognizable secret value.
+- **Affected area:** Windows release verification, OpenNext tracing and every
+  Cloudflare dry run or upload.
+- **Verifying commits:** sanitizer in `cf2cb47`; clean exact-commit proof at
+  `a969f10` (local, not pushed while repository visibility is unresolved).
+
+## DEPLOY-001 — Environment reviewer availability depends on live repo visibility
 
 - **Symptom:** GitHub returned 422 when creating an environment reviewer rule,
   even with an empty reviewer list.
-- **Root cause:** GitHub's current Free/Pro/Team environment reviewer protection
-  is limited to public repositories; this repository is correctly private.
+- **Root cause:** GitHub's Free/Pro/Team environment reviewer protection was
+  limited to public repositories when this rule was attempted against the
+  then-private repo. A 2026-09-23 recheck reported the repo **public**, contrary
+  to its private-repository contract; the earlier visibility assumption is no
+  longer current. See the [exposure check](reviews/2026-09-23-public-repository-exposure-check.md).
 - **Proven fix:** create the `production` environment with a custom `main` branch
   policy and keep the exact release SHA, backup reference, typed approval phrase,
   and absent-by-default deployment credentials as the no-cost release gates.
-- **Prevention/test:** audit the environment and secret names read-only before a
-  release; never weaken repository privacy to gain a reviewer button.
+- **Prevention/test:** audit live visibility, environment and secret names
+  read-only before a release. Never change privacy merely to gain a reviewer
+  button; resolve the unexpected current public state separately.
 - **Affected area:** GitHub Actions and production approval.
 - **Verifying commit:** `4408a89`; environment configured 2026-08-21.
 
