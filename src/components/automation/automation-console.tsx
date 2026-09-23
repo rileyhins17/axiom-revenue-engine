@@ -9,11 +9,10 @@ import type { AutomationOperatorConsoleData } from "@/lib/automation-operator-vi
 
 type Props = {
   data: AutomationOperatorConsoleData | null;
-  canOpenBusinessReview: boolean;
   canControlEmergencyStop: boolean;
 };
 
-export function AutomationConsole({ data, canOpenBusinessReview, canControlEmergencyStop }: Props) {
+export function AutomationConsole({ data, canControlEmergencyStop }: Props) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
   const [stopState, setStopState] = useState<boolean | null>(data?.settings.emergencyPaused ?? null);
@@ -87,32 +86,8 @@ export function AutomationConsole({ data, canOpenBusinessReview, canControlEmerg
         </div>
       ) : null}
 
-      <section aria-label="Follow-through actions" className="grid gap-4 lg:grid-cols-12">
-        <section aria-labelledby="follow-through-business-review" className="relative overflow-hidden rounded-[22px] border border-[#dce6dc] bg-[#f0f3e9] p-5 sm:p-7 lg:col-span-7">
-          <div className="absolute inset-y-0 left-0 w-1.5 bg-[#12573f]" aria-hidden="true" />
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#426e58]">Business review</p>
-          <h2 id="follow-through-business-review" className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#172c25] sm:text-[28px]">
-            Check the proposed business list
-          </h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-[#52665a]">
-            Open the list to see saved decisions and anything that still needs a decision. Opening it does not start research or contact anyone.
-          </p>
-          {canOpenBusinessReview ? (
-            <Link
-              href="/leads/m2/identity"
-              prefetch={false}
-              className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#12573f] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0f4834] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#197255]"
-            >
-              Open business review <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
-          ) : (
-            <p className="mt-5 rounded-lg border border-[#dbe5da] bg-white/80 px-4 py-3 text-sm leading-5 text-[#52665a]">
-              An admin owner can open the business review.
-            </p>
-          )}
-        </section>
-
-        <section aria-labelledby="follow-through-stop" className="rounded-[22px] border border-[#dfe7df] bg-white p-5 sm:p-6 lg:col-span-5">
+      <section aria-label="Follow-through actions" className="grid gap-4 lg:grid-cols-2">
+        <section aria-labelledby="follow-through-stop" className="rounded-[22px] border border-[#dfe7df] bg-white p-5 sm:p-6">
           <div className="flex items-start gap-3">
             <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${emergencyPaused ? "bg-[#f4ece6] text-[#805a3b]" : "bg-[#edf4ee] text-[#286047]"}`}>
               {emergencyPaused ? <ShieldAlert className="size-5" aria-hidden="true" /> : <ShieldCheck className="size-5" aria-hidden="true" />}
@@ -150,7 +125,7 @@ export function AutomationConsole({ data, canOpenBusinessReview, canControlEmerg
           </div>
         </section>
 
-        <section aria-labelledby="follow-through-clients" className="flex flex-col justify-between gap-4 rounded-[22px] border border-[#dfe7df] bg-white p-5 sm:flex-row sm:items-center sm:p-6 lg:col-span-7">
+        <section aria-labelledby="follow-through-clients" className="flex flex-col justify-between gap-4 rounded-[22px] border border-[#dfe7df] bg-white p-5 sm:flex-row sm:items-center sm:p-6">
           <div className="max-w-xl">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#566a5b]">Client work</p>
             <h2 id="follow-through-clients" className="mt-1 text-lg font-semibold tracking-tight text-[#20372b]">Client follow-ups</h2>
@@ -161,7 +136,7 @@ export function AutomationConsole({ data, canOpenBusinessReview, canControlEmerg
           </Link>
         </section>
 
-        <section aria-labelledby="follow-through-email" className="rounded-[22px] border border-[#e8e1cf] bg-[#fffaf0] p-5 sm:p-6 lg:col-span-5">
+        <section aria-labelledby="follow-through-email" className="rounded-[22px] border border-[#e8e1cf] bg-[#fffaf0] p-5 sm:p-6">
           <div className="flex items-start gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#f6efd9] text-[#7b6230]">
               <Mail className="size-5" aria-hidden="true" />

@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   ArrowRight,
   Bot,
-  Building2,
   CheckCircle2,
   Clock,
   Clock3,
@@ -543,8 +542,7 @@ async function getScrapeTargetList(): Promise<ScrapeTargetRow[]> {
 }
 
 export default async function DashboardPage() {
-  const session = await requireSession();
-  const canOpenBusinessReview = session.user.role === "admin";
+  await requireSession();
 
   const prisma = getPrisma();
   const renderNowMs = new Date().getTime();
@@ -783,28 +781,6 @@ export default async function DashboardPage() {
       ) : null}
 
       <section aria-label="Today owner action desk" className="grid gap-4">
-        <section aria-labelledby="today-next-action" className="rounded-2xl border border-[#dce5dd] bg-white shadow-[0_12px_32px_-28px_rgba(27,62,44,0.4)]">
-          <div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:px-8">
-            <div className="min-w-0">
-              <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.13em] text-[#537262]">
-                <span className="grid size-7 place-items-center rounded-lg bg-[#eaf3e9] text-[#145943]"><Building2 className="size-4" aria-hidden="true" /></span>
-                Business review
-              </p>
-              <h2 id="today-next-action" className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#20352c] sm:text-[1.75rem]">Check the proposed business list</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#52645a]">See saved choices and anything that still needs a decision. Opening this private review does not start research or contact anyone.</p>
-            </div>
-            <div className="lg:min-w-[210px] lg:text-right">
-              {canOpenBusinessReview ? (
-                <Link href="/leads/m2/identity" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#145943] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#104a37] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943] lg:w-auto">
-                  Open business review <ArrowRight className="size-4" aria-hidden="true" />
-                </Link>
-              ) : (
-                <p className="rounded-xl border border-[#e4ebe2] bg-[#f8faf7] px-4 py-3 text-sm leading-5 text-[#53675a]">A named owner can complete this review.</p>
-              )}
-            </div>
-          </div>
-        </section>
-
         {replyInboxRead.unavailable || followUpsRead.unavailable || ownerRepliesRead.unavailable || ownerReplies.length > 0 || replyInbox.length > 0 || followUpAttentionCount > 0 ? <section aria-labelledby="today-attention" className="overflow-hidden rounded-2xl border border-[#dce5dd] bg-white shadow-sm">
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#e4ebe2] px-5 py-4 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -858,7 +834,10 @@ export default async function DashboardPage() {
             )}
             <Link href="/clients" className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#145943] hover:text-[#0f4634] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943]">See all client actions <ArrowRight className="size-4" aria-hidden="true" /></Link>
           </div>
-        </section> : null}
+        </section> : <section aria-labelledby="today-attention-empty" className="rounded-2xl border border-[#dce5dd] bg-white px-5 py-6 shadow-sm sm:px-7">
+          <h2 id="today-attention-empty" className="text-xl font-semibold tracking-tight text-[#20352c]">No actions due right now</h2>
+          <p className="mt-1 text-sm leading-6 text-[#52645a]">No recorded replies or client follow-ups need your attention.</p>
+        </section>}
       </section>
 
       <details className="group overflow-hidden rounded-xl border border-[#dce5dd] bg-white">

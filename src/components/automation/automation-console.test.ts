@@ -20,7 +20,6 @@ const router = {
 
 function renderConsole(options: {
   data?: AutomationOperatorConsoleData | null;
-  canOpenBusinessReview?: boolean;
   canControlEmergencyStop?: boolean;
 } = {}) {
   return renderToStaticMarkup(createElement(
@@ -28,7 +27,6 @@ function renderConsole(options: {
     { value: router },
     createElement(AutomationConsole, {
       data: options.data ?? null,
-      canOpenBusinessReview: options.canOpenBusinessReview ?? true,
       canControlEmergencyStop: options.canControlEmergencyStop ?? true,
     }),
   ));
@@ -41,24 +39,20 @@ function statusData(emergencyPaused: boolean): AutomationOperatorConsoleData {
   } as AutomationOperatorConsoleData;
 }
 
-test("follow-through page avoids inventing a next review and keeps business and client routes clear", () => {
+test("follow-through page avoids stale business review prompts and keeps client work and email status clear", () => {
   const html = renderConsole({ data: statusData(false) });
 
   assert.match(html, /<h1[^>]*>Follow-through<\/h1>/);
-  assert.match(html, /Check the proposed business list/);
-  assert.match(html, /see saved decisions and anything that still needs a decision/);
-  assert.match(html, /Open business review/);
-  assert.doesNotMatch(html, /Your next review|Review the proposed businesses|Review proposed businesses/);
-  assert.match(html, /href="\/leads\/m2\/identity"/);
-  assert.doesNotMatch(html, /href="\/leads\/m2"/);
+  assert.doesNotMatch(html, /Check the proposed business list|Open business review|business review/i);
+  assert.doesNotMatch(html, /href="\/leads\/m2(?:\/identity)?"/);
   assert.match(html, /Client follow-ups/);
   assert.match(html, /href="\/clients"/);
   assert.match(html, /Email is not ready/);
   assert.match(html, /owner inbox and reply path/);
 
-  const restrictedHtml = renderConsole({ data: statusData(false), canOpenBusinessReview: false });
-  assert.match(restrictedHtml, /An admin owner can open the business review/);
-  assert.doesNotMatch(restrictedHtml, /href="\/leads\/m2\/identity"/);
+  const restrictedHtml = renderConsole({ data: statusData(false), canControlEmergencyStop: false });
+  assert.match(restrictedHtml, /Only an admin owner can turn on or verify the stop/);
+  assert.doesNotMatch(restrictedHtml, /Stop new automated work/);
 });
 
 test("follow-through page keeps stop state and admin-only stop control visible", () => {

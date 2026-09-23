@@ -33,8 +33,10 @@ defaults to preflight. Explicit `--execute` requires the recorded capture
 approval; `--verify` reloads saved evidence without network access. Its input and
 operating limits are in the same preparation runbook.
 The [initial public-research scope](docs/reviews/2026-09-21-m2-public-research-scope.md)
-produced ten proposed evaluation businesses. Their individual identity and
-disposition decisions are still pending.
+produced ten proposed evaluation businesses. Codex completed the delegated
+identity selection in an ignored private ledger and saved a ten-record shadow
+manifest. This selection does not assess website need or authorize capture or
+contact; see [current status](docs/STATUS.md) for the exact scope and blockers.
 
 The private ten-business research packet now has a separate owner decision
 sheet and a no-network `npm run kw:prepare-m2-owner-decisions` preparer. It
@@ -44,17 +46,13 @@ documented access-blocked sites cannot enter that selection; they need reviewed
 replacements or a separately designed partial cohort. Nothing in this step
 authorizes capture or contact. See [the M2 decision runbook](docs/RUNBOOK.md#m2-research-scope-and-current-authorization-preparation).
 
-An admin can record those identity decisions from the local **Businesses →
-Review 10 businesses** screen. It checks the exact private research packet,
-shows source links, and keeps an unfinished browser draft bound to that packet.
-Riley or Aidan signs in under their own account, completes the ten decisions,
-and selects **Save owner decisions**. The server verifies the current packet and
-owner before writing an immutable private ledger under ignored
-`data/kw-evaluation/`; the page shows its saved status on return. Downloading a
-copy is optional. This identity review comes before preparing the source
-import plan; the later preparer still verifies that plan and every selected
-identity. Saving does not select businesses, authorize capture or contact, or
-send anything. The local screen is unavailable on Cloudflare.
+The older local **Businesses → Review 10 businesses** screen remains available
+for an owner who specifically wants to make a new owner-attributed decision.
+It is no longer promoted as a next step because the current ten identity
+choices were made and recorded by Codex under Riley's delegation. The server
+still verifies the packet and actual reviewer on that older path; the
+Codex-attributed private ledger is separate. Neither path authorizes capture,
+contact, or sending. The local screen is unavailable on Cloudflare.
 
 For sealed evidence that needs more research, the same assessment command saves
 a research report with missing pages and limitations, without an assessment
@@ -104,8 +102,9 @@ operator diagnostics behind a disclosure. The private business decision flow
 and saved-research console are admin-only. Each page must distinguish
 available, blocked, stale, empty and unavailable states.
 
-Today leads with a short business-review action. Replies and follow-ups appear
-when they need attention or their status cannot be read. Email readiness lives
+Today shows replies and follow-ups when they need attention or their status
+cannot be read; otherwise it shows a compact no-actions state. It no longer
+asks an owner to repeat the completed ten-name selection. Email readiness lives
 in Settings, while legacy operator metrics sit behind Operator details.
 The navigation does not use lead-score badges as if they counted approved
 business decisions. Today does not present Gmail OAuth as the path to the
@@ -113,11 +112,11 @@ selected zero-paid-mailbox design. Missing critical status reads appear as
 unavailable; a dashboard warning is not a runtime stop or proof of provider
 readiness.
 
-Businesses starts with the separate ten-name identity review, then groups
-saved assessments as ready for a decision, needing another look, or stopped.
+Businesses groups saved assessments as ready for a decision, needing another
+look, or stopped. It does not present the ten-name identity selection as an
+owner task.
 Each row shows why it is there and opens its evidence. The old ranking
-and detailed scores sit in a closed advanced preview, while Business Review
-remains the admin owner's primary saved-research action. That saved-research
+and detailed scores sit in a closed advanced preview. The admin-only saved-research
 view shows the selected business and a short summary of captured pages; page
 sources sit under a disclosure. A business detail leads with one supported
 website finding, its source, open questions when recorded, and the next owner
@@ -125,7 +124,7 @@ action. Owner stop and task controls follow. Contact-review status stays
 visible; recorded routes, history, and the full audit are available under
 **Research details** when needed.
 A score or suggested contact route is not a contact decision. Follow-through
-starts with the same private business decision flow and manual next steps, and labels the mail route
+starts with client work and the automation stop, and labels the mail route
 unverified; it does not surface legacy Gmail connection or send controls.
 Clients distinguishes recorded
 recurring estimates from cash received. Settings reads emergency state without

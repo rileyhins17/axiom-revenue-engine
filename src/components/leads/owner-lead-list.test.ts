@@ -137,16 +137,11 @@ function fixtureResponse(leads: OwnerLeadProjection[], options: { rejectedBusine
   };
 }
 
-test("owner lead list presents plain business details and keeps ranking details secondary", () => {
-  const html = renderToStaticMarkup(createElement(OwnerLeadList, { data: fixtureResponse([fixtureLead()]), canReviewBusinessResearch: true }));
+test("owner lead list presents assessed business details without asking for a proposed-name review", () => {
+  const html = renderToStaticMarkup(createElement(OwnerLeadList, { data: fixtureResponse([fixtureLead()]) }));
   const primary = html.slice(0, html.indexOf("<details")).replace(/<[^>]*>/g, " ");
 
   assert.match(html, /<h1[^>]*>Businesses<\/h1>/);
-  assert.match(primary, /Review proposed businesses/);
-  assert.match(primary, /Confirm the names before deeper research/);
-  assert.match(primary, /Saved assessed businesses appear below/);
-  assert.match(primary, /saving choices contacts no one/);
-  assert.equal((primary.match(/\b10\b/g) ?? []).length, 1);
   assert.match(primary, /Assessed businesses/);
   assert.match(primary, /Ready for a decision/);
   assert.match(primary, /Roofing/);
@@ -173,8 +168,8 @@ test("owner lead list presents plain business details and keeps ranking details 
   assert.match(html, /Open Quality Lab/);
   assert.match(html, /href="\/leads\/evaluation"/);
   assert.match(html, /Read-only · no outreach permission/);
-  assert.match(html, /href="\/leads\/m2\/identity"/);
-  assert.match(html, /Review 10 proposed businesses/);
+  assert.doesNotMatch(html, /href="\/leads\/m2\/identity"/);
+  assert.doesNotMatch(primary, /Review proposed businesses|Confirm the names|Review 10 proposed businesses/);
   assert.match(html, />1 assessed business<\/p>/);
   assert.match(html, /How business records are assessed/);
   assert.doesNotMatch(html, />Send</);
@@ -250,8 +245,8 @@ test("unavailable owner lead list stays honest about the live stop state", () =>
   assert.match(html, /read failure does not stop live automation/i);
 });
 
-test("non-admin lead preview does not offer the admin-only Business Review route", () => {
+test("business list does not repeat the completed proposed-name selection workflow", () => {
   const html = renderToStaticMarkup(createElement(OwnerLeadList, { data: fixtureResponse([fixtureLead()]) }));
-  assert.match(html, /Business research is owner-managed/);
-  assert.doesNotMatch(html, /href="\/leads\/m2"/);
+  assert.match(html, /Assessed businesses/);
+  assert.doesNotMatch(html, /href="\/leads\/m2\/identity"|Review 10 proposed businesses|Business research is owner-managed/);
 });

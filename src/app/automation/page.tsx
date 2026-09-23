@@ -12,5 +12,5 @@ export default async function AutomationPage() {
   const data = await getAutomationOperatorConsole().catch(() => null);
 
   const isAdmin = session.user.role === "admin";
-  return <AutomationConsole data={data} canOpenBusinessReview={isAdmin} canControlEmergencyStop={isAdmin} />;
+  return <AutomationConsole data={data} canControlEmergencyStop={isAdmin} />;
 }

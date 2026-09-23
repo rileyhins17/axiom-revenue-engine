@@ -128,10 +128,7 @@ function qualificationStatusMessage(lead: OwnerLeadProjection) {
   return "Website qualification is incomplete. Research or refresh this business before making a decision.";
 }
 
-export function OwnerLeadList({ data, canReviewBusinessResearch = false }: {
-  data: OwnerLeadListResponse;
-  canReviewBusinessResearch?: boolean;
-}) {
+export function OwnerLeadList({ data }: { data: OwnerLeadListResponse }) {
   const rejectedBusinesses = data.summary.rejectedBusinesses;
   const ignoredContactRows = data.summary.ignoredContactRows;
   const needsQualificationCount = data.leads.filter((lead) => lead.attention === "REVIEW" || lead.attention === "RESEARCH").length;
@@ -142,27 +139,13 @@ export function OwnerLeadList({ data, canReviewBusinessResearch = false }: {
   ].filter((group) => group.leads.length > 0);
 
   return (
-    <div className="mx-auto flex max-w-[1280px] flex-col gap-7 text-[#20352a]">
+    <div className="mx-auto flex max-w-[1280px] flex-col gap-5 text-[#20352a]">
       <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[#d9e2d9] pb-5">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#476351]">Research workspace</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em] text-[#172b21]">Businesses</h1>
         </div>
-        <span className="rounded-full border border-[#d9e5da] bg-white px-3 py-1.5 text-xs font-semibold text-[#425b49]">Private owner workspace</span>
       </header>
-
-      <section aria-labelledby="proposed-businesses-heading" className="flex flex-col gap-3 rounded-2xl border border-[#d9e5da] bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5">
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#476351]">First step · proposed businesses</p>
-          <h2 id="proposed-businesses-heading" className="mt-1 text-lg font-semibold tracking-tight text-[#172b21]">Review proposed businesses</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-5 text-[#58695f]">Confirm the names before deeper research. Saved assessed businesses appear below; saving choices contacts no one.</p>
-        </div>
-        {canReviewBusinessResearch ? (
-          <Button asChild size="lg" className="w-full shrink-0 justify-between rounded-xl bg-[#174e37] px-4 font-semibold text-white hover:bg-[#123f2d] focus-visible:ring-[#174e37] sm:w-auto sm:min-w-64">
-            <Link href={"/leads/m2/identity" as Route} prefetch={false}>Review 10 proposed businesses <ArrowUpRight aria-hidden="true" /></Link>
-          </Button>
-        ) : <p role="note" className="text-sm text-[#58695f]"><strong className="font-semibold text-[#20352a]">Business research is owner-managed.</strong> An owner with administrator access can review these names.</p>}
-      </section>
 
       <section aria-labelledby="business-records-heading">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">

@@ -307,6 +307,20 @@ async function applyMigrations(database: SqliteDatabase) {
   // Add independent owner-action tables only after that seed completes.
 }
 
+async function assertNoProposedBusinessReviewPrompt(page: Page, label: string) {
+  const bodyText = await page.locator("body").innerText();
+  assert.equal(
+    await page.getByRole("link", { name: /business review|proposed businesses/i }).count(),
+    0,
+    `${label} must not show a business-review link.`,
+  );
+  assert.doesNotMatch(
+    bodyText,
+    /check the proposed business list|review proposed businesses|review \d+ proposed businesses|open business review/i,
+    `${label} must not prompt the owner to review the proposed business list.`,
+  );
+}
+
 function fixtureTimestamp(offsetMilliseconds: number) {
   return new Date(Date.now() + offsetMilliseconds).toISOString();
 }
@@ -878,7 +892,8 @@ async function assertKeyboardFlow(page: Page) {
   await page.reload({ waitUntil: "domcontentloaded" });
   // Next may still be streaming the loading skeleton after DOMContentLoaded.
   // Wait for the actual owner page before focusing its disclosure.
-  await page.getByRole("link", { name: "Review 10 proposed businesses" }).waitFor({ state: "visible" });
+  await page.getByRole("heading", { name: "Assessed businesses", exact: true }).waitFor({ state: "visible" });
+  await assertNoProposedBusinessReviewPrompt(page, "Keyboard Businesses page");
   await page.waitForLoadState("networkidle");
   await page.waitForFunction(() => document.body !== null);
   await page.evaluate(() => document.body.focus());
@@ -1299,9 +1314,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     const listStart = performance.now();
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Businesses" }).waitFor();
-    const businessesReview = page.getByRole("link", { name: "Review 10 proposed businesses" });
-    await businessesReview.waitFor();
-    assert.equal(await businessesReview.getAttribute("href"), "/leads/m2/identity");
+    await page.getByRole("heading", { name: "Assessed businesses", exact: true }).waitFor();
+    await assertNoProposedBusinessReviewPrompt(page, "Desktop Businesses");
     await page.screenshot({ path: join(outputDirectory, "leads-desktop.png"), fullPage: true });
     await openLegacyLeadPreview(page);
     await page.getByRole("link", { name: /Open evidence dossier/i }).first().waitFor();
@@ -1708,15 +1722,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "desktop Today safety";
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
-    const todayReview = page.getByRole("region", { name: "Today owner action desk" });
-    await todayReview.getByRole("heading", { name: "Check the proposed business list" }).waitFor();
-    assert.equal(await todayReview.getByRole("heading", { name: "Replies and follow-ups" }).count(), 0,
-      "The empty Today view should not show a replies card when there is nothing to act on.");
-    assert.equal(await todayReview.getByRole("heading", { name: "Safety and email status" }).count(), 0,
-      "The Today view should not repeat email setup details from Settings.");
-    const todayBusinessReview = todayReview.getByRole("link", { name: "Open business review" });
-    await todayBusinessReview.waitFor();
-    assert.equal(await todayBusinessReview.getAttribute("href"), "/leads/m2/identity");
+    await page.getByRole("heading", { name: "No actions due right now", exact: true }).waitFor();
+    await assertNoProposedBusinessReviewPrompt(page, "Desktop Today");
     assert.equal(await page.getByText("Safety gated", { exact: true }).count(), 0,
       "The owner shell must not imply that safety is verified through a static badge.");
     assert.equal(await page.getByText("prod", { exact: true }).count(), 0,
@@ -1735,9 +1742,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.getByRole("heading", { name: "Email is not ready" }).waitFor();
     await page.getByRole("heading", { name: "Client follow-ups" }).waitFor();
     await page.getByRole("heading", { name: "Automation stop" }).waitFor();
-    const followThroughReview = page.getByRole("link", { name: "Open business review" });
-    await followThroughReview.waitFor();
-    assert.equal(await followThroughReview.getAttribute("href"), "/leads/m2/identity");
+    await assertNoProposedBusinessReviewPrompt(page, "Desktop Outreach");
     assert.equal(await page.getByRole("link", { name: /Connect Gmail/i }).count(), 0);
     await assertResponsive(page, "desktop Outreach");
     await assertWcag(page, "desktop Outreach");
@@ -1769,6 +1774,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Businesses" }).waitFor();
+    await page.getByRole("heading", { name: "Assessed businesses", exact: true }).waitFor();
+    await assertNoProposedBusinessReviewPrompt(page, "Mobile Businesses");
     await page.screenshot({ path: join(outputDirectory, "leads-mobile.png"), fullPage: true });
     await openLegacyLeadPreview(page);
     await page.getByRole("link", { name: /Open evidence dossier/i }).first().waitFor();
@@ -1834,7 +1841,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "mobile Today safety";
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
-    await page.getByRole("region", { name: "Today owner action desk" }).getByRole("link", { name: "Open business review" }).waitFor();
+    await page.getByRole("heading", { name: "No actions due right now", exact: true }).waitFor();
+    await assertNoProposedBusinessReviewPrompt(page, "Mobile Today");
     assert.equal(await page.getByRole("link", { name: "Connect now" }).count(), 0,
       "The phone Today view must not offer Gmail OAuth as the next owner action.");
     await assertResponsive(page, "mobile Today safety");
@@ -1846,9 +1854,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.getByRole("heading", { level: 1, name: "Follow-through" }).waitFor();
     await page.getByRole("heading", { name: "Email is not ready" }).waitFor();
     await page.getByRole("heading", { name: "Client follow-ups" }).waitFor();
-    const mobileFollowThroughReview = page.getByRole("link", { name: "Open business review" });
-    await mobileFollowThroughReview.waitFor();
-    assert.equal(await mobileFollowThroughReview.getAttribute("href"), "/leads/m2/identity");
+    await assertNoProposedBusinessReviewPrompt(page, "Mobile Outreach");
     await assertResponsive(page, "mobile Outreach");
     await assertWcag(page, "mobile Outreach");
     await page.screenshot({ path: join(outputDirectory, "outreach-mobile.png"), fullPage: true });
