@@ -1,5 +1,71 @@
 # Current status — Axiom Revenue Engine
 
+## Owner workspace redesign and M2 decision boundary; production goal remains open
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified code commits:** `24c78c9`
+(`feat(revenue): redesign owner workspace for business workflows`) and `8c91aaa`
+(`feat(revenue): prepare explicit M2 owner decisions`). This is a local
+owner-workflow checkpoint, not M2 exit or a production release. M1's synthetic
+offline flow remains complete. M2 still has
+**0/10 real engine assessments**; M3–M7 and production remain incomplete.
+
+The owner workspace now uses a light, consistent shell with plain navigation:
+Today, Businesses, Outreach, Clients, and Settings. Today leads with a next
+decision and shows system/email state without presenting it as provider proof.
+Businesses shows saved records and direct evidence links before its advanced
+legacy scores. The admin-only Business Review uses compact list/detail panels;
+the old dossier removes its oversized tinted frame and puts detailed legacy
+scores behind a disclosure. Outreach separates human follow-through from the
+unverified email route; Clients shows replies, due work, and an honest empty
+state; Settings puts the saved stop first. These display changes do not alter
+qualification, contact, consent, or send authority.
+
+The local M2 owner-decision preparer now accepts an explicit per-business ledger
+bound to the exact research packet and reviewed source plan. It writes only an
+ignored, plan-only exact-ten shadow selection. The two documented access-blocked
+sites can remain `KEEP_AS_BLOCKED` in the ledger but cannot enter that selection;
+they need supported, reviewed replacements or a separate approved partial-cohort
+design. No owner decision has been inferred from Aidan's aggregate feedback.
+The provider plan records the checked Cloudflare Email Sending Beta alternative
+and keeps Resend a conditional first-pilot route. Neither account is treated as
+connected or authorized.
+
+**Verification:** `npm run check:safety`, `npm test -- --test-concurrency=1`
+(739 tests: 736 passed, zero failed, three expected Windows skips),
+`npm run typecheck`, `npm run lint`, `npm run build:cloudflare`,
+`npx wrangler deploy --env="" --dry-run --autoconfig false`, and `git diff --check`
+passed. The Cloudflare command was a dry run and did not deploy. The final
+`npm run test:owner-ui` passed against the committed UI after the build and dry
+run had exited: 1440 px desktop and 390 px phone, 17 WCAG scans, zero external
+requests, and the owner-task retry/create/reload/complete flow. Desktop list,
+dossier and M2 review loaded in 879 ms, 108 ms and 4,732 ms against their
+10,000/15,000/15,000 ms budgets. The M2 decision-preparer tests passed, as did
+the focused browser-diagnostics tests. Only synthetic fixtures were used; no
+prospect data or provider was contacted.
+
+**Production, automation, and spend:** no deployment, remote migration,
+provider activation, live inbox operation, prospect capture, contact, send, or
+external outreach occurred. Live production remains unverified. Autonomous
+intake, queue, follow-up, and send remain off; the C$50/month ceiling is
+unchanged. Incremental engine-provider spend is C$0. No paid mailbox or Google
+Workspace is assumed.
+
+**Owner decisions and blockers:** Riley/Aidan still need to review each proposed
+M2 business identity/disposition and the first supervised source-use/retention
+packet. The two access-blocked sites need a replacement decision or partial
+cohort plan. A live owner-controlled reply route, Cloudflare account access,
+private legacy snapshot, staging backup, migration, rollback, and release gates
+remain separate. The UI checkpoint authorizes none of them.
+
+Next three concrete actions:
+
+1. Record the exact per-business keep, replace, hold, or blocked M2 decision,
+   including the source-plan match for any replacement.
+2. Prepare source rights and retention for one supervised real M2 capture and
+   owner assessment, then inspect the evidence before proceeding to ten.
+3. Verify the owner-controlled no-paid-mailbox reply route and private history
+   snapshot, then prepare a backed-up staging release and rollback proof.
+
 ## Owner workflow UI checkpoint; production goal remains open
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified code commit:** `0cf76f5`
