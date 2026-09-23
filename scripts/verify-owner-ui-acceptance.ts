@@ -275,15 +275,18 @@ async function applyMigrations(database: SqliteDatabase) {
     .sort((left, right) => left.localeCompare(right));
   assert(migrations.length >= 60 && migrations.at(-1)?.startsWith("0068_"),
     "The owner fixture must use the complete pre-M2 migration history through 0068.");
-  const ownerTasksMigration = "0071_revenue_owner_tasks.sql";
-  assert((await readdir(migrationsDirectory)).includes(ownerTasksMigration), "The synthetic owner fixture requires migration 0071 for task acceptance.");
+  const postSeedMigrations = ["0071_revenue_owner_tasks.sql", "0072_revenue_business_stop.sql"];
+  const migrationNames = await readdir(migrationsDirectory);
+  for (const migration of postSeedMigrations) {
+    assert(migrationNames.includes(migration), `The synthetic owner fixture requires ${migration} for owner-action acceptance.`);
+  }
 
   database.pragma("foreign_keys = ON");
   for (const migration of migrations) {
     database.exec(await readFile(join(migrationsDirectory, migration), "utf8"));
   }
   // The contact writer used by seedOwnerLead verifies this exact baseline.
-  // Add the independent owner-task tables only after that seed completes.
+  // Add independent owner-action tables only after that seed completes.
 }
 
 function fixtureTimestamp(offsetMilliseconds: number) {
@@ -1002,6 +1005,16 @@ export async function warmOwnerAcceptanceRoutes(page: Page, extraRoutes: string[
   for (const route of extraRoutes) await page.goto(route, { waitUntil: "load" });
 }
 
+async function assertBusinessStopRoutesBlocked(page: Page) {
+  const routes = page.locator('section[aria-labelledby="reachable-routes"] ul > li');
+  const routeCount = await routes.count();
+  assert(routeCount >= 3, "The synthetic dossier must keep its email, phone, and form routes visible for stop verification.");
+  for (let index = 0; index < routeCount; index += 1) {
+    assert.equal(await routes.nth(index).getByText("Blocked", { exact: true }).count(), 1,
+      `Recorded route ${index + 1} must be visibly blocked by the owner stop.`);
+  }
+}
+
 async function assertM2Review(page: Page, fixture: Awaited<ReturnType<typeof createM2OwnerConsoleFixture>>, label: string) {
   await page.getByRole("heading", { level: 1, name: "Local research console" }).waitFor();
   await assertOwnerPageTitle(page, "M2 Local Review | Axiom Revenue Engine");
@@ -1065,7 +1078,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await warmOwnerAcceptanceRoutes(warmupPage, ["/leads/m2"]);
     await warmupPage.close();
 
-    stage = "owner-task authentication gate";
+    stage = "owner-action authentication gate";
     const anonymous = await browser.newContext({ baseURL: baseUrl, serviceWorkers: "block" });
     await anonymous.route("**/*", async (route) => {
       const url = route.request().url();
@@ -1073,6 +1086,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
       else { externalRequests.push(url); await route.abort("blockedbyclient"); }
     });
     const taskApiPath = `/api/v1/leads/${encodeURIComponent(FIXTURE_BUSINESS_ID)}/tasks`;
+    const stopApiPath = `/api/v1/leads/${encodeURIComponent(FIXTURE_BUSINESS_ID)}/stops`;
     const anonymousTasksResponse = await anonymous.request.get(taskApiPath, { maxRedirects: 0 });
     assert.equal(anonymousTasksResponse.status(), 401,
       `Anonymous owner-task listing must return HTTP 401, got ${anonymousTasksResponse.status()}.`);
@@ -1094,6 +1108,18 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
       `Anonymous owner-task creation must return HTTP 401, got ${anonymousCreateResponse.status()}.`);
     await anonymousCreateResponse.dispose();
 
+    const anonymousStopResponse = await anonymous.request.get(stopApiPath, { maxRedirects: 0 });
+    assert.equal(anonymousStopResponse.status(), 401,
+      `Anonymous business-stop read must return HTTP 401, got ${anonymousStopResponse.status()}.`);
+    await anonymousStopResponse.dispose();
+    const anonymousStopCreateResponse = await anonymous.request.post(stopApiPath, {
+      maxRedirects: 0,
+      data: { idempotencyKey: randomUUID(), reason: "OWNER_DECISION", note: "Unauthenticated stop acceptance probe." },
+    });
+    assert.equal(anonymousStopCreateResponse.status(), 401,
+      `Anonymous business-stop creation must return HTTP 401, got ${anonymousStopCreateResponse.status()}.`);
+    await anonymousStopCreateResponse.dispose();
+
     stage = "M2 authentication gate";
     const anonymousPage = await anonymous.newPage();
     const anonymousErrors: string[] = [];
@@ -1110,7 +1136,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     assert.deepEqual(anonymousErrors, [], "Unauthenticated redirect raised a script error.");
     await anonymous.close();
 
-    stage = "owner-task same-origin gate";
+    stage = "owner-action same-origin gate";
     const authenticatedTasks = await context.request.get(taskApiPath);
     assert.equal(authenticatedTasks.status(), 200, "An authenticated owner must be able to read saved tasks.");
     await authenticatedTasks.dispose();
@@ -1124,6 +1150,17 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     assert.equal(crossSiteCreate.status(), 403, "An authenticated cross-site task mutation must be rejected.");
     assert.equal((await crossSiteCreate.json() as { code?: string }).code, "ORIGIN_REJECTED");
     await crossSiteCreate.dispose();
+    const crossSiteStopCreate = await context.request.post(stopApiPath, {
+      headers: { Origin: "https://untrusted.example.invalid" },
+      data: { idempotencyKey: randomUUID(), reason: "OWNER_DECISION", note: "Cross-site stop mutation must be rejected." },
+    });
+    assert.equal(crossSiteStopCreate.status(), 403, "An authenticated cross-site business-stop mutation must be rejected.");
+    assert.equal((await crossSiteStopCreate.json() as { code?: string }).code, "ORIGIN_REJECTED");
+    await crossSiteStopCreate.dispose();
+    const initialStopResponse = await context.request.get(stopApiPath);
+    assert.equal(initialStopResponse.status(), 200, "An authenticated owner must be able to read saved business-stop state.");
+    assert.deepEqual(await initialStopResponse.json(), { stop: null }, "The fresh synthetic business must start with no owner stop.");
+    await initialStopResponse.dispose();
 
     page = await context.newPage();
     attachBrowserDiagnostics(page, () => stage, diagnostics, baseUrl);
@@ -1235,6 +1272,110 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     assert.equal(await completedTaskRow.getByRole("button", { name: /^(Complete|Cancel) task:/ }).count(), 0,
       "A terminal task must not expose completion or cancellation actions after reload.");
 
+    // Keep one open fixture action so the stop can prove that completion is
+    // blocked and cancellation remains available.
+    const openTaskAction = "Call the synthetic business";
+    const openTaskResponse = await context.request.post(taskApiPath, {
+      headers: { Origin: baseUrl },
+      data: {
+        operation: "CREATE", idempotencyKey: randomUUID(), owner: "AIDAN",
+        action: openTaskAction, dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000).toISOString(),
+      },
+    });
+    assert.equal(openTaskResponse.status(), 200, "The fixture needs one open task before the business stop.");
+    const openTaskBody = await openTaskResponse.json() as { task?: { taskId?: string } };
+    const openTaskId = openTaskBody.task?.taskId;
+    assert(openTaskId, "The open fixture task needs a durable identity.");
+    await openTaskResponse.dispose();
+
+    stage = "desktop owner business stop";
+    const stopNote = "Owner decision: do not contact this synthetic business.";
+    const capturedStopCommands: Array<{ idempotencyKey?: string; reason?: string; note?: string }> = [];
+    const captureStopCommand = (request: import("playwright").Request) => {
+      if (new URL(request.url()).pathname !== stopApiPath || request.method() !== "POST") return;
+      capturedStopCommands.push(JSON.parse(request.postData() ?? "{}") as { idempotencyKey?: string; reason?: string; note?: string });
+    };
+    page.on("request", captureStopCommand);
+    await page.getByRole("heading", { level: 2, name: "Do not contact" }).waitFor();
+    await page.getByLabel("Reason").selectOption("OWNER_DECISION");
+    await page.getByLabel("Note").fill(stopNote);
+    await page.getByRole("button", { name: "Record do not contact" }).click();
+    await page.getByText("Contact stop saved and verified. The business dossier is refreshing.", { exact: true }).waitFor();
+    await page.getByText("Contact stopped", { exact: true }).waitFor();
+    assert.deepEqual(capturedStopCommands.map(({ reason, note }) => ({ reason, note })), [{ reason: "OWNER_DECISION", note: stopNote }],
+      "The UI must submit the owner's exact selected stop reason and note once.");
+    const stopIdempotencyKey = capturedStopCommands[0]?.idempotencyKey;
+    assert.equal(typeof stopIdempotencyKey, "string", "The UI stop command must carry an idempotency key.");
+    assert(stopIdempotencyKey, "The UI stop command must carry a non-empty idempotency key.");
+    page.off("request", captureStopCommand);
+
+    const savedStopResponse = await context.request.get(stopApiPath);
+    assert.equal(savedStopResponse.status(), 200, "The authenticated owner must be able to read the saved business stop.");
+    const savedStopBody = await savedStopResponse.json() as { stop?: { stopId?: string; businessId?: string; reason?: string; source?: string; note?: string } | null };
+    assert.equal(savedStopBody.stop?.businessId, FIXTURE_BUSINESS_ID);
+    assert.equal(savedStopBody.stop?.reason, "OWNER_DECISION");
+    assert.equal(savedStopBody.stop?.source, "OWNER_ACTION");
+    assert.equal(savedStopBody.stop?.note, stopNote);
+    const savedStopId = savedStopBody.stop?.stopId;
+    assert(savedStopId, "The authoritative saved stop must include its durable identity.");
+    await savedStopResponse.dispose();
+
+    const exactReplayResponse = await context.request.post(stopApiPath, {
+      headers: { Origin: baseUrl },
+      data: { idempotencyKey: stopIdempotencyKey, reason: "OWNER_DECISION", note: stopNote },
+    });
+    assert(exactReplayResponse.ok(), `Exact same-key stop replay must succeed (${exactReplayResponse.status()}).`);
+    const replayedStopBody = await exactReplayResponse.json() as { stop?: { stopId?: string; reason?: string; note?: string } };
+    assert.equal(replayedStopBody.stop?.stopId, savedStopId, "Exact replay must return the same durable stop record.");
+    assert.equal(replayedStopBody.stop?.reason, "OWNER_DECISION");
+    assert.equal(replayedStopBody.stop?.note, stopNote);
+    await exactReplayResponse.dispose();
+
+    stage = "desktop owner business stop after reload";
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 2, name: "Do not contact" }).waitFor();
+    await page.getByText("Contact stopped", { exact: true }).waitFor();
+    await page.getByText("Owner decision", { exact: true }).waitFor();
+    await page.getByText(stopNote, { exact: true }).waitFor();
+    await page.getByRole("heading", { level: 2, name: "Every recorded route" }).waitFor();
+    await page.getByText("Contact status: Do not contact", { exact: true }).waitFor();
+    await assertBusinessStopRoutesBlocked(page);
+    const stoppedTaskRow = page.getByRole("list", { name: "Saved owner tasks" }).locator("li").filter({ hasText: openTaskAction });
+    await stoppedTaskRow.waitFor({ state: "visible" });
+    assert.equal(await stoppedTaskRow.getByRole("button", { name: `Complete task: ${openTaskAction}` }).count(), 0,
+      "An open task must not offer completion after the business is stopped.");
+    assert.equal(await page.getByRole("button", { name: "Save task" }).count(), 0,
+      "A stopped business must not offer new owner tasks.");
+    await stoppedTaskRow.getByRole("button", { name: `Cancel task: ${openTaskAction}` }).waitFor();
+
+    const blockedCreate = await context.request.post(taskApiPath, {
+      headers: { Origin: baseUrl },
+      data: {
+        operation: "CREATE", idempotencyKey: randomUUID(), owner: "RILEY",
+        action: "Contact after stop must be blocked", dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000).toISOString(),
+      },
+    });
+    assert.equal(blockedCreate.status(), 409, "A stop must block task creation at the API and storage boundary.");
+    assert.equal((await blockedCreate.json() as { code?: string }).code, "OWNER_TASK_BUSINESS_STOPPED");
+    await blockedCreate.dispose();
+    const blockedComplete = await context.request.post(taskApiPath, {
+      headers: { Origin: baseUrl },
+      data: { operation: "COMPLETE", idempotencyKey: randomUUID(), taskId: openTaskId, note: "Must not complete after stop." },
+    });
+    assert.equal(blockedComplete.status(), 409, "A stop must block task completion at the API and storage boundary.");
+    assert.equal((await blockedComplete.json() as { code?: string }).code, "OWNER_TASK_BUSINESS_STOPPED");
+    await blockedComplete.dispose();
+    await stoppedTaskRow.getByRole("button", { name: `Cancel task: ${openTaskAction}` }).click();
+    await stoppedTaskRow.getByText("Cancelled", { exact: true }).waitFor();
+
+    stage = "ranked leads owner stop";
+    await page.goto("/leads", { waitUntil: "domcontentloaded" });
+    const rankedLeads = page.getByRole("list", { name: "Ranked leads" });
+    const stoppedLead = rankedLeads.locator("li").filter({ hasText: "Tri-City Roofing Fixture" });
+    await stoppedLead.waitFor({ state: "visible" });
+    assert(await stoppedLead.getByText("Blocked", { exact: true }).count() > 0,
+      "The ranked lead must visibly report its durable owner stop as blocked.");
+
     stage = "desktop quality lab";
     await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
@@ -1304,6 +1445,11 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await openMobileDossier(page);
     await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Contact review not recorded" }).waitFor();
+    await page.getByRole("heading", { level: 2, name: "Do not contact" }).waitFor();
+    await page.getByText("Contact stopped", { exact: true }).waitFor();
+    await page.getByText("Owner decision", { exact: true }).waitFor();
+    await page.getByText("Owner decision: do not contact this synthetic business.", { exact: true }).waitFor();
+    await assertBusinessStopRoutesBlocked(page);
     await page.getByRole("list", { name: "Saved owner tasks" }).getByText("Completed", { exact: true }).waitFor();
     await assertWcag(page, "mobile dossier");
     await assertReadOnlyOwnerSurface(page, "mobile dossier", "[data-owner-readonly-dossier]");
@@ -1390,6 +1536,7 @@ async function run() {
     await applyMigrations(database);
     seedOwnerLead(database);
     database.exec(await readFile(join(REPOSITORY_ROOT, "migrations", "0071_revenue_owner_tasks.sql"), "utf8"));
+    database.exec(await readFile(join(REPOSITORY_ROOT, "migrations", "0072_revenue_business_stop.sql"), "utf8"));
     database.close();
     m2Fixture = await createM2OwnerConsoleFixture();
     const m2DatabaseIdentity = readSetupFile(resolve(m2Fixture.databasePath)).identity;

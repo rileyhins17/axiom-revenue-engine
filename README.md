@@ -80,6 +80,14 @@ Read `AGENTS.md` and the required documents before changes. Use Node.js 22+, npm
 
 `npm run dev` starts the console. `npm run cf:engine:dev` inspects the locked engine scaffold. Neither command is permission to contact a provider, run real acquisition, sync an inbox, send, migrate remotely or deploy. Existing guarded private-KW commands are documented in the runbook; their approval and trusted-input requirements remain.
 
+On an authenticated v2 lead dossier, the **Do not contact** panel records one
+manual business-level owner stop with a reason and note. The saved stop blocks
+route presentation in both the dossier and ranked list. An unreadable stop
+state also blocks route presentation. This requires migration 0072 in the
+target environment; the committed migration is not a deployed schema. It does
+not replace contact-level suppression, legal/consent review, or legacy-history
+reconciliation, and it does not enable sending.
+
 ### Local M1 offline dossier checkpoint
 
 The integrated M1 CLI accepts only the bounded direct-child paths and identities below. Prepare a new local SQLite with the canonical private-KW migrations, generate the canonical synthetic source/materialization/manifest/invocation inputs, and then run the same command twice without changing any path or ID:

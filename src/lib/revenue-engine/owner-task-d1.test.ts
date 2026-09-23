@@ -8,12 +8,14 @@ import { createRevenueOwnerTaskD1Boundary } from "@/lib/revenue-engine/owner-tas
 
 const kernel = readFileSync(new URL("../../../migrations/0054_revenue_shadow_kernel.sql", import.meta.url), "utf8");
 const migration = readFileSync(new URL("../../../migrations/0071_revenue_owner_tasks.sql", import.meta.url), "utf8");
+const businessStopMigration = readFileSync(new URL("../../../migrations/0072_revenue_business_stop.sql", import.meta.url), "utf8");
 
 function fixture() {
   const db = new Database(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(kernel);
   db.exec(migration);
+  db.exec(businessStopMigration);
   db.prepare(`INSERT INTO "RevenueBusiness" ("id","canonicalName") VALUES (?,?)`).run("business-a", "Synthetic Roofing");
   db.prepare(`INSERT INTO "RevenueBusiness" ("id","canonicalName") VALUES (?,?)`).run("business-b", "Synthetic HVAC");
   const database: D1DatabaseLike = {
@@ -128,4 +130,47 @@ test("task listing is capped at 100 rows", async () => {
     await tasks.createTask({ ...createInput, idempotencyKey: `bulk-${String(index).padStart(3, "0")}`, actionText: `Synthetic action ${index}` });
   }
   assert.equal((await tasks.listTasks("business-a")).length, 100);
+});
+
+test("business stop blocks new tasks and completions, permits cancellation, and preserves exact accepted replays", async () => {
+  const { db, tasks } = fixture();
+  const preexistingOpen = await tasks.createTask(createInput);
+  const preexistingForComplete = await tasks.createTask({ ...createInput, idempotencyKey: "create-before-stop-complete" });
+  const openForBlockedComplete = await tasks.createTask({ ...createInput, idempotencyKey: "create-before-stop-blocked-complete" });
+  const acceptedComplete = {
+    businessId: "business-a", taskId: preexistingForComplete.taskId, idempotencyKey: "complete-before-stop",
+    outcome: "COMPLETE" as const, actorUserId: "user-riley", note: "Reviewed before the stop was recorded.",
+  };
+  const completed = await tasks.closeTask(acceptedComplete);
+  db.prepare(`INSERT INTO "RevenueBusinessStopEvent" ("stopId","businessId","idempotencyKey","reason","source","note","actorUserId")
+    VALUES ('business-stop:owner-stop','business-a','owner-stop','OWNER_DECISION','OWNER_ACTION','Owner stopped this business.','user-riley')`).run();
+
+  await assert.rejects(tasks.createTask({ ...createInput, idempotencyKey: "create-after-stop" }), /OWNER_TASK_BUSINESS_STOPPED/);
+  assert.deepEqual(await tasks.createTask(createInput), { ...preexistingOpen, status: "REPLAYED" });
+  await assert.rejects(tasks.closeTask({ ...acceptedComplete, taskId: openForBlockedComplete.taskId, idempotencyKey: "complete-after-stop" }), /OWNER_TASK_BUSINESS_STOPPED/);
+  assert.deepEqual(await tasks.closeTask(acceptedComplete), { ...completed, status: "REPLAYED" });
+
+  const cancellation = await tasks.closeTask({
+    businessId: "business-a", taskId: preexistingOpen.taskId, idempotencyKey: "cancel-after-stop",
+    outcome: "CANCEL", actorUserId: "user-riley", note: "Cancelled after the owner stop.",
+  });
+  assert.equal(cancellation.status, "CANCELLED");
+  assert.equal((db.prepare(`SELECT count(*) AS count FROM "RevenueOwnerTask"`).get() as { count: number }).count, 3);
+  assert.equal((db.prepare(`SELECT count(*) AS count FROM "RevenueOwnerTaskTerminalEvent"`).get() as { count: number }).count, 2);
+});
+
+test("task create and completion fail closed when the business stop table is unavailable", async () => {
+  const { db, tasks } = fixture();
+  const { taskId } = await tasks.createTask(createInput);
+  db.exec(`DROP TABLE "RevenueBusinessStopEvent"`);
+  await assert.rejects(tasks.createTask(createInput));
+  await assert.rejects(tasks.closeTask({
+    businessId: "business-a", taskId, idempotencyKey: "complete-without-stop-table",
+    outcome: "COMPLETE", actorUserId: "user-riley", note: "Must fail closed.",
+  }));
+  const cancelled = await tasks.closeTask({
+    businessId: "business-a", taskId, idempotencyKey: "cancel-without-stop-table",
+    outcome: "CANCEL", actorUserId: "user-riley", note: "Safe closure remains available.",
+  });
+  assert.equal(cancelled.status, "CANCELLED");
 });

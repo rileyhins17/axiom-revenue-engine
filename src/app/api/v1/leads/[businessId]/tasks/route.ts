@@ -94,6 +94,9 @@ async function readJsonUnderLimit(request: Request): Promise<unknown> {
 
 function writeError(error: unknown) {
   const code = error instanceof Error ? error.message : "OWNER_TASK_WRITE_FAILED";
+  if (code === "OWNER_TASK_BUSINESS_STOPPED") {
+    return json({ code, error: "This business is stopped or its stop status is unavailable. New tasks and completion are blocked; existing tasks can be cancelled." }, 409);
+  }
   if (code === "OWNER_TASK_IDEMPOTENCY_CONFLICT" || code === "OWNER_TASK_ALREADY_TERMINAL") {
     return json({ code, error: "The task changed or this request conflicts with an earlier one. Reload and review it." }, 409);
   }

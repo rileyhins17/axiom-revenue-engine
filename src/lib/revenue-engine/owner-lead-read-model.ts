@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 import type { D1DatabaseLike } from "@/lib/cloudflare";
+import { createRevenueBusinessStopD1Boundary } from "@/lib/revenue-engine/business-stop-d1";
 import { OwnerLeadBusinessIdSchema } from "@/lib/revenue-engine/owner-lead-identity";
+import { applyOwnerLeadStopState } from "@/lib/revenue-engine/owner-lead-stop-overlay";
 import {
   OWNER_LEAD_PROJECTION_VERSION,
   OwnerLeadContactPointSchema,
@@ -359,6 +361,19 @@ export async function readOwnerLeadList(
     .map((result) => result.data.businessId);
   const uniqueBusinessIds = Array.from(new Set(candidateIdentities)).sort();
 
+  let stopLookupUnavailable = false;
+  let stoppedBusinessIds = new Set<string>();
+  if (uniqueBusinessIds.length > 0) {
+    try {
+      const stops = await createRevenueBusinessStopD1Boundary(database).listStopsForBusinessIds(uniqueBusinessIds);
+      stoppedBusinessIds = new Set(stops.keys());
+    } catch {
+      // If stops cannot be checked, fail closed on contact readiness while
+      // retaining the evidence list for owner diagnosis.
+      stopLookupUnavailable = true;
+    }
+  }
+
   const contactsByBusiness = new Map<string, OwnerLeadProjectionInput["contactPoints"]>();
   let ignoredContactRows = 0;
   if (uniqueBusinessIds.length > 0) {
@@ -399,7 +414,9 @@ export async function readOwnerLeadList(
         generatedAt,
         contactsByBusiness.get(candidate.data.businessId) ?? [],
       );
-      projections.push(projectOwnerLead(projectionInput));
+      const lead = projectOwnerLead(projectionInput);
+      projections.push(applyOwnerLeadStopState(lead,
+        stopLookupUnavailable ? "UNAVAILABLE" : stoppedBusinessIds.has(candidate.data.businessId) ? "STOPPED" : "CLEAR"));
     } catch {
       rejections.push(RejectionSchema.parse({ businessId: candidate.data.businessId, code: "INVALID_PROJECTION_INPUT" }));
     }

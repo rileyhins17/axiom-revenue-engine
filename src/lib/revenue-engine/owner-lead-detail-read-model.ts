@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { D1DatabaseLike } from "@/lib/cloudflare";
+import { createRevenueBusinessStopD1Boundary } from "@/lib/revenue-engine/business-stop-d1";
 import { EvidenceClaimSchema } from "@/lib/revenue-engine/evidence";
 import {
   OWNER_LEAD_MAX_AUDIT_AGE_MS,
@@ -17,6 +18,7 @@ import {
   parseOwnerLeadJson,
 } from "@/lib/revenue-engine/owner-lead-read-model";
 import { OwnerLeadBusinessIdSchema } from "@/lib/revenue-engine/owner-lead-identity";
+import { applyOwnerLeadStopState, type OwnerLeadStopState } from "@/lib/revenue-engine/owner-lead-stop-overlay";
 import {
   PrivateKwContactInvocationSchema,
   privateKwContactInvocationCanonicalJson,
@@ -186,6 +188,7 @@ const ContactReviewReceiptRowSchema = z.object({
 export const OwnerLeadDetailResponseSchema = z.object({
   readModelVersion: z.literal(OWNER_LEAD_DETAIL_READ_MODEL_VERSION),
   generatedAt: TimestampSchema,
+  operationalStopState: z.enum(["CLEAR", "STOPPED", "UNAVAILABLE"]).optional(),
   lead: OwnerLeadProjectionSchema,
   identity: z.object({
     addressLine: z.string().max(300).nullable(),
@@ -674,6 +677,7 @@ export async function readOwnerLeadDetail(
   database: D1DatabaseLike,
   businessId: string,
   generatedAt: string,
+  options: Readonly<{ stopGate?: "REQUIRE" | "NOT_APPLICABLE" }> = {},
 ): Promise<OwnerLeadDetailResponse | null> {
   const exactBusinessId = OwnerLeadBusinessIdSchema.parse(businessId);
   TimestampSchema.parse(generatedAt);
@@ -712,7 +716,7 @@ export async function readOwnerLeadDetail(
     }
   }
 
-  const lead = projectOwnerLead(mapOwnerLeadCandidate(candidate, generatedAt, contacts));
+  let lead = projectOwnerLead(mapOwnerLeadCandidate(candidate, generatedAt, contacts));
   const audit = DeterministicWebsiteAuditResultSchema.parse(parseOwnerLeadJson(candidate.auditJson));
   assertSnapshotMatchesAudit(candidate, audit);
   const claimsById = new Map(audit.claims.map((claim) => [claim.claimId, claim]));
@@ -763,11 +767,23 @@ export async function readOwnerLeadDetail(
     .slice(0, OWNER_LEAD_HISTORY_LIMIT)
     .map(normalizeHistoryRow)
     .map(historyEvent);
+  let operationalStopState: OwnerLeadStopState = "CLEAR";
+  if (options.stopGate !== "NOT_APPLICABLE") {
+    try {
+      const stops = await createRevenueBusinessStopD1Boundary(database).listStopsForBusinessIds([exactBusinessId]);
+      operationalStopState = stops.has(exactBusinessId) ? "STOPPED" : "CLEAR";
+    } catch {
+      // A missing/unreadable stop table must not present a contact route as safe.
+      // Keep the evidence dossier available so the owner can diagnose the gate.
+      operationalStopState = "UNAVAILABLE";
+    }
+  }
+  lead = applyOwnerLeadStopState(lead, operationalStopState);
   const routes = contacts
     .map((contact) => DetailContactSchema.parse({
       ...contact,
       recommended: contact.contactPointId === lead.route.contactPointId,
-      readiness: contactReadiness(contact, generatedAt),
+      readiness: operationalStopState === "CLEAR" ? contactReadiness(contact, generatedAt) : "BLOCKED",
     }))
     .sort((left, right) => Number(right.recommended) - Number(left.recommended)
       || left.channel.localeCompare(right.channel, "en-CA")
@@ -776,6 +792,7 @@ export async function readOwnerLeadDetail(
   return OwnerLeadDetailResponseSchema.parse({
     readModelVersion: OWNER_LEAD_DETAIL_READ_MODEL_VERSION,
     generatedAt,
+    ...(options.stopGate === "NOT_APPLICABLE" ? {} : { operationalStopState }),
     lead,
     identity: {
       addressLine: candidate.addressLine,

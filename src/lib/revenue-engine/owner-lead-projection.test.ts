@@ -8,6 +8,7 @@ import {
   type OwnerLeadProjectionInput,
 } from "@/lib/revenue-engine/owner-lead-projection";
 import { qualifyRevenueLead, type ReachableChannel } from "@/lib/revenue-engine/qualification";
+import { applyOwnerLeadStopState } from "@/lib/revenue-engine/owner-lead-stop-overlay";
 import {
   auditWebsiteDeterministically,
   type DeterministicWebsiteAuditInput,
@@ -263,6 +264,26 @@ test("a strong non-email lead stays valuable and becomes a manual phone review",
     providerOperationsAuthorized: 0,
     costAuthorizedUsd: 0,
   });
+});
+
+test("an operational stop blocks the owner route without rewriting qualification evidence", () => {
+  const original = projectOwnerLead(ownerInput());
+  const stopped = applyOwnerLeadStopState(original, "STOPPED");
+  const unavailable = applyOwnerLeadStopState(original, "UNAVAILABLE");
+
+  assert.equal(original.attention, "READY_FOR_REVIEW");
+  assert.equal(stopped.attention, "BLOCKED");
+  assert.equal(stopped.ownerActionable, false);
+  assert.equal(stopped.route.channel, "RESEARCH");
+  assert.equal(stopped.route.contactPointId, null);
+  assert.match(stopped.route.reason, /do not contact/i);
+  assert.deepEqual(stopped.qualification, original.qualification);
+  assert.deepEqual(stopped.evidence, original.evidence);
+  assert.deepEqual(stopped.authority, original.authority);
+  assert.equal(unavailable.attention, "BLOCKED");
+  assert.equal(unavailable.ownerActionable, false);
+  assert.match(unavailable.route.reason, /could not be checked/i);
+  assert.equal(applyOwnerLeadStopState(original, "CLEAR"), original);
 });
 
 test("a healthy current site with a recorded phone remains research-only without block copy", () => {

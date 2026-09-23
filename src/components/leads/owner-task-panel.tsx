@@ -105,7 +105,7 @@ function sortTasks(tasks: OwnerTask[]) {
   });
 }
 
-export function OwnerTaskPanel({ businessId }: { businessId: string }) {
+export function OwnerTaskPanel({ businessId, stopState }: { businessId: string; stopState: "CLEAR" | "STOPPED" | "UNAVAILABLE" }) {
   const [state, setState] = React.useState<PanelState>("loading");
   const [tasks, setTasks] = React.useState<OwnerTask[]>([]);
   const [owner, setOwner] = React.useState<Owner>("RILEY");
@@ -171,6 +171,10 @@ export function OwnerTaskPanel({ businessId }: { businessId: string }) {
 
   const createTask = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (stopState !== "CLEAR") {
+      setMessage({ tone: "error", text: "Do not create a new task while this business is stopped or its stop state is unavailable." });
+      return;
+    }
     const normalizedAction = action.trim();
     const selectedTime = torontoDateTimeToIso(dueAt);
     if (!normalizedAction || !selectedTime) {
@@ -192,6 +196,10 @@ export function OwnerTaskPanel({ businessId }: { businessId: string }) {
   };
 
   const changeTask = async (task: OwnerTask, operation: "COMPLETE" | "CANCEL") => {
+    if (operation === "COMPLETE" && stopState !== "CLEAR") {
+      setMessage({ tone: "error", text: "Do not complete a task while this business is stopped or its stop state is unavailable. Cancel it if appropriate." });
+      return;
+    }
     const note = operation === "COMPLETE" ? "Marked complete by owner." : "Cancelled by owner.";
     const commandIdentity = JSON.stringify({ businessId, operation, taskId: task.taskId, note });
     await submit({ operation, taskId: task.taskId, note }, `${operation}:${task.taskId}`, commandIdentity);
@@ -221,6 +229,14 @@ export function OwnerTaskPanel({ businessId }: { businessId: string }) {
         <p className={`mx-4 mt-4 rounded-lg border px-3 py-2 text-xs leading-5 sm:mx-5 ${message.tone === "error" ? "border-rose-300/20 bg-rose-300/[0.05] text-rose-100" : "border-emerald-300/20 bg-emerald-300/[0.05] text-emerald-100"}`} role="status" aria-live="polite">
           {message.tone === "error" ? <CircleAlert className="mr-1.5 inline size-3.5" aria-hidden="true" /> : <Check className="mr-1.5 inline size-3.5" aria-hidden="true" />}
           {message.text}
+        </p>
+      ) : null}
+
+      {stopState !== "CLEAR" ? (
+        <p className="mx-4 mt-4 rounded-lg border border-rose-300/20 bg-rose-300/[0.05] px-3 py-2 text-xs leading-5 text-rose-100 sm:mx-5" role="status">
+          {stopState === "STOPPED"
+            ? "This business is stopped. Existing tasks remain visible; cancel open tasks that should no longer be done. New tasks and completion are blocked."
+            : "Business stop status is unavailable. New tasks and completion are blocked until the saved status can be checked."}
         </p>
       ) : null}
 
@@ -255,9 +271,11 @@ export function OwnerTaskPanel({ businessId }: { businessId: string }) {
                   </div>
                   {!isTerminal(task.status) ? (
                     <div className="flex shrink-0 gap-2">
-                      <button type="button" onClick={() => void changeTask(task, "COMPLETE")} disabled={pending !== null} className="v2-focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-300/20 bg-emerald-300/[0.05] px-3 text-xs font-semibold text-emerald-100 hover:bg-emerald-300/[0.1] disabled:opacity-50" aria-label={`Complete task: ${task.action}`}>
-                        <Check className="size-3.5" aria-hidden="true" /> Complete
-                      </button>
+                      {stopState === "CLEAR" ? (
+                        <button type="button" onClick={() => void changeTask(task, "COMPLETE")} disabled={pending !== null} className="v2-focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-300/20 bg-emerald-300/[0.05] px-3 text-xs font-semibold text-emerald-100 hover:bg-emerald-300/[0.1] disabled:opacity-50" aria-label={`Complete task: ${task.action}`}>
+                          <Check className="size-3.5" aria-hidden="true" /> Complete
+                        </button>
+                      ) : null}
                       <button type="button" onClick={() => void changeTask(task, "CANCEL")} disabled={pending !== null} className="v2-focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/[0.1] px-3 text-xs font-semibold text-zinc-300 hover:border-rose-300/20 hover:text-rose-100 disabled:opacity-50" aria-label={`Cancel task: ${task.action}`}>
                         <X className="size-3.5" aria-hidden="true" /> Cancel
                       </button>
@@ -268,7 +286,7 @@ export function OwnerTaskPanel({ businessId }: { businessId: string }) {
             </ul>
           )}
 
-          <form onSubmit={createTask} className="grid gap-3 border-t border-white/[0.07] px-4 py-4 sm:grid-cols-[minmax(0,1fr)_140px_210px_auto] sm:items-end sm:px-5">
+          {stopState === "CLEAR" ? <form onSubmit={createTask} className="grid gap-3 border-t border-white/[0.07] px-4 py-4 sm:grid-cols-[minmax(0,1fr)_140px_210px_auto] sm:items-end sm:px-5">
             <label className="grid gap-1.5 text-xs font-semibold text-zinc-300">
               Next action
               <input value={action} onChange={(event) => setAction(event.target.value)} maxLength={500} required disabled={pending !== null} placeholder="For example, review the website evidence" className="v2-focus-ring min-h-10 rounded-lg border border-white/[0.1] bg-black/20 px-3 text-sm font-normal text-white placeholder:text-zinc-600" />
@@ -289,7 +307,7 @@ export function OwnerTaskPanel({ businessId }: { businessId: string }) {
               Save task
             </button>
             <p className="text-[11px] text-zinc-500 sm:col-span-4">Due times are entered and shown in America/Toronto. Saving a task records an owner action only.</p>
-          </form>
+          </form> : null}
         </>
       )}
 

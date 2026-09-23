@@ -112,7 +112,7 @@ function validPhone() {
   };
 }
 
-function fakeDatabase(candidateRows: unknown[], contactRows: unknown[]) {
+function fakeDatabase(candidateRows: unknown[], contactRows: unknown[], stopRows: unknown[] = [], stopUnavailable = false) {
   const queries: string[] = [];
   const database: D1DatabaseLike = {
     prepare(query: string): D1PreparedStatementLike {
@@ -126,6 +126,10 @@ function fakeDatabase(candidateRows: unknown[], contactRows: unknown[]) {
         async all<T>() {
           if (/^\s*PRAGMA\s+table_info/i.test(query)) return { results: [{ name: "id", type: "TEXT", notnull: 1, dflt_value: null }] as T[] };
           assert(bindings.length > 0);
+          if (query.includes('FROM "RevenueBusinessStopEvent"')) {
+            if (stopUnavailable) throw new Error("Stop table unavailable");
+            return { results: stopRows as T[] };
+          }
           const rows = query.includes('FROM "RevenueBusiness"') ? candidateRows : contactRows;
           return { results: rows as T[] };
         },
@@ -160,8 +164,27 @@ test("the D1 reader returns an authenticated-API-safe, read-only owner list", as
     providerOperationsAuthorized: 0,
     costAuthorizedUsd: 0,
   });
-  assert.equal(fake.queries.length, 9);
+  assert.equal(fake.queries.length, 10);
   assert(fake.queries.slice(7).every((query) => /^\s*SELECT\b/i.test(query)));
+});
+
+test("ranked leads fail closed for a saved stop or unavailable stop lookup", async () => {
+  const stopRow = {
+    stopId: "business-stop:fixture", businessId: "business:one", idempotencyKey: "fixture",
+    reason: "OWNER_DECISION", source: "OWNER_ACTION", note: "Do not pursue this business.",
+    actorUserId: "owner", createdAt: "2026-08-24T14:00:00.000Z",
+  };
+  const original = await readOwnerLeadList(fakeDatabase([validCandidate()], [validPhone()]).database, GENERATED_AT, 50);
+  const stopped = await readOwnerLeadList(fakeDatabase([validCandidate()], [validPhone()], [stopRow]).database, GENERATED_AT, 50);
+  const unavailable = await readOwnerLeadList(fakeDatabase([validCandidate()], [validPhone()], [], true).database, GENERATED_AT, 50);
+  assert.equal(stopped.leads[0]?.attention, "BLOCKED");
+  assert.equal(stopped.leads[0]?.ownerActionable, false);
+  assert.equal(stopped.leads[0]?.route.channel, "RESEARCH");
+  assert.match(stopped.leads[0]?.route.reason ?? "", /do not contact/i);
+  assert.deepEqual(stopped.leads[0]?.qualification, original.leads[0]?.qualification);
+  assert.equal(stopped.summary.blocked, 1);
+  assert.equal(unavailable.leads[0]?.attention, "BLOCKED");
+  assert.match(unavailable.leads[0]?.route.reason ?? "", /could not be checked/i);
 });
 
 test("malformed businesses are explicit and malformed contacts cannot authorize a route", async () => {

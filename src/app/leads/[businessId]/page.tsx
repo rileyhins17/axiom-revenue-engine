@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { OwnerLeadDetail, OwnerLeadDetailUnavailable } from "@/components/leads/owner-lead-detail";
+import { OwnerBusinessStopPanel } from "@/components/leads/owner-business-stop-panel";
 import { OwnerTaskPanel } from "@/components/leads/owner-task-panel";
 import { getDatabase } from "@/lib/cloudflare";
 import {
@@ -36,7 +37,10 @@ export default async function LeadDetailPage({
     <div className="space-y-5">
       <OwnerLeadDetail data={detail} />
       <div className="mx-auto max-w-[1500px]">
-        <OwnerTaskPanel businessId={identity} />
+        <OwnerBusinessStopPanel businessId={identity} />
+      </div>
+      <div className="mx-auto max-w-[1500px]">
+        <OwnerTaskPanel businessId={identity} stopState={detail.operationalStopState ?? "UNAVAILABLE"} />
       </div>
     </div>
   );

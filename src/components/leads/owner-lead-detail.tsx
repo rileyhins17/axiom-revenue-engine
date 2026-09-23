@@ -391,16 +391,25 @@ function WebsiteEvidence({ data }: { data: OwnerLeadDetailResponse }) {
 }
 
 function Reachability({ data }: { data: OwnerLeadDetailResponse }) {
+  const operationalStop = data.operationalStopState === "STOPPED" || data.operationalStopState === "UNAVAILABLE";
   return (
     <section aria-labelledby="reachable-routes" className="rounded-2xl border border-white/[0.08] bg-[#0e1014] p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-300">Reachability</p>
           <h2 id="reachable-routes" className="mt-1 text-lg font-semibold text-white">Every recorded route</h2>
-          <p className="mt-1 max-w-2xl text-xs leading-5 text-zinc-500">The recommended route is explained, but every channel remains read-only. Phone, forms, and social are always manual.</p>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-zinc-500">
+            {operationalStop
+              ? "Recorded channels remain evidence only. No contact action is available while the business is stopped or its stop status cannot be checked."
+              : "The recommended route is explained, but every channel remains read-only. Phone, forms, and social are always manual."}
+          </p>
         </div>
-        <div className="rounded-xl border border-emerald-300/15 bg-emerald-300/[0.045] p-3 sm:max-w-sm">
-          <p className="text-[10px] font-semibold text-emerald-200">Recommended: {data.lead.route.label}</p>
+        <div className={cn("rounded-xl border p-3 sm:max-w-sm", operationalStop
+          ? "border-rose-300/20 bg-rose-300/[0.05]"
+          : "border-emerald-300/15 bg-emerald-300/[0.045]")}>
+          <p className={cn("text-[10px] font-semibold", operationalStop ? "text-rose-100" : "text-emerald-200")}>
+            {operationalStop ? "Contact status" : "Recommended"}: {data.lead.route.label}
+          </p>
           <p className="mt-1 text-[11px] leading-5 text-zinc-400">{data.lead.route.reason}</p>
         </div>
       </div>

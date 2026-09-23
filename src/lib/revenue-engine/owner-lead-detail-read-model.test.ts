@@ -162,7 +162,7 @@ function historyRows() {
   }];
 }
 
-function fakeDatabase(resultSets: unknown[][]) {
+function fakeDatabase(resultSets: unknown[][], stopRows: unknown[] = [], stopUnavailable = false) {
   const queries: string[] = [];
   const bindings: unknown[][] = [];
   let index = 0;
@@ -179,6 +179,10 @@ function fakeDatabase(resultSets: unknown[][]) {
         async all<T>() {
           if (/^\s*PRAGMA\s+table_info/i.test(query)) return { results: [{ name: "id", type: "TEXT", notnull: 1, dflt_value: null }] as T[] };
           assert(values.length > 0);
+          if (query.includes('FROM "RevenueBusinessStopEvent"')) {
+            if (stopUnavailable) throw new Error("Stop table unavailable");
+            return { results: stopRows as T[] };
+          }
           const rows = resultSets[index] ?? [];
           index += 1;
           return { results: rows as T[] };
@@ -233,7 +237,7 @@ test("detail reader returns exact evidence, all current routes, and honest v2 hi
     providerOperationsAuthorized: 0,
     costAuthorizedUsd: 0,
   });
-  assert.equal(fake.queries.length, 11);
+  assert.equal(fake.queries.length, 12);
   assert(fake.queries.slice(7).every((query) => /^\s*SELECT\b/i.test(query)));
   assert.deepEqual(fake.bindings[0], ["business:one"]);
   assert.deepEqual(fake.bindings[2], ["business:one"]);
@@ -245,6 +249,31 @@ test("detail reader returns exact evidence, all current routes, and honest v2 hi
     "business:one",
     OWNER_LEAD_HISTORY_LIMIT + 1,
   ]);
+});
+
+test("saved or unreadable business stops block every dossier route without changing the evidence", async () => {
+  const stopRow = {
+    stopId: "business-stop:fixture", businessId: "business:one", idempotencyKey: "fixture",
+    reason: "OWNER_DECISION", source: "OWNER_ACTION", note: "Do not pursue this business.",
+    actorUserId: "owner", createdAt: "2026-08-24T14:00:00.000Z",
+  };
+  const original = await readOwnerLeadDetail(fakeDatabase([[validCandidate()], [validPhone()], [], historyRows()]).database,
+    "business:one", GENERATED_AT);
+  const stopped = await readOwnerLeadDetail(fakeDatabase([[validCandidate()], [validPhone()], [], historyRows()], [stopRow]).database,
+    "business:one", GENERATED_AT);
+  const unavailable = await readOwnerLeadDetail(fakeDatabase([[validCandidate()], [validPhone()], [], historyRows()], [], true).database,
+    "business:one", GENERATED_AT);
+  assert(original && stopped && unavailable);
+  assert.equal(stopped.lead.attention, "BLOCKED");
+  assert.equal(stopped.lead.ownerActionable, false);
+  assert.match(stopped.lead.route.reason, /do not contact/i);
+  assert(stopped.routes.every((route) => !route.recommended && route.readiness === "BLOCKED"));
+  assert.deepEqual(stopped.lead.qualification, original.lead.qualification);
+  assert.deepEqual(stopped.website, original.website);
+  assert.equal(unavailable.lead.attention, "BLOCKED");
+  assert.equal(unavailable.lead.ownerActionable, false);
+  assert.match(unavailable.lead.route.reason, /could not be checked/i);
+  assert(unavailable.routes.every((route) => route.readiness === "BLOCKED"));
 });
 
 test("detail reader returns null for an exact business with no current v2 dossier", async () => {

@@ -106,12 +106,15 @@ export function createRevenueOwnerTaskD1Boundary(database: Pick<D1DatabaseLike, 
     const inserted = await database.prepare(`INSERT INTO "RevenueOwnerTask"
       ("taskId","businessId","idempotencyKey","owner","actionText","dueAt","actorUserId")
       SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM "RevenueBusiness" WHERE "id"=?)
-      ON CONFLICT ("idempotencyKey") DO NOTHING`).bind(taskId, businessId, idempotencyKey, input.owner, actionText, dueAt, actorUserId, businessId).run();
+        AND NOT EXISTS (SELECT 1 FROM "RevenueBusinessStopEvent" WHERE "businessId"=?)
+      ON CONFLICT ("idempotencyKey") DO NOTHING`).bind(taskId, businessId, idempotencyKey, input.owner, actionText, dueAt, actorUserId, businessId, businessId).run();
     const existing = await database.prepare(`SELECT "taskId","businessId","idempotencyKey","owner","actionText","dueAt","actorUserId"
       FROM "RevenueOwnerTask" WHERE "idempotencyKey"=?`).bind(idempotencyKey).first<Record<string, unknown>>();
     if (!existing) {
       const business = await database.prepare(`SELECT "id" FROM "RevenueBusiness" WHERE "id"=?`).bind(businessId).first();
       if (!business) return fail("OWNER_TASK_BUSINESS_UNKNOWN");
+      const stop = await database.prepare(`SELECT "businessId" FROM "RevenueBusinessStopEvent" WHERE "businessId"=?`).bind(businessId).first();
+      if (stop) return fail("OWNER_TASK_BUSINESS_STOPPED");
       return fail("OWNER_TASK_CREATE_NOT_ADMITTED");
     }
     if (existing.taskId !== taskId || existing.businessId !== businessId || existing.owner !== input.owner ||
@@ -129,10 +132,14 @@ export function createRevenueOwnerTaskD1Boundary(database: Pick<D1DatabaseLike, 
     const actorUserId = text(input.actorUserId, "actorUserId", 160);
     const note = text(input.note, "note", 500);
     const eventId = `owner-task-event:${idempotencyKey}`;
+    const stopGuard = input.outcome === "COMPLETE"
+      ? `AND NOT EXISTS (SELECT 1 FROM "RevenueBusinessStopEvent" s WHERE s."businessId"=t."businessId")`
+      : "";
     const inserted = await database.prepare(`INSERT INTO "RevenueOwnerTaskTerminalEvent"
       ("eventId","idempotencyKey","taskId","outcome","actorUserId","note")
       SELECT ?,?,?,?,?,? FROM "RevenueOwnerTask" t WHERE t."taskId"=? AND t."businessId"=?
         AND NOT EXISTS (SELECT 1 FROM "RevenueOwnerTaskTerminalEvent" e WHERE e."taskId"=t."taskId")
+        ${stopGuard}
       ON CONFLICT DO NOTHING`).bind(eventId, idempotencyKey, taskId, input.outcome, actorUserId, note, taskId, businessId).run();
     const existing = await database.prepare(`SELECT e."eventId",e."idempotencyKey",e."taskId",e."outcome",e."actorUserId",e."note",t."businessId"
       FROM "RevenueOwnerTaskTerminalEvent" e JOIN "RevenueOwnerTask" t ON t."taskId"=e."taskId"
@@ -147,6 +154,10 @@ export function createRevenueOwnerTaskD1Boundary(database: Pick<D1DatabaseLike, 
     if (task.businessId !== businessId) return fail("OWNER_TASK_BUSINESS_MISMATCH");
     const terminalRow = await database.prepare(`SELECT "taskId" FROM "RevenueOwnerTaskTerminalEvent" WHERE "taskId"=?`).bind(taskId).first();
     if (terminalRow) return fail("OWNER_TASK_ALREADY_TERMINAL");
+    if (input.outcome === "COMPLETE") {
+      const stop = await database.prepare(`SELECT "businessId" FROM "RevenueBusinessStopEvent" WHERE "businessId"=?`).bind(businessId).first();
+      if (stop) return fail("OWNER_TASK_BUSINESS_STOPPED");
+    }
     return fail("OWNER_TASK_TERMINAL_NOT_ADMITTED");
   }
 

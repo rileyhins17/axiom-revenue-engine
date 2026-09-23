@@ -557,6 +557,7 @@ export async function executePrivateKwM1Dossier(
       createPrivateKwLocalD1Adapter(database),
       operation.businessId,
       currentAssessment.assessment.assessedAt,
+      { stopGate: "NOT_APPLICABLE" },
     );
     if (!ownerDossier) throw new Error("The canonical owner dossier is missing after assessment persistence.");
     const detail = OwnerLeadDetailResponseSchema.parse(ownerDossier);
