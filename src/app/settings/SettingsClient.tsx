@@ -32,7 +32,7 @@ export function SettingsClient({
   const stopVerified = emergencyControl.status === "VERIFIED" && typeof emergencyControl.emergencyPaused === "boolean";
 
   return (
-    <main className="mx-auto flex max-w-[1120px] flex-col gap-5 text-[#24352e]">
+    <div className="mx-auto flex max-w-[1120px] flex-col gap-5 text-[#24352e]">
       <header className="border-b border-[#dedfd7] pb-5">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#416b55]">Workspace controls</p>
         <h1 className="mt-2 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-[#1e3027] sm:text-[2.65rem]">Settings & safety</h1>
@@ -110,7 +110,7 @@ export function SettingsClient({
           <AccountRow label="Access" value={userProfile.role ?? "user"} capitalize />
         </dl>
       </section>
-    </main>
+    </div>
   );
 }
 

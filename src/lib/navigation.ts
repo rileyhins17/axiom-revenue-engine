@@ -49,7 +49,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     title: "Clients",
     label: "Clients",
-    description: "Replies, deals, and follow through",
+    description: "Clients and open deals",
     url: "/clients" as Route,
     icon: ChartNoAxesCombined,
     shortcut: "⌘4",

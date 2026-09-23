@@ -1321,6 +1321,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await assertReadOnlyOwnerSurface(page, "desktop dossier", "[data-owner-readonly-dossier] > details");
     await assertResponsive(page, "desktop dossier");
     await assertReducedMotion(page, "desktop dossier");
+    await page.evaluate(() => { if (document.scrollingElement) document.scrollingElement.scrollTop = 0; });
     await page.screenshot({ path: join(outputDirectory, "dossier-desktop.png"), fullPage: true });
 
     stage = "desktop observed email stop";
