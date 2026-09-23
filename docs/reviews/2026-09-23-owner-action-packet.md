@@ -4,7 +4,7 @@ Prepared by Claude for Riley. These are the only steps that need an owner,
 because each changes an account, a public setting or a legal registration.
 Everything else continues without you. Nothing here spends money.
 
-## 1. Make the GitHub repository private (about 1 minute)
+## 1. ~~Make the GitHub repository private~~ — declined by Riley (keep public)
 
 - **Why:** GitHub shows `rileyhins17/axiom-revenue-engine` as public, but it
   holds private business context. New local commits stay unpushed until this

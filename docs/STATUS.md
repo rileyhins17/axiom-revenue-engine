@@ -1,5 +1,12 @@
 # Current status — Axiom Revenue Engine
 
+**Owner decision (Riley, 2026-09-23):** keep the GitHub repository **public**;
+do not make it private (private-repo Actions usage can cost money and fail
+builds). A visibility change was started and cancelled before GitHub's sudo
+confirmation, and the repository was verified still public. Future sessions
+must not change visibility. Pushing further commits remains a separate owner
+decision.
+
 ## The engine now finds, checks and shortlists businesses by itself (local)
 
 **Updated:** 2026-09-23 (America/Toronto) by Claude Code. Local, unpushed.
