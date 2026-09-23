@@ -81,11 +81,16 @@ Operational controls in `wrangler.jsonc`:
 
 ## Cloudflare Operations
 
-Apply remote migrations:
+Production deploy and remote migration commands are intentionally blocked while
+the configured Worker and D1 still point at the legacy production resources.
+Use local migrations and dry-run checks for development; production release
+requires an isolated target and a separately verified release path.
 
-```bash
-npm run db:migrate:remote
-```
+Remote migrations are blocked until production has an isolated D1 target and a
+verified backup and rollback path. `npm run db:migrate:remote` currently exits
+before invoking Wrangler.
+
+Use `npm run db:migrate:local` for local development.
 
 Generate Cloudflare types:
 
@@ -99,11 +104,11 @@ Build for Cloudflare:
 npm run build:cloudflare
 ```
 
-Deploy manually:
+Production deployment is blocked until the Worker and D1 target are isolated
+and the release gate is verified. `npm run deploy` currently exits before
+invoking Wrangler.
 
-```bash
-npm run deploy
-```
+Use dry-run deploy checks for release validation.
 
 Check recent deployments:
 
