@@ -1,5 +1,79 @@
 # Current status — Axiom Revenue Engine
 
+## Security candidate verified; live release still gated
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
+`3098615f83ee294a950963f4e8e72d8b16d3fbfd`, pushed on
+`codex/revenue-engine-production` in draft [PR #9](https://github.com/rileyhins17/axiom-revenue-engine/pull/9).
+The owner UI no longer repeats the completed ten-business selection. Daybreak
+Blue's bounded release-path audits found first-registration admin takeover,
+unsafe legacy Gmail/reply paths, and a browser crawler private-target path.
+The candidate rejects public signup before persistence, allows only the
+isolated loopback synthetic fixture, blocks Gmail at the provider boundary,
+adds fail-closed manual-reply stop/suppression checks, and disables the deployed
+legacy crawler before it can claim work. Local crawler routing now aborts
+private/non-web requests and stops if interception cannot be installed. Next.js
+is pinned to patched 16.3.6; `npm audit --omit=dev` reported zero production
+dependency vulnerabilities. See [security review](reviews/2026-09-23-daybreak-release-security-review.md)
+and [ADR 0054](adr/0054-quarantine-legacy-public-signup-gmail-and-browser-crawler.md).
+
+**Exact-code verification:** GitHub Actions Revenue Engine CI run
+`35893290427` passed on `3098615`, including fresh local D1 migrations, full
+Linux tests, owner browser acceptance, safety, generated bindings, typecheck,
+lint, Cloudflare builds, and default/engine no-upload dry runs. In a separate
+clean Windows checkout, the full parent security commit `737f45b` suite passed
+835 tests (831 passed, zero failed, four host symlink skips); the final
+`3098615` interceptor-install change passed its focused three tests and the
+exact-commit Linux suite. The exact `3098615` local owner-browser run also
+passed 17 accessibility page scans, desktop 1440 px and phone 390 px flows,
+owner-task retry/reload checks, and zero external requests. Local safety,
+typecheck, lint, Cloudflare build, and default/staging no-upload Wrangler dry
+runs passed on parent security commit `737f45b`; `3098615` changed only local
+request-interception failure handling and passed focused checks and the full
+exact-commit CI gate. These checks prove the candidate, not deployment.
+
+**Current live inventory (read-only Cloudflare dashboard, 2026-09-23):** the
+isolated staging console is still version `941b37bc` from August, with only
+its staging D1, Browser Run, and assets bindings. It has no cron, queue, or
+email trigger; the only displayed secret name is `BETTER_AUTH_SECRET`, whose
+value was not read. Staging D1 has 55 migration receipts through 0055, one
+admin and one system account, and all outreach stops engaged. Its current Time
+Travel bookmark is recorded in [staging inventory](STAGING_INVENTORY.md), but
+no fresh export or restore drill exists. The legacy production Worker remains
+version `9670516c` on `operations.getaxiom.ca`, with legacy D1 through 0052,
+no cron/queue/email trigger, and all database stops engaged. See
+[production inventory](PRODUCTION_INVENTORY.md). No new code, schema, provider,
+or route was deployed. The local Wrangler OAuth token expired; dashboard reads
+do not restore CLI or protected-workflow release access.
+
+**Production, automation, owner decisions and spend:** the user asked Codex to
+make the ten identity decisions; they are already saved with Codex provenance
+and no repeat owner review is needed. M2 remains 0/10 real website-need
+assessments and M3 remains 0/50 real judged dossiers. Source rights and
+retention, legacy-contact reconciliation, a verified inbound reply route, and
+a provider permitted for the proposed cold first touch remain unresolved.
+Automated intake, queue, follow-up, and send remain off; legacy Gmail delivery
+and cloud crawling are now hard-disabled in the unreleased candidate. No
+prospect was contacted, no email sent, and no new paid service enabled. The
+C$50/month ceiling is unchanged; incremental spend is C$0. No current backup,
+rollback drill, staging migration, or production release approval exists for
+this candidate. **The full Revenue Engine is not yet production-ready.**
+
+Next three concrete actions:
+
+1. Restore authorized Wrangler release access, then export/checksum current
+   staging D1, verify its migration ledger and secret names, and rehearse an
+   isolated restore against the exact pre-change state. Do not touch the legacy
+   production D1.
+2. Prepare a separate, backed-up staging migration from 0055 through the
+   required additive schemas, plus a fresh exact-commit staging console packet
+   with current rollback version and synthetic owner smoke. Keep every
+   autonomous and provider switch off; execute only under its release gate.
+3. Resolve one source-rights/retention case and complete one supervised real
+   website-need assessment, then extend to the ten/50 evidence gates and the
+   separate lawful contact/reply/send pilot. Do not count identity selection
+   or synthetic browser evidence as a real qualified opportunity.
+
 ## Owner UI no longer repeats the completed ten-business selection
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**

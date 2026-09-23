@@ -1,5 +1,29 @@
 # Staging inventory
 
+## Read-only dashboard refresh — 2026-09-23 17:11 UTC
+
+The Cloudflare dashboard still shows `axiom-revenue-engine-console-staging`
+at version `941b37bc`, bound to the isolated `axiom-revenue-engine-staging`
+D1, Browser Run, and assets. It has no cron trigger, queue consumer, or email
+trigger. Its only displayed secret name is `BETTER_AUTH_SECRET`; the value was
+not opened. Its live autonomy variables are still `false` with zero intake
+and send caps. The Worker overview showed no invocations or errors in the
+preceding 24 hours at inspection time.
+
+Read-only D1 queries showed about 950 kB, 39 user-facing tables, 55 migration
+receipts ending at `0055_outreach_human_approval.sql`, and two user rows: one
+`admin` and one `system`. The automation-setting row was `enabled=0`, with
+global, emergency, intake, and follow-up pauses all `1`. This confirms an
+admin bootstrap exists but does not prove that its owner can currently sign in.
+No export, restore drill, new migration, secret read, or deployment occurred.
+The application code now includes migrations through 0074, so this staging
+schema cannot prove the newer owner workflows until an approved, backed-up
+migration and smoke test are complete. The dashboard returned current D1 Time
+Travel bookmark `0000000d-00000000-000050ef-3d62f35540b7ace2e2e626616b08a6b5`
+at 17:15 UTC, within its displayed 30-day restore window. A bookmark is not
+an exported backup or a tested restore. Wrangler's local OAuth session remains
+expired even though the dashboard is readable.
+
 Last verified: 2026-08-22 (America/Toronto)
 
 Staging is isolated from every legacy production resource. It has no schedule,

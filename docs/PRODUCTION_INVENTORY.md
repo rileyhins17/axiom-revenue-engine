@@ -1,5 +1,22 @@
 # Legacy production inventory
 
+## Read-only dashboard refresh — 2026-09-23 17:11 UTC
+
+The active legacy Worker `axiom-ops-omniscient` still serves
+`operations.getaxiom.ca` at version `9670516c`. Its dashboard shows the legacy
+D1, Browser Run, assets, and a self-service binding. It has no cron trigger,
+queue consumer, or email trigger. The database remains about 223 MB with 58
+user-facing tables. Read-only SQL returned 55 migration receipts whose latest
+filename is `0052_message_evidence_and_experiments.sql`. The current
+automation-setting row is `enabled=0`, with global, emergency, intake, and
+follow-up pauses all `1`.
+
+These observations confirm the stopped runtime state at the inspection time;
+they do not prove that every historical background effect or external mailbox
+is reconciled. No deployment, migration, data export, restore drill, or
+configuration change occurred. The August backup below is historical and is
+not a current release backup. The local Wrangler OAuth session is expired.
+
 Verified: 2026-08-21 (America/Toronto)
 
 This inventory contains identifiers and aggregate counts only. It intentionally
