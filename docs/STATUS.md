@@ -2,8 +2,8 @@
 
 ## Delegated M2 selection saved; production goal remains open
 
-**Updated:** 2026-09-23 (America/Toronto). **Current application commit:**
-`c9c8f08`; **planning correction commit:** `e212981`. The private, strict v2
+**Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
+`570bc3f`; **planning correction commit:** `e212981`. The private, strict v2
 decision ledger records Riley's delegation verbatim and attributes all ten
 identity selections to Codex. It is bound to the exact research review bytes
 and source-plan digest. The resulting ten-record shadow manifest is saved and
@@ -24,13 +24,29 @@ research, ledger and manifest artifacts were SHA-256 checked and copied into
 the original OneDrive checkout without overwriting files. The manifest's
 stable ID is `kw-shadow-slice:1c9e358f46e3eded957debe668ae3d536ea08eb92911eecc506195552ba6de8c`.
 
-**Verification at `c9c8f08`:** the isolated full suite finished with **813
-tests: 809 passed, zero failed, four Windows symlink skips**. The focused
-delegation tests passed 21/21; safety checks, typecheck, lint, a Cloudflare
-build, Wrangler dry run, and `git diff --check` passed. The build and dry run
-made no deployment. The previously recorded synthetic owner-browser acceptance
-applies to the manual reply slice; this delegation change is an offline CLI
-and manifest path, not a new UI or live-provider test.
+**Verification at `570bc3f`:** the isolated full suite finished with **815
+tests: 811 passed, zero failed, four Windows symlink skips**. The eight
+focused materialization tests, safety check, typecheck, lint, Cloudflare
+build, default and isolated-staging Wrangler dry runs, and `git diff --check`
+passed. Neither dry run deployed. The previously recorded synthetic
+owner-browser acceptance applies to the manual reply slice; the new delegated
+source/workflow path is offline and changes no owner UI or live provider.
+An optional latest browser rerun did not reach assertions: the main checkout
+has a pre-existing M2 setup lock, and a clean test checkout's shared
+`node_modules` junction could not resolve a native Sharp binary during its
+prerequisite build. Neither blocker was bypassed or treated as an app failure;
+fresh-dependency Linux CI remains the next browser proof.
+
+**Additional 2026-09-23 local work:** the separate, versioned Codex-delegated
+source/workflow decision path is verified against [ADR 0053](adr/0053-record-codex-delegated-local-source-workflow-decision.md).
+It preserves the owner-only v1 path and cannot fetch a site, contact anyone, or
+deploy. No real decision input, database materialization, or M2 assessment has
+been executed. Two Luna researchers also checked public company statements
+for the exact ten without storing page bodies. Their ignored
+`data/kw-evaluation/2026-09-23-m2-public-page-fact-check.md` note is preserved
+in both checkouts. Website need, mobile experience, performance, buying intent
+and contact permission remain unknown for all ten; this fact check is not a
+lead-quality or M2 completion claim.
 
 **Next source gate:** an official-site policy check found no affirmative raw
 HTML retention permission for Service 1st, Roofsaver, or Jaro. Service 1st has
@@ -53,17 +69,25 @@ intake, queue, follow-up, and send are off. The C$50/month ceiling is unchanged
 and incremental provider spend is C$0. Legacy-contact reconciliation, live
 reply routing, backup, rollback, and release gates remain open.
 
+**Release readiness check:** `wrangler whoami` on 2026-09-23 failed because the
+local Cloudflare login has expired. The existing staging packet is pinned to
+an older commit and cannot release this build. Staging and production account
+inventories are dated August; current Worker, D1, secret, migration, backup
+and rollback state have not been verified. This check made no account changes.
+Any next release candidate needs Linux CI, a fresh exact packet and current
+backup/restore proof before migration or deployment.
+
 Next three concrete actions:
 
-1. Complete and record a source-rights and retention disposition for the
-   selected identities, starting with the minimum conservative Service 1st
-   case; keep capture blocked while evidence or authority is incomplete.
-2. Once its separate gate is satisfied, run one supervised real capture and
-   then complete the ten traceable M2 website assessments without treating
-   identity evidence as lead qualification.
-3. Reconcile legacy contact history and finish the owner-managed sales/reply
-   path while researching a policy-permitted C$0-paid-mailbox email route;
-   cold email remains off under the current provider policies.
+1. Run Linux CI and prepare a new staging packet bound to the exact verified
+   commit. Refresh live staging inventory only after account access is restored;
+   keep migration and deployment behind current backup/rollback proof.
+2. Resolve source rights and retention for at least one selected business,
+   then complete a supervised real website-need assessment. Company facts
+   alone do not complete M2 or create a qualified lead.
+3. Reconcile legacy contact history and prove inbound reply routing before
+   any send work. Keep cold email disabled until a legal and provider-policy
+   compatible C$0-paid-mailbox route is proven.
 
 ## Manual observed-reply checkpoint; production goal remains open
 
