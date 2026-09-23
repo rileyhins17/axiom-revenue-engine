@@ -58,11 +58,13 @@ effects. No local or CI success implies live permission or readiness.
 The top of `docs/STATUS.md` records the latest verified application commit,
 tests and live inventory. At preparation time, the **pushed** candidate was
 `d30db0c` and its [CI run 121](https://github.com/rileyhins17/axiom-revenue-engine/actions/runs/35907330796)
-passed. The local, unpushed application commit `a969f10` passed the full suite,
-safety, typecheck, lint, a clean Cloudflare build, two no-upload dry runs and
-owner browser acceptance. Subsequent local changes add a Codex-attributed,
-source-decision-bound manual fact entry path; verify the final commit and
-update STATUS before calling that slice complete. Draft [PR #9](https://github.com/rileyhins17/axiom-revenue-engine/pull/9)
+passed. The local, unpushed application commit `84771da` adds a
+Codex-attributed, source-decision-bound manual fact entry path and this
+handoff. It passed the clean-checkout full suite (868 tests, 863 passed, five
+skipped), safety, typecheck, lint, a Cloudflare build, and default and isolated
+staging no-upload dry runs, and owner browser acceptance (17 pages, zero
+external requests). The exact checks are recorded in `docs/STATUS.md`. Draft
+[PR #9](https://github.com/rileyhins17/axiom-revenue-engine/pull/9)
 is not a production release.
 
 **Security hold:** GitHub currently reports this repository **public**, while
@@ -140,16 +142,15 @@ boundary with a prepared packet; resume immediately when it is satisfied.
 
 ## Claude Code desktop entry
 
-Riley uses the **Claude desktop app**, not the CLI, for this handoff. On
-2026-09-23 the signed-in desktop app showed a Code-mode new-session screen
-with **Local** selected and **Opus 5.5** as its default; weekly usage was
-displayed at 48%. Start a new local Code session, select this exact checkout
-as the project folder, and confirm the session header shows Local and Opus
-5.5. A separate CLI installation was updated to 2.1.281 but reported itself
-signed out; its account state is irrelevant to desktop access. Do not route
-this handoff through that CLI or start from a cloud checkout that lacks the
-local commits and ignored evaluation data. Enable desktop Remote Control only
-through an explicit user-approved access decision.
+Riley uses the **Claude desktop app** for this handoff. On 2026-09-23, a new
+**Local** Code session was opened with this exact checkout as its project
+folder, **Opus 5.5** selected, and workspace trust granted at Riley's explicit
+request. The session header's **Remote Control** toggle is on and generated a
+session link. The `/remote-control` slash command itself responded that it is
+unavailable in this desktop environment; use the session-header toggle, which
+is the observed working control. Do not start from a cloud checkout that lacks
+the local commits and ignored evaluation data. The link is intentionally kept
+out of Git; verify the current session state in the app before relying on it.
 
 First session request: **Read AGENTS.md and its required docs, then this
 handoff. Verify Git and current provider/repo facts. Continue the next safe

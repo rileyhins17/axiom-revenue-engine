@@ -1,5 +1,69 @@
 # Current status — Axiom Revenue Engine
 
+## Claude desktop transfer and Codex-attributed M2 observation checkpoint
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified local application
+commit:** `84771da6fe488761bfc0f7ea2e0632e8051ee0c5` on
+`codex/revenue-engine-production`. The branch is five commits ahead of its
+pushed counterpart; the documentation checkpoint that records this verification
+is a further local commit. It has not been pushed. An anonymous GitHub page
+check on 2026-09-23 still showed `rileyhins17/axiom-revenue-engine` as
+**public**. The tracked owner context calls it private, and the historical WAL
+exposure investigation remains unresolved. Do not push more internal material
+or rewrite shared history until visibility and history treatment are settled.
+
+This application commit gives a delegated agent its own `CODEX` attribution
+when saving a narrowly authorized, local, human-observed M2 website fact.
+The command must match the current saved KEEP/REPLACE identity, exact page,
+source decision, short expiry and facts-only retention; the owner UI no longer
+mislabels a delegated note as Aidan's. Every note remains `UNKNOWN / RESEARCH`
+with zero qualification or outreach authority. The ten identity decisions are
+saved, but **no real note or website assessment was entered**. M2 remains
+**0/10 real assessments** and M3 **0/50 judged dossiers**. The operator
+handoff is in [HANDOFF_TO_CLAUDE_CODE.md](HANDOFF_TO_CLAUDE_CODE.md).
+
+The exact commit passed the clean-checkout full suite: **868 tests, 863
+passed, zero failed, five skipped**. Safety, typecheck and lint passed (zero
+errors, three existing warnings). A separate clean checkout passed the
+Cloudflare build with **1,769 scanned bundle files** and zero local secret
+values removed, followed by default and isolated-staging **no-upload** Wrangler
+dry runs. Owner browser acceptance passed 17 accessibility page scans,
+desktop/mobile widths, task retry/reload and **zero external requests**. These
+checks establish local code behavior, not provider or live release readiness.
+
+A new Claude desktop **Local** Code session is bound to this exact checkout,
+shows **Opus 5.5**, has Riley-approved workspace trust, and has **Remote
+Control enabled** in its session header. The substantive continuation prompt
+is to be delivered after this documentation checkpoint; the session link is
+not stored in Git. The last pushed candidate remains `d30db0c`, whose
+[CI run 121](https://github.com/rileyhins17/axiom-revenue-engine/actions/runs/35907330796)
+passed. Draft [PR #9](https://github.com/rileyhins17/axiom-revenue-engine/pull/9)
+does not include these local commits.
+
+No staging or legacy production Worker, D1, provider account, inbox, or
+autonomy switch was changed in this checkpoint. The last observed stops remain
+engaged. No export, restore, migration, deployment, prospect contact, email,
+or paid operation occurred; incremental spend is **C$0** against the
+C$50/month runtime ceiling. Staging data access and its release packet remain
+pending. No permitted cold-email sender or verified reply route is connected;
+manual calls remain held pending verified National DNCL registration and
+calling controls. **Production readiness remains open.**
+
+Next three concrete actions:
+
+1. Deliver the exact repo handoff in the trusted Claude desktop session;
+   reconcile current Git state there and let the integration owner continue
+   bounded, locally verifiable work. Resolve and anonymously recheck GitHub
+   visibility before any further internal push.
+2. With scoped Cloudflare read access, export and checksum the current
+   isolated staging D1, rehearse migrations 0055–0074 on those exact rows,
+   and prepare a fresh backup/rollback/release packet before any separate
+   remote-write or deploy decision.
+3. Obtain source-specific clearance for real M2 evidence, replace blocked
+   identities as needed, complete ten real assessments and fifty judged M3
+   dossiers, then prove channel/reply and suppression controls before any
+   authorized outreach pilot.
+
 ## Local M2 observation checkpoint and repository exposure hold
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified local application
