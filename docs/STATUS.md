@@ -3,7 +3,8 @@
 ## Release-path and private-bundle safety checkpoint — exact candidate verified
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
-`cf2cb47e9690ecb3e9db986d7c69d99a5cf471be` on
+`cf2cb47e9690ecb3e9db986d7c69d99a5cf471be`; **verified packet checkpoint:**
+`26d48c3d638d3ea90529c0c9b2d8907d53bb380e` on
 `codex/revenue-engine-production`, draft [PR #9](https://github.com/rileyhins17/axiom-revenue-engine/pull/9).
 This checkpoint is not a live release or production-readiness claim. Daybreak
 Blue found that the protected production workflow could use an older main
@@ -39,9 +40,17 @@ rehearsal are prepared. A separate [pending migration-and-console packet](releas
 now pins `cf2cb47`, the ordered 19 migration blobs, staging Worker/D1 target,
 CI run 118, exact-commit staging no-upload dry run, and the observed rollback
 Worker version. Its Git-only verifier passed eight focused tests and printed
-canonical SHA-256 `1cf2ec39d471281c76d8e52caf99245d2f09c1114f7c1b81bd9da40cfe5fd66e`;
-the previously pending docs-only CI [run 119](https://github.com/rileyhins17/axiom-revenue-engine/actions/runs/35903014126)
-also passed. A scoped Cloudflare API-token route is documented in the staging
+canonical SHA-256 `1cf2ec39d471281c76d8e52caf99245d2f09c1114f7c1b81bd9da40cfe5fd66e`.
+The exact packet checkpoint passed [Linux CI run 120](https://github.com/rileyhins17/axiom-revenue-engine/actions/runs/35906114566).
+In a separate clean Windows checkout, all 850 full-suite tests passed (zero
+failed, five skips), safety, typecheck and lint passed, the Cloudflare build
+scanned 1,765 bundle files with zero local secret values removed, and default
+and staging Wrangler no-upload dry runs passed. The owner browser check passed
+17 accessibility page scans, desktop/mobile flows, task retry/reload and zero
+external requests. A prior full-suite attempt in the private-data worktree
+hit an old M2 setup lock whose recorded process no longer existed; its tests
+passed from the separate clean checkout without deleting the private lock.
+A scoped Cloudflare API-token route is documented in the staging
 runbook, but no release token is connected. Synthetic migration/row-preservation
 and export-guard tests pass; no current staging export, restore or remote
 migration exists. All live packet gates and release authorities remain pending
