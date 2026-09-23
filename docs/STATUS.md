@@ -1,8 +1,9 @@
 # Current status — Axiom Revenue Engine
 
-## Release-path and private-bundle safety checkpoint — exact merge verification in progress
+## Release-path and private-bundle safety checkpoint — exact candidate verified
 
-**Updated:** 2026-09-23 (America/Toronto). **Candidate branch:**
+**Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
+`cf2cb47e9690ecb3e9db986d7c69d99a5cf471be` on
 `codex/revenue-engine-production`, draft [PR #9](https://github.com/rileyhins17/axiom-revenue-engine/pull/9).
 This checkpoint is not a live release or production-readiness claim. Daybreak
 Blue found that the protected production workflow could use an older main
@@ -23,10 +24,15 @@ synthetic sanitizer test passes and the deliberately contaminated local bundle
 fails with a count-only error. On the dirty Windows worktree, Next still traces
 private files despite the exclusion setting. A separate clean checkout built
 the candidate `29c56b8` and passed default and staging no-upload Wrangler dry
-runs; each generated bundle passed the private-file scan of 1,765 files. Linux
-CI passed its tests and owner browser checks on that commit and is completing
-its final dry runs. Never bypass the sanitizer. The merge of the main hotfix
-into the candidate is being verified separately.
+runs; each generated bundle passed the private-file scan of 1,765 files. The
+exact combined commit `cf2cb47` passed
+[Linux CI run 118](https://github.com/rileyhins17/axiom-revenue-engine/actions/runs/35901772615):
+safety, generated bindings,
+fresh local migrations, full tests, owner browser acceptance, typecheck, lint,
+Cloudflare build and default/engine no-upload dry runs. Local merged-commit
+safety, focused production-guard tests, typecheck and lint also passed;
+`npm audit --omit=dev` found zero production dependency vulnerabilities.
+Never bypass the sanitizer. This verifies code and synthetic flows only.
 
 The 0055-to-0074 staging schema procedure and offline checksum-pinned export
 rehearsal are prepared. Synthetic migration/row-preservation and export-guard
@@ -41,13 +47,13 @@ production-ready.**
 
 Next three concrete actions:
 
-1. Finish the merged candidate's exact-commit safety, test, typecheck, lint,
-   clean build, dry-run and Linux CI checks before calling it a staging packet.
-2. Restore authorized Cloudflare release access, export/checksum the current
+1. Restore authorized Cloudflare release access, export/checksum the current
    isolated staging D1, and rehearse its exact 0055-to-0074 upgrade locally.
-3. Under the separate staging release gate, verify sign-in and synthetic owner
-   flows; then resolve real source, reply and lawful first-touch gates before
-   any production cutover or outreach.
+2. Prepare the exact staging release packet and, under its separate release
+   gate, verify authenticated sign-in and synthetic owner flows after upgrade.
+3. Resolve current source rights, real website assessment and dossier gates,
+   inbound reply proof, and a lawful permitted first-touch route before any
+   production cutover or outreach.
 
 ## Security candidate verified; live release still gated
 
