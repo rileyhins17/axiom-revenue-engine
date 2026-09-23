@@ -1,3 +1,2 @@
-console.error("Production migration is blocked: the current default config targets the legacy production D1.");
-console.error("Use a separately reviewed isolated target only after a current export and restore rehearsal.");
+console.error("Remote database migration is blocked: this checkout still targets the legacy production D1 database. No database command was attempted.");
 process.exitCode = 1;

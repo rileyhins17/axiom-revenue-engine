@@ -1,6 +1,6 @@
 # Current status — Axiom Revenue Engine
 
-## Release-path and private-bundle safety checkpoint — verification in progress
+## Release-path and private-bundle safety checkpoint — exact merge verification in progress
 
 **Updated:** 2026-09-23 (America/Toronto). **Candidate branch:**
 `codex/revenue-engine-production`, draft [PR #9](https://github.com/rileyhins17/axiom-revenue-engine/pull/9).
@@ -9,16 +9,24 @@ Blue found that the protected production workflow could use an older main
 commit's raw deploy alias against the legacy production D1. The candidate now
 blocks both production deploy and migration commands before Wrangler, requires
 the current main tip in the protected workflow, and calls the guard directly.
-Until this change is merged, the old `main` workflow remains unsafe to dispatch.
+The minimal legacy-main safety hotfix was separately verified and merged as
+[`e5da196`](https://github.com/rileyhins17/axiom-revenue-engine/pull/10).
+`main` has no production deployment workflow; its former raw deploy and remote
+migration aliases now stop before Wrangler. The broader candidate still needs
+its own exact-commit validation and release gates.
 
 A Luna audit then found ignored local evaluation data in a generated staging
 bundle: 3,645 files, including 104 SQLite databases. Nothing was uploaded.
 The candidate now uses Next trace exclusions and rejects any final Cloudflare
 bundle containing private workspace paths or local database/key files. The
 synthetic sanitizer test passes and the deliberately contaminated local bundle
-fails with a count-only error. On this Windows worktree, Next still traces
-private files despite the exclusion setting; a clean release checkout and an
-exact-code Linux build are the next verification. Never bypass the sanitizer.
+fails with a count-only error. On the dirty Windows worktree, Next still traces
+private files despite the exclusion setting. A separate clean checkout built
+the candidate `29c56b8` and passed default and staging no-upload Wrangler dry
+runs; each generated bundle passed the private-file scan of 1,765 files. Linux
+CI passed its tests and owner browser checks on that commit and is completing
+its final dry runs. Never bypass the sanitizer. The merge of the main hotfix
+into the candidate is being verified separately.
 
 The 0055-to-0074 staging schema procedure and offline checksum-pinned export
 rehearsal are prepared. Synthetic migration/row-preservation and export-guard
@@ -33,8 +41,8 @@ production-ready.**
 
 Next three concrete actions:
 
-1. Commit the candidate, verify it in a clean checkout and Linux CI, inspect
-   the exact upload bundle for zero private files, and merge the safety guards.
+1. Finish the merged candidate's exact-commit safety, test, typecheck, lint,
+   clean build, dry-run and Linux CI checks before calling it a staging packet.
 2. Restore authorized Cloudflare release access, export/checksum the current
    isolated staging D1, and rehearse its exact 0055-to-0074 upgrade locally.
 3. Under the separate staging release gate, verify sign-in and synthetic owner

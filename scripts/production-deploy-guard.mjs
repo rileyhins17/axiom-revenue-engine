@@ -1,3 +1,2 @@
-console.error("Production deploy is blocked: the current default config targets the legacy production D1.");
-console.error("Provision and verify an isolated production target and backed-up release path before enabling deployment.");
+console.error("Production deployment is blocked: this checkout still targets the legacy production Worker and D1 database. No Cloudflare upload was attempted.");
 process.exitCode = 1;
