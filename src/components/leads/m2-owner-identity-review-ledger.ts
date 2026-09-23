@@ -135,3 +135,78 @@ export function buildM2OwnerIdentityDecisionLedger(input: {
     decisions,
   };
 }
+
+/** Rebuilds the owner form from a validated, saved review of this exact packet. */
+export function restoreM2OwnerIdentityDrafts(
+  packet: M2OwnerIdentityReadyPacket,
+  decisions: unknown,
+): M2OwnerIdentityDraftMap {
+  const invalid = (): never => { throw new Error("The saved review could not be verified against this business list."); };
+  if (!Array.isArray(decisions) || decisions.length !== packet.selected.length) return invalid();
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const value of decisions) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return invalid();
+    const decision = value as Record<string, unknown>;
+    if (typeof decision.reviewId !== "string" || byId.has(decision.reviewId)) return invalid();
+    byId.set(decision.reviewId, decision);
+  }
+
+  const restored: M2OwnerIdentityDraftMap = {};
+  for (const candidate of packet.selected) {
+    const decision = byId.get(candidate.reviewId);
+    if (!decision || typeof decision.rationale !== "string") return invalid();
+    const draft = emptyM2OwnerIdentityDraft();
+    draft.rationale = decision.rationale;
+    if (decision.action === "HOLD" || decision.action === "REJECT") {
+      draft.action = decision.action;
+    } else if (decision.action === "KEEP" || decision.action === "KEEP_AS_BLOCKED") {
+      if (decision.identityConfirmed !== true || decision.marketAndNicheConfirmed !== true
+        || decision.independenceConfirmed !== true) return invalid();
+      draft.action = decision.action;
+      draft.identityConfirmed = true;
+      draft.marketAndNicheConfirmed = true;
+      draft.independenceConfirmed = true;
+    } else if (decision.action === "REPLACE") {
+      const replacement = decision.replacement;
+      if (!replacement || typeof replacement !== "object" || Array.isArray(replacement)) return invalid();
+      const item = replacement as Record<string, unknown>;
+      const alternate = packet.supportedAlternates.find((choice) => choice.name === item.name
+        && choice.officialWebsite === item.websiteUrl && choice.sourceUrl === item.sourceEvidenceUrl);
+      if (!alternate || item.rationale !== decision.rationale
+        || item.identityConfirmed !== true || item.marketAndNicheConfirmed !== true || item.independenceConfirmed !== true
+        || !["KITCHENER", "WATERLOO", "CAMBRIDGE"].includes(String(item.city))
+        || !["ROOFING", "HVAC", "LANDSCAPING"].includes(String(item.niche))) return invalid();
+      draft.action = "REPLACE";
+      draft.alternateKey = m2OwnerIdentityAlternateKey(alternate);
+      draft.city = item.city as M2OwnerMarket;
+      draft.niche = item.niche as M2OwnerNiche;
+      draft.identityConfirmed = true;
+      draft.marketAndNicheConfirmed = true;
+      draft.independenceConfirmed = true;
+    } else {
+      return invalid();
+    }
+    if (!isM2OwnerIdentityDecisionComplete(candidate, draft, packet.supportedAlternates)) return invalid();
+    restored[candidate.reviewId] = draft;
+  }
+  return restored;
+}
+
+/** Never replace browser edits made while the saved review was loading. */
+export function selectM2OwnerIdentityDrafts(
+  browserDrafts: M2OwnerIdentityDraftMap,
+  savedDrafts: M2OwnerIdentityDraftMap,
+  editedSinceLoad: boolean,
+): { drafts: M2OwnerIdentityDraftMap; showingSaved: boolean } {
+  if (editedSinceLoad) return { drafts: browserDrafts, showingSaved: false };
+  const hasBrowserChoice = Object.values(browserDrafts).some((draft) => Boolean(draft.action || draft.rationale.trim()
+    || draft.alternateKey || draft.identityConfirmed || draft.marketAndNicheConfirmed || draft.independenceConfirmed));
+  if (!hasBrowserChoice) return { drafts: savedDrafts, showingSaved: true };
+  const sortedEntries = (drafts: M2OwnerIdentityDraftMap) => JSON.stringify(
+    Object.entries(drafts).sort(([left], [right]) => left.localeCompare(right, "en")),
+  );
+  if (sortedEntries(browserDrafts) === sortedEntries(savedDrafts)) {
+    return { drafts: savedDrafts, showingSaved: true };
+  }
+  return { drafts: browserDrafts, showingSaved: false };
+}

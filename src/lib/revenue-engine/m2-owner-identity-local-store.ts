@@ -24,6 +24,9 @@ export type M2OwnerIdentityLocalStoreSummary = {
   researchReviewSha256: string;
   decisionDigest: string;
 };
+export type M2OwnerIdentityLocalStoreRecord = M2OwnerIdentityLocalStoreSummary & {
+  decisions: PrivateKwM2OwnerDecisions["decisions"];
+};
 
 export class M2OwnerIdentityLocalStoreError extends Error {
   constructor(readonly code: "CONFLICT" | "UNAVAILABLE", message: string, options?: ErrorOptions) {
@@ -155,11 +158,11 @@ export async function savePrivateKwM2OwnerDecisions(
   }
 }
 
-/** Reads only the latest valid saved ledger for the current exact research packet, returning summary metadata only. */
+/** Reads the latest valid saved review for the current exact research packet. */
 export async function readLatestPrivateKwM2OwnerDecisions(
   packetSha256: string,
   options: M2OwnerIdentityLocalStoreOptions = {},
-): Promise<M2OwnerIdentityLocalStoreSummary | null> {
+): Promise<M2OwnerIdentityLocalStoreRecord | null> {
   if (!/^[a-f0-9]{64}$/.test(packetSha256)) fail("UNAVAILABLE", "The current research packet digest is invalid.");
   const rootDir = path.resolve(options.rootDir ?? DEFAULT_ROOT);
   await ensureSafeRoot(rootDir);
@@ -171,11 +174,11 @@ export async function readLatestPrivateKwM2OwnerDecisions(
   }
   const prefix = `${FILE_PREFIX}${packetSha256}-`;
   const matches = entries.filter((entry) => entry.startsWith(prefix));
-  const records: M2OwnerIdentityLocalStoreSummary[] = [];
+  const records: M2OwnerIdentityLocalStoreRecord[] = [];
   for (const filename of matches) {
     if (!FILE_PATTERN.test(filename)) fail("CONFLICT", "A malformed owner-decision version exists for the current research packet.");
     const ledger = await readStoredFile(rootDir, filename);
-    records.push(summary(ledger, filename, "LATEST"));
+    records.push({ ...summary(ledger, filename, "LATEST"), decisions: ledger.decisions });
   }
   records.sort((left, right) => Date.parse(right.reviewedAt) - Date.parse(left.reviewedAt) || left.filename.localeCompare(right.filename, "en"));
   return records[0] ?? null;

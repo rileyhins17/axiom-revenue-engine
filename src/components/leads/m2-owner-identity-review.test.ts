@@ -66,12 +66,13 @@ test("saved owner decisions use the same-origin endpoint and exact owner-bound p
     researchReviewSha256: "b".repeat(64),
     decisionDigest: "c".repeat(64),
   };
+  const savedReview = { ...saved, decisions: Array.from({ length: 10 }, (_, index) => ({ reviewId: `M2-${String(index + 1).padStart(2, "0")}`, action: "HOLD", rationale: "Synthetic business needs another check." })) };
   const getCalls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
   const getResponse = await loadSavedM2OwnerIdentityDecisions(async (input, init) => {
     getCalls.push([input, init]);
-    return Response.json({ saved });
+    return Response.json({ saved: savedReview });
   });
-  assert.deepEqual(getResponse, saved);
+  assert.deepEqual(getResponse, savedReview);
   assert.equal(getCalls[0]?.[0], "/api/leads/m2/identity-decisions");
   assert.deepEqual(getCalls[0]?.[1], { method: "GET", credentials: "same-origin", cache: "no-store" });
 
@@ -97,5 +98,16 @@ test("saved owner decision requests surface server errors to the caller", async 
   await assert.rejects(
     saveM2OwnerIdentityDecisions({ packetSha256: "a".repeat(64), reviewedBy: "AIDAN", drafts: {} }, async () => Response.json({ error: "The private review could not be saved locally." }, { status: 503 })),
     /The private review could not be saved locally\./,
+  );
+});
+
+test("saved status without durable choices cannot appear restorable", async () => {
+  const summaryOnly = {
+    status: "LATEST", filename: "m2-owner-decisions-test.json", reviewedBy: "RILEY",
+    reviewedAt: "2026-09-23T14:00:00.000Z", researchReviewSha256: "a".repeat(64), decisionDigest: "b".repeat(64),
+  };
+  await assert.rejects(
+    loadSavedM2OwnerIdentityDecisions(async () => Response.json({ saved: summaryOnly })),
+    /saved owner choices could not be understood/i,
   );
 });

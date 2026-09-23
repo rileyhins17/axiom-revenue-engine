@@ -10,6 +10,8 @@ import {
   isM2OwnerIdentityDecisionComplete,
   m2OwnerIdentityAlternateKey,
   m2OwnerIdentityDraftStorageKey,
+  restoreM2OwnerIdentityDrafts,
+  selectM2OwnerIdentityDrafts,
   type M2OwnerAction,
   type M2OwnerIdentityDraft,
   type M2OwnerIdentityDraftMap,
@@ -28,6 +30,7 @@ export type M2OwnerIdentitySavedSummary = {
   researchReviewSha256: string;
   decisionDigest: string;
 };
+export type M2OwnerIdentitySavedReview = M2OwnerIdentitySavedSummary & { decisions: unknown[] };
 
 type OwnerDecisionSavePayload = {
   packetSha256: string;
@@ -56,7 +59,7 @@ async function responseError(response: Response, fallback: string) {
   return fallback;
 }
 
-export async function loadSavedM2OwnerIdentityDecisions(fetcher: typeof fetch = fetch): Promise<M2OwnerIdentitySavedSummary | null> {
+export async function loadSavedM2OwnerIdentityDecisions(fetcher: typeof fetch = fetch): Promise<M2OwnerIdentitySavedReview | null> {
   const response = await fetcher(OWNER_DECISIONS_ENDPOINT, {
     method: "GET",
     credentials: "same-origin",
@@ -66,7 +69,11 @@ export async function loadSavedM2OwnerIdentityDecisions(fetcher: typeof fetch = 
   const body = await response.json() as { saved?: unknown };
   if (body.saved === null) return null;
   if (!isSavedSummary(body.saved)) throw new Error("The saved owner decision status could not be understood.");
-  return body.saved;
+  const review = body.saved as M2OwnerIdentitySavedSummary & { decisions?: unknown };
+  if (!Array.isArray(review.decisions) || review.decisions.length !== 10) {
+    throw new Error("The saved owner choices could not be understood.");
+  }
+  return review as M2OwnerIdentitySavedReview;
 }
 
 export async function saveM2OwnerIdentityDecisions(
@@ -142,10 +149,14 @@ export function M2OwnerIdentityReview({ result, actor }: { result: M2OwnerIdenti
   const [hydratedFor, setHydratedFor] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState<M2OwnerIdentitySavedSummary | null>(null);
+  const [savedDrafts, setSavedDrafts] = React.useState<M2OwnerIdentityDraftMap | null>(null);
+  const [showingSaved, setShowingSaved] = React.useState(false);
   const [savedStatusLoading, setSavedStatusLoading] = React.useState(true);
   const [savedStatusError, setSavedStatusError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const draftsModified = React.useRef(false);
+  const browserDraftsAtLoad = React.useRef<M2OwnerIdentityDraftMap>({});
+  const latestDrafts = React.useRef<M2OwnerIdentityDraftMap>({});
 
   React.useEffect(() => {
     if (result.status !== "READY") return;
@@ -159,7 +170,12 @@ export function M2OwnerIdentityReview({ result, actor }: { result: M2OwnerIdenti
     } catch {
       storedDrafts = null;
     }
+    browserDraftsAtLoad.current = storedDrafts ?? {};
+    latestDrafts.current = storedDrafts ?? {};
     setDrafts(storedDrafts ?? {});
+    setSaved(null);
+    setSavedDrafts(null);
+    setShowingSaved(false);
     setCurrentIndex(0);
     setHydratedFor(packet.packetSha256);
   }, [result]);
@@ -173,7 +189,21 @@ export function M2OwnerIdentityReview({ result, actor }: { result: M2OwnerIdenti
     setSavedStatusLoading(true);
     setSavedStatusError(null);
     void loadSavedM2OwnerIdentityDecisions()
-      .then((summary) => { if (!cancelled && !draftsModified.current) setSaved(summary); })
+      .then((review) => {
+        if (cancelled || !review) return;
+        if (review.researchReviewSha256 !== readyPacket.packetSha256) {
+          throw new Error("The saved review belongs to a different business list.");
+        }
+        const restored = restoreM2OwnerIdentityDrafts(readyPacket, review.decisions);
+        const display = selectM2OwnerIdentityDrafts(browserDraftsAtLoad.current, restored, draftsModified.current);
+        setSaved(review);
+        setSavedDrafts(restored);
+        setShowingSaved(display.showingSaved);
+        if (!draftsModified.current) {
+          latestDrafts.current = display.drafts;
+          setDrafts(display.drafts);
+        }
+      })
       .catch((error: unknown) => {
         if (!cancelled) setSavedStatusError(error instanceof Error ? error.message : "Saved owner decisions could not be loaded.");
       })
@@ -213,16 +243,18 @@ export function M2OwnerIdentityReview({ result, actor }: { result: M2OwnerIdenti
   const candidate = candidates[currentIndex] ?? candidates[0]!;
   const draft = drafts[candidate.reviewId] ?? emptyM2OwnerIdentityDraft();
   const completedCount = candidates.filter((item) => isM2OwnerIdentityDecisionComplete(item, drafts[item.reviewId], readyPacket.supportedAlternates)).length;
-  const canSave = completedCount === 10 && actor !== null;
-  const canDownload = canSave;
+  const canDownload = completedCount === 10 && actor !== null;
+  const canSave = canDownload && !savedStatusLoading && !savedStatusError;
 
   const updateCurrent = (patch: Partial<M2OwnerIdentityDraft>) => {
     draftsModified.current = true;
-    setDrafts((current) => ({
-      ...current,
-      [candidate.reviewId]: { ...(current[candidate.reviewId] ?? emptyM2OwnerIdentityDraft()), ...patch },
-    }));
-    setSaved(null);
+    const next = {
+      ...latestDrafts.current,
+      [candidate.reviewId]: { ...(latestDrafts.current[candidate.reviewId] ?? emptyM2OwnerIdentityDraft()), ...patch },
+    };
+    latestDrafts.current = next;
+    setDrafts(next);
+    setShowingSaved(false);
     setMessage(null);
   };
 
@@ -262,7 +294,7 @@ export function M2OwnerIdentityReview({ result, actor }: { result: M2OwnerIdenti
     try {
       const completeDrafts = Object.fromEntries(candidates.map((item) => [
         item.reviewId,
-        drafts[item.reviewId] ?? emptyM2OwnerIdentityDraft(),
+        latestDrafts.current[item.reviewId] ?? emptyM2OwnerIdentityDraft(),
       ])) as M2OwnerIdentityDraftMap;
       const summary = await saveM2OwnerIdentityDecisions({
         packetSha256: readyPacket.packetSha256,
@@ -270,6 +302,13 @@ export function M2OwnerIdentityReview({ result, actor }: { result: M2OwnerIdenti
         drafts: completeDrafts,
       });
       setSaved(summary);
+      setSavedDrafts(completeDrafts);
+      const display = selectM2OwnerIdentityDrafts(latestDrafts.current, completeDrafts, false);
+      setShowingSaved(display.showingSaved);
+      if (display.showingSaved) {
+        browserDraftsAtLoad.current = completeDrafts;
+        draftsModified.current = false;
+      }
       setSavedStatusError(null);
       setMessage(null);
     } catch (error) {
@@ -469,11 +508,12 @@ export function M2OwnerIdentityReview({ result, actor }: { result: M2OwnerIdenti
             <button type="button" disabled={!canSave || saving} onClick={() => void saveDecisions()} className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#173f30] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#21533d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#32815b] disabled:cursor-not-allowed disabled:bg-[#b7c4ba] disabled:text-white/90 disabled:shadow-none">
               {saving ? "Saving…" : "Save owner decisions"}
             </button>
-            {!canSave ? <p className="mt-2 text-xs leading-5 text-[#718078]">Complete all ten decisions and sign in as a listed owner to save.</p> : null}
+            {!canDownload ? <p className="mt-2 text-xs leading-5 text-[#718078]">Complete all ten decisions and sign in as a listed owner to save.</p> : null}
             {canDownload ? <button type="button" className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#d5e0d7] bg-white px-4 text-sm font-semibold text-[#344c3d] transition hover:bg-[#f5f8f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#32815b]" onClick={downloadLedger}><Download aria-hidden="true" className="size-4" />Download a copy</button> : null}
             {savedStatusLoading ? <p className="mt-3 text-center text-xs text-[#718078]" role="status">Checking for a saved review…</p> : null}
             {savedStatusError ? <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-[#674c1f]" role="status" aria-live="polite">{savedStatusError}</p> : null}
-            {saved ? <p className="mt-3 rounded-xl border border-[#cfe5d4] bg-[#edf7ef] px-3 py-2.5 text-xs leading-5 text-[#286547]" role="status" aria-live="polite">Latest saved review: {new Date(saved.reviewedAt).toLocaleString()} by {titleCase(saved.reviewedBy)}. The choices shown here remain a browser draft until you save them. Saving does not start research or contact businesses.</p> : null}
+            {saved && showingSaved ? <p className="mt-3 rounded-xl border border-[#cfe5d4] bg-[#edf7ef] px-3 py-2.5 text-xs leading-5 text-[#286547]" role="status" aria-live="polite">Showing the review saved {new Date(saved.reviewedAt).toLocaleString()} by {titleCase(saved.reviewedBy)}. Saving does not start research or contact businesses.</p> : null}
+            {saved && !showingSaved ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-[#674c1f]" role="status" aria-live="polite"><p>A review was saved {new Date(saved.reviewedAt).toLocaleString()} by {titleCase(saved.reviewedBy)}. The choices shown here are unsaved browser changes.</p><button type="button" disabled={!savedDrafts} onClick={() => { if (!savedDrafts) return; latestDrafts.current = savedDrafts; setDrafts(savedDrafts); setShowingSaved(true); setMessage("Loaded the saved choices. Any unsaved browser changes were replaced."); }} className="mt-2 min-h-10 rounded-md font-semibold underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#32815b]">Load saved choices</button></div> : null}
             {message ? <p className="mt-3 rounded-xl border border-[#dce4de] bg-[#f8faf8] px-3 py-2.5 text-xs leading-5 text-[#405248]" role="status" aria-live="polite">{message}</p> : null}
             <div className="mt-4 flex items-start gap-2.5 border-t border-[#e8eee9] pt-4 text-xs leading-5 text-[#6b7b70]" role="note">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#2b7750]" aria-hidden="true" />

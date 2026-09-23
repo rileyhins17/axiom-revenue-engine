@@ -55,7 +55,7 @@ test("saves an immutable private ledger and exact decision replay keeps its orig
   });
 });
 
-test("changed decisions create a distinct immutable version and latest read exposes summary only", async () => {
+test("changed decisions create a distinct immutable version and latest read restores its exact choices", async () => {
   await withRoot(async (rootDir) => {
     const firstLedger = ledger();
     const changed = ledger({
@@ -76,8 +76,8 @@ test("changed decisions create a distinct immutable version and latest read expo
     assert.equal(second.status, "SAVED");
     assert.equal(latest?.filename, second.filename);
     assert.equal(latest?.reviewedAt, changed.reviewedAt);
-    assert.equal("decisions" in (latest ?? {}), false);
-    assert.equal("rationale" in (latest ?? {}), false);
+    assert.deepEqual(latest?.decisions, changed.decisions);
+    assert.equal(latest?.reviewedBy, "RILEY");
     assert.equal((await readdir(rootDir)).length, 3);
   });
 });

@@ -6,6 +6,8 @@ import {
   emptyM2OwnerIdentityDraft,
   isM2OwnerIdentityDecisionComplete,
   m2OwnerIdentityAlternateKey,
+  restoreM2OwnerIdentityDrafts,
+  selectM2OwnerIdentityDrafts,
   type M2OwnerIdentityDraftMap,
   type M2OwnerIdentityReadyPacket,
 } from "./m2-owner-identity-review-ledger";
@@ -166,4 +168,42 @@ test("review rationale longer than the strict schema limit is incomplete", () =>
   const candidate = packet.selected[0]!;
   const draft = { ...emptyM2OwnerIdentityDraft(), action: "HOLD" as const, rationale: "x".repeat(501) };
   assert.equal(isM2OwnerIdentityDecisionComplete(candidate, draft, packet.supportedAlternates), false);
+});
+
+test("a saved review restores exact keep, blocked, replacement and hold choices", () => {
+  const drafts = completeDrafts();
+  drafts["M2-01"] = { ...drafts["M2-01"]!, action: "REPLACE", rationale: "Use the supported alternate for this synthetic review.", alternateKey: m2OwnerIdentityAlternateKey(packet.supportedAlternates[0]!), city: "CAMBRIDGE", niche: "HVAC" };
+  drafts["M2-02"] = { ...emptyM2OwnerIdentityDraft(), action: "HOLD", rationale: "The synthetic ownership information needs another check." };
+  drafts["M2-03"] = { ...emptyM2OwnerIdentityDraft(), action: "REJECT", rationale: "The synthetic company is outside the selected market." };
+  const saved = buildM2OwnerIdentityDecisionLedger({ packet, reviewedBy: "RILEY", reviewedAt: "2026-09-23T13:14:15.000Z", drafts });
+
+  const restored = restoreM2OwnerIdentityDrafts(packet, saved.decisions);
+  assert.deepEqual(restored["M2-01"], drafts["M2-01"]);
+  assert.deepEqual(restored["M2-02"], drafts["M2-02"]);
+  assert.deepEqual(restored["M2-03"], drafts["M2-03"]);
+  assert.deepEqual(restored["M2-06"], drafts["M2-06"]);
+  assert.equal(Object.keys(restored).length, 10);
+});
+
+test("saved choices with a missing identity or unsupported replacement fail closed", () => {
+  const drafts = completeDrafts();
+  const saved = buildM2OwnerIdentityDecisionLedger({ packet, reviewedBy: "RILEY", reviewedAt: "2026-09-23T13:14:15.000Z", drafts });
+  assert.throws(() => restoreM2OwnerIdentityDrafts(packet, saved.decisions.slice(1)), /saved review/i);
+  assert.throws(() => restoreM2OwnerIdentityDrafts(packet, [saved.decisions[0], saved.decisions[0], ...saved.decisions.slice(2)]), /saved review/i);
+  const unsupported = saved.decisions.map((item, index) => index === 0 ? {
+    reviewId: "M2-01", action: "REPLACE", rationale: "Use a business that is not in the reviewed packet.",
+    replacement: { name: "Unknown", websiteUrl: "https://unknown.example.test/", sourceEvidenceUrl: "https://unknown.example.test/about", city: "CAMBRIDGE", niche: "HVAC", ...confirmations, rationale: "Use a business that is not in the reviewed packet." },
+  } : item);
+  assert.throws(() => restoreM2OwnerIdentityDrafts(packet, unsupported), /saved review/i);
+});
+
+test("a fresh browser displays saved choices while unsaved browser work is preserved", () => {
+  const savedDrafts = completeDrafts();
+  const browserDrafts = {
+    "M2-01": { ...emptyM2OwnerIdentityDraft(), action: "HOLD" as const, rationale: "A local unsaved choice needs another check." },
+  };
+  assert.deepEqual(selectM2OwnerIdentityDrafts({}, savedDrafts, false), { drafts: savedDrafts, showingSaved: true });
+  assert.deepEqual(selectM2OwnerIdentityDrafts(browserDrafts, savedDrafts, false), { drafts: browserDrafts, showingSaved: false });
+  assert.deepEqual(selectM2OwnerIdentityDrafts({}, savedDrafts, true), { drafts: {}, showingSaved: false });
+  assert.deepEqual(selectM2OwnerIdentityDrafts(savedDrafts, savedDrafts, false), { drafts: savedDrafts, showingSaved: true });
 });

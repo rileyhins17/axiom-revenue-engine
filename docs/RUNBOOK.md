@@ -502,12 +502,17 @@ Select **Save owner decisions** after all ten are complete. The local server
 validates the signed-in owner and exact packet again, then writes a new,
 immutable `m2-owner-decisions-<packet>-<owner>-<decision>.json` under ignored
 `data/kw-evaluation`. A retry of the same choices returns the original saved
-record; a changed review becomes a separate version. Reopen the page to verify
-the saved summary. Download a copy only if needed. Browser storage and a
-download alone are not the saved record. Saving the ledger does not pass the
-later source-plan, cohort, or capture gates; the operator still reviews and
-supplies the exact saved file to the preparer as `--decisions`. The screen does
-not fetch candidate sites automatically; following a source link is a separate
+record; a changed review becomes a separate version. Reopen the page, including
+from a fresh browser, to inspect the saved choices. The local server checks the
+immutable file before returning them to a named owner. If this browser has
+different unsaved choices, the page preserves them and offers **Load saved
+choices** rather than silently replacing them. The screen identifies whether
+the visible choices are saved or still a browser draft. Download a copy only
+if needed. Browser storage and a download alone are not the saved record.
+Saving the ledger does not pass the later source-plan, cohort, or capture gates;
+the operator still reviews and supplies the exact saved file to the preparer as
+`--decisions`. The screen does not fetch candidate sites automatically;
+following a source link is a separate
 owner-controlled browser visit. It grants no capture or contact.
 
 The owner identity ledger binds the exact research-review SHA-256, reviewer,
@@ -534,6 +539,10 @@ reasons to silently promote it to a capturable site. A separate, reviewed
 partial-cohort design is required if the owner elects to finish M2 with blocked
 cases instead of finding replacements. Do not fabricate confirmations to make
 the preparer pass.
+
+The first public-research operation exhausted its candidate and search caps.
+[The bounded replacement-search proposal](reviews/2026-09-23-m2-replacement-research-proposal.md)
+is **pending owner approval**; it authorizes no new site opens by itself.
 
 The authorization CLI requires an explicit review-policy JSON in addition to
 the source plan and reviewed manifest. Its seven input/output paths must be
