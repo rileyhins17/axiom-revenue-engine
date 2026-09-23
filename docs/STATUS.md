@@ -1,5 +1,46 @@
 # Current status — Axiom Revenue Engine
 
+## Owner UI no longer repeats the completed ten-business selection
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
+`3c1ceb0`. Today, Businesses, and Follow-through no longer present the
+ten-name identity selection as an owner task. Today shows recorded replies and
+client follow-ups when they exist, a compact no-actions state when they do not,
+and its live system-stop warning independently. Businesses starts with saved
+assessments; its older local identity route remains available only for a
+separately requested owner-attributed redo. This UI correction does not turn
+the ten identity choices into website-need assessments or outreach permission.
+
+**Verification:** eight focused component tests, safety configuration,
+typecheck, lint, Cloudflare build, default Wrangler dry run, and staged-diff
+checks passed for `3c1ceb0`. The dry run did not deploy. The prior 815-test
+isolated suite applies to `0c8313f`, not to this UI commit. A fresh Linux CI
+run, including full tests and desktop/mobile owner browser acceptance, is the
+next exact-commit proof. The old local M2 setup lock remains untouched; do not
+mistake it for a UI failure or clear it without checking its owner.
+
+**Production, automation, owner decisions and spend:** production remains
+unverified. No deployment, remote migration, provider activation, website
+capture, prospect contact, or email occurred. Autonomous intake, queue,
+follow-up, and send remain off. Riley delegated the ten identity selections to
+Codex; those selections are saved with Codex provenance and do not need a
+repeat owner click-through. No other policy or release decision is implied.
+The C$50/month ceiling is unchanged; incremental provider spend is C$0.
+Cloudflare login is expired, the staging packet is stale, source rights and
+retention are unresolved, and there is no approved cold-email route or proven
+inbound reply path.
+
+Next three concrete actions:
+
+1. Run fresh Linux CI and inspect the new Today, Businesses, and Follow-through
+   browser captures at desktop and phone sizes. Fix any regression before a
+   release packet is prepared.
+2. Resolve source rights and retention for one selected business and complete
+   one supervised real website-need assessment. M2 remains 0/10 and M3 0/50.
+3. Refresh Cloudflare staging inventory after account access returns, then
+   prepare an exact-commit staging packet with current backup and rollback
+   proof. Keep migration, deployment, and sending behind their release gates.
+
 ## Delegated M2 selection saved; production goal remains open
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
