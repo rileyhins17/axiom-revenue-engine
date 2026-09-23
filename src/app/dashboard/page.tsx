@@ -730,25 +730,25 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="mx-auto flex max-w-[1500px] flex-col gap-6">
-      <header className="page-header-main border-b border-white/[0.08] pb-6">
+    <div className="mx-auto flex max-w-[1320px] flex-col gap-5 text-[#20352c]">
+      <header className="page-header-main border-b border-[#dce5dd] pb-5">
         <div className="min-w-0 flex-1">
-          <span className="v2-eyebrow inline-flex items-center gap-2 text-[10px]">
-            <span className="v2-dot text-emerald-400" />
-            Axiom owner review
+          <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#537262]">
+            <span className="size-2 rounded-full bg-[#145943]" />
+            Axiom Web · Owner review
           </span>
-          <h1 className="page-header-title">Today</h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            A clear 30-minute review of what needs attention and what to do next.
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#20352c]">Today</h1>
+          <p className="mt-1 text-sm text-[#52645a]">
+            Start with the next decision. Take the rest in order.
           </p>
         </div>
         <div className="page-header-actions">
           <RefreshButton />
-          <div className="rounded-lg border border-white/[0.08] bg-black/20 px-3 py-1.5 text-right text-[11px] text-zinc-400">
-          <div className="font-medium text-zinc-200">
+          <div className="rounded-lg border border-[#dce5dd] bg-white px-3 py-1.5 text-right text-[11px] text-[#52645a]">
+          <div className="font-medium text-[#20352c]">
             {new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: BUSINESS_TZ }).format(new Date())}
           </div>
-          <div className="font-mono text-[10.5px] text-zinc-500">
+          <div className="text-[10.5px] text-[#52645a]">
             {formatAppDateTime(new Date(), { hour: "numeric", minute: "2-digit" }, "")}
           </div>
           </div>
@@ -757,14 +757,14 @@ export default async function DashboardPage() {
 
       {criticalStatusUnavailable ? (
         <div
-          className="flex flex-wrap items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-400/[0.08] px-4 py-3 text-sm"
+          className="flex flex-wrap items-start gap-3 rounded-xl border border-amber-300 bg-[#fff8e8] px-4 py-3 text-sm text-[#583d12]"
           role="alert"
           aria-live="polite"
         >
-          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-300" aria-hidden="true" />
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-700" aria-hidden="true" />
           <div>
-            <p className="font-semibold text-amber-100">Some status could not be verified</p>
-            <p className="mt-1 text-amber-100/75">
+            <p className="font-semibold">Some status could not be checked</p>
+            <p className="mt-1 text-[#745a2d]">
               Email, reply, or follow-up information may be incomplete. Do not start new external work until it is checked. This warning does not pause the live system.
             </p>
           </div>
@@ -772,123 +772,119 @@ export default async function DashboardPage() {
       ) : null}
 
       {!automationRead.unavailable && automation.settings.emergencyPaused ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-rose-300/25 bg-rose-500/[0.08] px-5 py-4 text-sm" role="alert" aria-live="polite">
-          <ShieldAlert className="size-5 shrink-0 text-rose-300" aria-hidden="true" />
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-rose-200 bg-[#fff1ef] px-5 py-4 text-sm text-[#602b25]" role="alert" aria-live="polite">
+          <ShieldAlert className="size-5 shrink-0 text-rose-700" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-rose-100">Emergency stop is on</p>
-            <p className="mt-1 text-rose-100/75">The system reports that new intake, queueing and sending are blocked.</p>
+            <p className="font-semibold">System stop is on</p>
+            <p className="mt-1 text-[#81534e]">The latest status says new intake, queueing, and sending are blocked.</p>
           </div>
-          <Link href="/settings" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-rose-200/30 bg-rose-200/10 px-4 text-sm font-semibold text-rose-100 hover:bg-rose-200/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-200">
-            Review stop settings <ArrowRight className="size-4" aria-hidden="true" />
+          <Link href="/settings" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-rose-300 bg-white px-4 text-sm font-semibold text-[#602b25] hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700">
+            Review safety <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
         </div>
       ) : null}
 
-      <section aria-label="Weekly owner review" className="rounded-[28px] bg-[#f6f8f3] p-4 text-[#263a2f] shadow-xl shadow-black/10 sm:p-6 lg:p-8">
-        <div className="mx-auto max-w-[1160px]">
-          <header className="mb-6 flex flex-col gap-4 border-b border-[#dfe7dd] pb-5 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#537262]">Your weekly review</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#24382d] sm:text-3xl">A steady week starts with the right next step.</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#586d60]">Check that the system is safe, review the best business evidence, handle owner actions, then record what you learned.</p>
+      <section aria-label="Today owner action desk" className="overflow-hidden rounded-[28px] border border-[#dce5dd] bg-[#f6f8f3] shadow-sm">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.8fr)]">
+          <section aria-labelledby="today-attention" className="p-5 sm:p-7 lg:p-8">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#537262]">First things first</p>
+                <h2 id="today-attention" className="mt-1 text-2xl font-semibold tracking-tight text-[#20352c] sm:text-3xl">What needs your attention?</h2>
+              </div>
             </div>
-            <span className="inline-flex min-h-9 w-fit items-center rounded-full bg-white px-3.5 text-sm font-semibold text-[#3e5b4a] ring-1 ring-inset ring-[#dce5da]">About 30 minutes</span>
-          </header>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <section aria-labelledby="today-safety" className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-inset ring-[#e4ebe2] sm:p-6">
-              <StepHeading number="01" title="Check safety and readiness" time="5 min" id="today-safety" />
-              <p className="mt-4 text-sm leading-6 text-[#5b7063]">Confirm what the system has actually checked before moving anything forward.</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <StatusTile label="Emergency stop" value={automationRead.unavailable ? "Could not verify" : automation.settings.emergencyPaused ? "On" : "Not active at last check"} tone={automationRead.unavailable || automation.settings.emergencyPaused ? "warning" : "neutral"} />
-                <StatusTile label="Email route" value="Not verified" tone="warning" detail="No paid inbox is assumed. Forwarding and the owner reply route have not been proven." />
+            {replyInboxRead.unavailable || followUpsRead.unavailable ? (
+              <div className="mt-5 rounded-xl border border-amber-300 bg-[#fff8e8] px-4 py-3 text-sm leading-6 text-[#583d12]" role="status">
+                Reply or follow-up status could not be checked. Open the client board and confirm before taking action.
               </div>
-              <p className="mt-3 text-xs leading-5 text-[#566a5d]">The email route has not been cleared for use. No provider readiness is assumed.</p>
-            </section>
-
-            <section aria-labelledby="today-shortlist" className="rounded-2xl bg-[#e5f1e7] p-5 shadow-sm ring-1 ring-inset ring-[#d3e6d7] sm:p-6">
-              <StepHeading number="02" title="Review the business shortlist" time="10 min" id="today-shortlist" />
-              <p className="mt-4 text-sm leading-6 text-[#4e6958]">Start with the evidence. A website capture alone does not mean a business is a good fit or ready to contact.</p>
-              <div className="mt-5 flex flex-col gap-4 rounded-xl bg-white/80 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-[#294333]">Business Review</p>
-                  <p className="mt-1 text-sm text-[#5b7063]">Review the current research status for each business.</p>
-                  <p className="mt-1 text-xs leading-5 text-[#566a5d]">The proposed ten are evaluation candidates, not an approved calling list.</p>
-                </div>
-                {canOpenBusinessReview ? (
-                  <Link href="/leads/m2" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#176443] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#125638] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">
-                    Open Business Review <ArrowRight className="size-4" aria-hidden="true" />
-                  </Link>
-                ) : (
-                  <p className="rounded-xl bg-[#f1f5ef] px-4 py-3 text-sm font-medium text-[#53675a]">An admin owner needs to open Business Review.</p>
-                )}
-              </div>
-            </section>
-
-            <section aria-labelledby="today-actions" className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-inset ring-[#e4ebe2] sm:p-6">
-              <StepHeading number="03" title="Take the next human actions" time="10 min" id="today-actions" />
-              <p className="mt-4 text-sm leading-6 text-[#5b7063]">Replies and client follow-ups stay with an owner. Review the item before changing its status.</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl bg-[#f6f8f5] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#53675a]">Recent replies to review</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#294333]">{replyInboxRead.unavailable ? "—" : `${replyInbox.length}${replyInbox.length === 10 ? "+" : ""}`}</p>
-                  <p className="mt-1 text-xs text-[#566a5d]">{replyInboxRead.unavailable ? "Could not verify" : "Up to 10 without a recorded next sales step"}</p>
-                </div>
-                <div className="rounded-xl bg-[#f6f8f5] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#53675a]">Client actions due</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#294333]">{followUpsRead.unavailable ? "—" : `${followUpAttentionCount}${followUps.overdue.length === 8 || followUps.dueToday.length === 8 ? "+" : ""}`}</p>
-                  <p className="mt-1 text-xs text-[#566a5d]">{followUpsRead.unavailable ? "Could not verify" : "Overdue or due today; up to 8 of each shown"}</p>
-                </div>
-              </div>
-              {replyInboxRead.unavailable || followUpsRead.unavailable ? (
-                <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 ring-1 ring-inset ring-amber-200">Some owner actions could not be checked. Confirm the live reply and follow-up state before starting new external work.</p>
-              ) : replyInbox.length > 0 || followUpAttentionCount > 0 ? (
-                <ul className="mt-4 divide-y divide-[#e4ebe2] rounded-xl border border-[#e4ebe2] bg-white" aria-label="Next owner actions">
-                  {replyInbox.slice(0, 3).map((item) => (
-                    <li key={`reply-${item.id}`}>
-                      <Link href={`/clients/${item.id}`} className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[#f6f8f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#176443]">
-                        <span className="min-w-0"><strong className="block truncate text-[#294333]">{item.businessName}</strong><span className="text-xs text-[#566a5d]">Reply recorded · {item.replyAgeLabel}</span></span><span className="shrink-0 font-semibold text-[#176443]">Review reply <ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>
-                      </Link>
-                    </li>
-                  ))}
-                  {[...followUps.overdue, ...followUps.dueToday].slice(0, Math.max(0, 3 - Math.min(3, replyInbox.length))).map((item) => (
-                    <li key={`follow-up-${item.id}`}>
-                      <Link href={`/clients/${item.id}`} className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[#f6f8f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#176443]">
-                        <span className="min-w-0"><strong className="block truncate text-[#294333]">{item.businessName}</strong><span className="text-xs text-[#566a5d]">{item.nextAction ?? "Client follow-up"}</span></span><span className="shrink-0 font-semibold text-[#176443]">Open action <ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+            ) : replyInbox.length > 0 || followUpAttentionCount > 0 ? (
+              <ul className="mt-5 divide-y divide-[#e4ebe2] overflow-hidden rounded-2xl border border-[#e4ebe2] bg-white" aria-label="Immediate owner actions">
+                {followUps.overdue.slice(0, 3).map((item) => (
+                  <li key={`overdue-${item.id}`}>
+                    <Link href={`/clients/${item.id}`} className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[#fbfcfa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#145943] sm:px-5">
+                      <span className="min-w-0"><strong className="block truncate text-[#20352c]">{item.businessName}</strong><span className="text-xs text-[#9a5424]">Overdue · {item.nextAction ?? "Client follow-up"}</span></span><span className="shrink-0 font-semibold text-[#145943]">Open action <ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>
+                    </Link>
+                  </li>
+                ))}
+                {replyInbox.slice(0, Math.max(0, 3 - Math.min(3, followUps.overdue.length))).map((item) => (
+                  <li key={`reply-${item.id}`}>
+                    <Link href={`/clients/${item.id}`} className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[#fbfcfa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#145943] sm:px-5">
+                      <span className="min-w-0"><strong className="block truncate text-[#20352c]">{item.businessName}</strong><span className="text-xs text-[#52645a]">Reply recorded · {item.replyAgeLabel}</span></span><span className="shrink-0 font-semibold text-[#145943]">Review reply <ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>
+                    </Link>
+                  </li>
+                ))}
+                {followUps.dueToday.slice(0, Math.max(0, 3 - Math.min(3, followUps.overdue.length + replyInbox.length))).map((item) => (
+                  <li key={`due-${item.id}`}>
+                    <Link href={`/clients/${item.id}`} className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[#fbfcfa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#145943] sm:px-5">
+                      <span className="min-w-0"><strong className="block truncate text-[#20352c]">{item.businessName}</strong><span className="text-xs text-[#52645a]">Due today · {item.nextAction ?? "Client follow-up"}</span></span><span className="shrink-0 font-semibold text-[#145943]">Open action <ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-5 rounded-xl border border-[#e4ebe2] bg-white px-4 py-4 text-sm text-[#53675a]">No recorded replies or client actions are due in the current owner view.</p>
+            )}
+            <Link href="/clients" className="mt-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#145943] hover:text-[#0f4634] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943]">See all client actions <ArrowRight className="size-4" aria-hidden="true" /></Link>
+            <section aria-labelledby="today-review-business" className="mt-7 border-t border-[#dce5dd] pt-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#537262]">Your next review</p>
+              <h3 id="today-review-business" className="mt-2 text-xl font-semibold tracking-tight text-[#20352c]">Review one business</h3>
+              <p className="mt-2 text-sm leading-6 text-[#52645a]">Check the evidence and decide whether it deserves more research. A website snapshot alone is not a reason to make contact.</p>
+              {canOpenBusinessReview ? (
+                <Link href="/leads/m2" className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#145943] px-6 text-sm font-semibold text-white transition hover:bg-[#104a37] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943] sm:w-fit">
+                  Review businesses <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
               ) : (
-                <p className="mt-4 rounded-xl bg-[#f6f8f5] px-4 py-3 text-sm leading-6 text-[#5b7063]">No recorded replies or client actions are due in the current owner view.</p>
+                <p className="mt-4 rounded-xl bg-[#f6f8f3] px-4 py-3 text-sm text-[#53675a]">An admin owner can open the business review.</p>
               )}
-              <Link href="/clients" className="mt-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#176443] hover:text-[#104c32] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">Open client board <ArrowRight className="size-4" aria-hidden="true" /></Link>
+              <p className="mt-2 text-xs leading-5 text-[#52645a]">These are evaluation candidates, not an approved contact list.</p>
+            </section>
+          </section>
+
+          <aside className="border-t border-[#dce5dd] bg-white p-5 sm:p-7 lg:border-l lg:border-t-0 lg:p-8">
+            <section aria-labelledby="today-readiness">
+              <div className="flex items-center justify-between gap-3">
+                <h3 id="today-readiness" className="text-sm font-semibold text-[#20352c]">Safety and email status</h3>
+                <Link href="/settings" className="inline-flex min-h-8 items-center text-xs font-semibold text-[#145943] hover:underline">Details</Link>
+              </div>
+              <p className="mt-1 text-xs text-[#52645a]">{operatorConsoleRead.unavailable ? "Last checked: unavailable" : `Last checked ${formatAppDateTime(operatorConsole?.generatedAt, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`}</p>
+              <div className="mt-3 grid gap-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-[#f6f8f3] px-3.5 py-3">
+                  <span className="text-sm text-[#53675a]">System stop</span>
+                  <span className={`text-sm font-semibold ${automationRead.unavailable ? "text-amber-800" : automation.settings.emergencyPaused ? "text-rose-800" : "text-[#53675a]"}`}>
+                    {automationRead.unavailable ? "Unknown" : automation.settings.emergencyPaused ? "On" : "Not active at last check"}
+                  </span>
+                </div>
+                <div className="rounded-xl bg-[#fff8e8] px-3.5 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-[#745a2d]">Email route</span><span className="text-sm font-semibold text-[#745a2d]">Not verified</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-[#806b45]">Forwarding and a working owner reply path have not been confirmed. Email is not cleared for use.</p>
+                </div>
+              </div>
             </section>
 
-            <section aria-labelledby="today-learning" className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-inset ring-[#e4ebe2] sm:p-6">
-              <StepHeading number="04" title="Learn from what happened" time="5 min" id="today-learning" />
-              <p className="mt-4 text-sm leading-6 text-[#5b7063]">Keep the next decision grounded in real feedback. Record useful evidence, corrections, source gaps, and what happened after a reply.</p>
+            <section aria-labelledby="today-learning" className="mt-6 border-t border-[#e4ebe2] pt-5">
+              <h3 id="today-learning" className="text-sm font-semibold text-[#20352c]">A note from recent work</h3>
               {messageVariantsRead.unavailable || auditLogRead.unavailable ? (
-                <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 ring-1 ring-inset ring-amber-200">Learning records could not be loaded, so no outcome summary is shown.</p>
+                <p className="mt-1 text-sm leading-5 text-[#745a2d]">Learning records could not be checked.</p>
               ) : messageVariants.length > 0 ? (
-                <p className="mt-4 rounded-xl bg-[#f6f8f5] px-4 py-3 text-sm leading-6 text-[#4e6958]">The record contains {messageVariants.reduce((sum, item) => sum + Number(item.sent || 0), 0)} initial messages and {messageVariants.reduce((sum, item) => sum + Number(item.replied || 0), 0)} linked replies. Review conversations before drawing a conclusion.</p>
+                <p className="mt-1 text-sm leading-5 text-[#52645a]">{messageVariants.reduce((sum, item) => sum + Number(item.sent || 0), 0)} initial messages and {messageVariants.reduce((sum, item) => sum + Number(item.replied || 0), 0)} linked replies are recorded. Review conversations before drawing a conclusion.</p>
               ) : (
-                <p className="mt-4 rounded-xl bg-[#f6f8f5] px-4 py-3 text-sm leading-6 text-[#4e6958]">No validated message-result comparisons are available yet.</p>
+                <p className="mt-1 text-sm leading-5 text-[#52645a]">No validated message-result comparisons are available yet.</p>
               )}
-              <Link href="/clients" className="mt-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#176443] hover:text-[#104c32] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">Review recorded conversations <ArrowRight className="size-4" aria-hidden="true" /></Link>
             </section>
-          </div>
+          </aside>
         </div>
       </section>
 
-      <details className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025]">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-zinc-300 hover:bg-white/[0.035] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">
+      <details className="group overflow-hidden rounded-xl border border-[#dce5dd] bg-white">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-[#52645a] hover:bg-[#f7f9f6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943]">
           <span>Advanced system details</span>
-          <span className="text-xs font-normal text-zinc-500">Legacy metrics · not proof of email readiness</span>
+          <span className="text-xs font-normal text-[#68766c]">Legacy metrics · not proof of email readiness</span>
         </summary>
         {diagnosticsUnavailable ? (
-          <p className="border-t border-white/10 px-5 py-4 text-sm leading-6 text-amber-100">Diagnostics are hidden because some critical status could not be verified. This screen does not pause the live system.</p>
-        ) : <div className="flex max-w-[1500px] flex-col gap-6 p-4 sm:p-6">
+          <p className="border-t border-[#dce5dd] bg-[#fff8e8] px-5 py-4 text-sm leading-6 text-amber-900">Diagnostics are hidden because some critical status could not be verified. This screen does not pause the live system.</p>
+        ) : <div className="flex max-w-[1500px] flex-col gap-6 bg-[#0d0f13] p-4 text-white sm:p-6">
       <ControlRoomHero
         mode={operatingMode}
         hasRisk={riskItems.length > 0}
@@ -1270,28 +1266,6 @@ export default async function DashboardPage() {
       <FollowUpsPanel data={followUps} />
         </div>}
       </details>
-    </div>
-  );
-}
-
-function StepHeading({ number, title, time, id }: { number: string; title: string; time: string; id: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#e8f0e7] text-xs font-bold tracking-wide text-[#315b43]" aria-hidden="true">{number}</span>
-      <div className="min-w-0 flex-1">
-        <h3 id={id} className="text-base font-semibold tracking-tight text-[#263a2f]">{title}</h3>
-        <p className="mt-0.5 text-xs font-medium text-[#5d7163]">{time}</p>
-      </div>
-    </div>
-  );
-}
-
-function StatusTile({ label, value, tone, detail }: { label: string; value: string; tone: "warning" | "neutral"; detail?: string }) {
-  return (
-    <div className={`rounded-xl p-4 ${tone === "warning" ? "bg-amber-50" : "bg-[#f6f8f5]"}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[#53675a]">{label}</p>
-      <p className={`mt-2 text-sm font-semibold ${tone === "warning" ? "text-amber-900" : "text-[#294333]"}`}>{value}</p>
-      {detail ? <p className="mt-1 text-xs leading-5 text-[#566a5d]">{detail}</p> : null}
     </div>
   );
 }

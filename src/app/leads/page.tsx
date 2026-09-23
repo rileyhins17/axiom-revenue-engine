@@ -9,7 +9,7 @@ import {
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Leads | Axiom Revenue Engine" };
+export const metadata: Metadata = { title: "Businesses | Axiom Revenue Engine" };
 
 export default async function LeadsPage() {
   const session = await requireSession();

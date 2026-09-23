@@ -144,24 +144,35 @@ export function attachBrowserDiagnostics(
 /** Chromium can omit the script URL and stack from a Playwright pageerror.
  * Capture parser/runtime attribution and the exact failing source before navigation loses it. */
 export async function attachBrowserScriptDiagnostics(context: BrowserContext, page: Page,
-  getStage: () => string, diagnostics: BrowserDiagnostic[], outputDirectory: string) {
+  getStage: () => string, diagnostics: BrowserDiagnostic[], outputDirectory: string, sourceTimeoutMs = 5_000) {
   const session = await context.newCDPSession(page);
   const pending: Promise<void>[] = [];
+  let draining = false;
+  let drainPromise: Promise<void> | null = null;
   const capture = (kind: "script-parse-error" | "runtime-exception", details: {
     scriptId?: string; url?: string; lineNumber?: number; columnNumber?: number; message: string;
   }) => {
     const diagnostic: BrowserDiagnostic = { capturedAt: new Date().toISOString(), stage: getStage(), kind,
       ...details, url: details.url || page.url() };
     diagnostics.push(diagnostic);
-    if (details.scriptId) {
+    if (details.scriptId && draining) {
+      diagnostic.sourceCaptureError = "Script source collection already closed.";
+    } else if (details.scriptId) {
       const filename = `owner-ui-script-${diagnostics.length}.js.txt`;
       pending.push((async () => {
+        let timeout: ReturnType<typeof setTimeout> | undefined;
         try {
-          const result = await session.send("Debugger.getScriptSource", { scriptId: details.scriptId! });
+          const result = await Promise.race([
+            session.send("Debugger.getScriptSource", { scriptId: details.scriptId! }),
+            new Promise<never>((_, reject) => {
+              timeout = setTimeout(() => reject(new Error("Script source capture timed out.")), sourceTimeoutMs);
+            }),
+          ]);
           if (Buffer.byteLength(result.scriptSource) > 5_000_000) throw new Error("Failing script exceeded diagnostic size limit.");
           await writeFile(join(outputDirectory, filename), result.scriptSource, { flag: "wx" });
           diagnostic.sourceArtifact = filename;
         } catch (error) { diagnostic.sourceCaptureError = error instanceof Error ? error.message : String(error); }
+        finally { if (timeout) clearTimeout(timeout); }
       })());
     }
   };
@@ -175,7 +186,13 @@ export async function attachBrowserScriptDiagnostics(context: BrowserContext, pa
   }));
   await session.send("Runtime.enable");
   await session.send("Debugger.enable");
-  return async () => { await Promise.all(pending); };
+  return () => {
+    if (!drainPromise) {
+      draining = true;
+      drainPromise = Promise.all(pending).then(() => undefined);
+    }
+    return drainPromise;
+  };
 }
 
 export async function writeBrowserDiagnostics(
@@ -1019,7 +1036,7 @@ export async function warmOwnerAcceptanceRoutes(page: Page, extraRoutes: string[
   // SSR headings precede async script completion. Starting the next compilation
   // can rewrite a shared dev chunk while the previous response is still reading it.
   await page.goto("/leads", { waitUntil: "load" });
-  await page.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
+  await page.getByRole("heading", { level: 1, name: "Businesses" }).waitFor();
   await page.goto(`/leads/${FIXTURE_BUSINESS_ID}`, { waitUntil: "load" });
   await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
   await page.goto("/leads/evaluation", { waitUntil: "load" });
@@ -1087,7 +1104,7 @@ async function assertM2Review(page: Page, fixture: Awaited<ReturnType<typeof cre
 async function assertM2MobileNavigationClear(page: Page, titleSelector: string, finalSelector: string, label: string) {
   await page.evaluate(() => window.scrollTo(0, 0));
   const top = await page.evaluate((selector) => {
-    const header = document.querySelector("header.v2-header")?.getBoundingClientRect();
+    const header = document.querySelector("header.owner-topbar")?.getBoundingClientRect();
     const title = document.querySelector(selector)?.getBoundingClientRect();
     return header && title ? { headerBottom: header.bottom, titleTop: title.top } : null;
   }, titleSelector);
@@ -1232,14 +1249,14 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "desktop leads";
     const listStart = performance.now();
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
+    await page.getByRole("heading", { level: 1, name: "Businesses" }).waitFor();
     await page.getByRole("link", { name: "Open Business Review" }).waitFor();
     await page.screenshot({ path: join(outputDirectory, "leads-desktop.png"), fullPage: true });
     await openLegacyLeadPreview(page);
     await page.getByRole("link", { name: /Open evidence dossier/i }).first().waitFor();
     const desktopListReadyMs = Math.round(performance.now() - listStart);
     assert(desktopListReadyMs <= OWNER_LIST_BUDGET_MS, `The next owner lead was not discoverable within ${OWNER_LIST_BUDGET_MS} ms.`);
-    await assertOwnerPageTitle(page, "Leads | Axiom Revenue Engine");
+    await assertOwnerPageTitle(page, "Businesses | Axiom Revenue Engine");
     await assertWcag(page, "desktop leads");
     await assertReadOnlyOwnerSurface(page, "desktop leads");
     const desktopWidth = await assertResponsive(page, "desktop leads");
@@ -1502,14 +1519,14 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "desktop Today safety";
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
-    const todayReview = page.getByRole("region", { name: "Weekly owner review" });
-    await todayReview.getByRole("heading", { name: "Check safety and readiness" }).waitFor();
-    await todayReview.getByRole("heading", { name: "Review the business shortlist" }).waitFor();
-    await todayReview.getByRole("heading", { name: "Take the next human actions" }).waitFor();
-    await todayReview.getByRole("heading", { name: "Learn from what happened" }).waitFor();
+    const todayReview = page.getByRole("region", { name: "Today owner action desk" });
+    await todayReview.getByRole("heading", { name: "What needs your attention?" }).waitFor();
+    await todayReview.getByRole("heading", { name: "Review one business" }).waitFor();
+    await todayReview.getByRole("heading", { name: "Safety and email status" }).waitFor();
+    await todayReview.getByRole("heading", { name: "A note from recent work" }).waitFor();
     await todayReview.getByText("Email route", { exact: true }).waitFor();
     await todayReview.getByText("Not verified", { exact: true }).waitFor();
-    await todayReview.getByRole("link", { name: "Open Business Review" }).waitFor();
+    await todayReview.getByRole("link", { name: "Review businesses" }).waitFor();
     assert.equal(await page.getByText("Safety gated", { exact: true }).count(), 0,
       "The owner shell must not imply that safety is verified through a static badge.");
     assert.equal(await page.getByText("prod", { exact: true }).count(), 0,
@@ -1534,9 +1551,9 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
 
     stage = "desktop Revenue";
     await page.goto("/clients", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { level: 1, name: "Clients and opportunities" }).waitFor();
+    await page.getByRole("heading", { level: 1, name: "Clients & opportunities" }).waitFor();
     assert.equal(await page.getByText("Collected revenue", { exact: true }).count(), 0);
-    await page.getByText("No clients yet", { exact: true }).waitFor();
+    await page.getByText("No client records to review", { exact: true }).waitFor();
     assert.equal(await page.getByRole("region", { name: /Deal stages/ }).count(), 0,
       "An empty client board should not show a long row of empty stages.");
     await assertResponsive(page, "desktop Revenue");
@@ -1545,8 +1562,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
 
     stage = "desktop Settings";
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { level: 1, name: "Settings and safety" }).waitFor();
-    await page.getByRole("heading", { name: "Mail route" }).waitFor();
+    await page.getByRole("heading", { level: 1, name: "Settings & safety" }).waitFor();
+    await page.getByRole("heading", { name: "Business email" }).waitFor();
     assert.equal(await page.getByRole("link", { name: /Connect Gmail/i }).count(), 0);
     await assertResponsive(page, "desktop Settings");
     await assertWcag(page, "desktop Settings");
@@ -1555,7 +1572,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "mobile leads";
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
+    await page.getByRole("heading", { level: 1, name: "Businesses" }).waitFor();
     await page.screenshot({ path: join(outputDirectory, "leads-mobile.png"), fullPage: true });
     await openLegacyLeadPreview(page);
     await page.getByRole("link", { name: /Open evidence dossier/i }).first().waitFor();
@@ -1579,22 +1596,31 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await assertResponsive(page, "mobile dossier");
     await assertReducedMotion(page, "mobile dossier");
     await assertMobileNavigationClear(page);
-    await page.screenshot({ path: join(outputDirectory, "dossier-mobile.png"), fullPage: true });
+    // A viewport capture is enough to verify the phone layout. Capturing the
+    // entire long legacy evidence document can stall Chromium before the next
+    // owner route, even after the image file has been written.
+    await page.screenshot({ path: join(outputDirectory, "dossier-mobile.png"), timeout: 15_000 });
+    console.log("Mobile dossier checked; opening Quality Lab.");
 
     stage = "mobile quality lab";
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
+    console.log("Mobile Quality Lab page loaded.");
     await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
     await page.locator("[data-quality-lab-ready='true']:visible").waitFor();
+    console.log("Mobile Quality Lab is ready; loading the synthetic checkpoint.");
     await page.locator("input[aria-label='Choose owner-review checkpoint']:visible:enabled").setInputFiles({
       name: "owner-labeling-checkpoint.json",
       mimeType: "application/json",
       buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
     });
     await page.getByRole("heading", { level: 2, name: firstEvaluationBusiness }).waitFor();
+    console.log("Mobile Quality Lab checkpoint loaded.");
     assert.equal(await page.getByRole("button", { name: /^Strong/ }).getAttribute("aria-pressed"), "true");
     await assertWcag(page, "mobile quality lab");
     await assertResponsive(page, "mobile quality lab");
     await assertReducedMotion(page, "mobile quality lab");
+    console.log("Mobile Quality Lab checks passed; opening Business Review.");
 
     stage = "mobile M2 research console";
     await page.goto("/leads/m2", { waitUntil: "domcontentloaded" });
@@ -1609,7 +1635,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "mobile Today safety";
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
-    await page.getByRole("region", { name: "Weekly owner review" }).getByRole("link", { name: "Open Business Review" }).waitFor();
+    await page.getByRole("region", { name: "Today owner action desk" }).getByRole("link", { name: "Review businesses" }).waitFor();
     assert.equal(await page.getByRole("link", { name: "Connect now" }).count(), 0,
       "The phone Today view must not offer Gmail OAuth as the next owner action.");
     await assertResponsive(page, "mobile Today safety");
@@ -1626,8 +1652,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
 
     stage = "mobile Revenue";
     await page.goto("/clients", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { level: 1, name: "Clients and opportunities" }).waitFor();
-    await page.getByText("No clients yet", { exact: true }).waitFor();
+    await page.getByRole("heading", { level: 1, name: "Clients & opportunities" }).waitFor();
+    await page.getByText("No client records to review", { exact: true }).waitFor();
     assert.equal(await page.getByText("No clients in this stage yet").count(), 0,
       "An empty phone board should not repeat every stage before its empty state.");
     await assertResponsive(page, "mobile Revenue");
@@ -1636,14 +1662,16 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
 
     stage = "mobile Settings";
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { level: 1, name: "Settings and safety" }).waitFor();
+    await page.getByRole("heading", { level: 1, name: "Settings & safety" }).waitFor();
     await page.getByRole("heading", { name: "System stop" }).waitFor();
     await assertResponsive(page, "mobile Settings");
     await assertWcag(page, "mobile Settings");
     await page.screenshot({ path: join(outputDirectory, "settings-mobile.png"), fullPage: true });
 
     assert.deepEqual(externalRequests, [], "The owner acceptance browser attempted an external request.");
+    console.log("Final owner pages rendered; collecting browser diagnostics.");
     await Promise.all(drainScriptDiagnostics.map((drain) => drain()));
+    console.log("Browser diagnostics collected; closing the owner session.");
     // CDP events attribute failures; caught/revoked exceptions are not new acceptance gates.
     // Preserve the existing uncaught pageerror and console-error gates.
     const intentionalLostResponse = diagnostics.filter((diagnostic) =>
@@ -1669,6 +1697,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
       externalRequests: externalRequests.length,
     } satisfies AcceptanceResult;
   } catch (error) {
+    console.error(`Owner UI browser step failed at ${stage}: ${error instanceof Error ? error.message : String(error)}`);
     await Promise.all(drainScriptDiagnostics.map((drain) => drain()));
     if (page) await page.screenshot({ path: join(outputDirectory, "owner-ui-failure.png"), fullPage: true }).catch(() => undefined);
     return await reportBrowserAcceptanceFailure({

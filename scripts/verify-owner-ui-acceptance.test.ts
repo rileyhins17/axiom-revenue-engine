@@ -214,6 +214,31 @@ test("script diagnostic drain waits for pending source artifacts", async () => {
   }
 });
 
+test("script diagnostic drain times out an unresponsive CDP source and remains idempotent", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "owner-ui-script-timeout-"));
+  try {
+    let releaseSource!: (value: string) => void;
+    const sourceReady = new Promise<string>((resolve) => { releaseSource = resolve; });
+    const fixture = fakeCdpPage("http://127.0.0.1:8787/leads", async () => sourceReady);
+    const diagnostics: Parameters<typeof attachBrowserDiagnostics>[2] = [];
+    const drain = await attachBrowserScriptDiagnostics(fixture.context, fixture.page, () => "desktop leads", diagnostics, directory, 20);
+    fixture.session.listeners.get("Debugger.scriptFailedToParse")?.({
+      scriptId: "unresponsive-script", url: "http://127.0.0.1:8787/_next/chunk.js", startLine: 1, startColumn: 0,
+    });
+
+    const firstDrain = drain();
+    assert.strictEqual(drain(), firstDrain, "A second drain must not wait on CDP again.");
+    await firstDrain;
+    assert.equal(diagnostics[0]?.sourceCaptureError, "Script source capture timed out.");
+    releaseSource("late source");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await assert.rejects(readFile(join(directory, "owner-ui-script-1.js.txt"), "utf8"), { code: "ENOENT" },
+      "A late CDP response must not write into an output directory after the drain finishes.");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("failure reporting writes captured diagnostics before rethrowing with the measured URL", async () => {
   const primaryError = new Error("acceptance failed");
   const diagnostic = {

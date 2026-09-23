@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { CircleUserRound, LogOutIcon, Settings, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -66,23 +66,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   })();
 
   return (
-    <SidebarProvider>
+    <SidebarProvider
+      className="owner-app-shell min-h-svh bg-[#f5f4ef] text-[#202c26]"
+      style={{ "--sidebar-width": "15rem" } as CSSProperties}
+    >
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:border focus:border-emerald-400/40 focus:bg-[#07111c] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-emerald-100"
+        className="owner-skip-link sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:border focus:px-3 focus:py-2 focus:text-sm focus:font-semibold"
       >
         Skip to main content
       </a>
       <AppSidebar />
-      <main id="main-content" tabIndex={-1} className="flex min-h-screen min-w-0 w-full flex-1 flex-col bg-background outline-none">
-        <header className="v2-header sticky top-0 z-40">
-          <div className="flex h-[68px] items-center gap-3 px-4 md:px-7">
-            <SidebarTrigger className="v2-focus-ring rounded-md text-zinc-400 transition-colors hover:text-white" />
-            <div className="hidden h-6 w-px bg-white/[0.08] md:block" />
+      <main id="main-content" tabIndex={-1} className="owner-main flex min-h-screen min-w-0 w-full flex-1 flex-col outline-none">
+        <header className="owner-topbar sticky top-0 z-40">
+          <div className="flex h-[64px] items-center gap-3 px-4 sm:px-6 lg:px-9">
+            <SidebarTrigger aria-label="Toggle navigation" className="owner-icon-button" />
             <div className="min-w-0 flex-1">
               <LayoutBreadcrumb />
             </div>
-            <SearchTrigger />
+            <div className="owner-search-trigger"><SearchTrigger /></div>
             <div className="hidden items-center gap-2 lg:flex">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -90,7 +92,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     type="button"
                     aria-label="Open settings"
                     onClick={() => router.push("/settings")}
-                    className="v2-focus-ring relative flex size-9 cursor-pointer items-center justify-center rounded-lg border border-white/[0.09] bg-black/20 text-zinc-400 transition-colors hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white"
+                    className="owner-icon-button"
                   >
                     <Settings className="size-4" aria-hidden="true" />
                   </button>
@@ -103,13 +105,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   aria-label="Open account menu"
-                  className="v2-focus-ring flex size-9 cursor-pointer items-center justify-center rounded-lg outline-none transition-colors hover:bg-white/[0.05] lg:h-auto lg:w-auto lg:gap-3 lg:px-2 lg:py-1.5"
+                  className="owner-account-trigger"
                 >
                   <div className="hidden text-right leading-tight lg:block">
-                    <div className="text-xs font-semibold text-white">
+                    <div className="text-xs font-semibold text-[#202c26]">
                       {loading ? "Loading…" : displayName || sessionEmail || "User"}
                     </div>
-                    <div className="font-mono text-[10.5px] text-zinc-500">
+                    <div className="text-[10.5px] text-[#52645a]">
                       {sessionEmail || "—"}
                     </div>
                   </div>
@@ -118,19 +120,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       src={session?.user?.image}
                       fallback={initials}
                       size="lg"
+                      className="owner-avatar"
                     />
-                    <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-[#06101a] bg-emerald-400" />
+                    <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-[#fff] bg-[#145943]" />
                   </div>
-                  <CircleUserRound className="size-5 text-zinc-400 sm:hidden" aria-hidden="true" />
+                  <CircleUserRound className="size-5 text-[#526158] sm:hidden" aria-hidden="true" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="owner-account-menu w-56">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1 px-0.5 py-1">
-                    <p className="text-sm font-medium text-white">
+                    <p className="text-sm font-medium text-[#202c26]">
                       {displayName || sessionEmail || "User"}
                     </p>
-                    <p className="font-mono text-xs text-zinc-500">
+                    <p className="text-xs text-[#52645a]">
                       {sessionEmail}
                     </p>
                   </div>
@@ -157,7 +160,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <HotkeyProvider>
-          <div data-owner-content className="min-w-0 flex-1 px-3 py-4 pb-28 sm:px-5 sm:py-6 md:px-8 md:py-8">{children}</div>
+          <div data-owner-content className="owner-page-content min-w-0 flex-1 px-4 py-6 pb-28 sm:px-6 sm:py-8 md:px-9 md:py-9">{children}</div>
         </HotkeyProvider>
 
         <MobileTabBar pathname={pathname} />
@@ -170,7 +173,7 @@ function MobileTabBar({ pathname }: { pathname: string | null }) {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-white/[0.08] bg-[#0b0d10]/96 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 backdrop-blur-xl md:hidden"
+      className="owner-mobile-nav fixed inset-x-0 bottom-0 z-50 px-2 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] pt-2 md:hidden"
     >
       <div className="grid grid-cols-5 gap-1">
         {APP_NAV_ITEMS.map((item) => {
@@ -185,14 +188,14 @@ function MobileTabBar({ pathname }: { pathname: string | null }) {
               aria-current={active ? "page" : undefined}
               aria-label={item.title}
               className={cn(
-                "v2-focus-ring flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[10px] font-medium transition-colors",
+                "owner-mobile-nav-item flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium transition-colors",
                 active
-                  ? "bg-emerald-400/12 text-emerald-200"
-                  : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200",
+                  ? "is-active"
+                  : "",
               )}
             >
-              <Icon className={cn("size-4", active ? "text-emerald-300" : "text-zinc-500")} aria-hidden="true" />
-              <span className="max-w-full truncate">{item.title}</span>
+              <Icon className="size-[17px]" aria-hidden="true" />
+              <span className="max-w-full truncate">{item.label}</span>
             </Link>
           );
         })}

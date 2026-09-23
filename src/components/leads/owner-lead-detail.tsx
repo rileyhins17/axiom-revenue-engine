@@ -132,7 +132,7 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
     ?? "The dossier keeps business fit, website need, reachability, timing, and evidence confidence separate so the next decision stays explainable.";
 
   return (
-    <div data-owner-readonly-dossier className="mx-auto flex max-w-[1500px] flex-col gap-5 rounded-[26px] border border-[#e3eae0] bg-[#f6f8f3] p-4 text-[#263a2f] shadow-[0_18px_60px_rgba(30,53,37,0.07)] sm:p-6 lg:p-7">
+    <div data-owner-readonly-dossier className="mx-auto flex max-w-[1320px] flex-col gap-4 text-[#263a2f]">
       <Link
         href="/leads"
         className="v2-focus-ring inline-flex min-h-9 w-fit items-center gap-2 rounded-lg px-1 text-xs font-semibold text-[#53675a] hover:text-[#176443]"
@@ -165,21 +165,6 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
             </a>
           ) : null}
         </div>
-        <dl className="grid grid-cols-2 border-t border-[#e6ece3] bg-[#fbfcfa] sm:grid-cols-4">
-          {[
-            { label: "Legacy score", value: lead.qualification.totalScore, detail: "/100" },
-            { label: "Rebuild need", value: lead.qualification.scores.rebuildNeed, detail: "/100" },
-            { label: "Evidence", value: lead.qualification.scores.evidenceConfidence, detail: "/100" },
-            { label: "Suggested route", value: readableCode(lead.route.channel), detail: lead.route.readiness === "MANUAL_ACTION" ? "manual" : "review" },
-          ].map((metric, index) => (
-            <div key={metric.label} className={cn("min-w-0 px-4 py-3.5 sm:px-5", index % 2 === 0 && index < 2 ? "border-r border-[#e6ece3]" : "", index < 2 ? "border-b border-[#e6ece3] sm:border-b-0" : "", index === 2 ? "sm:border-l sm:border-[#e6ece3]" : "")}>
-              <dt className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#566a5d]">{metric.label}</dt>
-              <dd className="mt-1.5 flex items-baseline gap-1.5 font-mono text-lg font-semibold tabular-nums text-[#24382d]">
-                <span>{metric.value}</span><span className="text-[10px] font-medium text-[#566a5d]">{metric.detail}</span>
-              </dd>
-            </div>
-          ))}
-        </dl>
       </header>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)]">
@@ -231,18 +216,24 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
               {decisionState.label}
             </span>
           </div>
-          <dl className="mt-4 grid grid-cols-2 gap-2">
-            {SCORE_LABELS.map(({ key, label }) => (
-              <div key={key} className={cn("rounded-xl border border-[#e4ebe2] bg-[#f8faf6] p-3", key === "evidenceConfidence" && "col-span-2")}>
-                <dt className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#566a5d]">{label}</dt>
-                <dd className="mt-2 flex items-end justify-between gap-2">
-                  <span className="font-mono text-lg font-semibold tabular-nums text-[#24382d]">{lead.qualification.scores[key]}</span>
-                  <span className="text-[9px] text-[#566a5d]">/100</span>
-                </dd>
-              </div>
-            ))}
-          </dl>
-          <div className="mt-4 rounded-xl border border-[#e4ebe2] bg-[#f8faf6] p-3">
+          <details className="mt-3 rounded-xl border border-[#e4ebe2] bg-[#f8faf6]">
+            <summary className="v2-focus-ring flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-[#425b4d] marker:hidden">
+              <span>Previous score details</span>
+              <span className="font-mono text-[11px] font-medium tabular-nums text-[#617367]">{lead.qualification.totalScore}/100</span>
+            </summary>
+            <dl className="grid grid-cols-2 gap-2 border-t border-[#e4ebe2] p-3">
+              {SCORE_LABELS.map(({ key, label }) => (
+                <div key={key} className={cn("rounded-lg border border-[#e4ebe2] bg-white p-2.5", key === "evidenceConfidence" && "col-span-2")}>
+                  <dt className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#566a5d]">{label}</dt>
+                  <dd className="mt-1 flex items-end justify-between gap-2">
+                    <span className="font-mono text-base font-semibold tabular-nums text-[#24382d]">{lead.qualification.scores[key]}</span>
+                    <span className="text-[9px] text-[#566a5d]">/100</span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+          <div className="mt-3 rounded-xl border border-[#e4ebe2] bg-[#f8faf6] p-3">
             <p className="text-[10px] font-semibold text-[#425b4d]">Evidence state</p>
             <p className="mt-1 text-xs leading-5 text-[#617367]">
               {readableCode(lead.dataQuality.state)} · audit {lead.audit.auditVersion}

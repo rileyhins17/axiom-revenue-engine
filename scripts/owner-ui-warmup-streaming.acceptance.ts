@@ -4,7 +4,7 @@ import { createServer, type ServerResponse } from "node:http";
 import type { Browser, BrowserContext, Page } from "playwright";
 
 const WARM_ROUTES = [
-  { path: "/leads", heading: "Leads", script: "/warmup-script/leads.js" },
+  { path: "/leads", heading: "Businesses", script: "/warmup-script/leads.js" },
   {
     path: "/leads/business:owner-acceptance-roofing",
     heading: "Tri-City Roofing Fixture",

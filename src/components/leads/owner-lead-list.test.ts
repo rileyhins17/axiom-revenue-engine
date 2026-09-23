@@ -140,7 +140,7 @@ function fixtureResponse(leads: OwnerLeadProjection[], options: { rejectedBusine
 test("owner lead list explains legacy scores, exact evidence, and a manual route", () => {
   const html = renderToStaticMarkup(createElement(OwnerLeadList, { data: fixtureResponse([fixtureLead()]), canReviewBusinessResearch: true }));
 
-  assert.match(html, /<h1[^>]*>Leads<\/h1>/);
+  assert.match(html, /<h1[^>]*>Businesses<\/h1>/);
   assert.match(html, /Ranked review queue/);
   assert.match(html, /Tri-City Roofing/);
   assert.match(html, /Business fit/);

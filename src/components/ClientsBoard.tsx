@@ -1044,13 +1044,13 @@ function StatTile({
   }[tone];
 
   return (
-    <div className="rounded-2xl border border-[#e0e8dc] bg-white px-4 py-4 shadow-sm">
-      <div className="mb-2 flex min-h-8 items-center gap-2 text-xs font-semibold leading-5 text-[#526457]">
+    <div className="min-w-0 rounded-xl border border-[#e1e5dc] bg-white px-4 py-3">
+      <div className="mb-1 flex min-h-7 items-center gap-2 text-xs font-semibold leading-5 text-[#526457]">
         {icon}
         {label}
       </div>
-      <div className={cn("font-mono text-xl font-semibold tabular-nums", toneClasses)}>{value}</div>
-      <div className="mt-1 text-xs leading-5 text-[#64766a]">{detail}</div>
+      <div className={cn("text-xl font-semibold tabular-nums tracking-tight", toneClasses)}>{value}</div>
+      <div className="mt-0.5 text-[11px] leading-4 text-[#64766a]">{detail}</div>
     </div>
   );
 }
@@ -1313,7 +1313,7 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
   }, []);
 
   return (
-    <div className="mx-auto flex min-w-0 w-full max-w-[1320px] flex-col gap-6 rounded-[28px] border border-[#dfe7dd] bg-[#f6f8f3] p-4 shadow-sm sm:p-6 lg:p-7">
+    <div className="flex min-w-0 w-full flex-col gap-5 rounded-2xl border border-[#e1e5dc] bg-white p-4 shadow-sm sm:p-6">
       <AddClientDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
@@ -1330,8 +1330,8 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
         onConfirm={handleRemoveFromBoard}
       />
 
-      {/* Search + Add Client */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      {/* Find or create a record. */}
+      <div className="flex flex-col gap-3 border-b border-[#e8ebe3] pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 sm:max-w-sm">
           <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#64766a]" aria-hidden="true" />
           <input
@@ -1340,43 +1340,29 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search clients or opportunities"
-            className="min-h-11 w-full rounded-xl border border-[#d8e2d5] bg-white py-2 pl-10 pr-3 text-sm text-[#263a2f] placeholder:text-[#5b6d5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]"
+            className="min-h-11 w-full rounded-lg border border-[#d8e2d5] bg-white py-2 pl-10 pr-3 text-sm text-[#263a2f] placeholder:text-[#5b6d5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]"
           />
         </div>
         <button
           type="button"
           onClick={() => setShowAddDialog(true)}
           data-hotkey="add"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#b7cdb8] bg-[#e7f0e5] px-4 py-2 text-sm font-semibold text-[#285d3d] transition hover:border-[#8eaf91] hover:bg-[#dcebd9] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] cursor-pointer"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#145943] bg-[#145943] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0e4935] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] cursor-pointer"
         >
           <Plus className="size-3.5" />
-          Add Client
+          Add client
         </button>
       </div>
 
-      {/* Stats bar + export */}
+      {/* Put owner actions first; financial estimates remain available below. */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid flex-1 grid-cols-2 gap-2 md:grid-cols-3">
           <StatTile
             icon={<MessageSquare className="size-3.5" />}
             label="Replies to review"
             value={inboxLeads.length}
             detail="replied or interested"
             tone={inboxLeads.length > 0 ? "cyan" : "zinc"}
-          />
-          <StatTile
-            icon={<DollarSign className="size-3.5" />}
-            label="Pipeline monthly estimate"
-            value={`~${formatCompactMoney(openPipelineValue)}`}
-            detail={`${proposalCount} proposal${proposalCount === 1 ? "" : "s"} pending · estimate only`}
-            tone={openPipelineValue > 0 ? "amber" : "zinc"}
-          />
-          <StatTile
-            icon={<DollarSign className="size-3.5" />}
-            label="Recorded recurring estimate"
-            value={`~${formatCompactMoney(activeMrr)}/mo`}
-            detail="per month · not cash received"
-            tone={activeMrr > 0 ? "emerald" : "zinc"}
           />
           <StatTile
             icon={<Clock className="size-3.5" />}
@@ -1404,6 +1390,14 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
           </button>
         )}
       </div>
+
+      <details className="group rounded-xl border border-[#e1e5dc] bg-[#fafbf8]">
+        <summary className="flex min-h-11 cursor-pointer items-center px-4 py-2 text-sm font-semibold text-[#3b5947] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">View recorded value estimates</summary>
+        <div className="grid gap-2 border-t border-[#e1e5dc] p-3 sm:grid-cols-2">
+          <StatTile icon={<DollarSign className="size-3.5" />} label="Pipeline monthly estimate" value={`~${formatCompactMoney(openPipelineValue)}`} detail={`${proposalCount} proposal${proposalCount === 1 ? "" : "s"} pending · estimate only`} tone={openPipelineValue > 0 ? "amber" : "zinc"} />
+          <StatTile icon={<DollarSign className="size-3.5" />} label="Recorded recurring estimate" value={`~${formatCompactMoney(activeMrr)}/mo`} detail="Entered in client records · not invoices or cash received" tone={activeMrr > 0 ? "emerald" : "zinc"} />
+        </div>
+      </details>
 
       {error && (
         <div role="alert" className="rounded-xl border border-[#e5c4bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#8d2929] flex items-center gap-2">
@@ -1503,12 +1497,12 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
       )}
 
       {leads.length === 0 && inboxLeads.length === 0 && (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-[#e3e9e0] bg-white py-16 text-center">
-          <Building2 className="size-8 text-[#5b6d5f]" />
-          <div className="text-sm font-medium text-[#526457]">No clients yet</div>
-          <p className="text-xs text-[#5b6d5f] max-w-xs">
-            Leads that reply or get marked Interested will appear here. Move them through deal stages as you close them.
-          </p>
+        <div className="flex items-start gap-4 rounded-xl border border-dashed border-[#cfd9cd] bg-[#fafbf8] px-5 py-7">
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-[#eaf1e9]"><Building2 className="size-5 text-[#42624d]" /></span>
+          <div>
+            <div className="text-sm font-semibold text-[#263a2f]">No client records to review</div>
+            <p className="mt-1 max-w-md text-sm leading-6 text-[#5b6d5f]">Replies and owner-created client records will appear here. Add a record when there is a real relationship to track.</p>
+          </div>
         </div>
       )}
 

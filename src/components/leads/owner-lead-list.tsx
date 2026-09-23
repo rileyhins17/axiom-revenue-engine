@@ -122,33 +122,76 @@ export function OwnerLeadList({ data, canReviewBusinessResearch = false }: {
   const needsQualificationCount = data.leads.filter((lead) => lead.attention === "REVIEW" || lead.attention === "RESEARCH").length;
 
   return (
-    <div className="mx-auto flex max-w-[1500px] flex-col gap-5">
-      <header className="rounded-2xl border border-[#e1e9df] bg-[#f6f8f3] p-5 text-[#1a3124] shadow-sm sm:p-7">
-        <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#406849]">Axiom · Lead score preview</p>
-        <div className="mt-3 flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
-          <div className="max-w-2xl">
-            <h1 className="text-3xl font-semibold tracking-tight text-[#14291d] sm:text-4xl">Leads</h1>
-            <p className="mt-2 text-sm leading-6 text-[#5d6d62]">
-              This page contains legacy scores for calibration. Business Review is separate and shows saved research for each business.
-            </p>
-            <p className="mt-3 flex items-start gap-2 text-sm font-medium leading-5 text-[#425b4d]">
-              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#406849]" aria-hidden="true" />
-              A score or suggested route does not confirm contact readiness or allow outreach.
-            </p>
-          </div>
+    <div className="mx-auto flex max-w-[1500px] flex-col gap-4 text-[#20352a]">
+      <header className="flex flex-col gap-4 rounded-2xl border border-[#e3e9e2] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#145943]">Axiom Web · Research</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#172b21]">Businesses</h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[#58695f]">
+            Review current business evidence before deciding whether it is worth pursuing. This page contains legacy scores for calibration; Business Review shows the saved research for each business.
+          </p>
+        </div>
+        <div className="shrink-0 sm:w-[280px] sm:border-l sm:border-[#e5ebe5] sm:pl-6">
           {canReviewBusinessResearch ? (
-            <Button asChild size="lg" className="shrink-0">
-              <Link href={"/leads/m2" as Route} prefetch={false}>
-                Open Business Review <ArrowUpRight aria-hidden="true" />
-              </Link>
-            </Button>
+            <>
+              <p className="text-xs font-semibold text-[#53675a]">Your next step</p>
+              <Button asChild size="lg" className="mt-2 w-full justify-between bg-[#145943] text-white hover:bg-[#104a37]">
+                <Link href={"/leads/m2" as Route} prefetch={false}>
+                  Open Business Review <ArrowUpRight aria-hidden="true" />
+                </Link>
+              </Button>
+            </>
           ) : (
-            <p role="note" className="max-w-xs rounded-xl border border-[#dce4da] bg-white px-4 py-3 text-sm leading-5 text-[#53645b]">
-              Business Review access is limited to administrators. This score preview does not allow business review or contact.
+            <p role="note" className="rounded-xl border border-[#e3e9e2] bg-[#f8faf7] px-4 py-3 text-sm leading-5 text-[#53645b]">
+              <span className="block font-semibold text-[#263a2f]">Business Review access is limited to administrators.</span>
+              Ask an admin owner to review current business research. This score preview does not approve contact.
             </p>
           )}
         </div>
       </header>
+
+      <div className="flex flex-col gap-2 rounded-xl border border-[#e3e9e2] bg-[#f8faf7] px-4 py-3 text-sm text-[#53675a] sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <p className="flex items-start gap-2 leading-5">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#145943]" aria-hidden="true" />
+          A score or suggested route does not confirm contact readiness or allow outreach.
+        </p>
+        <span className="shrink-0 text-xs font-semibold text-[#145943]">Read-only preview</span>
+      </div>
+
+      <section aria-labelledby="business-records-heading" className="overflow-hidden rounded-2xl border border-[#e3e9e2] bg-white shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#e9eee9] px-5 py-4 sm:px-6">
+          <div>
+            <h2 id="business-records-heading" className="text-lg font-semibold text-[#172b21]">Business records</h2>
+            <p className="mt-1 text-sm text-[#52645a]">Saved score records to inspect. They are not an approved contact list.</p>
+          </div>
+          <p className="text-xs font-medium text-[#52645a]">{data.leads.length} {data.leads.length === 1 ? "record" : "records"}</p>
+        </div>
+        {data.leads.length === 0 ? (
+          <div className="px-5 py-9 text-center sm:px-6">
+            <p className="font-semibold text-[#20352a]">No business records yet</p>
+            <p className="mt-1 text-sm text-[#52645a]">Open Business Review to inspect any separately saved research.</p>
+          </div>
+        ) : (
+          <ol className="divide-y divide-[#e9eee9]" aria-label="Business score records">
+            {data.leads.map((lead) => (
+              <li key={lead.projectionKey} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-[#20352a]">{lead.business.canonicalName}</p>
+                  <p className="mt-1 text-xs text-[#52645a]">{readableCode(lead.business.niche)} · {readableCode(lead.business.location.city)}, ON · {CLASSIFICATION_LABELS[lead.audit.classification]}</p>
+                </div>
+                <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
+                  <span className="rounded-full border border-[#dce9dc] bg-[#f4f8f4] px-2.5 py-1 text-xs font-medium text-[#315b43]">
+                    {lead.attention === "READY_FOR_REVIEW" ? "Review evidence" : lead.attention === "BLOCKED" ? "Blocked" : lead.attention === "NEEDS_REFRESH" ? "Refresh evidence" : "More research"}
+                  </span>
+                  <Link href={ownerLeadDetailPath(lead.business.businessId) as Route} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-[#145943] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943]">
+                    View evidence <ArrowUpRight className="size-4" aria-hidden="true" />
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
 
       <details className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0e1014]">
         <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-300 sm:px-5">
@@ -438,10 +481,10 @@ function OwnerLeadEmptyState() {
 export function OwnerLeadsUnavailable() {
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
-      <section role="alert" className="rounded-[28px] bg-[#f6f8f3] px-5 py-10 text-center text-[#263a2f] shadow-sm sm:px-8">
+      <section role="alert" className="rounded-[28px] bg-white px-5 py-10 text-center text-[#263a2f] shadow-sm sm:px-8">
         <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-amber-100 text-amber-800"><AlertTriangle className="size-6" aria-hidden="true" /></span>
         <p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-[#806224]">Could not verify</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#24382d]">Leads</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#24382d]">Businesses</h1>
         <h2 className="mt-3 text-lg font-semibold text-[#294333]">Business research is temporarily unavailable</h2>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#566a5d]">
           The latest records could not be read, so no scores or business counts are shown. This page did not start outreach; the read failure does not stop live automation.
