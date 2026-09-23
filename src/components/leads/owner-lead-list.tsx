@@ -154,7 +154,7 @@ export function OwnerLeadList({ data, canReviewBusinessResearch = false }: {
             <p className="mb-2 text-xs font-semibold text-[#53675a]">Your next step</p>
             <Button asChild size="lg" className="w-full justify-between rounded-xl bg-[#145943] text-white shadow-md shadow-[#145943]/15 hover:bg-[#104a37]">
               <Link href={"/leads/m2/identity" as Route} prefetch={false}>
-                Review 10 businesses <ArrowUpRight aria-hidden="true" />
+                Review 10 proposed businesses <ArrowUpRight aria-hidden="true" />
               </Link>
             </Button>
           </div>
@@ -172,7 +172,7 @@ export function OwnerLeadList({ data, canReviewBusinessResearch = false }: {
             <h2 id="business-records-heading" className="text-lg font-semibold text-[#172b21]">Your businesses</h2>
             <p className="mt-1 text-sm text-[#52645a]">Review the evidence and decide what deserves your attention.</p>
           </div>
-          <p className="rounded-full bg-[#f3f7f2] px-3 py-1 text-xs font-semibold text-[#52645a]">{data.leads.length} {data.leads.length === 1 ? "business" : "businesses"}</p>
+          <p className="rounded-full bg-[#f3f7f2] px-3 py-1 text-xs font-semibold text-[#52645a]">{data.leads.length} {data.leads.length === 1 ? "assessed business" : "assessed businesses"}</p>
         </div>
         {data.leads.length === 0 ? (
           <div className="px-5 py-9 text-center sm:px-6">

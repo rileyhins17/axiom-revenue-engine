@@ -24,6 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import type { OwnerLeadDetailResponse } from "@/lib/revenue-engine/owner-lead-detail-read-model";
 import { cn } from "@/lib/utils";
@@ -191,7 +192,7 @@ function OwnerNextStep({ data }: { data: OwnerLeadDetailResponse }) {
   );
 }
 
-export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
+export function OwnerLeadDetail({ data, ownerControls }: { data: OwnerLeadDetailResponse; ownerControls?: ReactNode }) {
   const lead = data.lead;
   const qualifiedForReview = lead.attention === "READY_FOR_REVIEW" && lead.ownerActionable;
   const decisionState = decisionStateCopy(lead);
@@ -207,7 +208,7 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
         className="v2-focus-ring inline-flex min-h-9 w-fit items-center gap-2 rounded-lg px-1 text-xs font-semibold text-[#53675a] hover:text-[#176443]"
       >
         <ArrowLeft className="size-3.5" aria-hidden="true" />
-        Back to ranked leads
+        Back to businesses
       </Link>
 
       <header className="overflow-hidden rounded-[22px] border border-[#dce6d9] bg-white shadow-sm">
@@ -220,7 +221,7 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
               <div className="flex flex-wrap items-center gap-2.5">
                 <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-[#406849]">{readableCode(lead.business.niche)} · {readableCode(lead.business.location.city)}</p>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-[#eadfbd] bg-[#fff8e8] px-2.5 py-1 text-[10px] font-semibold text-[#76591f]">
-                  <ShieldCheck className="size-3" aria-hidden="true" /> Legacy score preview · read-only
+                  <ShieldCheck className="size-3" aria-hidden="true" /> Previous score · read-only
                 </span>
               </div>
               <h1 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.04em] text-[#172d20] sm:text-4xl">{lead.business.canonicalName}</h1>
@@ -237,6 +238,18 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
       </header>
 
       <OwnerNextStep data={data} />
+
+      {ownerControls ? <div aria-label="Owner controls" className="grid gap-4 xl:grid-cols-[minmax(300px,0.7fr)_minmax(0,1.3fr)]">{ownerControls}</div> : null}
+      <ContactReviewSection data={data} />
+
+      <details className="overflow-hidden rounded-2xl border border-[#dce6d9] bg-white shadow-sm">
+        <summary className="v2-focus-ring flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#24382d] marker:hidden sm:px-5">
+          <span>Research details</span>
+          <span className="flex shrink-0 items-center gap-2 text-xs font-normal text-[#617367]">
+            Routes, history, full audit <ChevronDown className="size-4" aria-hidden="true" />
+          </span>
+        </summary>
+        <div className="space-y-4 border-t border-[#e4ebe2] p-4 sm:p-5">
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)]">
         <section aria-labelledby="why-this-lead" className="rounded-2xl border border-[#e1e9df] bg-white p-4 sm:p-5">
@@ -327,7 +340,6 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
       </div>
 
       <Reachability data={data} />
-      <ContactReviewSection data={data} />
       <HistorySection data={data} />
 
       <details className="overflow-hidden rounded-2xl border border-[#e1e9df] bg-white">
@@ -361,10 +373,14 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
           <p className="mt-1 font-mono text-[9px] text-[#566a5d]">{data.readModelVersion}</p>
         </div>
       </section>
+        </div>
+      </details>
 
       <div role="note" className="flex gap-3 rounded-xl border border-[#eadfbd] bg-[#fff8e8] p-4 text-xs leading-5 text-[#76591f]">
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#76591f]" aria-hidden="true" />
-        <p>This dossier is read-only. No email, call, form, social message, provider request, or database change can start here.</p>
+        <p>{ownerControls
+          ? "Research details and recorded routes are read-only. The owner controls above can save a local stop or task, but cannot contact this business or approve outreach."
+          : "This dossier is read-only. No email, call, form, social message, provider request, or database change can start here."}</p>
       </div>
     </div>
   );
@@ -712,7 +728,7 @@ export function OwnerLeadDetailUnavailable() {
       <section role="alert" className="rounded-[28px] bg-[#f6f8f3] px-5 py-10 text-center text-[#263a2f] shadow-sm sm:px-8">
         <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-amber-100 text-amber-800"><AlertTriangle className="size-6" aria-hidden="true" /></span>
         <p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-[#76591f]">Could not verify</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#24382d]">Lead dossier unavailable</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#24382d]">Business details unavailable</h1>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[#566a5d]">The business, audit, routes, or history could not be read as one consistent dossier. No fallback data is shown. This page did not start outreach; a read failure does not stop live automation.</p>
         <Link href="/leads" className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#176443] px-5 text-sm font-semibold text-white hover:bg-[#125638] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">
           <ArrowLeft className="size-4" aria-hidden="true" /> Back to Leads
@@ -726,10 +742,10 @@ export function OwnerLeadDetailNotFound() {
   return (
     <div className="mx-auto max-w-[900px] rounded-[28px] bg-[#f6f8f3] p-6 text-[#263a2f] shadow-sm sm:p-8">
       <span className="grid size-11 place-items-center rounded-2xl bg-[#edf4eb] text-[#176443]"><FileSearch className="size-5" aria-hidden="true" /></span>
-      <h1 className="mt-5 text-2xl font-semibold tracking-tight text-[#24382d]">Lead dossier not found</h1>
+      <h1 className="mt-5 text-2xl font-semibold tracking-tight text-[#24382d]">Business details not found</h1>
       <p className="mt-3 max-w-xl text-sm leading-6 text-[#566a5d]">This identity does not have a current audited dossier. Legacy or incomplete data is not promoted into the owner queue.</p>
       <Link href="/leads" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#d8e2d5] bg-white px-4 text-sm font-semibold text-[#315740] hover:bg-[#f0f5ee] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">
-        <ArrowLeft className="size-4" aria-hidden="true" /> Return to ranked leads
+        <ArrowLeft className="size-4" aria-hidden="true" /> Return to businesses
       </Link>
     </div>
   );

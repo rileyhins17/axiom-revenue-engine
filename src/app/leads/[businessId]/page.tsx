@@ -13,7 +13,7 @@ import { parseOwnerLeadBusinessIdRouteParam } from "@/lib/revenue-engine/owner-l
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Lead dossier | Axiom Revenue Engine" };
+export const metadata: Metadata = { title: "Business details | Axiom Revenue Engine" };
 
 export default async function LeadDetailPage({
   params,
@@ -34,14 +34,14 @@ export default async function LeadDetailPage({
   if (!detail) notFound();
 
   return (
-    <div className="space-y-5">
-      <OwnerLeadDetail data={detail} />
-      <div className="mx-auto max-w-[1500px]">
-        <OwnerBusinessStopPanel businessId={identity} />
-      </div>
-      <div className="mx-auto max-w-[1500px]">
-        <OwnerTaskPanel businessId={identity} stopState={detail.operationalStopState ?? "UNAVAILABLE"} />
-      </div>
-    </div>
+    <OwnerLeadDetail
+      data={detail}
+      ownerControls={(
+        <>
+          <OwnerBusinessStopPanel businessId={identity} />
+          <OwnerTaskPanel businessId={identity} stopState={detail.operationalStopState ?? "UNAVAILABLE"} />
+        </>
+      )}
+    />
   );
 }

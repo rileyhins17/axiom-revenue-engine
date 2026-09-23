@@ -105,12 +105,14 @@ selected zero-paid-mailbox design. Missing critical status reads appear as
 unavailable; a dashboard warning is not a runtime stop or proof of provider
 readiness.
 
-Businesses presents a simple list of saved score records with direct evidence
-links. The old ranking and detailed scores sit in a closed advanced preview,
-while Business Review remains the admin owner's primary saved-research action.
-A business detail leads with the stop-aware next step and three sourced website
-findings; recorded routes and history remain visible, and the full audit opens
-only when requested.
+Businesses separates the proposed identities awaiting an owner decision from
+saved assessed-business records, with direct evidence links. The old ranking
+and detailed scores sit in a closed advanced preview, while Business Review
+remains the admin owner's primary saved-research action. A business detail leads
+with the stop-aware next step and three sourced website findings, followed by
+the owner stop and task controls. Contact-review status stays visible; recorded
+routes, history, and the full audit are available under **Research details**
+when needed.
 A score or suggested contact route is not a contact decision. Follow-through
 starts with the same private business decision flow and manual next steps, and labels the mail route
 unverified; it does not surface legacy Gmail connection or send controls.

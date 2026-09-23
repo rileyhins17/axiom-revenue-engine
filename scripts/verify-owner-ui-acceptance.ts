@@ -877,9 +877,10 @@ async function assertKeyboardFlow(page: Page) {
   await page.reload({ waitUntil: "domcontentloaded" });
   // Next may still be streaming the loading skeleton after DOMContentLoaded.
   // Wait for the actual owner page before focusing its disclosure.
-  await page.getByRole("link", { name: "Review 10 businesses" }).waitFor({ state: "visible" });
+  await page.getByRole("link", { name: "Review 10 proposed businesses" }).waitFor({ state: "visible" });
   await page.waitForLoadState("networkidle");
-  await page.locator("body").focus();
+  await page.waitForFunction(() => document.body !== null);
+  await page.evaluate(() => document.body.focus());
   await page.keyboard.press("Tab");
   const firstFocus = await page.evaluate(() => ({
     text: document.activeElement?.textContent?.trim(),
@@ -1068,6 +1069,27 @@ async function assertM2Review(page: Page, fixture: Awaited<ReturnType<typeof cre
     await entry.getByText(expected[index]!, { exact: true }).waitFor();
   }
   const mobile = (page.viewportSize()?.width ?? 1440) < 768;
+  if (mobile) {
+    const filterGroup = page.getByRole("group", { name: "Filter businesses" });
+    const filterLayout = await filterGroup.evaluate((group) => {
+      const buttons = [...group.querySelectorAll("button")].map((button) => button.getBoundingClientRect());
+      return {
+        clientWidth: group.clientWidth,
+        scrollWidth: group.scrollWidth,
+        buttonTops: buttons.map((rect) => rect.top),
+      };
+    });
+    assert(filterLayout.buttonTops.every((top) => top === filterLayout.buttonTops[0]),
+      `${label} mobile filters must stay on one row: ${JSON.stringify(filterLayout)}`);
+    assert(filterLayout.scrollWidth > filterLayout.clientWidth,
+      `${label} mobile filters must remain horizontally scrollable: ${JSON.stringify(filterLayout)}`);
+    await filterGroup.getByRole("button", { name: "Stopped 2" }).click();
+    assert.equal(await page.getByRole("list", { name: "Businesses to review", exact: true }).locator(":scope > li").count(), 2,
+      `${label} must apply the last horizontally scrolling filter.`);
+    await filterGroup.getByRole("button", { name: "All 10" }).click();
+    assert.equal(await page.getByRole("list", { name: "Businesses to review", exact: true }).locator(":scope > li").count(), 10,
+      `${label} must restore all businesses from the first filter.`);
+  }
   const firstDetail = page.getByRole("region", { name: `${fixture.selected[0]!.businessName} website review` });
   if (mobile) assert.equal(await firstDetail.isVisible(), false, `${label} must open a business before showing its dossier.`);
   else await firstDetail.waitFor();
@@ -1250,7 +1272,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     const listStart = performance.now();
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Businesses" }).waitFor();
-    const businessesReview = page.getByRole("link", { name: "Review 10 businesses" });
+    const businessesReview = page.getByRole("link", { name: "Review 10 proposed businesses" });
     await businessesReview.waitFor();
     assert.equal(await businessesReview.getAttribute("href"), "/leads/m2/identity");
     await page.screenshot({ path: join(outputDirectory, "leads-desktop.png"), fullPage: true });
@@ -1271,6 +1293,12 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
     await page.getByText("Owner next step", { exact: true }).waitFor();
     await page.getByRole("heading", { level: 3, name: "Top website findings" }).waitFor();
+    await page.getByRole("heading", { level: 2, name: "Do not contact" }).waitFor();
+    await page.getByRole("heading", { level: 2, name: "Owner tasks" }).waitFor();
+    const researchDetails = page.locator("details").filter({ has: page.getByText("Research details", { exact: true }) }).first();
+    await researchDetails.locator(":scope > summary").waitFor();
+    assert.equal(await researchDetails.getAttribute("open"), null, "Technical research should start closed behind the owner controls.");
+    await researchDetails.locator(":scope > summary").click();
     await page.getByRole("heading", { level: 2, name: "Why the old score flagged this business" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Contact review not recorded" }).waitFor();
     await page.locator("section[aria-labelledby='owner-next-step']").getByText("+15195550123", { exact: true }).waitFor();
@@ -1279,16 +1307,17 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await recordedRoutes.getByText("hello@roofing.axiomfixtures.ca", { exact: true }).waitFor();
     const desktopDossierReadyMs = Math.round(performance.now() - dossierStart);
     assert(desktopDossierReadyMs <= OWNER_DOSSIER_BUDGET_MS, `The lead rationale was not visible within ${OWNER_DOSSIER_BUDGET_MS} ms.`);
-    await assertOwnerPageTitle(page, "Lead dossier | Axiom Revenue Engine");
-    const fullAudit = page.locator("details").filter({ has: page.getByText("Full website audit and evidence details", { exact: true }) }).first();
+    await assertOwnerPageTitle(page, "Business details | Axiom Revenue Engine");
+    const fullAudit = researchDetails.locator("details").filter({ has: page.getByText("Full website audit and evidence details", { exact: true }) }).first();
     await fullAudit.locator("summary").waitFor();
     assert.equal(await fullAudit.getAttribute("open"), null, "The full audit should start closed so owner actions remain easy to find.");
     await fullAudit.locator("summary").click();
     await page.getByRole("heading", { level: 2, name: "Website evidence" }).waitFor();
     assert((await page.getByRole("link", { name: "Inspect proof" }).count()) >= 3, "The dossier must expose at least three inspectable observations.");
     await fullAudit.locator("summary").click();
+    await researchDetails.locator(":scope > summary").click();
     await assertWcag(page, "desktop dossier");
-    await assertReadOnlyOwnerSurface(page, "desktop dossier", "[data-owner-readonly-dossier]");
+    await assertReadOnlyOwnerSurface(page, "desktop dossier", "[data-owner-readonly-dossier] > details");
     await assertResponsive(page, "desktop dossier");
     await assertReducedMotion(page, "desktop dossier");
     await page.screenshot({ path: join(outputDirectory, "dossier-desktop.png"), fullPage: true });
@@ -1431,9 +1460,12 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.getByText("Contact stopped", { exact: true }).waitFor();
     await page.getByText("Owner decision", { exact: true }).waitFor();
     await page.getByText(stopNote, { exact: true }).waitFor();
+    const stoppedResearch = page.locator("details").filter({ has: page.getByText("Research details", { exact: true }) }).first();
+    await stoppedResearch.locator(":scope > summary").click();
     await page.getByRole("heading", { level: 2, name: "Every recorded route" }).waitFor();
     await page.getByText("Contact status: Do not contact", { exact: true }).waitFor();
     await assertBusinessStopRoutesBlocked(page);
+    await stoppedResearch.locator(":scope > summary").click();
     const stoppedTaskRow = page.getByRole("list", { name: "Saved owner tasks" }).locator("li").filter({ hasText: openTaskAction });
     await stoppedTaskRow.waitFor({ state: "visible" });
     assert.equal(await stoppedTaskRow.getByRole("button", { name: `Complete task: ${openTaskAction}` }).count(), 0,
@@ -1607,10 +1639,13 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.getByText("Contact stopped", { exact: true }).waitFor();
     await page.getByText("Owner decision", { exact: true }).waitFor();
     await page.getByText("Owner decision: do not contact this synthetic business.", { exact: true }).waitFor();
+    const mobileResearch = page.locator("details").filter({ has: page.getByText("Research details", { exact: true }) }).first();
+    await mobileResearch.locator(":scope > summary").click();
     await assertBusinessStopRoutesBlocked(page);
+    await mobileResearch.locator(":scope > summary").click();
     await page.getByRole("list", { name: "Saved owner tasks" }).getByText("Completed", { exact: true }).waitFor();
     await assertWcag(page, "mobile dossier");
-    await assertReadOnlyOwnerSurface(page, "mobile dossier", "[data-owner-readonly-dossier]");
+    await assertReadOnlyOwnerSurface(page, "mobile dossier", "[data-owner-readonly-dossier] > details");
     await assertResponsive(page, "mobile dossier");
     await assertReducedMotion(page, "mobile dossier");
     await assertMobileNavigationClear(page);

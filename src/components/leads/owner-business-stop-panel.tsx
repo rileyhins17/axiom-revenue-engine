@@ -149,80 +149,80 @@ export function OwnerBusinessStopPanel({ businessId }: { businessId: string }) {
   };
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-rose-300/25 bg-[#171014]" aria-labelledby="owner-business-stop-title">
-      <header className="flex flex-col gap-3 border-b border-rose-300/10 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
+    <section className="overflow-hidden rounded-2xl border border-rose-200 bg-white shadow-sm" aria-labelledby="owner-business-stop-title">
+      <header className="flex flex-col gap-3 border-b border-[#edf0eb] bg-[#fffafa] px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
         <div className="flex gap-3">
-          <div className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border border-rose-300/20 bg-rose-300/[0.08] text-rose-200">
+          <div className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700">
             <ShieldAlert className="size-4" aria-hidden="true" />
           </div>
           <div>
-            <h2 id="owner-business-stop-title" className="text-sm font-semibold text-white">Do not contact</h2>
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-zinc-400">A saved owner stop blocks this business in the v2 owner view. This panel only records and displays the stop.</p>
+            <h2 id="owner-business-stop-title" className="text-sm font-semibold text-[#203a2a]">Do not contact</h2>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-[#5d6d62]">A saved owner stop blocks this business in the v2 owner view. This panel only records and displays the stop.</p>
           </div>
         </div>
         <button
           type="button"
           onClick={() => void loadStop()}
           disabled={state === "loading" || pending}
-          className="v2-focus-ring inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-white/[0.1] px-3 text-xs font-semibold text-zinc-300 hover:border-white/[0.2] hover:text-white disabled:opacity-50"
+          className="v2-focus-ring inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-[#dfe8e1] bg-white px-3 text-xs font-semibold text-[#405347] hover:border-[#a8c8ae] hover:bg-[#f8fbf8] disabled:opacity-50"
         >
           <RefreshCw className="size-3.5" aria-hidden="true" /> Refresh
         </button>
       </header>
 
       {message ? (
-        <p className={`mx-4 mt-4 rounded-lg border px-3 py-2 text-xs leading-5 sm:mx-5 ${message.tone === "error" ? "border-rose-300/20 bg-rose-300/[0.05] text-rose-100" : "border-emerald-300/20 bg-emerald-300/[0.05] text-emerald-100"}`} role="status" aria-live="polite">
+        <p className={`mx-4 mt-4 rounded-lg border px-3 py-2 text-xs leading-5 sm:mx-5 ${message.tone === "error" ? "border-rose-200 bg-rose-50 text-rose-900" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} role="status" aria-live="polite">
           {message.tone === "error" ? <CircleAlert className="mr-1.5 inline size-3.5" aria-hidden="true" /> : null}
           {message.text}
         </p>
       ) : null}
 
       {state === "loading" ? (
-        <div className="flex items-center gap-2 px-4 py-5 text-xs text-zinc-400 sm:px-5" role="status">
+        <div className="flex items-center gap-2 px-4 py-5 text-xs text-[#617367] sm:px-5" role="status">
           <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Checking saved contact status…
         </div>
       ) : state === "unavailable" ? (
-        <div className="px-4 py-5 text-xs text-zinc-300 sm:px-5">
+        <div className="px-4 py-5 text-xs leading-5 text-[#45584b] sm:px-5">
           <p>Contact status could not be confirmed. Do not contact this business until the saved status can be checked.</p>
-          <button type="button" onClick={() => void loadStop()} className="v2-focus-ring mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/[0.1] px-3 font-semibold text-zinc-200 hover:border-white/[0.2]">
+          <button type="button" onClick={() => void loadStop()} className="v2-focus-ring mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#dfe8e1] bg-white px-3 font-semibold text-[#405347] hover:border-[#a8c8ae]">
             <RefreshCw className="size-3.5" aria-hidden="true" /> Try again
           </button>
         </div>
       ) : stop ? (
         <div className="px-4 py-5 sm:px-5" role="status" aria-live="polite">
-          <p className="flex items-center gap-2 text-sm font-semibold text-rose-100"><AlertTriangle className="size-4 shrink-0" aria-hidden="true" /> Contact stopped</p>
+          <p className="flex items-center gap-2 text-sm font-semibold text-rose-800"><AlertTriangle className="size-4 shrink-0" aria-hidden="true" /> Contact stopped</p>
           <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-[minmax(140px,0.45fr)_minmax(0,1fr)]">
-            <dt className="font-semibold text-zinc-400">Reason</dt>
-            <dd className="text-zinc-100">{readableReason(stop.reason)}</dd>
-            <dt className="font-semibold text-zinc-400">Owner note</dt>
-            <dd className="whitespace-pre-wrap break-words text-zinc-200">{stop.note}</dd>
-            <dt className="font-semibold text-zinc-400">Recorded</dt>
-            <dd className="text-zinc-300"><time dateTime={stop.createdAt}>{formatDateTime(stop.createdAt)}</time></dd>
+            <dt className="font-semibold text-[#617367]">Reason</dt>
+            <dd className="text-[#263b2d]">{readableReason(stop.reason)}</dd>
+            <dt className="font-semibold text-[#617367]">Owner note</dt>
+            <dd className="whitespace-pre-wrap break-words text-[#405347]">{stop.note}</dd>
+            <dt className="font-semibold text-[#617367]">Recorded</dt>
+            <dd className="text-[#53645b]"><time dateTime={stop.createdAt}>{formatDateTime(stop.createdAt)}</time></dd>
           </dl>
         </div>
       ) : (
         <form onSubmit={submitStop} className="grid gap-4 px-4 py-4 sm:px-5">
-          <p className="text-xs leading-5 text-zinc-300">No owner stop is currently recorded. Choose a reason and leave a note to permanently add a local do-not-contact record.</p>
+          <p className="text-xs leading-5 text-[#45584b]">No owner stop is currently recorded. Choose a reason and leave a note to permanently add a local do-not-contact record.</p>
           <div className="grid gap-3 sm:grid-cols-[minmax(180px,0.55fr)_minmax(0,1fr)] sm:items-start">
-            <label className="grid gap-1.5 text-xs font-semibold text-zinc-300">
+            <label className="grid gap-1.5 text-xs font-semibold text-[#405347]">
               Reason
-              <select value={reason} onChange={(event) => setReason(event.target.value as StopReason | "")} required disabled={pending} className="v2-focus-ring min-h-10 rounded-lg border border-white/[0.1] bg-[#111318] px-3 text-sm text-white">
+              <select value={reason} onChange={(event) => setReason(event.target.value as StopReason | "")} required disabled={pending} className="v2-focus-ring min-h-10 rounded-lg border border-[#d5dfd6] bg-white px-3 text-sm text-[#263b2d] disabled:bg-[#f3f6f3]">
                 <option value="" disabled>Select a reason</option>
                 <option value="OWNER_DECISION">Owner decision</option>
                 <option value="PROSPECT_REQUEST">Prospect requested no contact</option>
                 <option value="OTHER">Other</option>
               </select>
             </label>
-            <label className="grid gap-1.5 text-xs font-semibold text-zinc-300">
+            <label className="grid gap-1.5 text-xs font-semibold text-[#405347]">
               Note
-              <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} required disabled={pending} rows={3} placeholder="Record the context for this contact stop" className="v2-focus-ring min-h-24 resize-y rounded-lg border border-white/[0.1] bg-black/20 px-3 py-2 text-sm font-normal leading-5 text-white placeholder:text-zinc-600" />
+              <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} required disabled={pending} rows={3} placeholder="Record the context for this contact stop" className="v2-focus-ring min-h-24 resize-y rounded-lg border border-[#d5dfd6] bg-white px-3 py-2 text-sm font-normal leading-5 text-[#263b2d] placeholder:text-[#87968b] disabled:bg-[#f3f6f3]" />
             </label>
           </div>
-          <div className="rounded-lg border border-amber-300/20 bg-amber-300/[0.05] px-3 py-2.5 text-xs leading-5 text-amber-100">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-950">
             <p className="font-semibold">This action adds an irreversible local record.</p>
-            <p className="mt-0.5 text-amber-100/80">There is no resume control here. Confirm the reason and note before saving. If a save response is uncertain, retry the unchanged command.</p>
+            <p className="mt-0.5 text-amber-900">There is no resume control here. Confirm the reason and note before saving. If a save response is uncertain, retry the unchanged command.</p>
           </div>
-          <button type="submit" disabled={pending || state !== "ready" || !reason || !note.trim()} className="v2-focus-ring inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-rose-300/25 bg-rose-300/[0.08] px-4 text-xs font-semibold text-rose-100 hover:bg-rose-300/[0.14] disabled:opacity-50 sm:w-fit">
+          <button type="submit" disabled={pending || state !== "ready" || !reason || !note.trim()} className="v2-focus-ring inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-4 text-xs font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-50 sm:w-fit">
             {pending ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" /> : <ShieldAlert className="size-3.5" aria-hidden="true" />}
             {pending ? "Saving contact stop…" : "Record do not contact"}
           </button>

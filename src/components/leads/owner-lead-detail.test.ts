@@ -333,6 +333,24 @@ test("lead dossier renders an owner-first decision, evidence, routes, and factua
   assert.doesNotMatch(html, />Approve</);
 });
 
+test("lead dossier puts owner controls ahead of technical research and keeps research closed", () => {
+  const html = renderToStaticMarkup(createElement(OwnerLeadDetail, {
+    data: fixtureDetail(),
+    ownerControls: createElement("section", { "data-owner-controls": "" }, "Owner action controls"),
+  }));
+
+  const actionPosition = html.indexOf("Owner action controls");
+  const nextStepPosition = html.indexOf("Owner next step");
+  const researchPosition = html.indexOf("Research details");
+  assert.ok(actionPosition > nextStepPosition && actionPosition < researchPosition);
+  assert.ok(researchPosition > -1);
+  assert.match(html, /owner controls above can save a local stop or task, but cannot contact this business or approve outreach/);
+  const disclosureStart = html.lastIndexOf("<details", researchPosition);
+  const disclosureSummary = html.slice(disclosureStart, researchPosition);
+  assert.doesNotMatch(disclosureSummary, /\bopen(?:="")?(?:\s|>)/);
+  assert.match(html.slice(researchPosition), /Evidence and decision history/);
+});
+
 test("lead dossier explains that an unqualified review record needs qualification", () => {
   const base = fixtureDetail();
   const html = renderToStaticMarkup(createElement(OwnerLeadDetail, {
@@ -452,7 +470,7 @@ test("unavailable and not-found dossier states remain plain-language and fail cl
   assert.match(unavailable, /Could not verify/);
   assert.match(unavailable, /No fallback data is shown/);
   assert.match(unavailable, /read failure does not stop live automation/i);
-  assert.match(missing, /Lead dossier not found/);
+  assert.match(missing, /Business details not found/);
   assert.match(missing, /Legacy or incomplete data is not promoted/);
-  assert.match(missing, /Return to ranked leads/);
+  assert.match(missing, /Return to businesses/);
 });

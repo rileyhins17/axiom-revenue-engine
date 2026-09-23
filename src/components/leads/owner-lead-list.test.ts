@@ -167,7 +167,8 @@ test("owner lead list presents plain business details and keeps ranking details 
   assert.match(html, /href="\/leads\/evaluation"/);
   assert.match(html, /Read-only · no outreach permission/);
   assert.match(html, /href="\/leads\/m2\/identity"/);
-  assert.match(html, /Review 10 businesses/);
+  assert.match(html, /Review 10 proposed businesses/);
+  assert.match(html, />1 assessed business<\/p>/);
   assert.match(html, /How business records are assessed/);
   assert.doesNotMatch(html, />Send</);
   assert.doesNotMatch(html, />Approve</);
