@@ -89,6 +89,8 @@ const privateKwSourceWorkflowProgress = await readFile(new URL("../src/lib/reven
 const privateKwSourceWorkflowProgressCli = await readFile(new URL("./prepare-private-kw-source-workflow-progress.ts", import.meta.url), "utf8");
 const privateKwOwnerLabelingPrepareCli = await readFile(new URL("./prepare-private-kw-owner-labeling.ts", import.meta.url), "utf8");
 const privateKwOwnerLabelingRecordCli = await readFile(new URL("./record-private-kw-owner-labels.ts", import.meta.url), "utf8");
+const privateKwOwnerLabelingSplitCli = await readFile(new URL("./split-private-kw-owner-labeling.ts", import.meta.url), "utf8");
+const privateKwOwnerLabelingBlind = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-blind.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceEligibilityD1 = await readFile(new URL("../src/lib/revenue-engine/private-kw-current-website-evidence-eligibility-d1.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceProgress = await readFile(new URL("../src/lib/revenue-engine/private-kw-current-website-evidence-progress.ts", import.meta.url), "utf8");
 const privateKwWebsiteEvidenceProgressAppend = await readFile(new URL("../src/lib/revenue-engine/private-kw-current-website-evidence-progress-append.ts", import.meta.url), "utf8");
@@ -105,6 +107,7 @@ const privateKwWebsiteEvidenceEligibilityMigration = await readFile(new URL("../
 const ownerLabelingWorkspace = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-workspace.ts", import.meta.url), "utf8");
 const ownerLabelingUpload = await readFile(new URL("../src/lib/revenue-engine/owner-labeling-upload.ts", import.meta.url), "utf8");
 const ownerLabelingRoute = await readFile(new URL("../src/app/api/v1/leads/evaluation/validate/route.ts", import.meta.url), "utf8");
+const ownerLabelingRevealRoute = await readFile(new URL("../src/app/api/v1/leads/evaluation/reveal/route.ts", import.meta.url), "utf8");
 const ownerLabelingPage = await readFile(new URL("../src/app/leads/evaluation/page.tsx", import.meta.url), "utf8");
 const ownerLabelingComponent = await readFile(new URL("../src/components/leads/owner-lead-evaluation-workspace.tsx", import.meta.url), "utf8");
 const stagingConsoleRelease = await readFile(new URL("../src/lib/revenue-engine/staging-console-release.ts", import.meta.url), "utf8");
@@ -572,6 +575,13 @@ requireMatch("scripts/persist-private-kw-contacts.ts", privateKwContactInvocatio
 forbidMatch("scripts/persist-private-kw-contacts.ts", privateKwContactInvocationCli, /@cloudflare|env\.[A-Z_]+|D1Database|R2Bucket|fetch\s*\(|wrangler|migrations apply|\.put\s*\(|\.delete\s*\(/i, "reviewed contact persistence must remain local and provider/deployment-free");
 forbidMatch("src/engine/worker.ts", engineWorker, /private-kw-contact-invocation|private-kw-contact-prerequisites|prepare-private-kw-contact-review|persist-private-kw-contacts/, "the inert engine must not wire reviewed local contact invocation to runtime");
 requireMatch("package.json", packageJson, /"kw:prepare-owner-labeling"\s*:\s*"tsx scripts\/prepare-private-kw-owner-labeling\.ts"/, "the ignored-local owner-labeling preparation command must remain explicit");
+requireMatch("package.json", packageJson, /"kw:split-owner-labeling"\s*:\s*"tsx scripts\/split-private-kw-owner-labeling\.ts"/, "owner-labeling blind packet splitting must use the bounded local CLI");
+requireMatch("scripts/split-private-kw-owner-labeling.ts", privateKwOwnerLabelingSplitCli, /--packet[\s\S]*--blind-output[\s\S]*--assessment-output/, "owner-labeling split inputs and outputs must be explicit");
+requireMatch("scripts/split-private-kw-owner-labeling.ts", privateKwOwnerLabelingSplitCli, /assertOutputDoesNotExist[\s\S]*writePrivateKwJson/, "owner-labeling split outputs must fail closed when already present and use exclusive private-file creation");
+forbidMatch("scripts/split-private-kw-owner-labeling.ts", privateKwOwnerLabelingSplitCli, /wrangler|--remote|\bdeploy\b|fetch\s*\(|better-sqlite3|D1Database|R2Bucket|process\.env/i, "owner-labeling split CLI must remain local-file-only with no database, provider, network, or Cloudflare authority");
+requireMatch("src/lib/revenue-engine/owner-labeling-blind.ts", privateKwOwnerLabelingBlind, /BlindClaimSchema[\s\S]*observation[\s\S]*sourceUrl[\s\S]*method[\s\S]*confidence/, "blind dossiers must retain source-linked factual observations only");
+requireMatch("src/lib/revenue-engine/owner-labeling-blind.ts", privateKwOwnerLabelingBlind, /fullPacketDigest[\s\S]*blindDigest[\s\S]*rejoinOwnerLabelingPacket/, "blind review and assessment sidecar must be digest-linked before exact packet rejoin");
+forbidMatch("src/lib/revenue-engine/owner-labeling-blind.ts", privateKwOwnerLabelingBlind, /D1Database|R2Bucket|better-sqlite3|@cloudflare|fetch\s*\(|process\.env/i, "blind packet splitting must remain independent of providers, databases, Cloudflare, and runtime environment authority");
 requireMatch("package.json", packageJson, /"kw:record-owner-labels"\s*:\s*"tsx scripts\/record-private-kw-owner-labels\.ts"/, "the immutable owner-label checkpoint command must remain explicit");
 for (const field of ["databaseMutationAuthorized", "sourceMutationAuthorized", "assessmentMutationAuthorized", "qualificationAuthorized", "consentDecisionAuthorized", "outreachAuthorized", "sendAuthorized"]) {
   requireMatch("src/lib/revenue-engine/private-kw-owner-labeling.ts", privateKwOwnerLabeling, new RegExp(`${field}:\\s*z\\.literal\\(false\\)`), `${field} must remain false in owner-labeling contracts`);
@@ -603,10 +613,17 @@ requireMatch("src/app/api/v1/leads/evaluation/validate/route.ts", ownerLabelingR
 requireMatch("src/app/api/v1/leads/evaluation/validate/route.ts", ownerLabelingRoute, /readOwnerLabelingPacketRequest\(request\)/, "owner checkpoint validation must enforce the bounded upload parser");
 requireMatch("src/app/api/v1/leads/evaluation/validate/route.ts", ownerLabelingRoute, /private, no-store/, "owner checkpoint validation responses must not be cached publicly");
 forbidMatch("src/app/api/v1/leads/evaluation/validate/route.ts", ownerLabelingRoute, /getDatabase|D1Database|R2Bucket|\.run\s*\(|\.put\s*\(|\.delete\s*\(|export async function (?:GET|PUT|PATCH|DELETE)/, "owner checkpoint validation must not read or mutate a database, artifact store, or expose another method");
+requireMatch("src/app/api/v1/leads/evaluation/reveal/route.ts", ownerLabelingRevealRoute, /requireApiSession\(request\)/, "owner assessment reveal must require an authenticated session");
+requireMatch("src/app/api/v1/leads/evaluation/reveal/route.ts", ownerLabelingRevealRoute, /export async function POST\(request:\s*Request\)/, "owner assessment reveal must remain one explicit POST");
+requireMatch("src/app/api/v1/leads/evaluation/reveal/route.ts", ownerLabelingRevealRoute, /readOwnerLabelingPacketRequest\(request,\s*OWNER_LABELING_REVEAL_MAX_BYTES\)/, "owner assessment reveal must enforce the bounded combined-upload parser");
+requireMatch("src/app/api/v1/leads/evaluation/reveal/route.ts", ownerLabelingRevealRoute, /validateOwnerFirstPassForReveal\(/, "owner assessment reveal must validate the completed first-pass export");
+requireMatch("src/app/api/v1/leads/evaluation/reveal/route.ts", ownerLabelingRevealRoute, /private, no-store/, "owner assessment reveal responses must not be cached publicly");
+forbidMatch("src/app/api/v1/leads/evaluation/reveal/route.ts", ownerLabelingRevealRoute, /getDatabase|D1Database|R2Bucket|\.run\s*\(|\.put\s*\(|\.delete\s*\(|export async function (?:GET|PUT|PATCH|DELETE)/, "owner assessment reveal must not read or mutate a database, artifact store, or expose another method");
 requireMatch("src/app/leads/evaluation/page.tsx", ownerLabelingPage, /await requireSession\(\)/, "the Quality Lab page must require an authenticated session");
 forbidMatch("src/app/leads/evaluation/page.tsx", ownerLabelingPage, /getDatabase|fetch\s*\(|export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(/, "the Quality Lab page must not read a database, self-fetch, or expose write methods");
 requireMatch("src/components/leads/owner-lead-evaluation-workspace.tsx", ownerLabelingComponent, /fetch\("\/api\/v1\/leads\/evaluation\/validate"/, "the Quality Lab may call only its authenticated same-origin validation route");
-if ((ownerLabelingComponent.match(/fetch\s*\(/g) || []).length !== 1) failures.push("src/components/leads/owner-lead-evaluation-workspace.tsx: exactly one same-origin validation fetch is allowed");
+requireMatch("src/components/leads/owner-lead-evaluation-workspace.tsx", ownerLabelingComponent, /fetch\("\/api\/v1\/leads\/evaluation\/reveal"/, "the Quality Lab may reveal assessments only through its authenticated same-origin reveal route");
+if ((ownerLabelingComponent.match(/fetch\s*\(/g) || []).length !== 2) failures.push("src/components/leads/owner-lead-evaluation-workspace.tsx: exactly two same-origin Quality Lab fetches are allowed for validation and post-first-pass reveal");
 requireMatch("src/components/leads/owner-lead-evaluation-workspace.tsx", ownerLabelingComponent, /Review only · no outreach/, "the Quality Lab must state its review-only authority");
 forbidMatch("src/components/leads/owner-lead-evaluation-workspace.tsx", ownerLabelingComponent, /mailto:|tel:|\/api\/outreach|\/api\/send|\.prepare\s*\(|\.run\s*\(|\.put\s*\(|\.delete\s*\(/, "the Quality Lab must not expose contact actions, mutation endpoints, or storage writes");
 forbidMatch("src/engine/worker.ts", engineWorker, /owner-labeling-workspace|owner-labeling-upload|leads\/evaluation/, "the inert engine must not wire the owner Quality Lab to runtime execution");

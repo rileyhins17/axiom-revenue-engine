@@ -138,21 +138,37 @@ provider, or spend. It refuses to begin review with fewer or more than the fixed
 50 businesses, or when even one current exact assessment is missing, so later
 cohort growth cannot invalidate completed labels.
 
-Riley can review any convenient batch instead of finishing all 50 in one sitting.
-The authenticated Quality Lab at `/leads/evaluation` now provides a two-pass
-owner workflow in source. Load the exact prepared checkpoint, inspect the
-business and URL-backed observations, then choose **Strong**, **Weak**, or
-**Wrong** with at least one reason before revealing the engine's label and five
-scores for that business. Record a final judgment after the reveal and download
-`owner-reviews.json`. The export keeps both first-pass and final judgments; the
-existing checkpoint recorder carries the final judgment into the next packet.
-First-pass history therefore remains in the exported file and is not yet in the
-next packet. Drafts stay in that browser and are restored only for the exact
-same packet digest and business IDs. The visible workflow is blind before the
-first pass, but the current validation response still includes the engine
-assessment in browser data; a server-side blind boundary remains future work.
-The screen has no database or provider binding and cannot change qualification,
-assess consent, contact anyone, send, deploy, or spend.
+Before opening Quality Lab, split this full checkpoint into two linked files:
+
+```powershell
+npm run kw:split-owner-labeling -- --packet data/kw-evaluation/owner-labeling.json --blind-output data/kw-evaluation/owner-labeling-blind.json --assessment-output data/kw-evaluation/owner-labeling-assessments.json
+```
+
+The blind file contains 50 evidence dossiers without the engine's verdict,
+scores, aggregate agreement, audit classification, severity, or conversion
+priority cues. The assessment file holds those fields separately. The split is
+local, refuses to overwrite either output, and preserves the original full
+checkpoint for later recording. Keep all three files private.
+
+Riley can pause and resume in the same browser while judging the full set. The
+authenticated Quality Lab at `/leads/evaluation` accepts only the **blind**
+file first. It displays each business and URL-backed observation without sending
+engine assessments to the browser. Choose **Strong**, **Weak**, or **Wrong**
+with at least one matching reason for every unreviewed business, then download
+the complete first-pass file. Only after that export can Riley load the matching
+assessment file. The app checks the exact cohort, packet digests, policy, and
+shown evidence before revealing the engine's verdict, scores, and aggregate
+agreement. Riley can then record final judgments and download final reviews in
+smaller batches. The final review export retains each corresponding first-pass
+judgment; the checkpoint recorder carries final judgments into the next packet.
+The separately downloaded all-case first-pass file is the private audit record.
+Drafts stay in the browser and restore only for the exact packet digest and
+business IDs; scores and the assessment file are not stored there. Reloading
+requires reloading the blind file and, after the saved first-pass export, the
+assessment file. This is a procedural blind review: someone who deliberately
+opens the separate assessment file early can still see it. The screen has no
+database or outside-provider binding and cannot change qualification, assess
+consent, contact anyone, send, deploy, or spend.
 
 Record the downloaded batch as a new checkpoint with:
 
@@ -170,10 +186,10 @@ to staging.
 
 ## What Riley will do
 
-For each business, the app first shows the website capture and source-backed
-observations while hiding the engine verdict and scores in the interface. Riley
-chooses a first-pass label, then compares it with the engine and records a final
-label:
+For each business, the app first shows source-backed website observations in
+the blind dossier. Riley labels all unreviewed businesses before loading the
+separate engine assessment file, then compares each first-pass judgment with the
+engine and records a final label:
 
 - `Strong` — Axiom should seriously consider contacting this business.
 - `Weak` — it is a real business, but the opportunity is not good enough.

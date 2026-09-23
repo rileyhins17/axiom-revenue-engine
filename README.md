@@ -17,6 +17,14 @@ The checkpoint is synthetic, offline, and disconnected from providers, network a
 
 Start with [STATUS](docs/STATUS.md) for the verified commit, current artifacts, test evidence and blockers. The local setup command, `npm run kw:prepare-m2-database -- <recorded-release-path>`, defaults to preflight. Applying 0069 requires explicit `--apply` and a current recorded setup release; recovery requires a separate recorded rollback release. Follow the [runbook](docs/RUNBOOK.md#m2-local-database-setup-and-recovery). The assessment command, `npm run kw:assess-m2-html -- <run.json> <business-id>`, prepares a separate owner decision from already captured HTML evidence. Its execution and durable verification modes are documented in the [HTML assessment runbook](docs/RUNBOOK.md#m2-local-html-assessment-and-restart). This path produces a private JSON owner dossier with HTML limitations and no contact authority. Production, staging, provider, contact, outreach and spend state remain unknown or off. M2's real one-then-ten evaluation and subsequent milestones are still incomplete.
 
+The local Quality Lab now takes a **blind dossier file** first and a separate
+**engine assessment file** only after the owner has judged and downloaded a
+first pass for all 50 businesses. The local `kw:split-owner-labeling` command
+derives both from the existing immutable checkpoint; the original is still used
+to record final review batches. This closes the browser-payload score leak in
+the synthetic owner workflow, but 50 real M3 dossiers and owner judgments have
+not been completed. See the [owner-labeling runbook](docs/RUNBOOK.md#resumable-kw-owner-labelling-checkpoint).
+
 Preparing a current M2 capture packet requires `--review-policy` with explicit
 dates and the ten source-policy decisions. See the [preparation runbook](docs/RUNBOOK.md#m2-research-scope-and-current-authorization-preparation).
 Preparation cannot approve the packet or infer source rights from a public URL.

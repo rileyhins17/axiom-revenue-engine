@@ -13,6 +13,7 @@ import {
 } from "@/lib/revenue-engine/owner-labeling-workspace";
 import {
   OWNER_LABELING_UPLOAD_MAX_BYTES,
+  OWNER_LABELING_REVEAL_MAX_BYTES,
   OwnerLabelingUploadError,
   readOwnerLabelingPacketRequest,
   validateOwnerLabelingPacketUpload,
@@ -212,6 +213,20 @@ test("packet request parsing is bounded, JSON-only, and produces no side effects
       headers: { "Content-Type": "application/json", "Content-Length": String(OWNER_LABELING_UPLOAD_MAX_BYTES + 1) },
       body: "{}",
     })),
+    (error: unknown) => error instanceof OwnerLabelingUploadError && error.status === 413,
+  );
+  const combined = new Request("https://revenue.getaxiom.ca/api/v1/leads/evaluation/reveal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Content-Length": String(OWNER_LABELING_UPLOAD_MAX_BYTES + 1) },
+    body: "{}",
+  });
+  assert.deepEqual(await readOwnerLabelingPacketRequest(combined, OWNER_LABELING_REVEAL_MAX_BYTES), {});
+  await assert.rejects(
+    readOwnerLabelingPacketRequest(new Request("https://revenue.getaxiom.ca/api/v1/leads/evaluation/reveal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": String(OWNER_LABELING_REVEAL_MAX_BYTES + 1) },
+      body: "{}",
+    }), OWNER_LABELING_REVEAL_MAX_BYTES),
     (error: unknown) => error instanceof OwnerLabelingUploadError && error.status === 413,
   );
   await assert.rejects(

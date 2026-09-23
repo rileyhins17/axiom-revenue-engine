@@ -20,6 +20,12 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Textarea } from "@/components/ui/textarea";
+import type { BlindOwnerLabelingPacket } from "@/lib/revenue-engine/owner-labeling-blind";
+import {
+  BlindOwnerLabelingWorkspaceResponseSchema,
+  type BlindOwnerLabelingWorkspaceResponse,
+} from "@/lib/revenue-engine/owner-labeling-blind-workspace";
+import { buildOwnerFirstPassExport } from "@/lib/revenue-engine/owner-labeling-first-pass";
 import {
   OWNER_LABELING_DRAFT_VERSION,
   OWNER_LABEL_OPTIONS,
@@ -71,8 +77,11 @@ function storageKey(packetDigest: string) {
 
 export function OwnerLeadEvaluationWorkspace() {
   const [clientReady, setClientReady] = React.useState(false);
-  const [workspace, setWorkspace] = React.useState<OwnerLabelingWorkspaceResponse | null>(null);
+  const [workspace, setWorkspace] = React.useState<BlindOwnerLabelingWorkspaceResponse | null>(null);
+  const [blindPacket, setBlindPacket] = React.useState<BlindOwnerLabelingPacket | null>(null);
+  const [revealedWorkspace, setRevealedWorkspace] = React.useState<OwnerLabelingWorkspaceResponse | null>(null);
   const [firstPassDecisions, setFirstPassDecisions] = React.useState<DecisionMap>({});
+  const [firstPassExportedAt, setFirstPassExportedAt] = React.useState<string | null>(null);
   const [decisions, setDecisions] = React.useState<DecisionMap>({});
   const [revealedLeadIds, setRevealedLeadIds] = React.useState<string[]>([]);
   const [legacyRevealedLeadIds, setLegacyRevealedLeadIds] = React.useState<string[]>([]);
@@ -81,6 +90,7 @@ export function OwnerLeadEvaluationWorkspace() {
   const [loading, setLoading] = React.useState(false);
   const [message, setMessage] = React.useState<{ tone: "error" | "success"; text: string } | null>(null);
   const fileInput = React.useRef<HTMLInputElement>(null);
+  const assessmentInput = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     setClientReady(true);
@@ -94,6 +104,7 @@ export function OwnerLeadEvaluationWorkspace() {
         packetDigest: workspace.packetDigest,
         reviewedBy,
         firstPassDecisions,
+        ...(firstPassExportedAt ? { firstPassExportedAt } : {}),
         revealedLeadIds,
         legacyRevealedLeadIds,
         decisions,
@@ -101,10 +112,12 @@ export function OwnerLeadEvaluationWorkspace() {
     } catch {
       // The export remains available even when browser storage is blocked.
     }
-  }, [decisions, firstPassDecisions, legacyRevealedLeadIds, reviewedBy, revealedLeadIds, workspace]);
+  }, [decisions, firstPassDecisions, firstPassExportedAt, legacyRevealedLeadIds, reviewedBy, revealedLeadIds, workspace]);
 
   const unreviewed = workspace?.entries.filter((entry) => entry.ownerReview.label === "UNREVIEWED") ?? [];
   const completedDrafts = unreviewed.filter((entry) => isCompleteOwnerLabelingDecision(decisions[entry.leadId]));
+  const firstPassComplete = unreviewed.filter((entry) => isCompleteOwnerLabelingDecision(firstPassDecisions[entry.leadId]));
+  const firstPassRemaining = unreviewed.length - firstPassComplete.length;
   const incompleteDrafts = unreviewed.filter((entry) => {
     const firstPass = firstPassDecisions[entry.leadId];
     const decision = decisions[entry.leadId];
@@ -115,7 +128,10 @@ export function OwnerLeadEvaluationWorkspace() {
     ?? unreviewed[0]
     ?? workspace?.entries[0]
     ?? null;
-  const currentRevealed = currentEntry ? revealedLeadIds.includes(currentEntry.leadId) || currentEntry.ownerReview.label !== "UNREVIEWED" : false;
+  const currentRevealed = Boolean(revealedWorkspace && currentEntry && (
+    revealedLeadIds.includes(currentEntry.leadId) || currentEntry.ownerReview.label !== "UNREVIEWED"
+  ));
+  const currentAssessment = revealedWorkspace?.entries.find((entry) => entry.leadId === currentEntry?.leadId)?.engineAssessment;
   const currentFirstPass = currentEntry ? firstPassDecisions[currentEntry.leadId] ?? EMPTY_DECISION : EMPTY_DECISION;
   const currentDecision = currentEntry ? decisions[currentEntry.leadId] ?? EMPTY_DECISION : EMPTY_DECISION;
   const reviewPhase = currentRevealed ? "final" : "first-pass";
@@ -125,9 +141,10 @@ export function OwnerLeadEvaluationWorkspace() {
   const updateCurrent = React.useCallback((next: OwnerLabelingDraftDecision, phase: "first-pass" | "final") => {
     if (!currentEntry || currentEntry.ownerReview.label !== "UNREVIEWED") return;
     if (phase === "final" && !revealedLeadIds.includes(currentEntry.leadId)) return;
+    if (phase === "first-pass" && firstPassExportedAt) return;
     (phase === "first-pass" ? setFirstPassDecisions : setDecisions)((current) => ({ ...current, [currentEntry.leadId]: next }));
     setMessage(null);
-  }, [currentEntry, revealedLeadIds]);
+  }, [currentEntry, firstPassExportedAt, revealedLeadIds]);
 
   const chooseLabel = (label: OwnerWorkspaceLabel, phase: "first-pass" | "final") => {
     const active = phase === "first-pass" ? currentFirstPass : currentDecision;
@@ -144,15 +161,15 @@ export function OwnerLeadEvaluationWorkspace() {
   };
 
   const revealCurrent = () => {
-    if (!currentEntry || !isCompleteOwnerLabelingDecision(currentFirstPass)) return;
+    if (!revealedWorkspace || !currentEntry || !isCompleteOwnerLabelingDecision(currentFirstPass)) return;
     setRevealedLeadIds((current) => current.includes(currentEntry.leadId) ? current : [...current, currentEntry.leadId]);
-    setMessage({ tone: "success", text: "First-pass judgment saved. The engine verdict and scores are now revealed for this business." });
+    setMessage({ tone: "success", text: "The engine verdict and scores are now visible for this business." });
   };
 
   const loadPacket = async (file: File) => {
     setMessage(null);
     if (!file.name.toLowerCase().endsWith(".json")) {
-      setMessage({ tone: "error", text: "Choose the JSON checkpoint prepared by the Revenue Engine." });
+      setMessage({ tone: "error", text: "Choose the blind dossier JSON file prepared by the Revenue Engine." });
       return;
     }
     if (file.size > MAX_PACKET_BYTES) {
@@ -174,7 +191,7 @@ export function OwnerLeadEvaluationWorkspace() {
           : "The checkpoint could not be verified.";
         throw new Error(error);
       }
-      const verified = OwnerLabelingWorkspaceResponseSchema.parse(responseBody);
+      const verified = BlindOwnerLabelingWorkspaceResponseSchema.parse(responseBody);
       const leadIds = new Set(verified.entries.map((entry) => entry.leadId));
       let saved = null;
       try {
@@ -184,7 +201,10 @@ export function OwnerLeadEvaluationWorkspace() {
         saved = null;
       }
       setWorkspace(verified);
+      setBlindPacket(parsed as BlindOwnerLabelingPacket);
+      setRevealedWorkspace(null);
       setFirstPassDecisions(saved?.firstPassDecisions ?? {});
+      setFirstPassExportedAt(saved?.firstPassExportedAt ?? null);
       setDecisions(saved?.decisions ?? {});
       setRevealedLeadIds(saved?.revealedLeadIds ?? []);
       setLegacyRevealedLeadIds(saved?.legacyRevealedLeadIds ?? []);
@@ -192,11 +212,14 @@ export function OwnerLeadEvaluationWorkspace() {
       setSelectedLeadId(verified.entries.find((entry) => entry.ownerReview.label === "UNREVIEWED")?.leadId ?? verified.entries[0]?.leadId ?? null);
       setMessage({
         tone: "success",
-        text: saved ? "Verified the exact checkpoint and restored this browser's draft." : "Verified the exact 50-business checkpoint. No outreach was enabled.",
+        text: saved ? "Verified the blind dossiers and restored this browser's first-pass draft." : "Verified the exact 50 blind dossiers. No outreach was enabled.",
       });
     } catch (error) {
       setWorkspace(null);
+      setBlindPacket(null);
+      setRevealedWorkspace(null);
       setFirstPassDecisions({});
+      setFirstPassExportedAt(null);
       setDecisions({});
       setRevealedLeadIds([]);
       setLegacyRevealedLeadIds([]);
@@ -208,8 +231,78 @@ export function OwnerLeadEvaluationWorkspace() {
     }
   };
 
+  const downloadFirstPass = () => {
+    if (!workspace || firstPassRemaining > 0) return;
+    try {
+      const exported = buildOwnerFirstPassExport({
+        packetId: workspace.packetId,
+        packetDigest: workspace.packetDigest,
+        blindDigest: workspace.blindDigest,
+        entries: workspace.entries,
+        decisions: firstPassDecisions,
+        reviewedBy,
+        reviewedAt: new Date().toISOString(),
+      });
+      const blob = new Blob([`${JSON.stringify(exported, null, 2)}\n`], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `owner-first-pass-${workspace.blindDigest.slice(0, 12)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setFirstPassExportedAt(exported.reviewedAt);
+      setMessage({ tone: "success", text: "First-pass judgments downloaded. Keep that private file, then load the matching assessment file." });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "The first-pass judgments could not be exported." });
+    }
+  };
+
+  const loadAssessments = async (file: File) => {
+    if (!workspace || !blindPacket || !firstPassExportedAt || firstPassRemaining > 0) return;
+    setMessage(null);
+    if (!file.name.toLowerCase().endsWith(".json") || file.size > MAX_PACKET_BYTES) {
+      setMessage({ tone: "error", text: "Choose the matching assessment JSON file, up to 10 MB." });
+      return;
+    }
+    setLoading(true);
+    try {
+      const firstPassExport = buildOwnerFirstPassExport({
+        packetId: workspace.packetId,
+        packetDigest: workspace.packetDigest,
+        blindDigest: workspace.blindDigest,
+        entries: workspace.entries,
+        decisions: firstPassDecisions,
+        reviewedBy,
+        reviewedAt: firstPassExportedAt,
+      });
+      const assessmentSidecar = JSON.parse(await file.text()) as unknown;
+      const response = await fetch("/api/v1/leads/evaluation/reveal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blindPacket, assessmentSidecar, firstPassExport }),
+      });
+      const responseBody = await response.json() as unknown;
+      if (!response.ok) {
+        throw new Error(responseBody && typeof responseBody === "object" && "error" in responseBody
+          ? String(responseBody.error) : "The assessment file could not be verified.");
+      }
+      const verified = OwnerLabelingWorkspaceResponseSchema.parse(responseBody);
+      if (verified.packetId !== workspace.packetId || verified.packetDigest !== workspace.packetDigest) {
+        throw new Error("The assessment file does not match the blind dossiers.");
+      }
+      setRevealedWorkspace(verified);
+      setMessage({ tone: "success", text: "Assessment file matched. You can now compare your first-pass judgment with the engine, then record a final judgment." });
+    } catch (error) {
+      setRevealedWorkspace(null);
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "The assessment file could not be verified." });
+    } finally {
+      setLoading(false);
+      if (assessmentInput.current) assessmentInput.current.value = "";
+    }
+  };
+
   const downloadSubmission = () => {
-    if (!workspace) return;
+    if (!workspace || !revealedWorkspace) return;
     if (incompleteDrafts.length > 0) {
       setMessage({ tone: "error", text: `Finish the label and reason for ${incompleteDrafts.length} started review${incompleteDrafts.length === 1 ? "" : "s"} before exporting.` });
       return;
@@ -247,7 +340,10 @@ export function OwnerLeadEvaluationWorkspace() {
 
   const resetPacket = () => {
     setWorkspace(null);
+    setBlindPacket(null);
+    setRevealedWorkspace(null);
     setFirstPassDecisions({});
+    setFirstPassExportedAt(null);
     setDecisions({});
     setRevealedLeadIds([]);
     setLegacyRevealedLeadIds([]);
@@ -255,7 +351,7 @@ export function OwnerLeadEvaluationWorkspace() {
     setMessage(null);
   };
 
-  const totalReviewed = (workspace?.summary.reviewed ?? 0) + completedDrafts.length;
+  const totalReviewed = (workspace?.summary.reviewed ?? 0) + (revealedWorkspace ? completedDrafts.length : firstPassComplete.length);
 
   return (
     <div
@@ -265,7 +361,7 @@ export function OwnerLeadEvaluationWorkspace() {
       <PageHeader
         eyebrow="Lead quality calibration"
         title="Quality Lab"
-        description="Teach the engine what Axiom considers a genuinely worthwhile business. Review the evidence, choose one plain-language verdict, and export an immutable checkpoint."
+        description="Judge the evidence for all 50 businesses first. Then load the separate engine assessments, compare your calls, and export the final review."
         icon={Scale}
         status={
           <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/20 bg-amber-300/[0.07] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-100">
@@ -279,9 +375,9 @@ export function OwnerLeadEvaluationWorkspace() {
           </Button>
         }
         metrics={workspace ? [
-          { label: "Reviewed", value: `${totalReviewed}/50`, detail: "saved + draft", tone: "positive" },
-          { label: "This export", value: completedDrafts.length, detail: "complete decisions", tone: "info" },
-          { label: "Agreement", value: `${workspace.summary.agreementPercent}%`, detail: "recorded baseline", tone: "default" },
+          { label: revealedWorkspace ? "Final reviews" : "First pass", value: `${totalReviewed}/50`, detail: "saved + draft", tone: "positive" },
+          { label: "Next step", value: revealedWorkspace ? "Compare" : firstPassExportedAt ? "Load scores" : "Judge all 50", detail: "one step at a time", tone: "info" },
+          { label: "Engine", value: revealedWorkspace ? `${revealedWorkspace.summary.agreementPercent}%` : "Hidden", detail: revealedWorkspace ? "recorded agreement" : "separate file", tone: "default" },
         ] : [
           { label: "Required set", value: "50", detail: "fixed businesses", tone: "info" },
           { label: "Current file", value: "None", detail: "load checkpoint", tone: "warning" },
@@ -295,10 +391,23 @@ export function OwnerLeadEvaluationWorkspace() {
         accept="application/json,.json"
         disabled={!clientReady || loading}
         className="sr-only"
-        aria-label="Choose owner-review checkpoint"
+        aria-label="Choose blind owner-review dossiers"
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
           if (file) void loadPacket(file);
+        }}
+      />
+
+      <input
+        ref={assessmentInput}
+        type="file"
+        accept="application/json,.json"
+        disabled={!workspace || !firstPassExportedAt || firstPassRemaining > 0 || loading}
+        className="sr-only"
+        aria-label="Choose matching engine assessments"
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          if (file) void loadAssessments(file);
         }}
       />
 
@@ -322,19 +431,39 @@ export function OwnerLeadEvaluationWorkspace() {
             <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.07]">
               <FileCheck2 className="size-6 text-emerald-300" aria-hidden="true" />
             </div>
-            <h2 id="quality-lab-start" className="mt-5 text-xl font-semibold tracking-tight text-white">Load the exact 50-business review checkpoint</h2>
+            <h2 id="quality-lab-start" className="mt-5 text-xl font-semibold tracking-tight text-white">Load the 50 blind business dossiers</h2>
             <p className="mt-2 text-sm leading-6 text-zinc-400">
-              Codex prepares this private file after every business has current website evidence and an exact assessment. The app verifies the complete file before showing a single decision.
+              Codex prepares a private evidence file and a separate assessment file. Start with the evidence file so the engine&apos;s judgment cannot influence your first pass.
             </p>
             <Button className="mt-6 min-h-11" disabled={!clientReady || loading} onClick={() => fileInput.current?.click()}>
-              <FileUp aria-hidden="true" />{!clientReady ? "Starting Quality Lab…" : loading ? "Verifying checkpoint…" : "Choose checkpoint file"}
+              <FileUp aria-hidden="true" />{!clientReady ? "Starting Quality Lab…" : loading ? "Verifying dossiers…" : "Choose evidence file"}
             </Button>
             <p className="mt-4 text-[11px] leading-5 text-zinc-600">
-              Nothing is uploaded to a provider or written to the database. This screen cannot qualify, contact, or send to anyone.
+              Files are checked by this private app, with no database write or outside provider call. This screen cannot contact or send to anyone.
             </p>
           </div>
         </section>
       ) : currentEntry ? (
+        <>
+        <section className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-[#0e1014] p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="Quality Lab review step">
+          <div>
+            <p className="text-sm font-semibold text-white">{revealedWorkspace ? "Compare and finalize" : firstPassExportedAt ? "First pass saved" : "Judge every business before scores"}</p>
+            <p className="mt-1 text-xs leading-5 text-zinc-400">{revealedWorkspace
+              ? "Open each engine verdict, then save your final judgment."
+              : firstPassExportedAt
+                ? "Now load the matching assessment file to compare your calls."
+                : `${firstPassComplete.length} of ${unreviewed.length} new judgments complete. The engine file stays closed until you export this first pass.`}</p>
+          </div>
+          {!firstPassExportedAt ? (
+            <Button className="min-h-11 shrink-0" disabled={firstPassRemaining > 0 || loading} onClick={downloadFirstPass}>
+              <Download aria-hidden="true" />Download first pass
+            </Button>
+          ) : !revealedWorkspace ? (
+            <Button className="min-h-11 shrink-0" disabled={loading} onClick={() => assessmentInput.current?.click()}>
+              <FileUp aria-hidden="true" />{loading ? "Checking assessments…" : "Choose assessment file"}
+            </Button>
+          ) : null}
+        </section>
         <div className="grid min-h-[640px] gap-4 xl:grid-cols-[310px_minmax(0,1fr)]">
           <aside className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0e1014]" aria-label="Evaluation businesses">
             <div className="border-b border-white/[0.07] p-4">
@@ -354,7 +483,7 @@ export function OwnerLeadEvaluationWorkspace() {
             </div>
             <ol className="max-h-[600px] overflow-y-auto p-2" aria-label="Businesses in the fixed evaluation set">
               {workspace.entries.map((entry, index) => {
-                const draft = decisions[entry.leadId];
+                const draft = revealedWorkspace ? decisions[entry.leadId] : firstPassDecisions[entry.leadId];
                 const locked = entry.ownerReview.label !== "UNREVIEWED";
                 const complete = isCompleteOwnerLabelingDecision(draft);
                 const active = entry.leadId === currentEntry.leadId;
@@ -388,10 +517,10 @@ export function OwnerLeadEvaluationWorkspace() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full border border-white/[0.09] bg-white/[0.03] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Business {currentIndex + 1} of 50</span>
-                    {currentRevealed ? <span className={cn("rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em]", LABEL_TONES[currentEntry.engineAssessment.label])}>Engine says {readable(currentEntry.engineAssessment.label)}</span> : <span className="rounded-full border border-white/[0.09] bg-white/[0.03] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Engine verdict hidden</span>}
+                    {currentRevealed && currentAssessment ? <span className={cn("rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em]", LABEL_TONES[currentAssessment.label])}>Engine says {readable(currentAssessment.label)}</span> : <span className="rounded-full border border-white/[0.09] bg-white/[0.03] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Engine verdict hidden</span>}
                   </div>
                   <h2 id="evaluation-business-name" className="mt-3 text-2xl font-semibold tracking-[-0.035em] text-white">{currentEntry.businessName}</h2>
-                  <p className="mt-1.5 text-sm text-zinc-500">{readable(currentEntry.city)} · {readable(currentEntry.niche)} · {readable(currentEntry.audit.classification)}</p>
+                  <p className="mt-1.5 text-sm text-zinc-500">{readable(currentEntry.city)} · {readable(currentEntry.niche)} · {readable(currentEntry.audit.siteState)}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="icon-sm" onClick={() => move(-1)} disabled={currentIndex <= 0} aria-label="Previous business"><ChevronLeft aria-hidden="true" /></Button>
@@ -402,11 +531,11 @@ export function OwnerLeadEvaluationWorkspace() {
 
             <div className="grid gap-6 p-4 sm:p-6 2xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
               <div className="min-w-0 space-y-6">
-                {currentRevealed ? <section aria-labelledby="quality-scores-heading">
+                {currentRevealed && currentAssessment ? <section aria-labelledby="quality-scores-heading">
                   <h3 id="quality-scores-heading" className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500">Five separate quality scores</h3>
                   <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
                     {SCORE_LABELS.map((score) => {
-                      const value = currentEntry.engineAssessment.scores[score.key];
+                      const value = currentAssessment.scores[score.key];
                       return (
                         <div key={score.key} className="rounded-xl border border-white/[0.07] bg-black/20 px-3 py-3">
                           <dt className="text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-600">{score.label}</dt>
@@ -417,7 +546,7 @@ export function OwnerLeadEvaluationWorkspace() {
                   </dl>
                 </section> : <section className="rounded-xl border border-emerald-300/15 bg-emerald-300/[0.035] p-4" aria-label="Engine verdict hidden">
                   <h3 className="text-sm font-semibold text-emerald-100">Make your first-pass judgment first</h3>
-                  <p className="mt-1 text-xs leading-5 text-zinc-400">The engine verdict and scores stay hidden until you save a label and at least one reason for this exact business.</p>
+                  <p className="mt-1 text-xs leading-5 text-zinc-400">The engine verdict and scores stay in a separate file until the full first pass is exported.</p>
                 </section>}
 
                 <section aria-labelledby="quality-proof-heading">
@@ -433,8 +562,7 @@ export function OwnerLeadEvaluationWorkspace() {
                       {currentEntry.audit.claims.slice(0, 6).map((claim) => (
                         <li key={claim.claimId} className="rounded-xl border border-white/[0.07] bg-white/[0.018] p-3.5">
                           <div className="flex flex-wrap items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.13em]">
-                            <span className={claim.severity === "CRITICAL" ? "text-rose-300" : claim.severity === "IMPORTANT" ? "text-amber-300" : "text-zinc-500"}>{readable(claim.severity)}</span>
-                            {claim.conversionCritical ? <span className="text-emerald-300">Conversion critical</span> : null}
+                            <span className="text-zinc-500">Captured observation</span>
                             <span className="text-zinc-700">{claim.confidence}% confidence</span>
                           </div>
                           <p className="mt-2 text-sm leading-6 text-zinc-300">{claim.observation}</p>
@@ -478,6 +606,7 @@ export function OwnerLeadEvaluationWorkspace() {
                             type="button"
                             key={option.value}
                             aria-pressed={active}
+                            disabled={reviewPhase === "first-pass" && Boolean(firstPassExportedAt)}
                             onClick={() => chooseLabel(option.value, reviewPhase)}
                             className={cn(
                               "v2-focus-ring min-h-14 rounded-xl border px-3 py-2.5 text-left transition-colors",
@@ -497,7 +626,7 @@ export function OwnerLeadEvaluationWorkspace() {
                         <div className="mt-2 space-y-1.5">
                           {OWNER_REASON_OPTIONS[activeDecision.label].map((reason) => (
                             <label key={reason.value} className="flex min-h-10 cursor-pointer items-center gap-3 rounded-lg border border-white/[0.07] bg-white/[0.018] px-3 py-2 text-xs text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200">
-                              <input type="checkbox" checked={activeDecision.reasons.includes(reason.value)} onChange={() => toggleReason(reason.value, reviewPhase)} className="size-4 accent-emerald-400" />
+                              <input type="checkbox" checked={activeDecision.reasons.includes(reason.value)} disabled={reviewPhase === "first-pass" && Boolean(firstPassExportedAt)} onChange={() => toggleReason(reason.value, reviewPhase)} className="size-4 accent-emerald-400" />
                               {reason.label}
                             </label>
                           ))}
@@ -509,12 +638,14 @@ export function OwnerLeadEvaluationWorkspace() {
                     <Textarea
                       id={`owner-note-${reviewPhase}-${currentEntry.leadId}`}
                       value={activeDecision.notes}
+                      disabled={reviewPhase === "first-pass" && Boolean(firstPassExportedAt)}
                       maxLength={500}
                       placeholder={currentRevealed ? "What did the engine miss or get right?" : "What supports your first-pass judgment?"}
                       className="mt-2 min-h-24 border-white/[0.1] bg-black/20 text-zinc-200 placeholder:text-zinc-700"
                       onChange={(event) => updateCurrent({ ...activeDecision, notes: event.currentTarget.value }, reviewPhase)}
                     />
-                    {!currentRevealed ? <Button className="mt-5 min-h-11 w-full" disabled={!isCompleteOwnerLabelingDecision(currentFirstPass)} onClick={revealCurrent}>Save first pass and reveal engine verdict</Button> : null}
+                    {!currentRevealed && revealedWorkspace ? <Button className="mt-5 min-h-11 w-full" disabled={!isCompleteOwnerLabelingDecision(currentFirstPass)} onClick={revealCurrent}>Reveal engine verdict</Button> : null}
+                    {!currentRevealed && !revealedWorkspace && isCompleteOwnerLabelingDecision(currentFirstPass) ? <p className="mt-4 text-xs text-emerald-200">First-pass judgment saved in this browser. Continue through the list.</p> : null}
                   </>
                 )}
 
@@ -523,11 +654,11 @@ export function OwnerLeadEvaluationWorkspace() {
                     <span className="text-xs font-semibold text-zinc-300">Reviewing as</span>
                     <div className="flex rounded-lg border border-white/[0.09] bg-black/20 p-1" role="group" aria-label="Review owner">
                       {(["RILEY", "AIDAN"] as const).map((owner) => (
-                        <button key={owner} type="button" aria-pressed={reviewedBy === owner} onClick={() => setReviewedBy(owner)} className={cn("v2-focus-ring min-h-8 rounded-md px-2.5 text-[10px] font-semibold", reviewedBy === owner ? "bg-white/[0.09] text-white" : "text-zinc-600 hover:text-zinc-300")}>{readable(owner)}</button>
+                        <button key={owner} type="button" aria-pressed={reviewedBy === owner} disabled={Boolean(firstPassExportedAt)} onClick={() => setReviewedBy(owner)} className={cn("v2-focus-ring min-h-8 rounded-md px-2.5 text-[10px] font-semibold", reviewedBy === owner ? "bg-white/[0.09] text-white" : "text-zinc-600 hover:text-zinc-300")}>{readable(owner)}</button>
                       ))}
                     </div>
                   </div>
-                  <Button className="mt-4 min-h-11 w-full" disabled={completedDrafts.length === 0 || incompleteDrafts.length > 0} onClick={downloadSubmission}>
+                  <Button className="mt-4 min-h-11 w-full" disabled={!revealedWorkspace || completedDrafts.length === 0 || incompleteDrafts.length > 0} onClick={downloadSubmission}>
                     <Download aria-hidden="true" />Download {completedDrafts.length || ""} review{completedDrafts.length === 1 ? "" : "s"}
                   </Button>
                   <p className="mt-3 text-center text-[10px] leading-4 text-zinc-600">Creates a private checkpoint file only. No score, database, campaign, or contact action changes here.</p>
@@ -536,6 +667,7 @@ export function OwnerLeadEvaluationWorkspace() {
             </div>
           </main>
         </div>
+        </>
       ) : null}
 
       <div role="note" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">

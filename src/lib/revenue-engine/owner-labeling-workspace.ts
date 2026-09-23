@@ -164,6 +164,7 @@ export const OwnerLabelingDraftSchema = z.object({
   packetDigest: z.string().regex(/^[a-f0-9]{64}$/),
   reviewedBy: z.enum(["RILEY", "AIDAN"]),
   firstPassDecisions: z.record(z.string().trim().min(1).max(128), DraftDecisionSchema),
+  firstPassExportedAt: z.string().datetime({ offset: true }).optional(),
   revealedLeadIds: z.array(z.string().trim().min(1).max(128)).max(50),
   legacyRevealedLeadIds: z.array(z.string().trim().min(1).max(128)).max(50).optional(),
   decisions: z.record(z.string().trim().min(1).max(128), DraftDecisionSchema),

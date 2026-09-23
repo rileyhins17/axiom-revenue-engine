@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import {
   OwnerLabelingUploadError,
   readOwnerLabelingPacketRequest,
-  validateOwnerLabelingPacketUpload,
+  validateOwnerLabelingBlindUpload,
 } from "@/lib/revenue-engine/owner-labeling-upload";
 import { requireApiSession } from "@/lib/session";
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
   try {
     const value = await readOwnerLabelingPacketRequest(request);
-    const workspace = validateOwnerLabelingPacketUpload(value);
+    const workspace = validateOwnerLabelingBlindUpload(value);
     return NextResponse.json(workspace, { headers: PRIVATE_NO_STORE_HEADERS });
   } catch (error) {
     if (error instanceof OwnerLabelingUploadError) {

@@ -32,6 +32,7 @@ import {
 } from "../src/lib/revenue-engine/private-kw-contact-persistence";
 import { qualifyRevenueLead } from "../src/lib/revenue-engine/qualification";
 import { buildCompleteOwnerLabelingPacketFixture } from "../src/lib/revenue-engine/test-support/owner-labeling-fixture";
+import { splitOwnerLabelingPacket } from "../src/lib/revenue-engine/owner-labeling-blind";
 import { auditWebsiteDeterministically } from "../src/lib/revenue-engine/website-audit";
 import { executePrivateKwContactPersistenceForLocalDatabase } from "./private-kw-contact-persistence-executor";
 import { verifyOwnerWarmupStreaming } from "./owner-ui-warmup-streaming.acceptance";
@@ -1150,6 +1151,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
   const diagnostics: BrowserDiagnostic[] = [];
   const drainScriptDiagnostics: Array<() => Promise<void>> = [];
   const ownerLabelingPacket = buildCompleteOwnerLabelingPacketFixture();
+  const ownerLabelingSplit = splitOwnerLabelingPacket(ownerLabelingPacket);
   const firstEvaluationBusiness = ownerLabelingPacket.entries[0]!.businessName;
   let stage = "startup";
   try {
@@ -1525,17 +1527,63 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
     await page.locator("[data-quality-lab-ready='true']:visible").waitFor();
     await assertOwnerPageTitle(page, "Quality Lab | Axiom Revenue Engine");
-    await page.locator("input[aria-label='Choose owner-review checkpoint']:visible:enabled").setInputFiles({
-      name: "owner-labeling-checkpoint.json",
+    const blindValidation = page.waitForResponse((response) => response.url().endsWith("/api/v1/leads/evaluation/validate"));
+    await page.locator("input[aria-label='Choose blind owner-review dossiers']:visible:enabled").setInputFiles({
+      name: "owner-labeling-blind.json",
       mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
+      buffer: Buffer.from(JSON.stringify(ownerLabelingSplit.blindPacket)),
     });
+    const blindResponse = await blindValidation;
+    const blindRequestBody = blindResponse.request().postData() ?? "";
+    const blindResponseBody = await blindResponse.text();
+    for (const forbidden of ["engineAssessment", "scores", "agreementPercent", "agreements", "ready", "gateReasons", "classification", "severity", "conversionCritical", "manualReviewReasons"]) {
+      assert.equal(blindRequestBody.includes(`"${forbidden}":`), false, `Blind upload exposed ${forbidden}.`);
+      assert.equal(blindResponseBody.includes(`"${forbidden}":`), false, `Blind response exposed ${forbidden}.`);
+    }
     await page.getByRole("heading", { level: 2, name: firstEvaluationBusiness }).waitFor();
-    await page.getByText("Verified the exact 50-business checkpoint. No outreach was enabled.").waitFor();
+    await page.getByText("Verified the exact 50 blind dossiers. No outreach was enabled.").waitFor();
     await page.getByText("Engine verdict hidden", { exact: true }).first().waitFor();
     await page.getByRole("button", { name: /^Strong/ }).click();
     await page.getByRole("checkbox", { name: "Good commercial fit" }).check();
-    await page.getByRole("button", { name: "Save first pass and reveal engine verdict" }).click();
+    assert.equal(await page.getByRole("button", { name: "Download first pass" }).isEnabled(), false,
+      "One judgment must not open the assessment sidecar before the full blind cohort is judged.");
+    assert.equal(await page.getByRole("button", { name: "Reveal engine verdict" }).count(), 0);
+
+    // Core tests cover every decision rule; preload synthetic browser drafts so
+    // this acceptance can verify the full-cohort gate without 150 UI clicks.
+    await page.evaluate(({ packetDigest, leadIds }) => {
+      const firstPassDecisions = Object.fromEntries(leadIds.map((leadId) => [leadId, {
+        label: "STRONG", reasons: ["GOOD_COMMERCIAL_FIT"], notes: "Synthetic independent first pass.",
+      }]));
+      localStorage.setItem(`axiom-owner-labels:${packetDigest}`, JSON.stringify({
+        draftVersion: "owner-labeling-draft-v2", packetDigest, reviewedBy: "RILEY",
+        firstPassDecisions, revealedLeadIds: [], legacyRevealedLeadIds: [], decisions: {},
+      }));
+    }, { packetDigest: ownerLabelingPacket.packetDigest, leadIds: ownerLabelingPacket.entries.map((entry) => entry.leadId) });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator("[data-quality-lab-ready='true']:visible").waitFor();
+    await page.locator("input[aria-label='Choose blind owner-review dossiers']:visible:enabled").setInputFiles({
+      name: "owner-labeling-blind.json", mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(ownerLabelingSplit.blindPacket)),
+    });
+    await page.getByText("Verified the blind dossiers and restored this browser's first-pass draft.").waitFor();
+    const firstPassDownloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download first pass" }).click();
+    const firstPassDownload = await firstPassDownloadPromise;
+    const firstPassPath = await firstPassDownload.path();
+    assert(firstPassPath, "Quality Lab must download the complete blind first pass.");
+    const firstPassExport = JSON.parse(await readFile(firstPassPath, "utf8")) as Record<string, unknown>;
+    assert.equal((firstPassExport.decisions as Array<unknown>).length, 50);
+    assert.equal(firstPassExport.packetDigest, ownerLabelingPacket.packetDigest);
+    assert.equal(JSON.stringify(firstPassExport).includes("engineAssessment"), false);
+    assert.equal(await page.getByRole("button", { name: "Reveal engine verdict" }).count(), 0,
+      "The score file must still be absent after first-pass export.");
+    await page.locator("input[aria-label='Choose matching engine assessments']:visible:enabled").setInputFiles({
+      name: "owner-labeling-assessments.json", mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(ownerLabelingSplit.assessmentSidecar)),
+    });
+    await page.getByText("Assessment file matched. You can now compare your first-pass judgment with the engine, then record a final judgment.").waitFor();
+    await page.getByRole("button", { name: "Reveal engine verdict" }).click();
     await page.getByText("Before reveal, you said").waitFor();
     await page.getByRole("button", { name: /^Strong/ }).click();
     await page.getByRole("checkbox", { name: "Good commercial fit" }).check();
@@ -1563,12 +1611,17 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "desktop quality lab resume";
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.locator("[data-quality-lab-ready='true']:visible").waitFor();
-    await page.locator("input[aria-label='Choose owner-review checkpoint']:visible:enabled").setInputFiles({
-      name: "owner-labeling-checkpoint.json",
+    await page.locator("input[aria-label='Choose blind owner-review dossiers']:visible:enabled").setInputFiles({
+      name: "owner-labeling-blind.json",
       mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
+      buffer: Buffer.from(JSON.stringify(ownerLabelingSplit.blindPacket)),
     });
-    await page.getByText("Verified the exact checkpoint and restored this browser's draft.").waitFor();
+    await page.getByText("Verified the blind dossiers and restored this browser's first-pass draft.").waitFor();
+    await page.locator("input[aria-label='Choose matching engine assessments']:visible:enabled").setInputFiles({
+      name: "owner-labeling-assessments.json", mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(ownerLabelingSplit.assessmentSidecar)),
+    });
+    await page.getByText("Assessment file matched. You can now compare your first-pass judgment with the engine, then record a final judgment.").waitFor();
     assert.equal(await page.getByRole("button", { name: /^Strong/ }).getAttribute("aria-pressed"), "true");
     assert.equal(await page.getByRole("checkbox", { name: "Good commercial fit" }).isChecked(), true);
 
@@ -1684,10 +1737,10 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
     await page.locator("[data-quality-lab-ready='true']:visible").waitFor();
     console.log("Mobile Quality Lab is ready; loading the synthetic checkpoint.");
-    await page.locator("input[aria-label='Choose owner-review checkpoint']:visible:enabled").setInputFiles({
-      name: "owner-labeling-checkpoint.json",
+    await page.locator("input[aria-label='Choose blind owner-review dossiers']:visible:enabled").setInputFiles({
+      name: "owner-labeling-blind.json",
       mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(ownerLabelingPacket)),
+      buffer: Buffer.from(JSON.stringify(ownerLabelingSplit.blindPacket)),
     });
     await page.getByRole("heading", { level: 2, name: firstEvaluationBusiness }).waitFor();
     console.log("Mobile Quality Lab checkpoint loaded.");

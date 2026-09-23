@@ -428,7 +428,8 @@ This procedure records Riley's Strong/Weak/Wrong lead-quality decisions without
 changing the private database or enabling any pipeline action.
 
 1. Keep the exact source plan, existing local SQLite database, current labelling
-   packet, review submission, and next packet as distinct direct children of
+   packet, blind dossier, assessment sidecar, first-pass export, final review
+   submission, and next packet as distinct direct children of
    ignored `data/kw-evaluation/` storage.
 2. Confirm the database has canonical migrations 0054–0068 and contains the
    exact 50-business source cohort plus one sealed current assessment receipt for
@@ -440,28 +441,48 @@ changing the private database or enabling any pipeline action.
    npm run kw:prepare-owner-labeling -- --source-plan data/kw-evaluation/plan.json --database data/kw-evaluation/shadow.sqlite --output data/kw-evaluation/owner-labeling.json
    ```
 
-4. Sign in to the local console, open `/leads/evaluation`, and load the prepared
-   packet. Review each business identity, audit, five scores, engine label, and
-   exact evidence; choose `STRONG`, `WEAK`, or `WRONG`, at least one offered
-   reason, and an optional note. Partial batches are allowed. Download the review
-   file when the batch is complete. Browser drafts resume only for the same
-   packet digest; they are not durable system truth until step 5 records them.
-5. Record the batch into a different no-overwrite checkpoint:
+4. Split that same immutable packet into two new, no-overwrite ignored files:
+
+   ```powershell
+   npm run kw:split-owner-labeling -- --packet data/kw-evaluation/owner-labeling.json --blind-output data/kw-evaluation/owner-labeling-blind.json --assessment-output data/kw-evaluation/owner-labeling-assessments.json
+   ```
+
+   Keep the assessment file separate from the owner during the blind pass. The
+   command does not read or change the database.
+5. Sign in to the local console, open `/leads/evaluation`, and load only the
+   **blind dossier** file. For every as-yet-unreviewed business, inspect the
+   source-backed observations and choose `STRONG`, `WEAK`, or `WRONG` with at
+   least one offered reason. The screen does not receive engine labels, scores,
+   or aggregate agreement at this stage. Complete the entire unreviewed cohort
+   before selecting **Download first pass**. Retain that private audit file.
+   Draft judgments resume in the same browser only for the exact packet digest;
+   they are not durable system truth.
+6. Load the matching **assessment** file only after the first-pass export. The
+   app verifies both files against the original packet and all first-pass
+   judgments, then allows each business's engine verdict and scores to be
+   revealed. Record final judgments and download `owner-reviews-*.json` in
+   convenient batches. That final export includes the corresponding first-pass
+   judgment for each finalized business. Reopening the browser requires loading
+   the blind file again and then the assessment file; the latter is never saved
+   in browser storage.
+7. Record each final batch into a different no-overwrite checkpoint using the
+   **original full packet**, not either split file:
 
    ```powershell
    npm run kw:record-owner-labels -- --packet data/kw-evaluation/owner-labeling.json --reviews data/kw-evaluation/owner-reviews.json --output data/kw-evaluation/owner-labeling-next.json
    ```
 
-6. Confirm the new packet names the prior packet as its parent and the reviewed,
+8. Confirm the new packet names the prior packet as its parent and the reviewed,
    agreement, balance, and gate counts are correct. Use this new packet as the
    input for the next review batch; never edit or overwrite an older checkpoint.
-7. Stop on source, assessment, packet, digest, timestamp, identity, or decision
+9. Stop on source, assessment, packet, digest, timestamp, identity, or decision
    drift. Do not repair the checkpoint by hand.
 
-Both commands are ignored-local only. The Quality Lab validation route is
-authenticated, private/no-store, bounded to JSON, and has no database or provider
-binding. Together they authorize no database mutation, provider or network
-operation, acquisition, qualification change, consent
+All three local commands are ignored-local only. The Quality Lab's blind
+validation and later reveal routes are authenticated, private/no-store, bounded
+to JSON, and have no database or outside-provider binding. Together they
+authorize no database mutation, provider operation, acquisition, qualification
+change, consent
 decision, outreach, sending, deployment, remote database, or spend.
 
 ## M2 research scope and current authorization preparation

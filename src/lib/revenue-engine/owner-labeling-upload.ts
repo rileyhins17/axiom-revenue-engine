@@ -1,9 +1,12 @@
 import { PrivateKwOwnerLabelingPacketSchema } from "@/lib/revenue-engine/private-kw-owner-labeling";
+import { BlindOwnerLabelingPacketSchema } from "@/lib/revenue-engine/owner-labeling-blind";
+import { projectBlindOwnerLabelingWorkspace } from "@/lib/revenue-engine/owner-labeling-blind-workspace";
 import {
   projectOwnerLabelingWorkspace,
 } from "@/lib/revenue-engine/owner-labeling-workspace";
 
 export const OWNER_LABELING_UPLOAD_MAX_BYTES = 10_000_000;
+export const OWNER_LABELING_REVEAL_MAX_BYTES = 21_000_000;
 
 export class OwnerLabelingUploadError extends Error {
   constructor(
@@ -35,17 +38,37 @@ export function validateOwnerLabelingPacketUpload(value: unknown) {
   }
 }
 
-export async function readOwnerLabelingPacketRequest(request: Request) {
+export function validateOwnerLabelingBlindUpload(value: unknown) {
+  const packet = BlindOwnerLabelingPacketSchema.safeParse(value);
+  if (!packet.success) {
+    throw new OwnerLabelingUploadError(
+      "Choose the blind 50-business dossier file prepared by the Revenue Engine.",
+      "INVALID_PACKET",
+      400,
+    );
+  }
+  try {
+    return projectBlindOwnerLabelingWorkspace(packet.data);
+  } catch {
+    throw new OwnerLabelingUploadError(
+      "The blind dossier must contain the exact 50-business cohort and current evidence.",
+      "INVALID_PACKET",
+      400,
+    );
+  }
+}
+
+export async function readOwnerLabelingPacketRequest(request: Request, maxBytes = OWNER_LABELING_UPLOAD_MAX_BYTES) {
   const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
   if (contentType !== "application/json") {
     throw new OwnerLabelingUploadError("Upload the checkpoint as a JSON file.", "INVALID_CONTENT_TYPE", 415);
   }
   const declaredLength = request.headers.get("content-length");
-  if (declaredLength && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > OWNER_LABELING_UPLOAD_MAX_BYTES)) {
+  if (declaredLength && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > maxBytes)) {
     throw new OwnerLabelingUploadError("The owner-review checkpoint is too large.", "PACKET_TOO_LARGE", 413);
   }
   const bytes = await request.arrayBuffer();
-  if (bytes.byteLength > OWNER_LABELING_UPLOAD_MAX_BYTES) {
+  if (bytes.byteLength > maxBytes) {
     throw new OwnerLabelingUploadError("The owner-review checkpoint is too large.", "PACKET_TOO_LARGE", 413);
   }
   try {
