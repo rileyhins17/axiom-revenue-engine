@@ -25,6 +25,7 @@ import { createPrivateKwShadowSourceWorkflowFixture } from "../src/lib/revenue-e
 // Registered in setup.test.ts, so the shared real operation lock has one test process owner.
 // No independent *.test.ts file is used: parallel setup/assessment suites would contend by design.
 export async function createRun(captureOptions: NonNullable<Parameters<typeof createPrivateKwM2AssessmentFixture>[0]>[] = [{}, {}, {}], persistEvidence = false) {
+  fs.mkdirSync(path.resolve("data/kw-evaluation"), { recursive: true });
   const token = `m2-assessment-test-${randomUUID()}`;
   const relative = (label: string, extension = "json") => `data/kw-evaluation/${token}-${label}.${extension}`;
   const owned = new Map<string, { dev: bigint; ino: bigint }>();
