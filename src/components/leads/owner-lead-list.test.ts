@@ -137,10 +137,18 @@ function fixtureResponse(leads: OwnerLeadProjection[], options: { rejectedBusine
   };
 }
 
-test("owner lead list explains legacy scores, exact evidence, and a manual route", () => {
+test("owner lead list presents plain business details and keeps ranking details secondary", () => {
   const html = renderToStaticMarkup(createElement(OwnerLeadList, { data: fixtureResponse([fixtureLead()]), canReviewBusinessResearch: true }));
+  const primary = html.slice(0, html.indexOf("<details")).replace(/<[^>]*>/g, " ");
 
-  assert.match(html, /<h1[^>]*>Businesses<\/h1>/);
+  assert.match(html, /<h1[^>]*>Businesses to review<\/h1>/);
+  assert.match(primary, /Roofing/);
+  assert.match(primary, /Independent operator/);
+  assert.match(html, /Kitchener, ON/);
+  assert.match(html, /Website finding/);
+  assert.match(html, /Ready for owner review/);
+  assert.match(html, /Review evidence/);
+  assert.doesNotMatch(primary, /legacy|calibration|shadow|read-only/i);
   assert.match(html, /Ranked review queue/);
   assert.match(html, /Tri-City Roofing/);
   assert.match(html, /Business fit/);
@@ -158,10 +166,9 @@ test("owner lead list explains legacy scores, exact evidence, and a manual route
   assert.match(html, /Open Quality Lab/);
   assert.match(html, /href="\/leads\/evaluation"/);
   assert.match(html, /Read-only · no outreach permission/);
-  assert.match(html, /Open Business Review/);
   assert.match(html, /href="\/leads\/m2\/identity"/);
   assert.match(html, /Review 10 businesses/);
-  assert.match(html, /legacy scores for calibration/);
+  assert.match(html, /How business records are assessed/);
   assert.doesNotMatch(html, />Send</);
   assert.doesNotMatch(html, />Approve</);
 });
@@ -183,9 +190,9 @@ test("owner lead list separates legacy preview rules from leads that still need 
     data: fixtureResponse([fixtureLead(), needsQualification]),
   }));
 
-  assert.match(html, /Meets legacy rules/);
-  assert.match(html, /Needs qualification/);
-  assert.match(html, /Qualification criteria remain unmet/);
+  assert.match(html, /Ready for owner review/);
+  assert.match(html, /Needs a closer look/);
+  assert.match(html, /Some review checks are still open/);
   assert.match(html, /Rebuild Need Below 65/);
   assert.match(html, /Meets preview rules<\/dt><dd[^>]*>1<\/dd>/);
   assert.match(html, /Preview checks open<\/dt><dd[^>]*>1<\/dd>/);
@@ -216,11 +223,11 @@ test("owner lead list keeps refresh and block states explicit and surfaces rejec
   assert.match(html, /Check safety and status before relying on this preview/);
 });
 
-test("empty owner lead list refuses to promote legacy records", () => {
+test("empty owner lead list explains when businesses will appear", () => {
   const html = renderToStaticMarkup(createElement(OwnerLeadList, { data: fixtureResponse([]) }));
 
-  assert.match(html, /No current audited leads yet/);
-  assert.match(html, /Legacy records are intentionally not treated as qualified/);
+  assert.match(html, /No businesses to review yet/);
+  assert.match(html, /current website research has been completed and checked/);
   assert.match(html, /No outreach was started/);
   assert.doesNotMatch(html, /Records.*active records/);
 });
@@ -237,6 +244,6 @@ test("unavailable owner lead list stays honest about the live stop state", () =>
 
 test("non-admin lead preview does not offer the admin-only Business Review route", () => {
   const html = renderToStaticMarkup(createElement(OwnerLeadList, { data: fixtureResponse([fixtureLead()]) }));
-  assert.match(html, /Business Review access is limited to administrators/);
+  assert.match(html, /Business research is owner-managed/);
   assert.doesNotMatch(html, /href="\/leads\/m2"/);
 });

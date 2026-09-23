@@ -971,16 +971,16 @@ body::after {
   }
 }
 
-/* Owner workspace shell. Legacy CRM and calibration screens keep their own
-   dark surfaces; these rules restyle only the shared owner chrome. */
+/* Owner workspace chrome. The dark navigation anchors the decision-first
+   owner pages while the main canvas stays quiet and readable. */
 .owner-app-shell {
-  --owner-paper: #f5f4ef;
+  --owner-paper: #f7f8f5;
   --owner-white: #ffffff;
-  --owner-ink: #202c26;
-  --owner-line: #e1e5df;
-  --owner-pine: #145943;
-  --owner-pine-soft: #eaf2ec;
-  --owner-focus: #145943;
+  --owner-ink: #172c25;
+  --owner-line: #dfe7df;
+  --owner-pine: #12573f;
+  --owner-pine-soft: #e7f2eb;
+  --owner-focus: #197255;
   background: var(--owner-paper);
   color: var(--owner-ink);
 }
@@ -991,7 +991,7 @@ body::after {
 
 .owner-app-shell .owner-topbar {
   border-bottom: 1px solid var(--owner-line);
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.97);
   color: var(--owner-ink);
 }
 
@@ -1070,39 +1070,24 @@ body::after {
 .owner-app-shell .owner-sidebar,
 .owner-app-shell .owner-sidebar [data-sidebar="sidebar"],
 [data-sidebar="sidebar"][data-mobile="true"] {
-  border-right: 1px solid var(--owner-line, #e1e5df);
-  background: var(--owner-white, #ffffff);
-  color: var(--owner-ink, #202c26);
+  border-right: 1px solid #244b3d;
+  background: #142f27;
+  color: #eff7f0;
 }
 
 .owner-app-shell .owner-sidebar-brand {
-  min-height: 82px;
+  min-height: 91px;
   justify-content: center;
-  border-bottom: 1px solid #eceeea;
-  padding: 0 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0 22px;
 }
 
 .owner-app-shell .owner-brand {
   display: flex;
   align-items: center;
   gap: 11px;
-  color: var(--owner-ink);
+  color: #f8fbf6;
   text-decoration: none;
-}
-
-.owner-app-shell .owner-brand-mark {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 11px;
-  background: var(--owner-pine);
-  color: #fff;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -0.06em;
 }
 
 .owner-app-shell .owner-brand-name,
@@ -1111,16 +1096,20 @@ body::after {
 }
 
 .owner-app-shell .owner-brand-name {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-family: var(--font-app-sans);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.105em;
   line-height: 1.1;
+}
+
+.owner-app-shell .owner-brand-period {
+  color: #b4dfa8;
 }
 
 .owner-app-shell .owner-brand-caption {
   margin-top: 4px;
-  color: #58695d;
+  color: #adcdb9;
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.06em;
@@ -1128,12 +1117,12 @@ body::after {
 }
 
 .owner-app-shell .owner-sidebar-content {
-  padding: 25px 12px 16px;
+  padding: 28px 12px 16px;
 }
 
 .owner-app-shell .owner-sidebar-section-label {
   margin: 0 10px 10px;
-  color: #58695d;
+  color: #9abfa9;
   font-size: 10px;
   font-weight: 650;
   letter-spacing: 0.12em;
@@ -1146,23 +1135,23 @@ body::after {
   align-items: center;
   gap: 11px;
   border: 1px solid transparent;
-  border-radius: 10px;
-  padding: 6px 10px;
-  color: #4f6255;
+  border-radius: 11px;
+  padding: 7px 12px;
+  color: #d2e5d7;
   text-decoration: none;
   transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
 .owner-app-shell .owner-nav-item:hover {
-  background: #f5f7f4;
-  color: var(--owner-ink);
+  background: #244739;
+  color: #fff;
 }
 
 .owner-app-shell .owner-nav-item.is-active,
 .owner-app-shell .owner-nav-item[data-active="true"] {
-  border-color: #d8e6da;
-  background: var(--owner-pine-soft);
-  color: var(--owner-pine);
+  border-color: #c8e2cc;
+  background: #e8f4e9;
+  color: #173f2d;
 }
 
 .owner-app-shell .owner-nav-title,
@@ -1171,16 +1160,16 @@ body::after {
 }
 
 .owner-app-shell .owner-nav-title {
-  font-size: 13px;
-  font-weight: 620;
+  font-size: 14px;
+  font-weight: 650;
   line-height: 1.25;
 }
 
 .owner-app-shell .owner-nav-description {
   overflow: hidden;
   margin-top: 2px;
-  color: #58695d;
-  font-size: 10px;
+  color: #a8c4b0;
+  font-size: 10.5px;
   font-weight: 400;
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -1189,7 +1178,7 @@ body::after {
 
 .owner-app-shell .owner-nav-item.is-active .owner-nav-description,
 .owner-app-shell .owner-nav-item[data-active="true"] .owner-nav-description {
-  color: #426a50;
+  color: #446c53;
 }
 
 .owner-app-shell [data-collapsible="icon"] .owner-nav-item {
@@ -1207,10 +1196,10 @@ body::after {
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  border-top: 1px solid #eceeea;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding: 12px 17px;
-  color: #58695d;
-  font-size: 10px;
+  color: #b0ccba;
+  font-size: 11px;
 }
 
 .owner-app-shell .owner-sidebar-footer-dot {

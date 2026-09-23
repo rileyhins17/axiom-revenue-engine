@@ -24,10 +24,9 @@ export function AppSidebar() {
     <Sidebar className="owner-sidebar owner-app-shell">
       <SidebarHeader className="owner-sidebar-brand">
         <Link href="/dashboard" aria-label="Axiom Web home" className="owner-brand">
-          <span className="owner-brand-mark" aria-hidden="true">A</span>
           <span className="min-w-0">
-            <span className="owner-brand-name">Axiom</span>
-            <span className="owner-brand-caption">Web workspace</span>
+            <span className="owner-brand-name">AXIOM<span className="owner-brand-period">.</span></span>
+            <span className="owner-brand-caption">Revenue workspace</span>
           </span>
         </Link>
       </SidebarHeader>
@@ -68,9 +67,8 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="owner-sidebar-footer">
-        <span className="owner-sidebar-footer-dot" aria-hidden="true" />
-        <span>Axiom Web</span>
-        <span className="ml-auto">Kitchener–Waterloo</span>
+        <span>Private owner workspace</span>
+        <span className="ml-auto">KW</span>
       </SidebarFooter>
     </Sidebar>
   );

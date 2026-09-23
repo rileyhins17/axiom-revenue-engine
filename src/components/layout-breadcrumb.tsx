@@ -9,6 +9,17 @@ export function LayoutBreadcrumb() {
   const pathname = usePathname();
   const route = getNavItemForPath(pathname);
 
+  if (pathname === "/leads/m2/identity") {
+    return (
+      <div className="owner-breadcrumb flex min-w-0 items-center gap-3 text-sm">
+        <div className="owner-breadcrumb-icon grid size-8 shrink-0 place-items-center rounded-lg">
+          <Building2 className="size-3.5" aria-hidden="true" />
+        </div>
+        <span className="truncate font-semibold tracking-tight">Review businesses</span>
+      </div>
+    );
+  }
+
   if (pathname === "/leads/m2") {
     return (
       <div className="owner-breadcrumb flex min-w-0 items-center gap-3 text-sm">

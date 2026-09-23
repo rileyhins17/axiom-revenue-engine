@@ -274,8 +274,8 @@ export function OwnerLeadEvaluationWorkspace() {
           className={cn(
             "rounded-xl border px-4 py-3 text-sm",
             message.tone === "error"
-              ? "border-rose-300/20 bg-rose-300/[0.06] text-rose-100"
-              : "border-emerald-300/20 bg-emerald-300/[0.06] text-emerald-100",
+              ? "border-rose-200 bg-rose-50 text-rose-900"
+              : "border-emerald-200 bg-emerald-50 text-emerald-900",
           )}
         >
           {message.text}
@@ -495,8 +495,8 @@ export function OwnerLeadEvaluationWorkspace() {
         </div>
       ) : null}
 
-      <div role="note" className="flex items-start gap-3 rounded-xl border border-amber-300/15 bg-amber-300/[0.04] px-4 py-3 text-xs leading-5 text-amber-100/75">
-        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-amber-300" aria-hidden="true" />
+      <div role="note" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-amber-800" aria-hidden="true" />
         Quality Lab records owner judgment only. It cannot acquire leads, call providers, change qualification, assess consent, contact a business, send email, deploy, or spend money.
       </div>
     </div>

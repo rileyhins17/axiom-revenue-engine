@@ -38,9 +38,9 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     keywords: ["ranked", "businesses", "evidence", "leads"],
   },
   {
-    title: "Outreach",
-    label: "Outreach",
-    description: "Owner reviewed contact work",
+    title: "Follow-through",
+    label: "Actions",
+    description: "Calls, replies, and next steps",
     url: "/automation",
     icon: ClipboardList,
     shortcut: "⌘3",

@@ -22,14 +22,18 @@ export default async function ClientsPage() {
   const leads = read.leads;
 
   return (
-    <div className="mx-auto flex min-w-0 w-full max-w-[1280px] flex-col gap-5 text-[#24352e]">
-      <header className="flex flex-col gap-3 border-b border-[#dedfd7] pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div className="max-w-2xl">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#416b55]">Relationships</p>
-          <h1 id="clients-title" className="mt-2 text-[2rem] font-semibold leading-tight tracking-[-0.04em] text-[#1e3027] sm:text-[2.65rem]">Clients & opportunities</h1>
-          <p className="mt-2 text-sm leading-6 text-[#53655a]">See who replied, what needs a follow-up, and where each deal stands.</p>
+    <div className="mx-auto flex min-w-0 w-full max-w-[1320px] flex-col gap-7 text-[#202d26]">
+      <header className="relative overflow-hidden rounded-[1.75rem] border border-[#d9ded3] bg-[#f8f5ec] px-6 py-7 sm:px-9 sm:py-9">
+        <div className="pointer-events-none absolute -right-8 -top-16 size-64 rounded-full border border-[#dfe5d7] sm:right-14 sm:top-[-8.5rem] sm:size-[26rem]" aria-hidden="true" />
+        <div className="relative max-w-3xl">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#426b53]">Relationships · owner workspace</p>
+          <h1 id="clients-title" className="mt-3 text-[2rem] font-semibold leading-[1.08] tracking-[-0.045em] text-[#18251e] sm:text-[3.15rem]">Clients &amp; opportunities</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#526057] sm:text-base">Keep real conversations and client work moving. Start with the next human follow-up, then update each relationship as it progresses.</p>
         </div>
-        <span className="w-fit rounded-full border border-[#d7e2d8] bg-[#edf4ed] px-3 py-1.5 text-xs font-semibold text-[#24543a]">Owner-managed records</span>
+        <div className="relative mt-6 flex flex-wrap items-center gap-2 text-xs text-[#56655a]">
+          <span className="inline-flex items-center gap-2 rounded-full border border-[#d4ded1] bg-[#edf2e8] px-3 py-1.5 font-medium text-[#325541]"><span className="size-1.5 rounded-full bg-[#39734e]" aria-hidden="true" />Owner-managed records</span>
+          <span className="rounded-full border border-[#e2dfd5] bg-white/70 px-3 py-1.5">Counts reflect records in this workspace</span>
+        </div>
       </header>
 
       {!read.available ? (

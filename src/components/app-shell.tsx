@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { CircleUserRound, LogOutIcon, Settings, UserIcon } from "lucide-react";
+import { CircleUserRound, LogOutIcon, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -23,7 +23,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type ShellSession = {
   user?: {
@@ -85,21 +84,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <LayoutBreadcrumb />
             </div>
             <div className="owner-search-trigger"><SearchTrigger /></div>
-            <div className="hidden items-center gap-2 lg:flex">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="Open settings"
-                    onClick={() => router.push("/settings")}
-                    className="owner-icon-button"
-                  >
-                    <Settings className="size-4" aria-hidden="true" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Settings</TooltipContent>
-              </Tooltip>
-            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -122,7 +106,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       size="lg"
                       className="owner-avatar"
                     />
-                    <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-[#fff] bg-[#145943]" />
                   </div>
                   <CircleUserRound className="size-5 text-[#526158] sm:hidden" aria-hidden="true" />
                 </button>

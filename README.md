@@ -38,10 +38,15 @@ authorizes capture or contact. See [the M2 decision runbook](docs/RUNBOOK.md#m2-
 
 An admin can record those identity decisions from the local **Businesses →
 Review 10 businesses** screen. It checks the exact private research packet,
-shows source links, saves a browser draft by packet digest and downloads the
-explicit owner ledger. This identity review comes before preparing the source
+shows source links, and keeps an unfinished browser draft bound to that packet.
+Riley or Aidan signs in under their own account, completes the ten decisions,
+and selects **Save owner decisions**. The server verifies the current packet and
+owner before writing an immutable private ledger under ignored
+`data/kw-evaluation/`; the page shows its saved status on return. Downloading a
+copy is optional. This identity review comes before preparing the source
 import plan; the later preparer still verifies that plan and every selected
-identity. The local screen is unavailable on Cloudflare.
+identity. Saving does not select businesses, authorize capture or contact, or
+send anything. The local screen is unavailable on Cloudflare.
 
 For sealed evidence that needs more research, the same assessment command saves
 a research report with missing pages and limitations, without an assessment
@@ -85,10 +90,15 @@ The current sequence is one complete offline dossier, ten reviewed real-business
 
 ## Owner experience
 
-The owner navigation is Today, Businesses, Outreach, Clients and Settings. The light workspace leads with plain-language decisions and keeps technical diagnostics behind clearly labeled advanced sections. A Business Review link appears only for an admin, because the saved-research console is admin-only. Each page must distinguish available, blocked, stale, empty and unavailable states.
+The owner navigation is Today, Businesses, Follow-through, Clients and Settings.
+The decision-first workspace leads with plain-language actions and keeps
+operator diagnostics behind a disclosure. The private business decision flow
+and saved-research console are admin-only. Each page must distinguish
+available, blocked, stale, empty and unavailable states.
 
-Today leads with actions due, one business to review, and a separate safety and
-email-status panel. Legacy operator metrics sit behind Advanced system details.
+Today leads with the current business decision, then replies and follow-ups,
+with a separate safety and email-status panel. Legacy operator metrics sit
+behind Operator details.
 The navigation does not use lead-score badges as if they counted approved
 business decisions. Today does not present Gmail OAuth as the path to the
 selected zero-paid-mailbox design. Missing critical status reads appear as
@@ -98,8 +108,11 @@ readiness.
 Businesses presents a simple list of saved score records with direct evidence
 links. The old ranking and detailed scores sit in a closed advanced preview,
 while Business Review remains the admin owner's primary saved-research action.
-A score or suggested contact route is not a contact decision. Outreach starts
-with business evidence and manual next steps, and labels the mail route
+A business detail leads with the stop-aware next step and three sourced website
+findings; recorded routes and history remain visible, and the full audit opens
+only when requested.
+A score or suggested contact route is not a contact decision. Follow-through
+starts with the same private business decision flow and manual next steps, and labels the mail route
 unverified; it does not surface legacy Gmail connection or send controls.
 Clients distinguishes recorded
 recurring estimates from cash received. Settings reads emergency state without

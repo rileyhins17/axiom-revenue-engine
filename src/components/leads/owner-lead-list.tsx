@@ -32,35 +32,43 @@ const ATTENTION_COPY: Record<
   { label: string; explanation: string; className: string; icon: LucideIcon }
 > = {
   READY_FOR_REVIEW: {
-    label: "Meets legacy rules",
-    explanation: "The old score passed its preview rules. This does not approve contact.",
+    label: "Ready for owner review",
+    explanation: "Current evidence passed the review checks. An owner still needs to decide what to do.",
     className: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
     icon: CheckCircle2,
   },
   REVIEW: {
-    label: "Needs qualification",
-    explanation: "Qualification criteria remain unmet; resolve the failed gates before treating this as a sales lead.",
+    label: "Needs a closer look",
+    explanation: "Some review checks are still open. Look at what is missing before deciding whether to continue.",
     className: "border-amber-400/25 bg-amber-400/10 text-amber-100",
     icon: FileSearch,
   },
   RESEARCH: {
-    label: "Needs qualification",
-    explanation: "The current evidence does not support an owner review yet.",
+    label: "More research needed",
+    explanation: "There is not enough current information for an owner decision yet.",
     className: "border-violet-400/25 bg-violet-400/10 text-violet-200",
     icon: Search,
   },
   NEEDS_REFRESH: {
     label: "Needs refresh",
-    explanation: "Some evidence is stale or incomplete, so this preview needs checking.",
+    explanation: "Some information is old or incomplete and should be checked again.",
     className: "border-amber-400/25 bg-amber-400/10 text-amber-100",
     icon: RefreshCcw,
   },
   BLOCKED: {
     label: "Blocked",
-    explanation: "A safety, suppression, or business-fit rule prevents contact action.",
+    explanation: "A policy or business-fit check is blocking further action.",
     className: "border-rose-400/25 bg-rose-400/10 text-rose-100",
     icon: Ban,
   },
+  };
+
+const ATTENTION_LIGHT_CLASS: Record<OwnerLeadProjection["attention"], string> = {
+  READY_FOR_REVIEW: "border-[#cce2d0] bg-[#eaf4ec] text-[#245a36]",
+  REVIEW: "border-[#f2dca8] bg-[#fff4de] text-[#77520f]",
+  RESEARCH: "border-[#e0d5fa] bg-[#f2edff] text-[#65449a]",
+  NEEDS_REFRESH: "border-[#f2dca8] bg-[#fff4de] text-[#77520f]",
+  BLOCKED: "border-[#efcccc] bg-[#fff0f0] text-[#8a3434]",
 };
 
 const CLASSIFICATION_LABELS: Record<OwnerLeadProjection["audit"]["classification"], string> = {
@@ -68,6 +76,13 @@ const CLASSIFICATION_LABELS: Record<OwnerLeadProjection["audit"]["classification
   NO_SITE_NEW_BUILD: "New website opportunity",
   MINOR_IMPROVEMENT: "Minor improvements",
   NO_OPPORTUNITY: "No current website opportunity",
+};
+
+const OWNERSHIP_LABELS: Record<OwnerLeadProjection["business"]["independenceStatus"], string> = {
+  UNKNOWN: "Ownership not verified",
+  INDEPENDENT: "Independent operator",
+  CHAIN: "Chain",
+  FRANCHISE: "Franchise",
 };
 
 const ROUTE_ICONS: Record<OwnerLeadProjection["route"]["channel"], LucideIcon> = {
@@ -122,96 +137,107 @@ export function OwnerLeadList({ data, canReviewBusinessResearch = false }: {
   const needsQualificationCount = data.leads.filter((lead) => lead.attention === "REVIEW" || lead.attention === "RESEARCH").length;
 
   return (
-    <div className="mx-auto flex max-w-[1500px] flex-col gap-4 text-[#20352a]">
-      <header className="flex flex-col gap-4 rounded-2xl border border-[#e3e9e2] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#145943]">Axiom Web · Research</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#172b21]">Businesses</h1>
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[#58695f]">
-            Review current business evidence before deciding whether it is worth pursuing. This page contains legacy scores for calibration; Business Review shows the saved research for each business.
+    <div className="mx-auto flex max-w-[1380px] flex-col gap-6 text-[#20352a]">
+      <header className="relative overflow-hidden rounded-[28px] border border-[#dce7dc] bg-gradient-to-br from-white via-white to-[#edf5ed] p-6 shadow-[0_12px_35px_-28px_rgba(25,63,42,0.42)] sm:flex sm:items-center sm:justify-between sm:gap-8 sm:px-8 sm:py-7">
+        <div className="pointer-events-none absolute -right-12 -top-24 size-64 rounded-full bg-[#cfe5d1]/35 blur-3xl" aria-hidden="true" />
+        <div className="relative min-w-0">
+          <p className="inline-flex items-center gap-2 rounded-full border border-[#dce9de] bg-white/80 px-3 py-1 text-[11px] font-semibold tracking-wide text-[#34684b]">
+            <span className="size-1.5 rounded-full bg-[#42845a]" aria-hidden="true" />Business research
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.035em] text-[#172b21] sm:text-[2.1rem]">Businesses to review</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#58695f]">
+            See who each business serves, where it works, and what the website research found.
           </p>
         </div>
-        <div className="shrink-0 sm:w-[280px] sm:border-l sm:border-[#e5ebe5] sm:pl-6">
-          {canReviewBusinessResearch ? (
-            <>
-              <p className="text-xs font-semibold text-[#53675a]">Your next step</p>
-              <Button asChild size="lg" className="mt-2 w-full justify-between bg-[#145943] text-white hover:bg-[#104a37]">
-                <Link href={"/leads/m2/identity" as Route} prefetch={false}>
-                  Review 10 businesses <ArrowUpRight aria-hidden="true" />
-                </Link>
-              </Button>
-              <Link href={"/leads/m2" as Route} prefetch={false} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#145943] hover:underline">
-                Open Business Review
+        {canReviewBusinessResearch ? (
+          <div className="relative mt-5 shrink-0 sm:mt-0 sm:w-[245px]">
+            <p className="mb-2 text-xs font-semibold text-[#53675a]">Your next step</p>
+            <Button asChild size="lg" className="w-full justify-between rounded-xl bg-[#145943] text-white shadow-md shadow-[#145943]/15 hover:bg-[#104a37]">
+              <Link href={"/leads/m2/identity" as Route} prefetch={false}>
+                Review 10 businesses <ArrowUpRight aria-hidden="true" />
               </Link>
-            </>
-          ) : (
-            <p role="note" className="rounded-xl border border-[#e3e9e2] bg-[#f8faf7] px-4 py-3 text-sm leading-5 text-[#53645b]">
-              <span className="block font-semibold text-[#263a2f]">Business Review access is limited to administrators.</span>
-              Ask an admin owner to review current business research. This score preview does not approve contact.
-            </p>
-          )}
-        </div>
+            </Button>
+          </div>
+        ) : (
+          <p role="note" className="relative mt-5 rounded-xl border border-[#e3e9e2] bg-white/80 px-4 py-3 text-sm leading-5 text-[#53645b] sm:mt-0 sm:max-w-[260px]">
+            <span className="block font-semibold text-[#263a2f]">Business research is owner-managed.</span>
+            Ask an administrator to review current business evidence.
+          </p>
+        )}
       </header>
 
-      <div className="flex flex-col gap-2 rounded-xl border border-[#e3e9e2] bg-[#f8faf7] px-4 py-3 text-sm text-[#53675a] sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <p className="flex items-start gap-2 leading-5">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#145943]" aria-hidden="true" />
-          A score or suggested route does not confirm contact readiness or allow outreach.
-        </p>
-        <span className="shrink-0 text-xs font-semibold text-[#145943]">Read-only preview</span>
-      </div>
-
-      <section aria-labelledby="business-records-heading" className="overflow-hidden rounded-2xl border border-[#e3e9e2] bg-white shadow-sm">
+      <section aria-labelledby="business-records-heading" className="overflow-hidden rounded-[24px] border border-[#e1e8e0] bg-white shadow-[0_8px_28px_-24px_rgba(25,63,42,0.5)]">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#e9eee9] px-5 py-4 sm:px-6">
           <div>
-            <h2 id="business-records-heading" className="text-lg font-semibold text-[#172b21]">Business records</h2>
-            <p className="mt-1 text-sm text-[#52645a]">Saved score records to inspect. They are not an approved contact list.</p>
+            <h2 id="business-records-heading" className="text-lg font-semibold text-[#172b21]">Your businesses</h2>
+            <p className="mt-1 text-sm text-[#52645a]">Review the evidence and decide what deserves your attention.</p>
           </div>
-          <p className="text-xs font-medium text-[#52645a]">{data.leads.length} {data.leads.length === 1 ? "record" : "records"}</p>
+          <p className="rounded-full bg-[#f3f7f2] px-3 py-1 text-xs font-semibold text-[#52645a]">{data.leads.length} {data.leads.length === 1 ? "business" : "businesses"}</p>
         </div>
         {data.leads.length === 0 ? (
           <div className="px-5 py-9 text-center sm:px-6">
             <p className="font-semibold text-[#20352a]">No business records yet</p>
-            <p className="mt-1 text-sm text-[#52645a]">Open Business Review to inspect any separately saved research.</p>
+            <p className="mt-1 text-sm text-[#52645a]">New research will appear here when a business has current website evidence.</p>
           </div>
         ) : (
-          <ol className="divide-y divide-[#e9eee9]" aria-label="Business score records">
+          <ol className="divide-y divide-[#e9eee9]" aria-label="Businesses to review">
             {data.leads.map((lead) => (
-              <li key={lead.projectionKey} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-[#20352a]">{lead.business.canonicalName}</p>
-                  <p className="mt-1 text-xs text-[#52645a]">{readableCode(lead.business.niche)} · {readableCode(lead.business.location.city)}, ON · {CLASSIFICATION_LABELS[lead.audit.classification]}</p>
-                </div>
-                <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
-                  <span className="rounded-full border border-[#dce9dc] bg-[#f4f8f4] px-2.5 py-1 text-xs font-medium text-[#315b43]">
-                    {lead.attention === "READY_FOR_REVIEW" ? "Review evidence" : lead.attention === "BLOCKED" ? "Blocked" : lead.attention === "NEEDS_REFRESH" ? "Refresh evidence" : "More research"}
-                  </span>
-                  <Link href={ownerLeadDetailPath(lead.business.businessId) as Route} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-[#145943] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943]">
-                    View evidence <ArrowUpRight className="size-4" aria-hidden="true" />
-                  </Link>
-                </div>
+              <li key={lead.projectionKey} className="px-4 py-4 sm:px-6 sm:py-5">
+                <article className="rounded-2xl border border-[#edf0eb] bg-[#fcfdfb] p-4 transition-colors hover:border-[#d7e5d7] hover:bg-white sm:p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-start gap-3.5">
+                      <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#eaf3e9] text-[#256044]">
+                        <Building2 className="size-5" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="truncate text-base font-semibold tracking-[-0.015em] text-[#1b3024] sm:text-lg">{lead.business.canonicalName}</h3>
+                          <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold", ATTENTION_LIGHT_CLASS[lead.attention])}>
+                            {ATTENTION_COPY[lead.attention].label}
+                          </span>
+                        </div>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#647267]">
+                          <span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5" aria-hidden="true" />{readableCode(lead.business.location.city)}, {lead.business.location.region}</span>
+                          <span aria-hidden="true">·</span><span>{readableCode(lead.business.niche)}</span>
+                          <span aria-hidden="true">·</span><span>{OWNERSHIP_LABELS[lead.business.independenceStatus]}</span>
+                        </p>
+                        <p className="mt-3 text-sm font-medium text-[#354d3d]">
+                          <span className="mr-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#5d6e61]">Website finding</span>
+                          {CLASSIFICATION_LABELS[lead.audit.classification]}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#edf0eb] pt-3 sm:justify-end sm:border-0 sm:pt-0">
+                      <p className="max-w-[230px] text-xs leading-5 text-[#68756b] sm:hidden">{lead.attention === "READY_FOR_REVIEW" ? "Current evidence is ready for an owner decision." : ATTENTION_COPY[lead.attention].explanation}</p>
+                      <Link href={ownerLeadDetailPath(lead.business.businessId) as Route} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#145943] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#104a37] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943]">
+                        Review evidence <ArrowUpRight className="size-4" aria-hidden="true" />
+                      </Link>
+                    </div>
+                  </div>
+                  <p className="mt-4 hidden border-t border-[#edf0eb] pt-3 text-xs leading-5 text-[#68756b] sm:block">{ATTENTION_COPY[lead.attention].explanation}</p>
+                </article>
               </li>
             ))}
           </ol>
         )}
       </section>
 
-      <details className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0e1014]">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-300 sm:px-5">
-          <span className="min-w-0">Advanced: legacy ranking, scores, and evidence</span>
-          <span className="flex shrink-0 items-center gap-2 text-xs font-normal text-zinc-400">
-            <span className="hidden sm:inline">Read-only shadow view · calibration</span>
+      <details className="group overflow-hidden rounded-2xl border border-[#dfe8e1] bg-white">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold text-[#315443] hover:bg-[#f7faf7] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#176443] sm:px-5">
+          <span className="min-w-0">How business records are assessed</span>
+          <span className="flex shrink-0 items-center gap-2 text-xs font-normal text-[#596d5f]">
+            <span className="hidden sm:inline">Optional details for operators</span>
             <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
           </span>
         </summary>
-        <div className="border-t border-white/[0.07]">
+        <div className="border-t border-white/[0.07] bg-[#0e1014]">
           <header className="border-b border-white/[0.07] px-4 py-5 sm:px-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Legacy score details</p>
                 <h2 className="mt-1 text-lg font-semibold text-zinc-100">Ranked business evidence</h2>
                 <p className="mt-1 max-w-2xl text-xs leading-5 text-zinc-400">
-                  These rankings do not include the separate Business Review decision and never grant permission to contact a business.
+                  Read-only shadow view. These rankings do not include the separate Business Review decision and never grant permission to contact a business.
                 </p>
               </div>
               <Button asChild variant="outline" size="sm" className="shrink-0">
@@ -468,9 +494,9 @@ function OwnerLeadEmptyState() {
         <div className="mx-auto grid size-12 place-items-center rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.07]">
           <FileSearch className="size-5 text-emerald-300" aria-hidden="true" />
         </div>
-        <h3 className="mt-5 text-lg font-semibold tracking-tight text-white">No current audited leads yet</h3>
+        <h3 className="mt-5 text-lg font-semibold tracking-tight text-white">No businesses to review yet</h3>
         <p className="mt-2 text-sm leading-6 text-zinc-400">
-          The new evidence model has not produced a business with a current website audit and qualification snapshot. Legacy records are intentionally not treated as qualified.
+          A business will appear here after current website research has been completed and checked.
         </p>
         <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-amber-300/15 bg-amber-300/[0.05] px-3 py-1.5 text-[10px] font-semibold text-amber-100/80">
           <ShieldCheck className="size-3.5" aria-hidden="true" />

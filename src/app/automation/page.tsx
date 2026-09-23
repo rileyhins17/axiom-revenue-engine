@@ -5,7 +5,7 @@ import { getAutomationOperatorConsole } from "@/lib/automation-operator-view";
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Outreach | Axiom Revenue Engine" };
+export const metadata: Metadata = { title: "Follow-through | Axiom Revenue Engine" };
 
 export default async function AutomationPage() {
   const session = await requireSession();

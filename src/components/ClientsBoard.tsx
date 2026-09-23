@@ -1252,6 +1252,42 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
     [leads],
   );
 
+  const followUpPriority = useMemo(() => {
+    const overdue = leads
+      .filter((lead) => lead.dealStage && lead.dealStage !== "LOST" && isActionOverdue(lead.nextActionDueAt))
+      .sort((a, b) => toTime(a.nextActionDueAt) - toTime(b.nextActionDueAt))[0];
+    if (overdue) {
+      return {
+        lead: overdue,
+        title: "An agreed follow-up is overdue",
+        detail: overdue.nextAction || "Review the next step for this relationship.",
+        tag: formatDueDate(overdue.nextActionDueAt),
+      };
+    }
+
+    const reply = [...inboxLeads].sort((a, b) => toTime(b.lastUpdated) - toTime(a.lastUpdated))[0];
+    if (reply) {
+      return {
+        lead: reply,
+        title: "A reply is waiting for your review",
+        detail: "Read the conversation and choose the next step.",
+        tag: "Reply",
+      };
+    }
+
+    const renewal = [...renewalsSoon].sort((a, b) => toTime(a.renewalDate) - toTime(b.renewalDate))[0];
+    if (renewal) {
+      return {
+        lead: renewal,
+        title: "A renewal is coming up",
+        detail: `Recorded renewal date · ${formatDate(renewal.renewalDate)}`,
+        tag: `${getDaysUntilRenewal(renewal.renewalDate)}d`,
+      };
+    }
+
+    return null;
+  }, [leads, inboxLeads, renewalsSoon]);
+
   const filteredLeadsByStage = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return leadsByStage;
@@ -1313,7 +1349,7 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
   }, []);
 
   return (
-    <div className="flex min-w-0 w-full flex-col gap-5 rounded-2xl border border-[#e1e5dc] bg-white p-4 shadow-sm sm:p-6">
+    <div className="flex min-w-0 w-full flex-col gap-6">
       <AddClientDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
@@ -1331,8 +1367,8 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
       />
 
       {/* Find or create a record. */}
-      <div className="flex flex-col gap-3 border-b border-[#e8ebe3] pb-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 sm:max-w-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1 sm:max-w-lg">
           <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#64766a]" aria-hidden="true" />
           <input
             type="text"
@@ -1340,42 +1376,62 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search clients or opportunities"
-            className="min-h-11 w-full rounded-lg border border-[#d8e2d5] bg-white py-2 pl-10 pr-3 text-sm text-[#263a2f] placeholder:text-[#5b6d5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]"
+            className="min-h-12 w-full rounded-xl border border-[#d9ded3] bg-[#fffefa] py-2 pl-10 pr-3 text-sm text-[#263a2f] placeholder:text-[#68746a] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]"
           />
         </div>
         <button
           type="button"
           onClick={() => setShowAddDialog(true)}
           data-hotkey="add"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#145943] bg-[#145943] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0e4935] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] cursor-pointer"
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#164f3a] bg-[#164f3a] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#103f2e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] cursor-pointer"
         >
           <Plus className="size-3.5" />
           Add client
         </button>
       </div>
 
-      {/* Put owner actions first; financial estimates remain available below. */}
+      <section aria-labelledby="client-follow-up-heading" className="grid gap-4 rounded-[1.5rem] border border-[#d7dfd1] bg-[#eaf0e5] p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6 sm:py-5">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id="client-follow-up-heading" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#49634f]">Your next follow-up</h2>
+            {followUpPriority && <span className="rounded-full border border-[#cfdbc9] bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-[#365840]">{followUpPriority.tag}</span>}
+          </div>
+          {followUpPriority ? <>
+            <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[#1c3024]">{followUpPriority.title}</p>
+            <p className="mt-1 text-sm text-[#526057]"><span className="font-medium text-[#263a2f]">{followUpPriority.lead.businessName}</span><span aria-hidden="true"> · </span>{followUpPriority.detail}</p>
+          </> : leads.length > 0 ? <>
+            <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[#1c3024]">No urgent follow-ups are recorded</p>
+            <p className="mt-1 text-sm text-[#526057]">Keep each relationship’s next action and due date current.</p>
+          </> : <>
+            <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[#1c3024]">Start with a real relationship</p>
+            <p className="mt-1 text-sm text-[#526057]">Add a client or opportunity when there’s someone and a next step to track.</p>
+          </>}
+        </div>
+        {followUpPriority ? <button type="button" onClick={() => setEditing(followUpPriority.lead)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#28563b] bg-[#28563b] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1b452e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] cursor-pointer">Review relationship <span aria-hidden="true">→</span></button> : null}
+      </section>
+
+      {/* Owner actions and relationship counts stay ahead of optional value estimates. */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="grid flex-1 grid-cols-2 gap-2 md:grid-cols-3">
+        <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
           <StatTile
             icon={<MessageSquare className="size-3.5" />}
             label="Replies to review"
             value={inboxLeads.length}
-            detail="replied or interested"
+            detail={inboxLeads.length ? "replied or interested" : "No replies awaiting review"}
             tone={inboxLeads.length > 0 ? "cyan" : "zinc"}
           />
           <StatTile
             icon={<Clock className="size-3.5" />}
             label="Overdue actions"
             value={actionDueCount}
-            detail="follow-ups past due"
+            detail={actionDueCount ? "follow-ups past due" : "All recorded dates are current"}
             tone={actionDueCount > 0 ? "red" : "zinc"}
           />
           <StatTile
             icon={<RefreshCw className="size-3.5" />}
             label="Renewals due soon"
             value={renewalsSoon.length}
-            detail="within 30 days"
+            detail={renewalsSoon.length ? "within 30 days" : "None recorded in 30 days"}
             tone={renewalsSoon.length > 0 ? "amber" : "zinc"}
           />
         </div>
@@ -1391,9 +1447,9 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
         )}
       </div>
 
-      <details className="group rounded-xl border border-[#e1e5dc] bg-[#fafbf8]">
-        <summary className="flex min-h-11 cursor-pointer items-center px-4 py-2 text-sm font-semibold text-[#3b5947] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">View recorded value estimates</summary>
-        <div className="grid gap-2 border-t border-[#e1e5dc] p-3 sm:grid-cols-2">
+      <details className="group rounded-2xl border border-[#dedfd5] bg-[#f8f6ef]">
+        <summary className="flex min-h-12 cursor-pointer items-center px-5 py-3 text-sm font-semibold text-[#405548] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">Recorded value estimates <span className="ml-2 text-xs font-normal text-[#657067]">(optional)</span></summary>
+        <div className="grid gap-3 border-t border-[#e0dfd5] p-4 sm:grid-cols-2">
           <StatTile icon={<DollarSign className="size-3.5" />} label="Pipeline monthly estimate" value={`~${formatCompactMoney(openPipelineValue)}`} detail={`${proposalCount} proposal${proposalCount === 1 ? "" : "s"} pending · estimate only`} tone={openPipelineValue > 0 ? "amber" : "zinc"} />
           <StatTile icon={<DollarSign className="size-3.5" />} label="Recorded recurring estimate" value={`~${formatCompactMoney(activeMrr)}/mo`} detail="Entered in client records · not invoices or cash received" tone={activeMrr > 0 ? "emerald" : "zinc"} />
         </div>
@@ -1497,11 +1553,11 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
       )}
 
       {leads.length === 0 && inboxLeads.length === 0 && (
-        <div className="flex items-start gap-4 rounded-xl border border-dashed border-[#cfd9cd] bg-[#fafbf8] px-5 py-7">
-          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-[#eaf1e9]"><Building2 className="size-5 text-[#42624d]" /></span>
+        <div className="flex items-start gap-4 rounded-[1.5rem] border border-[#dedfd5] bg-[#fffefa] px-5 py-7 shadow-sm sm:px-7 sm:py-8">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[#eaf0e5]"><Building2 className="size-5 text-[#42624d]" /></span>
           <div>
-            <div className="text-sm font-semibold text-[#263a2f]">No client records to review</div>
-            <p className="mt-1 max-w-md text-sm leading-6 text-[#5b6d5f]">Replies and owner-created client records will appear here. Add a record when there is a real relationship to track.</p>
+            <div className="text-base font-semibold text-[#202d26]">Your relationship board is ready</div>
+            <p className="mt-1 max-w-xl text-sm leading-6 text-[#5d685f]">When you add a client or opportunity, its stage and next action will appear here. Start with a real conversation or project you want to keep moving.</p>
           </div>
         </div>
       )}

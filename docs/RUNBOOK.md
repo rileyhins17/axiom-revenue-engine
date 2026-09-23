@@ -495,12 +495,18 @@ An admin owner can open **Businesses → Review 10 businesses** on the local
 workspace. The page reads only the fixed, ignored research packet above, checks
 its SHA-256, and shows the exact source links and company-stated independence
 claims. It is unavailable in Cloudflare or when that packet is absent or changed.
-Riley or Aidan must select their own name, make a separate choice for all ten,
+Riley or Aidan must sign in under their own named owner account, make a separate choice for all ten,
 enter reasons, and explicitly confirm identity, city/niche, and independence
 where required. A browser draft resumes only against the same packet digest.
-Download the resulting JSON and place it as a new, ignored file under
-`data/kw-evaluation`; browser storage and a download are not a recorded engine
-decision until the file is reviewed and used by the preparer. The screen does
+Select **Save owner decisions** after all ten are complete. The local server
+validates the signed-in owner and exact packet again, then writes a new,
+immutable `m2-owner-decisions-<packet>-<owner>-<decision>.json` under ignored
+`data/kw-evaluation`. A retry of the same choices returns the original saved
+record; a changed review becomes a separate version. Reopen the page to verify
+the saved summary. Download a copy only if needed. Browser storage and a
+download alone are not the saved record. Saving the ledger does not pass the
+later source-plan, cohort, or capture gates; the operator still reviews and
+supplies the exact saved file to the preparer as `--decisions`. The screen does
 not fetch candidate sites automatically; following a source link is a separate
 owner-controlled browser visit. It grants no capture or contact.
 

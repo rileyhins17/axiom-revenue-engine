@@ -733,14 +733,9 @@ export default async function DashboardPage() {
     <div className="mx-auto flex max-w-[1320px] flex-col gap-5 text-[#20352c]">
       <header className="page-header-main border-b border-[#dce5dd] pb-5">
         <div className="min-w-0 flex-1">
-          <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#537262]">
-            <span className="size-2 rounded-full bg-[#145943]" />
-            Axiom Web · Owner review
-          </span>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#20352c]">Today</h1>
-          <p className="mt-1 text-sm text-[#52645a]">
-            Start with the next decision. Take the rest in order.
-          </p>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#537262]">Your workspace</span>
+          <h1 className="mt-1 text-4xl font-semibold tracking-[-0.045em] text-[#20352c]">Today</h1>
+          <p className="mt-1 text-sm text-[#52645a]">The decisions and people that need your attention.</p>
         </div>
         <div className="page-header-actions">
           <RefreshButton />
@@ -784,13 +779,40 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      <section aria-label="Today owner action desk" className="overflow-hidden rounded-[28px] border border-[#dce5dd] bg-[#f6f8f3] shadow-sm">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.8fr)]">
+      <section aria-label="Today owner action desk" className="grid gap-5">
+        <div className="relative isolate overflow-hidden rounded-[28px] bg-[#143c2e] px-6 py-7 text-white shadow-[0_22px_48px_-34px_rgba(12,48,32,0.8)] sm:px-9 sm:py-9 lg:px-10">
+          <div className="pointer-events-none absolute -right-24 -top-44 -z-10 size-[28rem] rounded-full border-[70px] border-white/[0.045]" aria-hidden="true" />
+          <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(250px,0.65fr)]">
+            <div className="max-w-2xl">
+              <p className="inline-flex items-center rounded-full border border-white/20 bg-white/[0.08] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#d1ebd9]">Your next decision</p>
+              <h2 className="mt-5 max-w-xl text-3xl font-semibold leading-[1.12] tracking-[-0.045em] sm:text-4xl">Choose which businesses deserve a closer look.</h2>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-[#d1e1d5]">Check each proposed business and record whether to keep it, replace it, or pause for more research. This is a private review.</p>
+              {canOpenBusinessReview ? (
+                <Link href="/leads/m2/identity" className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-xl bg-[#eef5e9] px-6 text-sm font-bold text-[#174633] shadow-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:w-fit">
+                  Review businesses <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+              ) : (
+                <p className="mt-6 inline-flex rounded-xl border border-white/25 px-4 py-3 text-sm text-[#d5e6d7]">A named owner can complete this review.</p>
+              )}
+            </div>
+            <div className="rounded-2xl border border-white/20 bg-white/[0.07] p-5 backdrop-blur-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#bcd8c6]">What this decision does</p>
+              <ol className="mt-4 grid gap-4 text-sm">
+                <li className="flex gap-3"><span className="font-semibold text-[#cfe8ae]">01</span><span>Confirm the right company and location.</span></li>
+                <li className="flex gap-3"><span className="font-semibold text-[#cfe8ae]">02</span><span>Record your choice and why.</span></li>
+                <li className="flex gap-3"><span className="font-semibold text-[#cfe8ae]">03</span><span>Save it for the next research step.</span></li>
+              </ol>
+              <p className="mt-5 border-t border-white/15 pt-4 text-xs leading-5 text-[#bed3c5]">Nobody is contacted from this review.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid overflow-hidden rounded-[24px] border border-[#dce5dd] bg-white shadow-sm lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.8fr)]">
           <section aria-labelledby="today-attention" className="p-5 sm:p-7 lg:p-8">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#537262]">First things first</p>
-                <h2 id="today-attention" className="mt-1 text-2xl font-semibold tracking-tight text-[#20352c] sm:text-3xl">What needs your attention?</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#537262]">People</p>
+                <h2 id="today-attention" className="mt-1 text-2xl font-semibold tracking-tight text-[#20352c]">Replies and follow-ups</h2>
               </div>
             </div>
             {replyInboxRead.unavailable || followUpsRead.unavailable ? (
@@ -822,25 +844,12 @@ export default async function DashboardPage() {
                 ))}
               </ul>
             ) : (
-              <p className="mt-5 rounded-xl border border-[#e4ebe2] bg-white px-4 py-4 text-sm text-[#53675a]">No recorded replies or client actions are due in the current owner view.</p>
+              <p className="mt-5 rounded-xl border border-[#e4ebe2] bg-[#f8faf7] px-4 py-4 text-sm text-[#53675a]">No recorded replies or client actions are due right now.</p>
             )}
             <Link href="/clients" className="mt-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#145943] hover:text-[#0f4634] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943]">See all client actions <ArrowRight className="size-4" aria-hidden="true" /></Link>
-            <section aria-labelledby="today-review-business" className="mt-7 border-t border-[#dce5dd] pt-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#537262]">Your next review</p>
-              <h3 id="today-review-business" className="mt-2 text-xl font-semibold tracking-tight text-[#20352c]">Review one business</h3>
-              <p className="mt-2 text-sm leading-6 text-[#52645a]">Check the evidence and decide whether it deserves more research. A website snapshot alone is not a reason to make contact.</p>
-              {canOpenBusinessReview ? (
-                <Link href="/leads/m2" className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#145943] px-6 text-sm font-semibold text-white transition hover:bg-[#104a37] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943] sm:w-fit">
-                  Review businesses <ArrowRight className="size-4" aria-hidden="true" />
-                </Link>
-              ) : (
-                <p className="mt-4 rounded-xl bg-[#f6f8f3] px-4 py-3 text-sm text-[#53675a]">An admin owner can open the business review.</p>
-              )}
-              <p className="mt-2 text-xs leading-5 text-[#52645a]">These are evaluation candidates, not an approved contact list.</p>
-            </section>
           </section>
 
-          <aside className="border-t border-[#dce5dd] bg-white p-5 sm:p-7 lg:border-l lg:border-t-0 lg:p-8">
+          <aside className="border-t border-[#dce5dd] bg-[#f7f9f5] p-5 sm:p-7 lg:border-l lg:border-t-0 lg:p-8">
             <section aria-labelledby="today-readiness">
               <div className="flex items-center justify-between gap-3">
                 <h3 id="today-readiness" className="text-sm font-semibold text-[#20352c]">Safety and email status</h3>
@@ -863,24 +872,14 @@ export default async function DashboardPage() {
               </div>
             </section>
 
-            <section aria-labelledby="today-learning" className="mt-6 border-t border-[#e4ebe2] pt-5">
-              <h3 id="today-learning" className="text-sm font-semibold text-[#20352c]">A note from recent work</h3>
-              {messageVariantsRead.unavailable || auditLogRead.unavailable ? (
-                <p className="mt-1 text-sm leading-5 text-[#745a2d]">Learning records could not be checked.</p>
-              ) : messageVariants.length > 0 ? (
-                <p className="mt-1 text-sm leading-5 text-[#52645a]">{messageVariants.reduce((sum, item) => sum + Number(item.sent || 0), 0)} initial messages and {messageVariants.reduce((sum, item) => sum + Number(item.replied || 0), 0)} linked replies are recorded. Review conversations before drawing a conclusion.</p>
-              ) : (
-                <p className="mt-1 text-sm leading-5 text-[#52645a]">No validated message-result comparisons are available yet.</p>
-              )}
-            </section>
           </aside>
         </div>
       </section>
 
       <details className="group overflow-hidden rounded-xl border border-[#dce5dd] bg-white">
         <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-[#52645a] hover:bg-[#f7f9f6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943]">
-          <span>Advanced system details</span>
-          <span className="text-xs font-normal text-[#68766c]">Legacy metrics · not proof of email readiness</span>
+          <span>Operator details</span>
+          <span className="text-xs font-normal text-[#68766c]">Optional diagnostics</span>
         </summary>
         {diagnosticsUnavailable ? (
           <p className="border-t border-[#dce5dd] bg-[#fff8e8] px-5 py-4 text-sm leading-6 text-amber-900">Diagnostics are hidden because some critical status could not be verified. This screen does not pause the live system.</p>

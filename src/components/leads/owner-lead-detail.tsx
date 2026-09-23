@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Building2,
+  ChevronDown,
   ClipboardCheck,
   Clock3,
   ExternalLink,
@@ -122,6 +123,74 @@ function decisionStateCopy(lead: OwnerLeadDetailResponse["lead"]) {
   return { label: "Needs qualification", description: "Qualification criteria remain unmet; review the failed gates before treating this as a sales lead." };
 }
 
+function topWebsiteFindings(data: OwnerLeadDetailResponse) {
+  const severityOrder = { CRITICAL: 0, IMPORTANT: 1, MINOR: 2 } as const;
+  return [...data.website.findings]
+    .sort((left, right) => severityOrder[left.severity] - severityOrder[right.severity])
+    .slice(0, 3);
+}
+
+function OwnerNextStep({ data }: { data: OwnerLeadDetailResponse }) {
+  const lead = data.lead;
+  const stopped = data.operationalStopState === "STOPPED" || data.operationalStopState === "UNAVAILABLE";
+  const recommendedRoute = data.routes.find((route) => route.contactPointId === lead.route.contactPointId);
+  const canReviewRoute = !stopped && lead.attention === "READY_FOR_REVIEW" && lead.ownerActionable;
+  const action = stopped
+    ? data.operationalStopState === "STOPPED" ? "Keep contact stopped" : "Pause contact review"
+    : canReviewRoute ? "Review the recommended route manually" : "Continue qualification or refresh research";
+  const actionReason = stopped
+    ? "The business stop is active or could not be checked. Recorded routes remain evidence only."
+    : canReviewRoute ? lead.route.reason : decisionStateCopy(lead).description;
+  const findings = topWebsiteFindings(data);
+
+  return (
+    <section aria-labelledby="owner-next-step" className="overflow-hidden rounded-2xl border border-[#d5e5d2] bg-[#f4f8f2]">
+      <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:p-6">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#176443]">Owner next step</p>
+          <h2 id="owner-next-step" className="mt-1 text-lg font-semibold text-[#1a3124]">{action}</h2>
+          <p className="mt-1 text-xs leading-5 text-[#53675a]">{actionReason}</p>
+          {canReviewRoute && recommendedRoute ? (
+            <div className="mt-4 rounded-xl border border-[#d5e5d2] bg-white p-3">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#566a5d]">Suggested route · read-only</p>
+              <p className="mt-1 text-sm font-semibold text-[#24382d]">{recommendedRoute.value}</p>
+              <p className="mt-1 text-[11px] leading-5 text-[#617367]">{readableCode(recommendedRoute.channel)} · {ROUTE_READINESS_COPY[recommendedRoute.readiness].label}</p>
+              <a href={recommendedRoute.sourceUrl} target="_blank" rel="noreferrer" className="v2-focus-ring mt-1 inline-flex min-h-8 items-center gap-1 rounded-md text-[10px] font-semibold text-[#176443] hover:text-[#315740]">
+                Route evidence <ExternalLink className="size-3" aria-hidden="true" />
+              </a>
+            </div>
+          ) : null}
+          <p className="mt-3 text-[10px] leading-4 text-[#617367]">This is a review reminder only. The page cannot contact the business or approve outreach.</p>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-xs font-semibold text-[#35493b]">Top website findings</h3>
+            <span className="font-mono text-[10px] text-[#566a5d]">{findings.length} of {data.website.findings.length}</span>
+          </div>
+          {findings.length > 0 ? (
+            <ol className="mt-2 divide-y divide-[#e4ebe2] rounded-xl border border-[#e1e9df] bg-white">
+              {findings.map((finding) => (
+                <li key={finding.checkId} className="flex items-start justify-between gap-3 p-3">
+                  <div>
+                    <p className="text-xs font-semibold text-[#35493b]">{readableCode(finding.category)} <span className="font-normal text-[#617367]">· {SEVERITY_COPY[finding.severity].label}</span></p>
+                    <p className="mt-1 text-[11px] leading-5 text-[#425b4d]">{finding.claim?.observation ?? "This check is incomplete and has no supported claim. Manual review is required."}</p>
+                  </div>
+                  {finding.claim ? (
+                    <a href={finding.claim.sourceUrl} target="_blank" rel="noreferrer" className="v2-focus-ring inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md px-1 text-[10px] font-semibold text-[#176443] hover:text-[#315740]">
+                      Proof <ExternalLink className="size-3" aria-hidden="true" />
+                    </a>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          ) : <p className="mt-2 rounded-xl border border-[#e1e9df] bg-white p-3 text-xs text-[#617367]">No website findings are recorded.</p>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
   const lead = data.lead;
   const qualifiedForReview = lead.attention === "READY_FOR_REVIEW" && lead.ownerActionable;
@@ -166,6 +235,8 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
           ) : null}
         </div>
       </header>
+
+      <OwnerNextStep data={data} />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)]">
         <section aria-labelledby="why-this-lead" className="rounded-2xl border border-[#e1e9df] bg-white p-4 sm:p-5">
@@ -255,10 +326,22 @@ export function OwnerLeadDetail({ data }: { data: OwnerLeadDetailResponse }) {
         </aside>
       </div>
 
-      <WebsiteEvidence data={data} />
       <Reachability data={data} />
       <ContactReviewSection data={data} />
       <HistorySection data={data} />
+
+      <details className="overflow-hidden rounded-2xl border border-[#e1e9df] bg-white">
+        <summary className="v2-focus-ring flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#24382d] marker:hidden sm:px-5">
+          <span>Full website audit and evidence details</span>
+          <span className="flex shrink-0 items-center gap-2">
+            <span className="rounded-full border border-[#e1e9df] bg-[#f1f5ef] px-2.5 py-1 text-[10px] font-medium text-[#566a5d]">{data.website.findings.length} findings</span>
+            <ChevronDown className="size-4 text-[#617367]" aria-hidden="true" />
+          </span>
+        </summary>
+        <div className="border-t border-[#e4ebe2]">
+          <WebsiteEvidence data={data} />
+        </div>
+      </details>
 
       <section aria-label="Dossier provenance" className="grid gap-3 rounded-2xl border border-[#e1e9df] bg-white p-4 text-xs text-[#617367] sm:grid-cols-3 sm:p-5">
         <div>

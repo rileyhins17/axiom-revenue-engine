@@ -877,7 +877,7 @@ async function assertKeyboardFlow(page: Page) {
   await page.reload({ waitUntil: "domcontentloaded" });
   // Next may still be streaming the loading skeleton after DOMContentLoaded.
   // Wait for the actual owner page before focusing its disclosure.
-  await page.getByRole("link", { name: "Open Business Review" }).waitFor({ state: "visible" });
+  await page.getByRole("link", { name: "Review 10 businesses" }).waitFor({ state: "visible" });
   await page.waitForLoadState("networkidle");
   await page.locator("body").focus();
   await page.keyboard.press("Tab");
@@ -892,7 +892,7 @@ async function assertKeyboardFlow(page: Page) {
   await page.keyboard.press("Enter");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "main-content", "The skip link must move focus to the main landmark.");
 
-  const legacySummary = page.locator("summary:visible").filter({ hasText: "Advanced: legacy ranking, scores, and evidence" }).first();
+  const legacySummary = page.locator("summary:visible").filter({ hasText: "How business records are assessed" }).first();
   await legacySummary.focus();
   await page.keyboard.press("Enter");
   assert.equal(await legacySummary.evaluate((element) => element.parentElement?.hasAttribute("open")), true,
@@ -919,7 +919,7 @@ async function assertKeyboardFlow(page: Page) {
 
 async function openLegacyLeadPreview(page: Page) {
   await page.waitForLoadState("networkidle");
-  const summary = page.locator("summary:visible").filter({ hasText: "Advanced: legacy ranking, scores, and evidence" }).first();
+  const summary = page.locator("summary:visible").filter({ hasText: "How business records are assessed" }).first();
   await summary.click();
   await page.getByRole("list", { name: "Legacy scored businesses" }).waitFor();
 }
@@ -1250,8 +1250,9 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     const listStart = performance.now();
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Businesses" }).waitFor();
-    await page.getByRole("link", { name: "Open Business Review" }).waitFor();
-    assert.equal(await page.getByRole("link", { name: "Review 10 businesses" }).getAttribute("href"), "/leads/m2/identity");
+    const businessesReview = page.getByRole("link", { name: "Review 10 businesses" });
+    await businessesReview.waitFor();
+    assert.equal(await businessesReview.getAttribute("href"), "/leads/m2/identity");
     await page.screenshot({ path: join(outputDirectory, "leads-desktop.png"), fullPage: true });
     await openLegacyLeadPreview(page);
     await page.getByRole("link", { name: /Open evidence dossier/i }).first().waitFor();
@@ -1268,16 +1269,24 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     const dossierStart = performance.now();
     await page.keyboard.press("Enter");
     await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
+    await page.getByText("Owner next step", { exact: true }).waitFor();
+    await page.getByRole("heading", { level: 3, name: "Top website findings" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Why the old score flagged this business" }).waitFor();
-    await page.getByRole("heading", { level: 2, name: "Website evidence" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Contact review not recorded" }).waitFor();
-    await page.getByText("+15195550123", { exact: true }).waitFor();
-    await page.getByText("https://roofing.axiomfixtures.ca/contact", { exact: true }).waitFor();
-    await page.getByText("hello@roofing.axiomfixtures.ca", { exact: true }).waitFor();
+    await page.locator("section[aria-labelledby='owner-next-step']").getByText("+15195550123", { exact: true }).waitFor();
+    const recordedRoutes = page.locator("section[aria-labelledby='reachable-routes']");
+    await recordedRoutes.getByText("https://roofing.axiomfixtures.ca/contact", { exact: true }).waitFor();
+    await recordedRoutes.getByText("hello@roofing.axiomfixtures.ca", { exact: true }).waitFor();
     const desktopDossierReadyMs = Math.round(performance.now() - dossierStart);
     assert(desktopDossierReadyMs <= OWNER_DOSSIER_BUDGET_MS, `The lead rationale was not visible within ${OWNER_DOSSIER_BUDGET_MS} ms.`);
     await assertOwnerPageTitle(page, "Lead dossier | Axiom Revenue Engine");
+    const fullAudit = page.locator("details").filter({ has: page.getByText("Full website audit and evidence details", { exact: true }) }).first();
+    await fullAudit.locator("summary").waitFor();
+    assert.equal(await fullAudit.getAttribute("open"), null, "The full audit should start closed so owner actions remain easy to find.");
+    await fullAudit.locator("summary").click();
+    await page.getByRole("heading", { level: 2, name: "Website evidence" }).waitFor();
     assert((await page.getByRole("link", { name: "Inspect proof" }).count()) >= 3, "The dossier must expose at least three inspectable observations.");
+    await fullAudit.locator("summary").click();
     await assertWcag(page, "desktop dossier");
     await assertReadOnlyOwnerSurface(page, "desktop dossier", "[data-owner-readonly-dossier]");
     await assertResponsive(page, "desktop dossier");
@@ -1521,13 +1530,14 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
     const todayReview = page.getByRole("region", { name: "Today owner action desk" });
-    await todayReview.getByRole("heading", { name: "What needs your attention?" }).waitFor();
-    await todayReview.getByRole("heading", { name: "Review one business" }).waitFor();
+    await todayReview.getByRole("heading", { name: "Choose which businesses deserve a closer look." }).waitFor();
+    await todayReview.getByRole("heading", { name: "Replies and follow-ups" }).waitFor();
     await todayReview.getByRole("heading", { name: "Safety and email status" }).waitFor();
-    await todayReview.getByRole("heading", { name: "A note from recent work" }).waitFor();
     await todayReview.getByText("Email route", { exact: true }).waitFor();
     await todayReview.getByText("Not verified", { exact: true }).waitFor();
-    await todayReview.getByRole("link", { name: "Review businesses" }).waitFor();
+    const todayBusinessReview = todayReview.getByRole("link", { name: "Review businesses" });
+    await todayBusinessReview.waitFor();
+    assert.equal(await todayBusinessReview.getAttribute("href"), "/leads/m2/identity");
     assert.equal(await page.getByText("Safety gated", { exact: true }).count(), 0,
       "The owner shell must not imply that safety is verified through a static badge.");
     assert.equal(await page.getByText("prod", { exact: true }).count(), 0,
@@ -1542,9 +1552,14 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
 
     stage = "desktop Outreach";
     await page.goto("/automation", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { level: 1, name: "Outreach" }).waitFor();
-    await page.getByRole("heading", { name: "Mail route not verified" }).waitFor();
-    await page.getByRole("link", { name: "Open Business Review" }).waitFor();
+    await page.getByRole("heading", { level: 1, name: "Follow-through" }).waitFor();
+    await page.getByRole("heading", { name: "Email is not ready" }).waitFor();
+    await page.getByRole("heading", { name: "Client follow-ups" }).waitFor();
+    await page.getByRole("heading", { name: "Automation stop" }).waitFor();
+    const followThroughReview = page.getByRole("link", { name: "Review proposed businesses" });
+    await followThroughReview.waitFor();
+    assert.equal(await followThroughReview.getAttribute("href"), "/leads/m2/identity");
+    assert.equal(await page.getByRole("link", { name: "Open Business Review" }).count(), 0);
     assert.equal(await page.getByRole("link", { name: /Connect Gmail/i }).count(), 0);
     await assertResponsive(page, "desktop Outreach");
     await assertWcag(page, "desktop Outreach");
@@ -1554,7 +1569,9 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.goto("/clients", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Clients & opportunities" }).waitFor();
     assert.equal(await page.getByText("Collected revenue", { exact: true }).count(), 0);
-    await page.getByText("No client records to review", { exact: true }).waitFor();
+    await page.getByRole("heading", { name: "Your next follow-up" }).waitFor();
+    await page.locator("#main-content").getByText("Your relationship board is ready", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Add client" }).waitFor();
     assert.equal(await page.getByRole("region", { name: /Deal stages/ }).count(), 0,
       "An empty client board should not show a long row of empty stages.");
     await assertResponsive(page, "desktop Revenue");
@@ -1645,8 +1662,13 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
 
     stage = "mobile Outreach";
     await page.goto("/automation", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { level: 1, name: "Outreach" }).waitFor();
-    await page.getByRole("heading", { name: "Mail route not verified" }).waitFor();
+    await page.getByRole("heading", { level: 1, name: "Follow-through" }).waitFor();
+    await page.getByRole("heading", { name: "Email is not ready" }).waitFor();
+    await page.getByRole("heading", { name: "Client follow-ups" }).waitFor();
+    const mobileFollowThroughReview = page.getByRole("link", { name: "Review proposed businesses" });
+    await mobileFollowThroughReview.waitFor();
+    assert.equal(await mobileFollowThroughReview.getAttribute("href"), "/leads/m2/identity");
+    assert.equal(await page.getByRole("link", { name: "Open Business Review" }).count(), 0);
     await assertResponsive(page, "mobile Outreach");
     await assertWcag(page, "mobile Outreach");
     await page.screenshot({ path: join(outputDirectory, "outreach-mobile.png"), fullPage: true });
@@ -1654,7 +1676,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "mobile Revenue";
     await page.goto("/clients", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Clients & opportunities" }).waitFor();
-    await page.getByText("No client records to review", { exact: true }).waitFor();
+    await page.getByRole("heading", { name: "Your next follow-up" }).waitFor();
+    await page.locator("#main-content").getByText("Your relationship board is ready", { exact: true }).waitFor();
     assert.equal(await page.getByText("No clients in this stage yet").count(), 0,
       "An empty phone board should not repeat every stage before its empty state.");
     await assertResponsive(page, "mobile Revenue");
