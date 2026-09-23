@@ -1,5 +1,65 @@
 # Current status — Axiom Revenue Engine
 
+## Manual owner next-action checkpoint; production goal remains open
+
+**Updated:** 2026-09-22 (America/Toronto). **Verified code commit:** `24c6294`
+(`feat(revenue): save manual owner next actions on v2 dossiers`), following
+schema commit `6544265`. This is one local M4 owner-workflow slice, not the M4
+exit gate. M1's offline dossier remains complete; M2 has **0/10 real engine
+assessments**; M3–M7 and production remain incomplete.
+
+An authenticated owner can now save a Riley- or Aidan-assigned next action and
+Toronto due time on a current v2 business dossier, then complete or cancel it.
+Migration 0071 holds append-only task and terminal-event rows. The API derives
+the actor from the session, binds every read/write to the business identity,
+requires a same-origin mutation, and checks exact idempotent readback. A lost
+POST response can be retried with the same key. Task records are reminders;
+they grant no qualification, contact, consent, provider, send, or automation
+authority. An unavailable task table leaves the evidence dossier readable and
+the task panel explicitly unavailable. See [ADR 0045](adr/0045-keep-owner-next-actions-manual-and-business-scoped.md).
+
+**Verification:** `npm run check:safety`, `npm test -- --test-concurrency=1`
+(694 tests: 691 passed, zero failed, three expected Windows skips),
+`npm run typecheck`, `npm run lint`, `npm run build:cloudflare`, and
+`npx wrangler deploy --env="" --dry-run --autoconfig false` passed. The
+separately run `npm run test:owner-ui` passed on the completed build: one
+synthetic task survived an accepted-but-lost response and exact retry, open and
+terminal states survived reload, anonymous and authenticated cross-site task
+requests were rejected, nine WCAG page scans passed, and external requests
+were zero. The initial suite refused an uncommitted migration, as designed.
+An interrupted subsequent run left the known `other-process` M2 lock marker;
+after confirming no owner process, that single marker was removed under
+GOTCHAS OPS-012 and the clean full suite passed. No test contacted a prospect.
+
+**Production, automation and spend:** schema 0071 is committed but has not been
+applied to staging or production. No deployment, remote migration, provider
+activation, inbox operation, or Revenue Engine prospect capture/contact or
+outreach occurred in this checkpoint.
+Live production state remains unverified. Autonomous switches remain off, the
+C$50/month runtime ceiling is unchanged, and incremental engine-provider
+spend is C$0. `wrangler whoami` on 2026-09-22 reports an expired local login;
+the dry run succeeded without production access.
+
+**Blockers and owner decisions:** the proposed ten businesses still need exact
+owner identity/disposition review; Aidan's calling feedback is aggregate and
+does not approve them or establish their individual website quality. Current
+source-use/retention decisions, a supervised real capture, account/quota and
+price evidence, Cloudflare reauthentication, and a staging backup/migration/
+rollback gate remain open. M4 still lacks verified contact policy, suppression,
+mailbox/reply readiness, exact-message approvals, and the broader CRM outcome
+loop. No live send has been authorized.
+
+Next three concrete actions:
+
+1. Record Riley/Aidan corrections or approval for each of the ten proposed M2
+   evaluation identities; keep them separate from any calling list.
+2. Complete the source-policy/retention and account/cost packet, restore
+   Cloudflare owner access, and prepare a backed-up staging migration/rollback
+   gate for the schemas actually needed by the next release.
+3. Execute one separately gated real M2 HTML capture and assessment, review its
+   evidence and cost receipt, then work toward ten dossiers and the fixed
+   50-business quality evaluation before external outreach.
+
 ## Inert CAD cost admission checkpoint; M2 remains at 0/10
 
 **Updated:** 2026-09-22 (America/Toronto). **Verified code commit:** `16d514a`
