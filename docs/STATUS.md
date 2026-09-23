@@ -1,5 +1,67 @@
 # Current status — Axiom Revenue Engine
 
+## M2 complete locally: ten real website-need assessments (Claude, delegated)
+
+**Updated:** 2026-09-23 (America/Toronto) by Claude Code (Opus 5.5) in the
+Local desktop session, which has Remote Control on. **Branch:**
+`codex/revenue-engine-production`, still unpushed while the repository is public.
+The verifying commit is the commit that adds this entry; its checks are listed below.
+
+**What changed.** Claude took over from Codex. The existing HTML pipeline
+always ends `UNKNOWN / HTML-only` and cannot judge website need, so under
+[ADR 0059](adr/0059-record-delegated-browser-view-website-need-assessments.md)
+Claude viewed each of the ten saved businesses' public pages in a normal
+browser at desktop and phone widths (2026-09-23, 19:55–20:40 UTC, no forms or
+logins, own-word facts only) and recorded sealed assessments in ignored
+`data/kw-evaluation/m2-website-need/`. A deterministic rule checks each stated
+need against its cited findings. **M2: 10/10 real assessments** — 2
+`REBUILD` (Kitchener roofing, Kitchener landscaping), 1 `MINOR_IMPROVEMENT`,
+7 `NO_OPPORTUNITY`. All remain `RESEARCH`, pending owner confirmation, with
+zero contact/outreach/spend authority. The local `/leads/m2` page now opens
+with a short "Website reviews" summary. Service 1st's former hold was
+resolved for this route by a manual robots check (public paths allowed); no
+site returned a denial. The 403 sites (Comfort Air, TriCity) were not used.
+
+**Key finding.** Selecting on identity and independence found mostly
+businesses that already have good websites (7/10). M3 sourcing therefore
+pre-screens homepages for weak-site signals before full assessment. A
+background research pass for about 60 more candidates is running.
+
+**Independent owner audit recorded (Riley, read-only Cloudflare dashboard,
+2026-09-23 20:39 UTC).** Isolated staging D1
+`322fcf89-312c-44f0-b238-c4a348f6d6ad` has exactly 55 migration receipts,
+last `0055_outreach_human_approval.sql`; its `OutreachAutomationSetting` row
+has `enabled=0`, `globalPaused=1`, `emergencyPaused=1`, `intakePaused=1`,
+`followUpsPaused=1`. `getaxiom.ca` Email Routing is Enabled with DNS locked
+but has **0 routing rules**; the only destination is **Pending** and the
+catch-all Drop rule is disabled. **No Riley/Aidan reply route is active or
+verified.** A 7-day whole-account D1 Read token was prepared at Cloudflare's
+review screen but **not created**. Claude created no token and changed no
+Cloudflare state.
+
+**Verification.** CHECKS_PLACEHOLDER
+
+**Production, automation, spend.** Staging and legacy production Workers/D1,
+providers and all autonomy stops are unchanged. No prospect was contacted,
+no form submitted, no email sent. Incremental spend C$0 against the C$50
+ceiling. **Production readiness remains open.**
+
+**Owner actions** (prepared in [the owner action packet](reviews/2026-09-23-owner-action-packet.md)):
+make the repository private; create the prepared D1 read token; verify the
+Email Routing destination and add the two address rules; register Axiom with
+the National DNCL.
+
+Next three concrete actions:
+
+1. Assess the pre-screened M3 candidates on desktop and phone, freeze a
+   balanced 50-case set (10 from M2 + 40), and record labels with class-level
+   metrics.
+2. When the D1 read token exists, run read-only staging inventory/export with
+   checksums and rehearse 0055→0074 locally on those rows.
+3. After Email Routing rules and destination verification, prove reply
+   delivery with owner-sent test messages only, then build the reply-owner
+   workflow on that proven route.
+
 ## Claude desktop transfer and Codex-attributed M2 observation checkpoint
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified local application
