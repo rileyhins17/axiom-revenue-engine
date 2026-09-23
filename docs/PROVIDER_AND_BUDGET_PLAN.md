@@ -56,30 +56,49 @@ guarantee. ([Workers pricing](https://developers.cloudflare.com/workers/platform
 [Browser Run](https://developers.cloudflare.com/browser-run/pricing/))
 
 The selected first-pilot mail route has **zero paid mailbox seats**. Cloudflare
-Email Routing is the inbound route to verified existing owner destinations;
-Cloudflare's current official pricing documents inbound routing as available on
-Workers Free/Paid and unlimited, while destination verification and active rules
-remain account gates. Resend is the separate outbound/reply adapter candidate;
-its published Free plan is a conditional $0 option, not proof of an account,
-quota or verified sender. If forwarding plus the reviewed Resend or free
-owner-only send-as route cannot meet reply ownership/privacy requirements, mail
-activation remains blocked. Paid mailboxes and Workspace seats are out of scope
-unless Riley explicitly reverses the zero-paid-mailbox decision. ([Cloudflare Email Routing pricing](https://developers.cloudflare.com/email-service/platform/pricing/),
-[Cloudflare routing addresses](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/),
-[Resend pricing](https://resend.com/pricing?product=transactional),
-[Resend domain verification](https://resend.com/docs/add-a-domain))
+Email Routing is the inbound route to verified existing owner destinations.
+Cloudflare's current Email Service separates inbound Email Routing from outbound
+Email Sending: Routing is available on Workers Free and Paid with unlimited
+inbound messages, while sending to arbitrary recipients requires Workers Paid.
+Sending only to verified destination addresses is free on either plan, including
+when only Email Routing is configured. This verified-destination allowance can
+support owner-controlled sink tests; it does not enable free replies to arbitrary
+prospects. Resend remains the selected conditional outbound/reply adapter for a
+zero-paid-mailbox pilot. If Cloudflare forwarding plus the gated Resend route or
+a separately reviewed free owner-only send-as route cannot meet reply ownership
+and privacy requirements, mail activation remains blocked. Paid mailboxes and
+Workspace seats remain out of scope unless Riley explicitly reverses the
+zero-paid-mailbox decision. ([Cloudflare Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/),
+[Cloudflare Email Service limits](https://developers.cloudflare.com/email-service/platform/limits/),
+[Cloudflare routing addresses](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/))
 
-The 2026-09-22 official-page refresh still shows a Resend Free option with a
-100/day sending limit, three custom domains, one webhook endpoint and 30-day
-provider-side data retention. These published features fit the proposed tiny
-pilot on paper; they do not establish that Axiom has a free account, an active
-sender/domain, a signing secret, or an acceptable privacy route. Cloudflare
-Email Routing cannot send a custom-domain reply by itself, so an owner-triggered
-Resend reply round trip with a verified `From` and `Reply-To` must be proven
-using owner-controlled inboxes before any external pilot. Verify live plan,
-billing/overage, destination/rule status, domain records, signed webhook and
-event handling in the actual accounts. ([Resend pricing](https://resend.com/pricing),
+Cloudflare Email Sending is a **Beta alternate**, not a second adapter to build
+alongside the first pilot route. If Axiom's Workers Paid entitlement and domain
+access are verified, compare it with Resend through one owner-controlled sink
+spike before changing the selected route. It supports reply and threading
+headers, but inbound Routing does not appear in outbound event subscriptions;
+the app would have to own that reply/event join and its retention policy. The
+published 3,000/month included sending quota does not prove the initial daily
+limit for Axiom's account. ([Cloudflare send API](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/),
+[headers](https://developers.cloudflare.com/email-service/reference/headers/),
+[event subscriptions](https://developers.cloudflare.com/email-service/platform/event-subscriptions/),
+[limits](https://developers.cloudflare.com/email-service/platform/limits/))
+
+**Provider-page check: 2026-09-23.** Resend's published Free plan lists 3,000
+emails/month, a 100/day limit, three domains, one webhook endpoint and 30-day
+provider-side data retention. These are published plan features, not evidence
+that Axiom has an eligible Free account, usable quota, a verified sending domain
+or sender, an API key, a webhook secret, or an acceptable privacy route. A free
+plan does not authorize overages or establish the account's actual billing and
+usage controls. Before activation, verify the live plan and billing state,
+Cloudflare destination/rule status, Resend domain records and sender, and signed
+webhook/event handling in the owner-controlled accounts. Prove the human-triggered
+reply round trip with owner-controlled inboxes and a verified `From` and
+Cloudflare-routed `Reply-To`; no prospect send is part of that readiness check.
+([Resend pricing](https://resend.com/pricing),
 [Resend send API](https://resend.com/docs/api-reference/emails/send-email),
+[Resend domain verification](https://resend.com/docs/add-a-domain),
+[Resend webhook verification](https://resend.com/docs/webhooks/verify-webhooks-requests),
 [Cloudflare Postmaster](https://developers.cloudflare.com/email-service/reference/postmaster/))
 
 Hunter Free is the proposed low-volume verifier: $0, no card, 50 shared monthly

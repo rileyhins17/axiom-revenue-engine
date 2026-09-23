@@ -56,7 +56,11 @@ export async function readPrivateKwJson(value: string, maxBytes: number) {
   if (!inputStats.isFile() || inputStats.size > maxBytes) {
     throw new Error(`The private KW input must be a JSON file no larger than ${maxBytes} bytes.`);
   }
-  return { file, value: JSON.parse(await readFile(file, "utf8")) as unknown };
+  const bytes = await readFile(file);
+  if (bytes.byteLength > maxBytes) {
+    throw new Error(`The private KW input must be a JSON file no larger than ${maxBytes} bytes.`);
+  }
+  return { file, bytes, value: JSON.parse(bytes.toString("utf8")) as unknown };
 }
 
 export async function writePrivateKwJson(value: string, data: unknown) {

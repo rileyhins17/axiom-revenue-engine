@@ -474,6 +474,47 @@ Aidan's review. Research notes cannot supply that owner decision. Prepare the
 source plan from actual research evidence and the exact-ten manifest after
 the recorded review.
 
+The private, source-linked candidate packet is
+`data/kw-evaluation/m2-public-research-2026-09-22-review.md`; the shorter
+`m2-owner-identity-decision-2026-09-23.md` in the same ignored directory is
+the owner decision sheet. The underlying review JSON has SHA-256
+`4bf0d8c942ee253dcc4dfe965390f53f351373506e8846f4596cbde0c8a9e70c`.
+Review every proposed identity, Kitchener/Waterloo/Cambridge assignment, niche
+and company-stated independence claim; record the reviewer, date, correction or
+keep/replace/hold decision for each ID. M2-06 and M2-10 denied access and may
+remain explicitly blocked research cases; keeping either does not make it
+capturable. Aidan's aggregate observation that many sites look decent has no
+per-business disposition or website-fit label. A "keep" is for evaluation,
+never permission to call or email. Do not turn the research JSON's `PENDING`
+fields into approval, or infer ten separate decisions from an earlier
+"continue." Preserve a separate decision record bound to the exact research
+packet. A replacement needs an exact supported source-plan member and the
+same city/niche balance; otherwise prepare a new reviewed research operation.
+
+The local npm run kw:prepare-m2-owner-decisions command is the no-network
+preparer for the later exact-ten shadow selection. It takes four distinct
+direct-child files under ignored data/kw-evaluation: --research-review,
+--source-plan, --decisions, and --output. The owner JSON must bind the exact
+research-review SHA-256 and source-plan digest and contain one explicit choice
+for every M2-01 through M2-10 with reviewer and time. A kept or replacement
+business needs explicit identity, city/niche, and independence confirmations.
+The command validates the saved source plan, cohort balance, exact supported
+replacement membership, and writes its output only if the destination is new.
+Its output is plan-only with every capture, database, provider, contact, send,
+deployment, and spend authority set to zero.
+
+**Known access blocks are a hard selection boundary.** KEEP_AS_BLOCKED for
+M2-06 or M2-10 can remain an honest owner decision in the separate JSON ledger,
+but the preparer refuses to put either blocked site in the next-phase shadow
+selection. A replacement requires a supported alternate that is also in a
+reviewed import source plan; the current research packet does not by itself
+establish that membership. HOLD or REJECT also leaves the exact-ten selection
+incomplete. These are valid ways to account for a business in M2 review, not
+reasons to silently promote it to a capturable site. A separate, reviewed
+partial-cohort design is required if the owner elects to finish M2 with blocked
+cases instead of finding replacements. Do not fabricate confirmations to make
+the preparer pass.
+
 The authorization CLI requires an explicit review-policy JSON in addition to
 the source plan and reviewed manifest. Its seven input/output paths must be
 different direct children of ignored `data/kw-evaluation`. It does not infer

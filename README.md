@@ -4,7 +4,7 @@ Axiom Web's private system for finding worthwhile local website opportunities, p
 
 ## Current state
 
-The owner Leads view separates businesses that meet the existing qualification
+The owner Businesses view separates businesses that meet the existing qualification
 criteria from records that still need qualification. Only current
 `READY_FOR_REVIEW` records with confirmed business independence count as qualified
 for review. A recorded contact remains visible on other records, without being
@@ -25,7 +25,16 @@ defaults to preflight. Explicit `--execute` requires the recorded capture
 approval; `--verify` reloads saved evidence without network access. Its input and
 operating limits are in the same preparation runbook.
 The [initial public-research scope](docs/reviews/2026-09-21-m2-public-research-scope.md)
-is prepared for a separate owner decision.
+produced ten proposed evaluation businesses. Their individual identity and
+disposition decisions are still pending.
+
+The private ten-business research packet now has a separate owner decision
+sheet and a no-network `npm run kw:prepare-m2-owner-decisions` preparer. It
+requires an explicit disposition for each proposed business and an exact
+reviewed source plan before it can write a plan-only shadow selection. The two
+documented access-blocked sites cannot enter that selection; they need reviewed
+replacements or a separately designed partial cohort. Nothing in this step
+authorizes capture or contact. See [the M2 decision runbook](docs/RUNBOOK.md#m2-research-scope-and-current-authorization-preparation).
 
 For sealed evidence that needs more research, the same assessment command saves
 a research report with missing pages and limitations, without an assessment
@@ -69,22 +78,23 @@ The current sequence is one complete offline dossier, ten reviewed real-business
 
 ## Owner experience
 
-The owner navigation is Today, Leads, Outreach, Revenue and System. The main owner surfaces now use plain-language decision cards; advanced legacy records remain available where useful. A Business Review link appears only for an admin, because the saved-research console is admin-only. Each page must distinguish available, blocked, stale, empty and unavailable states.
+The owner navigation is Today, Businesses, Outreach, Clients and Settings. The light workspace leads with plain-language decisions and keeps technical diagnostics behind clearly labeled advanced sections. A Business Review link appears only for an admin, because the saved-research console is admin-only. Each page must distinguish available, blocked, stale, empty and unavailable states.
 
-Today presents the owners' weekly review as four plain-language steps: check
-safety, review businesses, handle human actions and learn from outcomes. Business
-Review is the primary next step; legacy operator metrics sit behind Advanced
-system details. The navigation no longer uses legacy lead-score badges as if
-they counted approved business decisions. Today must not present Gmail OAuth as the path to the
-selected zero-paid-mailbox design. Missing critical status reads are shown as
-unavailable to the owner; a dashboard warning is not a runtime stop or proof
-that provider readiness has been checked.
+Today leads with actions due, one business to review, and a separate safety and
+email-status panel. Legacy operator metrics sit behind Advanced system details.
+The navigation does not use lead-score badges as if they counted approved
+business decisions. Today does not present Gmail OAuth as the path to the
+selected zero-paid-mailbox design. Missing critical status reads appear as
+unavailable; a dashboard warning is not a runtime stop or proof of provider
+readiness.
 
-Leads presents the old scored ranking as a closed advanced preview, with Business
-Review as the admin owner's primary research action. A score or suggested contact
-route is not a contact decision. Outreach starts with business evidence and
-manual next steps, and labels the mail route unverified; it does not surface
-legacy Gmail connection or send controls. Revenue distinguishes recorded
+Businesses presents a simple list of saved score records with direct evidence
+links. The old ranking and detailed scores sit in a closed advanced preview,
+while Business Review remains the admin owner's primary saved-research action.
+A score or suggested contact route is not a contact decision. Outreach starts
+with business evidence and manual next steps, and labels the mail route
+unverified; it does not surface legacy Gmail connection or send controls.
+Clients distinguishes recorded
 recurring estimates from cash received. Settings reads emergency state without
 activating or synchronizing mailbox records, shows an unknown state when the
 read fails, and does not offer Gmail OAuth. Only an admin can change the stop;
