@@ -1,5 +1,66 @@
 # Current status — Axiom Revenue Engine
 
+## Owner workspace clarity and mobile review polish; production goal remains open
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified code commit:** `0d5df0c`.
+This is a local owner-interface checkpoint, not the M2 exit
+gate or a production release. M1's offline flow remains complete; M2 still has
+**0/10 real engine assessments**. M3–M7 and production remain open.
+
+Businesses now says **10 proposed businesses** for the private identity review
+and **1 assessed business** for the separate saved-record list in the synthetic
+fixture, so those counts no longer imply the same queue. On phones, Business
+Review keeps its status filters on one horizontally scrollable row and gives
+the last list/detail content space to clear the fixed bottom navigation. The
+business detail puts the owner stop and task controls immediately after the
+next step, uses the same light visual treatment as the rest of the workspace,
+and starts with long routes, history, and audit research closed. Contact-review
+status remains visible. The detail loading and unavailable states use plain
+business language. Moving the controls required an explicit note that they
+can save local stop/task records while research and contact routes remain
+read-only; no call, message, or outreach approval can start there.
+
+**Verification:** `npm run check:safety`, `npm test` (779 tests: 775 passed,
+zero failed, four Windows symlink skips), `npm run typecheck`, `npm run lint`,
+`git diff --check`, `npm run build:cloudflare`, and
+`npx wrangler deploy --env="" --dry-run --autoconfig false` passed. The dry
+run did not deploy. A fresh production-style Next build and synthetic owner
+browser acceptance passed on the same application code at 1440 px and 390 px:
+17 accessibility scans, zero external requests, owner-task retry/reload and
+completion, stopped-business route checks, and the one-row mobile filter
+interaction. Desktop Businesses, dossier, and M2 review loaded in 968 ms,
+239 ms, and 5,649 ms within configured budgets. The verification worktree had
+zero normalized differences across 545 tracked application, script, migration,
+package, and Cloudflare configuration files before the final browser-script
+assertions were aligned with the new labels and closed research section. The
+application code did not change after the full suite; the browser script was
+typechecked/linted and its final run passed. These checks use synthetic data,
+not a real owner account, real prospect, or the private identity-save route.
+
+**Production, automation, and spend:** no deployment, migration, provider
+activation, live capture, prospect contact, send, or external outreach occurred.
+Live production is unverified. Autonomous intake, queue, follow-up, and send
+remain off. The C$50/month ceiling is unchanged; incremental provider spend is
+C$0. No paid mailbox or Google Workspace is assumed.
+
+**Owner decisions and blockers:** Riley/Aidan still need to decide and save
+the ten proposed identities. The first public-research allowance is exhausted;
+the C$0 bounded replacement-search proposal for Waterloo heating-and-cooling
+and Cambridge landscaping remains pending Riley's approval. Source rights and
+retention, a working owner reply route, private legacy snapshot, staging
+backup, migration, rollback, and release gates remain separate.
+
+Next three concrete actions:
+
+1. If Riley approves the bounded replacement search, document supported
+   alternatives; Riley or Aidan then verifies and saves the ten identity
+   decisions in the local Business Review.
+2. Resolve source rights and retention against the exact import plan, then
+   authorize and inspect one supervised real M2 capture before scaling to ten.
+3. Add an independent first-pass owner judgment to Quality Lab with synthetic
+   tests, while separately proving the no-paid-mailbox human reply route and
+   preparing the private history snapshot.
+
 ## Saved owner review restoration; production goal remains open
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified code commit:** `9469554`.
