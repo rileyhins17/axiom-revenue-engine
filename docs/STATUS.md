@@ -1,5 +1,66 @@
 # Current status — Axiom Revenue Engine
 
+## Saved owner review restoration; production goal remains open
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified code commit:** `9469554`.
+This completes a local owner-review continuity fix, not the
+M2 exit gate or a production release. M1's offline flow remains complete. M2
+still has **0/10 real engine assessments**; M3–M7 and production remain open.
+
+After an owner saves all ten business identity decisions, the private local
+review now reopens those exact choices on another browser or device. The server
+returns only a digest-verified ledger for the current research packet. The form
+rejects a mismatched or malformed saved review; it does not silently label
+unsaved browser edits as saved. If an owner has local changes, the screen keeps
+them visible and offers an explicit **Load saved choices** action. An edit made
+while a save is in flight stays labelled as an unsaved change. Saving still
+does not select a capturable cohort or authorize research, capture, contact,
+email, or release.
+
+**Verification:** `npm run check:safety`, `npm test` (778 tests: 774 passed,
+zero failed, four Windows symlink skips), `npm run typecheck`, `npm run lint`,
+`git diff --check`, `npm run build:cloudflare`, and
+`npx wrangler deploy --env="" --dry-run --autoconfig false` passed. The dry run
+did not deploy. Synthetic owner browser acceptance passed at 1440 px and
+390 px with 17 accessibility scans, zero external requests, and verified
+owner-task retry, reload, and completion. Desktop Businesses, dossier, and M2
+review loaded in 898 ms, 112 ms, and 4,759 ms within their configured budgets.
+The fresh verification worktree had zero normalized content differences from
+the current checkout across 545 tracked application, script, migration,
+package, and Cloudflare configuration files, including the edited files. The
+prior isolated browser checkout was based on an older commit and had 80 other
+source-file differences; its claim to verify the exact current repository
+snapshot is superseded by this fresh run. The private save route has focused
+local tests, but no browser test with a real owner account or real prospect was
+performed.
+
+**Production, automation, and spend:** no deployment, migration, provider
+activation, live capture, prospect contact, send, or external outreach occurred.
+Live production is unverified. Autonomous intake, queue, follow-up, and send
+remain off. The C$50/month ceiling is unchanged; incremental provider spend is
+C$0. No paid mailbox or Google Workspace is assumed.
+
+**Owner decisions and blockers:** no owner identity decision was entered.
+The prior approved public-research allowance is exhausted. A separate,
+C$0, read-only proposal for Waterloo heating-and-cooling and Cambridge
+landscaping replacement identities is pending Riley's approval; it grants no
+authority yet. The ten identities, source rights and retention, the owner reply
+route, private legacy snapshot, staging backup, migration, rollback, and
+release gates remain separate. Screenshot review also found small UI clarity
+issues in the separate Businesses counts and long mobile review; these remain
+for a subsequent polish checkpoint.
+
+Next three concrete actions:
+
+1. If Riley approves the bounded replacement search, research supported
+   identities and update the packet; Riley or Aidan then saves all ten owner
+   decisions in Business Review.
+2. Review source rights, retention, and the exact import plan; authorize one
+   supervised real M2 capture and inspect its assessment before scaling.
+3. Complete and verify the no-paid-mailbox owner reply route and private
+   history snapshot, then prepare a backed-up staging release with rollback
+   proof.
+
 ## Commercial owner workspace redesign and private decision save; production goal remains open
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified code commit:**
