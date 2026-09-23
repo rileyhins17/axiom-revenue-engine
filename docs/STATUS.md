@@ -1,5 +1,68 @@
 # Current status — Axiom Revenue Engine
 
+## Manual business stop checkpoint; production goal remains open
+
+**Updated:** 2026-09-22 (America/Toronto). **Verified code commit:** `eb53e7f`
+(`feat(revenue): add manual business do-not-contact stop`), following schema
+commit `016e3d8`. This is a local M4 safety/owner-workflow slice, not the M4
+exit gate or a production release. M1's offline synthetic dossier remains
+complete; M2 has **0/10 real engine assessments**; M3–M7 and production remain
+incomplete.
+
+An authenticated owner can now record one durable, append-only do-not-contact
+stop for an exact current v2 business, with reason, note, session actor, saved
+time, and exact idempotent retry. The dossier and ranked list read the current
+stop and visibly block route recommendations. An unreadable stop table also
+blocks route presentation while leaving evidence visible. Qualification scores
+and evidence are unchanged. The adjacent task workflow refuses new tasks and
+completion after a stop (or unavailable stop status), while retaining exact
+pre-stop replay and allowing cancellation of open tasks. The historical M1
+fixture explicitly omits this operational check because its pinned pre-0072
+schema and immutable synthetic report have no contact authority. See
+[ADR 0046](adr/0046-add-a-manual-business-stop-before-outreach.md).
+
+**Verification:** `npm run check:safety`, `npm test -- --test-concurrency=1`
+(702 tests: 699 passed, zero failed, three expected Windows skips),
+`npm run typecheck`, `npm run lint`, `npm run build:cloudflare`, and
+`npx wrangler deploy --env="" --dry-run --autoconfig false` passed on the final
+code. The separately run `npm run test:owner-ui` passed after build/dry-run:
+synthetic stop creation/replay survived reload, anonymous and cross-site stop
+requests failed, all three recorded contact routes and the ranked lead showed
+blocked, new/completed tasks were rejected while cancellation remained
+available, nine WCAG page scans passed, and external requests were zero. The
+first browser run exposed a wrong test selector for the route cards; the
+corrected test passed on the completed build. No test contacted a prospect.
+
+**Production, automation and spend:** schema 0072 and the owner UI/API are
+committed locally, not applied to staging or production. No remote migration,
+deployment, provider activation, inbox operation, engine prospect capture,
+external contact, or outreach occurred. Live production state remains
+unverified. Autonomous intake, queue, follow-up, and send remain off; the
+C$50/month runtime ceiling is unchanged; incremental engine-provider spend is
+C$0. The local `wrangler` login was expired at the last check, while the dry
+run succeeded without production access.
+
+**Blockers and owner decisions:** the ten proposed M2 businesses still need
+individual identity/disposition review; Aidan's aggregate calling feedback is
+not that decision. Current source-use/retention, account/quota/price, one
+supervised real capture, Cloudflare owner access, and a staging backup/
+migration/rollback release gate remain open. M4 still lacks contact-level and
+legacy suppression reconciliation, sender/legal/reply readiness, exact-message
+approval, and an outcome loop. A v2 business stop is not proof that legacy
+stops or prior sends have been reconciled. No live send is authorized.
+
+Next three concrete actions:
+
+1. Record Riley/Aidan's per-business corrections or dispositions for the ten
+   M2 evaluation identities and the current source-use/retention decisions
+   needed for a supervised first capture.
+2. Build and verify a read-only, snapshot-bound legacy-to-v2 identity,
+   suppression, sent, and reply reconciliation report with synthetic fixtures;
+   keep unresolved mappings blocked and make no import or outreach decision.
+3. Verify actual account/quota/cost and Cloudflare access, prepare a current
+   staging backup/restore and rollback gate, then execute one separately
+   approved M2 HTML capture and inspect its evidence and cost before the rest.
+
 ## Manual owner next-action checkpoint; production goal remains open
 
 **Updated:** 2026-09-22 (America/Toronto). **Verified code commit:** `24c6294`
