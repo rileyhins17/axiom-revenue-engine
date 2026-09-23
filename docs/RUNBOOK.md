@@ -491,17 +491,31 @@ fields into approval, or infer ten separate decisions from an earlier
 packet. A replacement needs an exact supported source-plan member and the
 same city/niche balance; otherwise prepare a new reviewed research operation.
 
-The local npm run kw:prepare-m2-owner-decisions command is the no-network
-preparer for the later exact-ten shadow selection. It takes four distinct
-direct-child files under ignored data/kw-evaluation: --research-review,
---source-plan, --decisions, and --output. The owner JSON must bind the exact
-research-review SHA-256 and source-plan digest and contain one explicit choice
-for every M2-01 through M2-10 with reviewer and time. A kept or replacement
-business needs explicit identity, city/niche, and independence confirmations.
-The command validates the saved source plan, cohort balance, exact supported
-replacement membership, and writes its output only if the destination is new.
-Its output is plan-only with every capture, database, provider, contact, send,
-deployment, and spend authority set to zero.
+An admin owner can open **Businesses → Review 10 businesses** on the local
+workspace. The page reads only the fixed, ignored research packet above, checks
+its SHA-256, and shows the exact source links and company-stated independence
+claims. It is unavailable in Cloudflare or when that packet is absent or changed.
+Riley or Aidan must select their own name, make a separate choice for all ten,
+enter reasons, and explicitly confirm identity, city/niche, and independence
+where required. A browser draft resumes only against the same packet digest.
+Download the resulting JSON and place it as a new, ignored file under
+`data/kw-evaluation`; browser storage and a download are not a recorded engine
+decision until the file is reviewed and used by the preparer. The screen does
+not fetch candidate sites automatically; following a source link is a separate
+owner-controlled browser visit. It grants no capture or contact.
+
+The owner identity ledger binds the exact research-review SHA-256, reviewer,
+review time, and one explicit choice for every M2-01 through M2-10. It may be
+recorded **before** a source import plan exists. Its `sourcePlanDigest` is
+optional: if present, the preparer must match it exactly. After the decisions,
+prepare and review the source import plan, including any supported replacement.
+Then `npm run kw:prepare-m2-owner-decisions` takes four distinct direct-child
+files under ignored `data/kw-evaluation`: `--research-review`, `--source-plan`,
+`--decisions`, and `--output`. It validates the saved source plan, exact
+identities, cohort balance and supported replacement membership, derives the
+plan digest for the output, and writes only when the destination is new. Its
+exact-ten shadow selection is plan-only with every capture, database, provider,
+contact, send, deployment, and spend authority set to zero.
 
 **Known access blocks are a hard selection boundary.** KEEP_AS_BLOCKED for
 M2-06 or M2-10 can remain an honest owner decision in the separate JSON ledger,

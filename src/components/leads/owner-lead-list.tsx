@@ -136,10 +136,13 @@ export function OwnerLeadList({ data, canReviewBusinessResearch = false }: {
             <>
               <p className="text-xs font-semibold text-[#53675a]">Your next step</p>
               <Button asChild size="lg" className="mt-2 w-full justify-between bg-[#145943] text-white hover:bg-[#104a37]">
-                <Link href={"/leads/m2" as Route} prefetch={false}>
-                  Open Business Review <ArrowUpRight aria-hidden="true" />
+                <Link href={"/leads/m2/identity" as Route} prefetch={false}>
+                  Review 10 businesses <ArrowUpRight aria-hidden="true" />
                 </Link>
               </Button>
+              <Link href={"/leads/m2" as Route} prefetch={false} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#145943] hover:underline">
+                Open Business Review
+              </Link>
             </>
           ) : (
             <p role="note" className="rounded-xl border border-[#e3e9e2] bg-[#f8faf7] px-4 py-3 text-sm leading-5 text-[#53645b]">

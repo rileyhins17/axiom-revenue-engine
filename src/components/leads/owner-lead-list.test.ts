@@ -159,6 +159,8 @@ test("owner lead list explains legacy scores, exact evidence, and a manual route
   assert.match(html, /href="\/leads\/evaluation"/);
   assert.match(html, /Read-only · no outreach permission/);
   assert.match(html, /Open Business Review/);
+  assert.match(html, /href="\/leads\/m2\/identity"/);
+  assert.match(html, /Review 10 businesses/);
   assert.match(html, /legacy scores for calibration/);
   assert.doesNotMatch(html, />Send</);
   assert.doesNotMatch(html, />Approve</);

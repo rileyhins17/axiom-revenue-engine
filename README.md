@@ -36,6 +36,13 @@ documented access-blocked sites cannot enter that selection; they need reviewed
 replacements or a separately designed partial cohort. Nothing in this step
 authorizes capture or contact. See [the M2 decision runbook](docs/RUNBOOK.md#m2-research-scope-and-current-authorization-preparation).
 
+An admin can record those identity decisions from the local **Businesses →
+Review 10 businesses** screen. It checks the exact private research packet,
+shows source links, saves a browser draft by packet digest and downloads the
+explicit owner ledger. This identity review comes before preparing the source
+import plan; the later preparer still verifies that plan and every selected
+identity. The local screen is unavailable on Cloudflare.
+
 For sealed evidence that needs more research, the same assessment command saves
 a research report with missing pages and limitations, without an assessment
 approval or database write. Sealed policy blocks return their existing receipt

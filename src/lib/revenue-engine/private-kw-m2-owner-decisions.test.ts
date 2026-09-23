@@ -193,6 +193,38 @@ test("builds a plan-only exact-ten selection from explicit confirmed owner decis
   assert(selection.selections.every((entry) => entry.sourceReview.decision === "APPROVED_FOR_BOUNDED_SHADOW_SLICE"));
 });
 
+test("allows identity decisions before a source-plan digest exists, then validates identities against the supplied plan", () => {
+  const fixture = createFixture(true);
+  const decisions = {
+    ...fixture.decisions,
+    sourcePlanDigest: undefined,
+    decisions: replaceBlockedSelections(fixture),
+  };
+  delete (decisions as { sourcePlanDigest?: string }).sourcePlanDigest;
+
+  assert.doesNotThrow(() => PrivateKwM2OwnerDecisionsSchema.parse(decisions));
+  const selection = buildPrivateKwM2OwnerDecisionSelection({
+    ...fixture,
+    decisions,
+    researchReviewBytes: Buffer.from(JSON.stringify(fixture.researchReview)),
+    createdAt: "2026-09-22T12:00:00.000Z",
+  });
+  assert.equal(selection.sourcePlanDigest, buildPrivateKwPersistencePlan(fixture.sourcePlan).sourcePlanDigest);
+  assert.equal(selection.selections.length, 10);
+
+  const changedSourcePlan = structuredClone(fixture.sourcePlan);
+  const changedCandidate = changedSourcePlan.records.find((record) => record.sourceOwnedId === "m2-01");
+  assert(changedCandidate);
+  changedCandidate.sourceRecord.sourceEvidenceUrl = "https://changed.getaxiom.ca/about";
+  assert.throws(() => buildPrivateKwM2OwnerDecisionSelection({
+    ...fixture,
+    sourcePlan: changedSourcePlan,
+    decisions,
+    researchReviewBytes: Buffer.from(JSON.stringify(fixture.researchReview)),
+    createdAt: "2026-09-22T12:00:00.000Z",
+  }), /source plan identity, market, niche, independence, or source does not match M2-01/i);
+});
+
 test("requires one decision for every proposed M2 identity", () => {
   const fixture = createFixture();
   assert.throws(() => buildPrivateKwM2OwnerDecisionSelection({

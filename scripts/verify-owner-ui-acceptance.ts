@@ -1251,6 +1251,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Businesses" }).waitFor();
     await page.getByRole("link", { name: "Open Business Review" }).waitFor();
+    assert.equal(await page.getByRole("link", { name: "Review 10 businesses" }).getAttribute("href"), "/leads/m2/identity");
     await page.screenshot({ path: join(outputDirectory, "leads-desktop.png"), fullPage: true });
     await openLegacyLeadPreview(page);
     await page.getByRole("link", { name: /Open evidence dossier/i }).first().waitFor();

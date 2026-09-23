@@ -88,7 +88,7 @@ const OwnerDecisionSchema = z.discriminatedUnion("action", [
 export const PrivateKwM2OwnerDecisionsSchema = z.object({
   decisionVersion: z.literal(PRIVATE_KW_M2_OWNER_DECISIONS_VERSION),
   researchReviewSha256: z.string().regex(/^[a-f0-9]{64}$/),
-  sourcePlanDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  sourcePlanDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   reviewedBy: z.enum(["RILEY", "AIDAN"]),
   reviewedAt: z.string().datetime({ offset: true }),
   decisions: z.array(OwnerDecisionSchema).length(10),
@@ -197,7 +197,7 @@ export function buildPrivateKwM2OwnerDecisionSelection(input: PrivateKwM2OwnerDe
   if (privateKwM2Digest(reviewFromBytes) !== privateKwM2Digest(review)) {
     throw new Error("Research review bytes do not match the parsed research review.");
   }
-  if (decisions.sourcePlanDigest !== sourcePlanDigest) {
+  if (decisions.sourcePlanDigest !== undefined && decisions.sourcePlanDigest !== sourcePlanDigest) {
     throw new Error("Owner decisions do not bind the exact source plan digest.");
   }
 
