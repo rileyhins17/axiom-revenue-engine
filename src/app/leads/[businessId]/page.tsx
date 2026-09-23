@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { OwnerLeadDetail, OwnerLeadDetailUnavailable } from "@/components/leads/owner-lead-detail";
 import { OwnerBusinessStopPanel } from "@/components/leads/owner-business-stop-panel";
+import { OwnerContactSuppressionPanel } from "@/components/leads/owner-contact-suppression-panel";
 import { OwnerTaskPanel } from "@/components/leads/owner-task-panel";
 import { getDatabase } from "@/lib/cloudflare";
 import {
@@ -42,6 +43,7 @@ export default async function LeadDetailPage({
           <OwnerTaskPanel businessId={identity} stopState={detail.operationalStopState ?? "UNAVAILABLE"} />
         </>
       )}
+      contactControls={<OwnerContactSuppressionPanel businessId={identity} contactPoints={detail.routes.map((route) => ({ contactPointId: route.contactPointId, businessId: route.businessId, channel: route.channel, label: route.label, value: route.value }))} />}
     />
   );
 }

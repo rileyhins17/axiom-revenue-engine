@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { OwnerLeadReasonSchema } from "@/lib/revenue-engine/lead-quality-evaluation";
+import { PrivateKwOwnerLabelSubmissionSchema } from "@/lib/revenue-engine/private-kw-owner-labeling";
 import {
   OWNER_LABELING_DRAFT_VERSION,
   OWNER_REASON_OPTIONS,
@@ -99,6 +100,8 @@ test("browser drafts resume only for the exact packet and known leads", () => {
     draftVersion: OWNER_LABELING_DRAFT_VERSION,
     packetDigest: packet.packetDigest,
     reviewedBy: "RILEY",
+    firstPassDecisions: { [leadId]: { label: "WEAK", reasons: ["NO_REALISTIC_ROUTE"], notes: "Independent view." } },
+    revealedLeadIds: [leadId],
     decisions: { [leadId]: { label: "WEAK", reasons: ["NO_REALISTIC_ROUTE"], notes: "Needs a better route." } },
   };
   assert.deepEqual(parseOwnerLabelingDraft(draft, packet.packetDigest, new Set([leadId])), draft);
@@ -108,6 +111,74 @@ test("browser drafts resume only for the exact packet and known leads", () => {
     ...draft,
     decisions: { [leadId]: { label: "WRONG", reasons: ["GOOD_COMMERCIAL_FIT"], notes: "" } },
   }, packet.packetDigest, new Set([leadId])), null);
+  const migratedLegacy = parseOwnerLabelingDraft({
+    draftVersion: "owner-labeling-draft-v1",
+    packetDigest: packet.packetDigest,
+    reviewedBy: "RILEY",
+    decisions: { [leadId]: { label: "WEAK", reasons: ["NO_REALISTIC_ROUTE"], notes: "Old saved judgment." } },
+  }, packet.packetDigest, new Set([leadId]));
+  assert.equal(migratedLegacy?.decisions[leadId]?.label, "WEAK");
+  assert.deepEqual(migratedLegacy?.legacyRevealedLeadIds, [leadId]);
+  assert.deepEqual(parseOwnerLabelingDraft(migratedLegacy, packet.packetDigest, new Set([leadId])), migratedLegacy,
+    "A restored v1 draft must survive being saved again as v2.");
+});
+
+test("engine verdicts cannot be revealed until a complete first-pass label and reason are saved", () => {
+  const packet = buildCompleteOwnerLabelingPacketFixture();
+  const leadId = packet.entries[0]!.leadId;
+  const draft = {
+    draftVersion: OWNER_LABELING_DRAFT_VERSION,
+    packetDigest: packet.packetDigest,
+    reviewedBy: "RILEY",
+    firstPassDecisions: { [leadId]: { label: "STRONG", reasons: [], notes: "" } },
+    revealedLeadIds: [leadId],
+    decisions: {},
+  };
+
+  assert.equal(parseOwnerLabelingDraft({ ...draft, revealedLeadIds: [] }, packet.packetDigest, new Set([leadId]))?.firstPassDecisions[leadId]?.label, "STRONG");
+  assert.equal(parseOwnerLabelingDraft(draft, packet.packetDigest, new Set([leadId])), null);
+  const complete = {
+    ...draft,
+    firstPassDecisions: { [leadId]: { label: "STRONG", reasons: ["GOOD_COMMERCIAL_FIT"], notes: "Independent first pass." } },
+  };
+  assert.deepEqual(parseOwnerLabelingDraft(complete, packet.packetDigest, new Set([leadId])), complete);
+});
+
+test("first-pass reload state is bound to the exact packet digest and lead IDs", () => {
+  const packet = buildCompleteOwnerLabelingPacketFixture();
+  const leadId = packet.entries[0]!.leadId;
+  const draft = {
+    draftVersion: OWNER_LABELING_DRAFT_VERSION,
+    packetDigest: packet.packetDigest,
+    reviewedBy: "RILEY",
+    firstPassDecisions: { [leadId]: { label: "WEAK", reasons: ["NO_REALISTIC_ROUTE"], notes: "Independent view." } },
+    revealedLeadIds: [leadId],
+    decisions: { [leadId]: { label: "STRONG", reasons: ["CLEAR_REBUILD_NEED"], notes: "Final after reveal." } },
+  };
+  assert.deepEqual(parseOwnerLabelingDraft(draft, packet.packetDigest, new Set([leadId])), draft);
+  assert.equal(parseOwnerLabelingDraft(draft, "f".repeat(64), new Set([leadId])), null);
+  assert.equal(parseOwnerLabelingDraft(draft, packet.packetDigest, new Set(["another-lead"])), null);
+  assert.equal(parseOwnerLabelingDraft({ ...draft, revealedLeadIds: ["another-lead"] }, packet.packetDigest, new Set([leadId])), null);
+});
+
+test("immutable review export retains both first-pass and final judgments", () => {
+  const packet = buildCompleteOwnerLabelingPacketFixture();
+  const leadId = packet.entries[0]!.leadId;
+  const submission = buildOwnerLabelSubmission({
+    packetId: packet.packetId,
+    packetDigest: packet.packetDigest,
+    reviewedBy: "RILEY",
+    reviewedAt: "2026-08-28T15:00:00.000Z",
+    firstPassDecisions: { [leadId]: { label: "WEAK", reasons: ["NO_REALISTIC_ROUTE"], notes: "Before reveal." } },
+    decisions: { [leadId]: { label: "STRONG", reasons: ["CLEAR_REBUILD_NEED"], notes: "After reveal." } },
+  });
+
+  assert.equal(submission.decisions[0]?.label, "STRONG");
+  assert.equal(submission.firstPassDecisions?.[0]?.label, "WEAK");
+  assert.equal(submission.firstPassDecisions?.[0]?.leadId, leadId);
+  assert.equal(submission.packetDigest, packet.packetDigest);
+  assert.equal(submission.outreachAuthorized, false);
+  assert.equal(PrivateKwOwnerLabelSubmissionSchema.safeParse(submission).success, true);
 });
 
 test("workspace reason choices remain complete and label-specific", () => {

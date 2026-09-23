@@ -114,6 +114,7 @@ export const PrivateKwOwnerLabelSubmissionSchema = z.object({
   reviewedBy: z.enum(["RILEY", "AIDAN"]),
   reviewedAt: TimestampSchema,
   decisions: z.array(OwnerDecisionSchema).min(1).max(KW_LEAD_EVALUATION_TARGET_SIZE),
+  firstPassDecisions: z.array(OwnerDecisionSchema).min(1).max(KW_LEAD_EVALUATION_TARGET_SIZE).optional(),
   reviewOnly: z.literal(true),
   databaseMutationAuthorized: z.literal(false),
   qualificationAuthorized: z.literal(false),
@@ -125,6 +126,15 @@ export const PrivateKwOwnerLabelSubmissionSchema = z.object({
   const leadIds = submission.decisions.map((decision) => decision.leadId);
   if (new Set(leadIds).size !== leadIds.length) {
     context.addIssue({ code: "custom", message: "One submission may label each lead only once.", path: ["decisions"] });
+  }
+  if (submission.firstPassDecisions) {
+    const firstPassIds = submission.firstPassDecisions.map((decision) => decision.leadId);
+    if (new Set(firstPassIds).size !== firstPassIds.length) {
+      context.addIssue({ code: "custom", message: "One submission may include each first-pass lead only once.", path: ["firstPassDecisions"] });
+    }
+    if (firstPassIds.some((leadId) => !leadIds.includes(leadId))) {
+      context.addIssue({ code: "custom", message: "First-pass judgments must identify leads with a final judgment.", path: ["firstPassDecisions"] });
+    }
   }
 });
 

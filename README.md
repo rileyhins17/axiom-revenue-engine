@@ -96,8 +96,8 @@ operator diagnostics behind a disclosure. The private business decision flow
 and saved-research console are admin-only. Each page must distinguish
 available, blocked, stale, empty and unavailable states.
 
-Today leads with the current business decision, then replies and follow-ups,
-with a separate safety and email-status panel. Legacy operator metrics sit
+Today leads with a short business-review action, then replies and follow-ups,
+with a separate compact safety and email-status panel. Legacy operator metrics sit
 behind Operator details.
 The navigation does not use lead-score badges as if they counted approved
 business decisions. Today does not present Gmail OAuth as the path to the
@@ -105,12 +105,16 @@ selected zero-paid-mailbox design. Missing critical status reads appear as
 unavailable; a dashboard warning is not a runtime stop or proof of provider
 readiness.
 
-Businesses separates the proposed identities awaiting an owner decision from
-saved assessed-business records, with direct evidence links. The old ranking
+Businesses starts with the separate ten-name identity review, then groups
+saved assessments as ready for a decision, needing another look, or stopped.
+Each row shows why it is there and opens its evidence. The old ranking
 and detailed scores sit in a closed advanced preview, while Business Review
-remains the admin owner's primary saved-research action. A business detail leads
-with the stop-aware next step and three sourced website findings, followed by
-the owner stop and task controls. Contact-review status stays visible; recorded
+remains the admin owner's primary saved-research action. That saved-research
+view now shows a compact status summary and selected-business next step; page
+sources sit under a disclosure. A business detail leads with a concise brief:
+the website finding, strongest supported source, open questions, next step,
+and three sourced findings. Owner stop and task controls follow. Contact-review
+status stays visible; recorded
 routes, history, and the full audit are available under **Research details**
 when needed.
 A score or suggested contact route is not a contact decision. Follow-through
@@ -145,6 +149,15 @@ state also blocks route presentation. This requires migration 0072 in the
 target environment; the committed migration is not a deployed schema. It does
 not replace contact-level suppression, legal/consent review, or legacy-history
 reconciliation, and it does not enable sending.
+
+The same dossier has a separate, closed **Email do-not-contact records** panel
+for an owner who personally observes an unsubscribe request, complaint, or
+bounce. It checks one saved email contact at a time and records a permanent
+local stop with reason, observed time, and short summary; it must not contain
+the message body. A later contact row with the same normalized address at that
+business inherits the stop. This requires migration 0073 and has not been
+migrated or deployed. It does not implement a provider webhook, legacy/global
+suppression reconciliation, or an outbound send gate.
 
 The M4 legacy-history report can compare old suppressions, contact attempts,
 bounces, and replies with v2 business identities from one private, standalone

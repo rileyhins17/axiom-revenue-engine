@@ -141,7 +141,10 @@ test("owner lead list presents plain business details and keeps ranking details 
   const html = renderToStaticMarkup(createElement(OwnerLeadList, { data: fixtureResponse([fixtureLead()]), canReviewBusinessResearch: true }));
   const primary = html.slice(0, html.indexOf("<details")).replace(/<[^>]*>/g, " ");
 
-  assert.match(html, /<h1[^>]*>Businesses to review<\/h1>/);
+  assert.match(html, /<h1[^>]*>Businesses<\/h1>/);
+  assert.match(primary, /Confirm who belongs on the list/);
+  assert.match(primary, /Assessed businesses/);
+  assert.match(primary, /Ready for a decision/);
   assert.match(primary, /Roofing/);
   assert.match(primary, /Independent operator/);
   assert.match(html, /Kitchener, ON/);

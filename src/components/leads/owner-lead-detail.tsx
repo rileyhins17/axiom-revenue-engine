@@ -131,6 +131,31 @@ function topWebsiteFindings(data: OwnerLeadDetailResponse) {
     .slice(0, 3);
 }
 
+function strongestSupportedFinding(data: OwnerLeadDetailResponse) {
+  const severityOrder = { CRITICAL: 0, IMPORTANT: 1, MINOR: 2 } as const;
+  return [...data.website.findings]
+    .filter((finding) => finding.claim)
+    .sort((left, right) => severityOrder[left.severity] - severityOrder[right.severity])[0] ?? null;
+}
+
+function uncertaintySummary(data: OwnerLeadDetailResponse) {
+  const openQuestions: string[] = [];
+  const unknownChecks = data.website.findings.filter((finding) => finding.outcome === "UNKNOWN").length;
+  if (unknownChecks > 0) openQuestions.push(`${unknownChecks} website ${unknownChecks === 1 ? "check is" : "checks are"} still unknown`);
+  if (data.website.manualReviewReasons.length > 0) {
+    openQuestions.push(...data.website.manualReviewReasons.map(readableCode));
+  }
+  if (data.lead.qualification.failedGates.length > 0) {
+    openQuestions.push(`${data.lead.qualification.failedGates.length} business review ${data.lead.qualification.failedGates.length === 1 ? "check is" : "checks are"} still open`);
+  }
+  if (data.lead.dataQuality.state !== "CURRENT" || data.lead.dataQuality.issues.length > 0) {
+    openQuestions.push(...data.lead.dataQuality.issues.map(readableCode));
+  }
+  return openQuestions.length > 0
+    ? [...new Set(openQuestions)].join(" · ")
+    : "No additional gaps are recorded. Findings apply only to the pages and sources captured for this audit.";
+}
+
 function OwnerNextStep({ data }: { data: OwnerLeadDetailResponse }) {
   const lead = data.lead;
   const stopped = data.operationalStopState === "STOPPED" || data.operationalStopState === "UNAVAILABLE";
@@ -143,25 +168,54 @@ function OwnerNextStep({ data }: { data: OwnerLeadDetailResponse }) {
     ? "The business stop is active or could not be checked. Recorded routes remain evidence only."
     : canReviewRoute ? lead.route.reason : decisionStateCopy(lead).description;
   const findings = topWebsiteFindings(data);
+  const strongestFinding = strongestSupportedFinding(data);
+  const supportedFindingCount = data.website.findings.filter((finding) => finding.claim).length;
+  const uncertainty = uncertaintySummary(data);
 
   return (
     <section aria-labelledby="owner-next-step" className="overflow-hidden rounded-2xl border border-[#d5e5d2] bg-[#f4f8f2]">
-      <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:p-6">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#176443]">Owner next step</p>
-          <h2 id="owner-next-step" className="mt-1 text-lg font-semibold text-[#1a3124]">{action}</h2>
-          <p className="mt-1 text-xs leading-5 text-[#53675a]">{actionReason}</p>
-          {canReviewRoute && recommendedRoute ? (
-            <div className="mt-4 rounded-xl border border-[#d5e5d2] bg-white p-3">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#566a5d]">Suggested route · read-only</p>
-              <p className="mt-1 text-sm font-semibold text-[#24382d]">{recommendedRoute.value}</p>
-              <p className="mt-1 text-[11px] leading-5 text-[#617367]">{readableCode(recommendedRoute.channel)} · {ROUTE_READINESS_COPY[recommendedRoute.readiness].label}</p>
-              <a href={recommendedRoute.sourceUrl} target="_blank" rel="noreferrer" className="v2-focus-ring mt-1 inline-flex min-h-8 items-center gap-1 rounded-md text-[10px] font-semibold text-[#176443] hover:text-[#315740]">
-                Route evidence <ExternalLink className="size-3" aria-hidden="true" />
-              </a>
-            </div>
-          ) : null}
-          <p className="mt-3 text-[10px] leading-4 text-[#617367]">This is a review reminder only. The page cannot contact the business or approve outreach.</p>
+      <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start lg:p-6">
+        <div className="space-y-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#176443]">Decision brief · what was found</p>
+            <p className="mt-1 text-sm font-semibold text-[#24382d]">{readableCode(data.website.classification)} website · {supportedFindingCount} supported {supportedFindingCount === 1 ? "finding" : "findings"}</p>
+            <p className="mt-1 text-xs leading-5 text-[#53675a]">This summarizes captured website evidence; it does not establish overall business quality or permission to contact.</p>
+          </div>
+
+          <div className="rounded-xl border border-[#d5e5d2] bg-white p-3">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#566a5d]">Strongest supported evidence</p>
+            {strongestFinding?.claim ? (
+              <>
+                <p className="mt-1 text-xs font-semibold text-[#35493b]">{readableCode(strongestFinding.category)} · {SEVERITY_COPY[strongestFinding.severity].label}</p>
+                <p className="mt-1 text-[11px] leading-5 text-[#425b4d]">{strongestFinding.claim.observation}</p>
+                <a href={strongestFinding.claim.sourceUrl} target="_blank" rel="noreferrer" className="v2-focus-ring mt-1 inline-flex min-h-8 items-center gap-1 rounded-md text-[10px] font-semibold text-[#176443] hover:text-[#315740]">
+                  Inspect source · captured {formatDateTime(strongestFinding.claim.capturedAt)} <ExternalLink className="size-3" aria-hidden="true" />
+                </a>
+              </>
+            ) : <p className="mt-1 text-[11px] leading-5 text-[#76591f]">No supported website claim is available yet. Keep this business in research.</p>}
+          </div>
+
+          <div className="rounded-xl border border-[#eadfbd] bg-[#fff8e8] p-3">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#76591f]">What remains uncertain</p>
+            <p className="mt-1 text-[11px] leading-5 text-[#76591f]">{uncertainty}</p>
+          </div>
+
+          <div className="rounded-xl border border-[#d5e5d2] bg-white p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#176443]">Owner next step</p>
+            <h2 id="owner-next-step" className="mt-1 text-base font-semibold text-[#1a3124]">{action}</h2>
+            <p className="mt-1 text-xs leading-5 text-[#53675a]">{actionReason}</p>
+            {canReviewRoute && recommendedRoute ? (
+              <div className="mt-3 border-t border-[#e4ebe2] pt-3">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#566a5d]">Suggested route · read-only</p>
+                <p className="mt-1 text-sm font-semibold text-[#24382d]">{recommendedRoute.value}</p>
+                <p className="mt-1 text-[11px] leading-5 text-[#617367]">{readableCode(recommendedRoute.channel)} · {ROUTE_READINESS_COPY[recommendedRoute.readiness].label}</p>
+                <a href={recommendedRoute.sourceUrl} target="_blank" rel="noreferrer" className="v2-focus-ring mt-1 inline-flex min-h-8 items-center gap-1 rounded-md text-[10px] font-semibold text-[#176443] hover:text-[#315740]">
+                  Route evidence <ExternalLink className="size-3" aria-hidden="true" />
+                </a>
+              </div>
+            ) : null}
+            <p className="mt-3 text-[10px] leading-4 text-[#617367]">This is a review reminder only. The page cannot contact the business or approve outreach.</p>
+          </div>
         </div>
 
         <div>
@@ -192,14 +246,13 @@ function OwnerNextStep({ data }: { data: OwnerLeadDetailResponse }) {
   );
 }
 
-export function OwnerLeadDetail({ data, ownerControls }: { data: OwnerLeadDetailResponse; ownerControls?: ReactNode }) {
+export function OwnerLeadDetail({ data, ownerControls, contactControls }: { data: OwnerLeadDetailResponse; ownerControls?: ReactNode; contactControls?: ReactNode }) {
   const lead = data.lead;
   const qualifiedForReview = lead.attention === "READY_FOR_REVIEW" && lead.ownerActionable;
   const decisionState = decisionStateCopy(lead);
   const description = !qualifiedForReview
     ? decisionState.description
-    : lead.whyThisLead[0]?.observation
-    ?? "The dossier keeps business fit, website need, reachability, timing, and evidence confidence separate so the next decision stays explainable.";
+    : "Review the strongest supported website evidence, remaining gaps, and recommended owner action below.";
 
   return (
     <div data-owner-readonly-dossier className="mx-auto flex max-w-[1320px] flex-col gap-4 text-[#263a2f]">
@@ -239,7 +292,8 @@ export function OwnerLeadDetail({ data, ownerControls }: { data: OwnerLeadDetail
 
       <OwnerNextStep data={data} />
 
-      {ownerControls ? <div aria-label="Owner controls" className="grid gap-4 xl:grid-cols-[minmax(300px,0.7fr)_minmax(0,1.3fr)]">{ownerControls}</div> : null}
+      {ownerControls ? <div aria-label="Owner controls" className="grid gap-4 xl:grid-cols-[minmax(300px,0.7fr)_minmax(0,1.3fr)] xl:items-start">{ownerControls}</div> : null}
+      {contactControls ? <div aria-label="Email contact stops">{contactControls}</div> : null}
       <ContactReviewSection data={data} />
 
       <details className="overflow-hidden rounded-2xl border border-[#dce6d9] bg-white shadow-sm">
@@ -251,14 +305,14 @@ export function OwnerLeadDetail({ data, ownerControls }: { data: OwnerLeadDetail
         </summary>
         <div className="space-y-4 border-t border-[#e4ebe2] p-4 sm:p-5">
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)] xl:items-start">
         <section aria-labelledby="why-this-lead" className="rounded-2xl border border-[#e1e9df] bg-white p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <Sparkles className="size-4 text-[#176443]" aria-hidden="true" />
             <h2 id="why-this-lead" className="text-sm font-semibold text-[#1a3124]">{qualifiedForReview ? "Why the old score flagged this business" : "Qualification status"}</h2>
           </div>
           {qualifiedForReview && lead.whyThisLead.length > 0 ? (
-            <ol className="mt-4 grid gap-3 md:grid-cols-3">
+            <ol className="mt-4 grid gap-3 md:grid-cols-3 md:items-start">
               {lead.whyThisLead.map((claim, index) => (
                 <li key={claim.claimId} className="rounded-xl border border-[#e4ebe2] bg-[#f8faf6] p-4">
                   <span className="font-mono text-[10px] text-[#176443]">0{index + 1}</span>
@@ -516,7 +570,7 @@ function Reachability({ data }: { data: OwnerLeadDetailResponse }) {
       </div>
 
       {data.routes.length > 0 ? (
-        <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <ul className="mt-4 grid gap-3 md:grid-cols-2 md:items-start xl:grid-cols-3">
           {data.routes.map((route) => {
             const Icon = ROUTE_ICONS[route.channel];
             const readiness = ROUTE_READINESS_COPY[route.readiness];

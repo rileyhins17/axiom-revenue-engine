@@ -6,7 +6,8 @@ import type {
 } from "@/lib/revenue-engine/private-kw-owner-labeling";
 
 export const OWNER_LABELING_WORKSPACE_VERSION = "owner-labeling-workspace-v1";
-export const OWNER_LABELING_DRAFT_VERSION = "owner-labeling-draft-v1";
+export const OWNER_LABELING_DRAFT_VERSION = "owner-labeling-draft-v2";
+const LEGACY_OWNER_LABELING_DRAFT_VERSION = "owner-labeling-draft-v1";
 
 export const OwnerWorkspaceLabelSchema = z.enum(["STRONG", "WEAK", "WRONG"]);
 export const OwnerWorkspaceReasonSchema = z.enum([
@@ -162,13 +163,29 @@ export const OwnerLabelingDraftSchema = z.object({
   draftVersion: z.literal(OWNER_LABELING_DRAFT_VERSION),
   packetDigest: z.string().regex(/^[a-f0-9]{64}$/),
   reviewedBy: z.enum(["RILEY", "AIDAN"]),
+  firstPassDecisions: z.record(z.string().trim().min(1).max(128), DraftDecisionSchema),
+  revealedLeadIds: z.array(z.string().trim().min(1).max(128)).max(50),
+  legacyRevealedLeadIds: z.array(z.string().trim().min(1).max(128)).max(50).optional(),
   decisions: z.record(z.string().trim().min(1).max(128), DraftDecisionSchema),
 }).strict();
 
 export type OwnerLabelingDraft = z.infer<typeof OwnerLabelingDraftSchema>;
 
+const LegacyOwnerLabelingDraftSchema = z.object({
+  draftVersion: z.literal(LEGACY_OWNER_LABELING_DRAFT_VERSION),
+  packetDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  reviewedBy: z.enum(["RILEY", "AIDAN"]),
+  decisions: z.record(z.string().trim().min(1).max(128), DraftDecisionSchema),
+}).strict();
+
 function allowedReasons(label: OwnerWorkspaceLabel) {
   return new Set(OWNER_REASON_OPTIONS[label].map((reason) => reason.value));
+}
+
+function hasValidDraftReasons(decision: OwnerLabelingDraftDecision) {
+  if (!decision.label) return decision.reasons.length === 0;
+  const allowed = allowedReasons(decision.label);
+  return decision.reasons.every((reason) => allowed.has(reason));
 }
 
 export function isCompleteOwnerLabelingDecision(decision: OwnerLabelingDraftDecision | undefined) {
@@ -178,15 +195,41 @@ export function isCompleteOwnerLabelingDecision(decision: OwnerLabelingDraftDeci
 }
 
 export function parseOwnerLabelingDraft(value: unknown, packetDigest: string, leadIds: Set<string>) {
-  const result = OwnerLabelingDraftSchema.safeParse(value);
-  if (!result.success || result.data.packetDigest !== packetDigest) return null;
-  if (Object.keys(result.data.decisions).some((leadId) => !leadIds.has(leadId))) return null;
-  if (Object.values(result.data.decisions).some((decision) => {
-    if (!decision.label) return decision.reasons.length > 0;
-    const allowed = allowedReasons(decision.label);
-    return decision.reasons.some((reason) => !allowed.has(reason));
-  })) return null;
-  return result.data;
+  const current = OwnerLabelingDraftSchema.safeParse(value);
+  const legacy = current.success ? null : LegacyOwnerLabelingDraftSchema.safeParse(value);
+  let draft: OwnerLabelingDraft;
+  if (current.success) {
+    draft = current.data;
+  } else {
+    if (!legacy?.success) return null;
+    draft = {
+      ...legacy.data,
+      draftVersion: OWNER_LABELING_DRAFT_VERSION,
+      firstPassDecisions: {},
+      revealedLeadIds: Object.keys(legacy.data.decisions),
+      legacyRevealedLeadIds: Object.keys(legacy.data.decisions),
+    };
+  }
+  if (draft.packetDigest !== packetDigest) return null;
+  const allDecisionIds = [
+    ...Object.keys(draft.firstPassDecisions),
+    ...Object.keys(draft.decisions),
+    ...draft.revealedLeadIds,
+    ...(draft.legacyRevealedLeadIds ?? []),
+  ];
+  if (allDecisionIds.some((leadId) => !leadIds.has(leadId))) return null;
+  if (new Set(draft.revealedLeadIds).size !== draft.revealedLeadIds.length) return null;
+  const legacyRevealed = new Set(draft.legacyRevealedLeadIds ?? []);
+  if (legacyRevealed.size !== (draft.legacyRevealedLeadIds?.length ?? 0) ||
+      [...legacyRevealed].some((leadId) => !draft.revealedLeadIds.includes(leadId) || !draft.decisions[leadId])) return null;
+  if (Object.values(draft.firstPassDecisions).some((decision) => !hasValidDraftReasons(decision))) return null;
+  const revealed = new Set(draft.revealedLeadIds);
+  if (Object.keys(draft.decisions).some((leadId) => !revealed.has(leadId))) return null;
+  if (Object.values(draft.decisions).some((decision) => !hasValidDraftReasons(decision))) return null;
+  if (current.success && draft.revealedLeadIds.some((leadId) => (
+    !legacyRevealed.has(leadId) && (!draft.firstPassDecisions[leadId] || !isCompleteOwnerLabelingDecision(draft.firstPassDecisions[leadId]))
+  ))) return null;
+  return draft;
 }
 
 export function projectOwnerLabelingWorkspace(packet: PrivateKwOwnerLabelingPacket) {
@@ -255,6 +298,7 @@ export function buildOwnerLabelSubmission(input: {
   packetDigest: string;
   reviewedBy: "RILEY" | "AIDAN";
   reviewedAt: string;
+  firstPassDecisions?: Record<string, OwnerLabelingDraftDecision>;
   decisions: Record<string, OwnerLabelingDraftDecision>;
 }): PrivateKwOwnerLabelSubmission {
   const identity = z.object({
@@ -284,6 +328,21 @@ export function buildOwnerLabelSubmission(input: {
     .sort((left, right) => left.leadId.localeCompare(right.leadId, "en-CA"));
   if (decisions.length === 0) throw new Error("Complete at least one lead review before exporting.");
   if (decisions.length > 50) throw new Error("One owner-review checkpoint cannot exceed 50 decisions.");
+  const finalLeadIds = new Set(decisions.map((decision) => decision.leadId));
+  const firstPassDecisions = input.firstPassDecisions
+    ? Object.entries(input.firstPassDecisions).map(([leadId, firstPass]) => {
+      if (!finalLeadIds.has(leadId)) throw new Error("A first-pass judgment needs a matching final judgment before export.");
+      if (!isCompleteOwnerLabelingDecision(firstPass)) {
+        throw new Error("Every exported final judgment needs its complete first-pass judgment.");
+      }
+      return {
+        leadId: z.string().trim().min(1).max(128).parse(leadId),
+        label: firstPass.label!,
+        reasons: firstPass.reasons,
+        notes: z.string().trim().max(500).parse(firstPass.notes),
+      };
+    })
+    : undefined;
   return {
     submissionVersion: "kw-private-owner-labeling-v1",
     packetId: identity.packetId,
@@ -291,6 +350,7 @@ export function buildOwnerLabelSubmission(input: {
     reviewedBy: identity.reviewedBy,
     reviewedAt: identity.reviewedAt,
     decisions,
+    ...(firstPassDecisions ? { firstPassDecisions } : {}),
     reviewOnly: true,
     databaseMutationAuthorized: false,
     qualificationAuthorized: false,

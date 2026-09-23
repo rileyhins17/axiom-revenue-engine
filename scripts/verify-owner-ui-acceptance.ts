@@ -292,7 +292,7 @@ async function applyMigrations(database: SqliteDatabase) {
     .sort((left, right) => left.localeCompare(right));
   assert(migrations.length >= 60 && migrations.at(-1)?.startsWith("0068_"),
     "The owner fixture must use the complete pre-M2 migration history through 0068.");
-  const postSeedMigrations = ["0071_revenue_owner_tasks.sql", "0072_revenue_business_stop.sql"];
+  const postSeedMigrations = ["0071_revenue_owner_tasks.sql", "0072_revenue_business_stop.sql", "0073_revenue_contact_suppression.sql"];
   const migrationNames = await readdir(migrationsDirectory);
   for (const migration of postSeedMigrations) {
     assert(migrationNames.includes(migration), `The synthetic owner fixture requires ${migration} for owner-action acceptance.`);
@@ -1079,13 +1079,13 @@ async function assertM2Review(page: Page, fixture: Awaited<ReturnType<typeof cre
         buttonTops: buttons.map((rect) => rect.top),
       };
     });
-    assert(filterLayout.buttonTops.every((top) => top === filterLayout.buttonTops[0]),
-      `${label} mobile filters must stay on one row: ${JSON.stringify(filterLayout)}`);
-    assert(filterLayout.scrollWidth > filterLayout.clientWidth,
-      `${label} mobile filters must remain horizontally scrollable: ${JSON.stringify(filterLayout)}`);
+    assert.equal(new Set(filterLayout.buttonTops).size, 2,
+      `${label} mobile filters must fit in two visible rows: ${JSON.stringify(filterLayout)}`);
+    assert(filterLayout.scrollWidth <= filterLayout.clientWidth + 1,
+      `${label} mobile filters must fit without horizontal scrolling: ${JSON.stringify(filterLayout)}`);
     await filterGroup.getByRole("button", { name: "Stopped 2" }).click();
     assert.equal(await page.getByRole("list", { name: "Businesses to review", exact: true }).locator(":scope > li").count(), 2,
-      `${label} must apply the last horizontally scrolling filter.`);
+      `${label} must apply the stopped filter.`);
     await filterGroup.getByRole("button", { name: "All 10" }).click();
     assert.equal(await page.getByRole("list", { name: "Businesses to review", exact: true }).locator(":scope > li").count(), 10,
       `${label} must restore all businesses from the first filter.`);
@@ -1097,6 +1097,7 @@ async function assertM2Review(page: Page, fixture: Awaited<ReturnType<typeof cre
   const derivedDetail = page.getByRole("region", { name: `${fixture.selected[4]!.businessName} website review` });
   await derivedDetail.waitFor();
   assert.equal(await page.getByRole("region", { name: /website review$/ }).count(), 1, `${label} must render only the selected dossier.`);
+  await derivedDetail.getByText("Pages checked and source links").click();
   const pageClues = derivedDetail.getByText(/Page clues: Page title/).first();
   await pageClues.waitFor();
   await pageClues.click();
@@ -1105,7 +1106,7 @@ async function assertM2Review(page: Page, fixture: Awaited<ReturnType<typeof cre
   await pageClues.click();
   await derivedDetail.getByText("Not assessed", { exact: true }).waitFor();
   await derivedDetail.getByText("No outreach is authorized from this review. No message or call can be sent here.").waitFor();
-  assert.equal(await derivedDetail.getByRole("link", { name: "Open website" }).count(), 1);
+  assert.equal(await derivedDetail.getByRole("link", { name: "Open business website" }).count(), 1);
   if (mobile) {
     assert.equal(await page.getByRole("list", { name: "Businesses to review", exact: true }).isVisible(), false);
     await assertWcag(page, `${label} selected detail`);
@@ -1322,6 +1323,21 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await assertReducedMotion(page, "desktop dossier");
     await page.screenshot({ path: join(outputDirectory, "dossier-desktop.png"), fullPage: true });
 
+    stage = "desktop observed email stop";
+    await page.getByRole("button", { name: /Review \d+ email contacts?/ }).click();
+    await page.getByRole("combobox", { name: "Email contact to review" }).waitFor();
+    assert.match(await page.getByRole("combobox", { name: "Email contact to review" }).locator("option:checked").textContent() ?? "", /hello@roofing\.axiomfixtures\.ca/, "The selected contact must show the exact email before a permanent stop.");
+    await page.getByText("This permanently blocks hello@roofing.axiomfixtures.ca for this business.", { exact: true }).waitFor();
+    await page.getByRole("combobox", { name: "Observed event" }).selectOption("UNSUBSCRIBE");
+    await page.getByRole("textbox", { name: "Short observation summary" }).fill("Owner observed an unsubscribe request in the synthetic fixture.");
+    await page.getByRole("checkbox", { name: /I personally observed this event/ }).check();
+    await page.getByRole("button", { name: "Record do not email" }).click();
+    await page.getByText("Do not email this contact", { exact: true }).waitFor();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: /Review \d+ email contacts?/ }).click();
+    await page.getByText("Do not email this contact", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Close" }).click();
+
     stage = "desktop owner-task creation";
     await page.getByRole("heading", { level: 2, name: "Owner tasks" }).waitFor();
     await page.getByText("No saved owner tasks for this business yet.", { exact: true }).waitFor();
@@ -1515,6 +1531,11 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     });
     await page.getByRole("heading", { level: 2, name: firstEvaluationBusiness }).waitFor();
     await page.getByText("Verified the exact 50-business checkpoint. No outreach was enabled.").waitFor();
+    await page.getByText("Engine verdict hidden", { exact: true }).first().waitFor();
+    await page.getByRole("button", { name: /^Strong/ }).click();
+    await page.getByRole("checkbox", { name: "Good commercial fit" }).check();
+    await page.getByRole("button", { name: "Save first pass and reveal engine verdict" }).click();
+    await page.getByText("Before reveal, you said").waitFor();
     await page.getByRole("button", { name: /^Strong/ }).click();
     await page.getByRole("checkbox", { name: "Good commercial fit" }).check();
     assert.equal(await page.getByRole("button", { name: /^Strong/ }).getAttribute("aria-pressed"), "true");
@@ -1526,6 +1547,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     const submission = JSON.parse(await readFile(downloadedPath, "utf8")) as Record<string, unknown>;
     assert.equal(submission.packetDigest, ownerLabelingPacket.packetDigest);
     assert.equal((submission.decisions as Array<{ label: string }>)[0]?.label, "STRONG");
+    assert.equal((submission.firstPassDecisions as Array<{ label: string }>)[0]?.label, "STRONG");
     assert.equal(submission.databaseMutationAuthorized, false);
     assert.equal(submission.qualificationAuthorized, false);
     assert.equal(submission.outreachAuthorized, false);
@@ -1562,12 +1584,12 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
     const todayReview = page.getByRole("region", { name: "Today owner action desk" });
-    await todayReview.getByRole("heading", { name: "Choose which businesses deserve a closer look." }).waitFor();
+    await todayReview.getByRole("heading", { name: "Confirm which businesses should move to research" }).waitFor();
     await todayReview.getByRole("heading", { name: "Replies and follow-ups" }).waitFor();
     await todayReview.getByRole("heading", { name: "Safety and email status" }).waitFor();
     await todayReview.getByText("Email route", { exact: true }).waitFor();
     await todayReview.getByText("Not verified", { exact: true }).waitFor();
-    const todayBusinessReview = todayReview.getByRole("link", { name: "Review businesses" });
+    const todayBusinessReview = todayReview.getByRole("link", { name: "Review proposed businesses" });
     await todayBusinessReview.waitFor();
     assert.equal(await todayBusinessReview.getAttribute("href"), "/leads/m2/identity");
     assert.equal(await page.getByText("Safety gated", { exact: true }).count(), 0,
@@ -1688,7 +1710,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "mobile Today safety";
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
-    await page.getByRole("region", { name: "Today owner action desk" }).getByRole("link", { name: "Review businesses" }).waitFor();
+    await page.getByRole("region", { name: "Today owner action desk" }).getByRole("link", { name: "Review proposed businesses" }).waitFor();
     assert.equal(await page.getByRole("link", { name: "Connect now" }).count(), 0,
       "The phone Today view must not offer Gmail OAuth as the next owner action.");
     await assertResponsive(page, "mobile Today safety");
@@ -1790,6 +1812,7 @@ async function run() {
     seedOwnerLead(database);
     database.exec(await readFile(join(REPOSITORY_ROOT, "migrations", "0071_revenue_owner_tasks.sql"), "utf8"));
     database.exec(await readFile(join(REPOSITORY_ROOT, "migrations", "0072_revenue_business_stop.sql"), "utf8"));
+    database.exec(await readFile(join(REPOSITORY_ROOT, "migrations", "0073_revenue_contact_suppression.sql"), "utf8"));
     database.close();
     m2Fixture = await createM2OwnerConsoleFixture();
     const m2DatabaseIdentity = readSetupFile(resolve(m2Fixture.databasePath)).identity;

@@ -72,7 +72,10 @@ function storageKey(packetDigest: string) {
 export function OwnerLeadEvaluationWorkspace() {
   const [clientReady, setClientReady] = React.useState(false);
   const [workspace, setWorkspace] = React.useState<OwnerLabelingWorkspaceResponse | null>(null);
+  const [firstPassDecisions, setFirstPassDecisions] = React.useState<DecisionMap>({});
   const [decisions, setDecisions] = React.useState<DecisionMap>({});
+  const [revealedLeadIds, setRevealedLeadIds] = React.useState<string[]>([]);
+  const [legacyRevealedLeadIds, setLegacyRevealedLeadIds] = React.useState<string[]>([]);
   const [reviewedBy, setReviewedBy] = React.useState<"RILEY" | "AIDAN">("RILEY");
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -90,42 +93,60 @@ export function OwnerLeadEvaluationWorkspace() {
         draftVersion: OWNER_LABELING_DRAFT_VERSION,
         packetDigest: workspace.packetDigest,
         reviewedBy,
+        firstPassDecisions,
+        revealedLeadIds,
+        legacyRevealedLeadIds,
         decisions,
       }));
     } catch {
       // The export remains available even when browser storage is blocked.
     }
-  }, [decisions, reviewedBy, workspace]);
+  }, [decisions, firstPassDecisions, legacyRevealedLeadIds, reviewedBy, revealedLeadIds, workspace]);
 
   const unreviewed = workspace?.entries.filter((entry) => entry.ownerReview.label === "UNREVIEWED") ?? [];
   const completedDrafts = unreviewed.filter((entry) => isCompleteOwnerLabelingDecision(decisions[entry.leadId]));
   const incompleteDrafts = unreviewed.filter((entry) => {
+    const firstPass = firstPassDecisions[entry.leadId];
     const decision = decisions[entry.leadId];
-    return decisionStarted(decision) && !isCompleteOwnerLabelingDecision(decision);
+    return (decisionStarted(firstPass) && !isCompleteOwnerLabelingDecision(firstPass))
+      || (revealedLeadIds.includes(entry.leadId) && decisionStarted(decision) && !isCompleteOwnerLabelingDecision(decision));
   });
   const currentEntry = workspace?.entries.find((entry) => entry.leadId === selectedLeadId)
     ?? unreviewed[0]
     ?? workspace?.entries[0]
     ?? null;
+  const currentRevealed = currentEntry ? revealedLeadIds.includes(currentEntry.leadId) || currentEntry.ownerReview.label !== "UNREVIEWED" : false;
+  const currentFirstPass = currentEntry ? firstPassDecisions[currentEntry.leadId] ?? EMPTY_DECISION : EMPTY_DECISION;
   const currentDecision = currentEntry ? decisions[currentEntry.leadId] ?? EMPTY_DECISION : EMPTY_DECISION;
+  const reviewPhase = currentRevealed ? "final" : "first-pass";
+  const activeDecision = currentRevealed ? currentDecision : currentFirstPass;
   const currentIndex = workspace && currentEntry ? workspace.entries.findIndex((entry) => entry.leadId === currentEntry.leadId) : -1;
 
-  const updateCurrent = React.useCallback((next: OwnerLabelingDraftDecision) => {
+  const updateCurrent = React.useCallback((next: OwnerLabelingDraftDecision, phase: "first-pass" | "final") => {
     if (!currentEntry || currentEntry.ownerReview.label !== "UNREVIEWED") return;
-    setDecisions((current) => ({ ...current, [currentEntry.leadId]: next }));
+    if (phase === "final" && !revealedLeadIds.includes(currentEntry.leadId)) return;
+    (phase === "first-pass" ? setFirstPassDecisions : setDecisions)((current) => ({ ...current, [currentEntry.leadId]: next }));
     setMessage(null);
-  }, [currentEntry]);
+  }, [currentEntry, revealedLeadIds]);
 
-  const chooseLabel = (label: OwnerWorkspaceLabel) => {
-    updateCurrent({ label, reasons: [], notes: currentDecision.notes });
+  const chooseLabel = (label: OwnerWorkspaceLabel, phase: "first-pass" | "final") => {
+    const active = phase === "first-pass" ? currentFirstPass : currentDecision;
+    updateCurrent({ label, reasons: [], notes: active.notes }, phase);
   };
 
-  const toggleReason = (reason: OwnerWorkspaceReason) => {
-    if (!currentDecision.label) return;
-    const reasons = currentDecision.reasons.includes(reason)
-      ? currentDecision.reasons.filter((candidate) => candidate !== reason)
-      : [...currentDecision.reasons, reason].slice(0, 5);
-    updateCurrent({ ...currentDecision, reasons });
+  const toggleReason = (reason: OwnerWorkspaceReason, phase: "first-pass" | "final") => {
+    const active = phase === "first-pass" ? currentFirstPass : currentDecision;
+    if (!active.label) return;
+    const reasons = active.reasons.includes(reason)
+      ? active.reasons.filter((candidate) => candidate !== reason)
+      : [...active.reasons, reason].slice(0, 5);
+    updateCurrent({ ...active, reasons }, phase);
+  };
+
+  const revealCurrent = () => {
+    if (!currentEntry || !isCompleteOwnerLabelingDecision(currentFirstPass)) return;
+    setRevealedLeadIds((current) => current.includes(currentEntry.leadId) ? current : [...current, currentEntry.leadId]);
+    setMessage({ tone: "success", text: "First-pass judgment saved. The engine verdict and scores are now revealed for this business." });
   };
 
   const loadPacket = async (file: File) => {
@@ -163,7 +184,10 @@ export function OwnerLeadEvaluationWorkspace() {
         saved = null;
       }
       setWorkspace(verified);
+      setFirstPassDecisions(saved?.firstPassDecisions ?? {});
       setDecisions(saved?.decisions ?? {});
+      setRevealedLeadIds(saved?.revealedLeadIds ?? []);
+      setLegacyRevealedLeadIds(saved?.legacyRevealedLeadIds ?? []);
       setReviewedBy(saved?.reviewedBy ?? "RILEY");
       setSelectedLeadId(verified.entries.find((entry) => entry.ownerReview.label === "UNREVIEWED")?.leadId ?? verified.entries[0]?.leadId ?? null);
       setMessage({
@@ -172,7 +196,10 @@ export function OwnerLeadEvaluationWorkspace() {
       });
     } catch (error) {
       setWorkspace(null);
+      setFirstPassDecisions({});
       setDecisions({});
+      setRevealedLeadIds([]);
+      setLegacyRevealedLeadIds([]);
       setSelectedLeadId(null);
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "The checkpoint could not be verified." });
     } finally {
@@ -188,10 +215,14 @@ export function OwnerLeadEvaluationWorkspace() {
       return;
     }
     try {
+      const exportedFirstPassDecisions = Object.fromEntries(completedDrafts
+        .filter((entry) => firstPassDecisions[entry.leadId])
+        .map((entry) => [entry.leadId, firstPassDecisions[entry.leadId]!]));
       const submission = buildOwnerLabelSubmission({
         packetId: workspace.packetId,
         packetDigest: workspace.packetDigest,
         reviewedBy,
+        firstPassDecisions: Object.keys(exportedFirstPassDecisions).length ? exportedFirstPassDecisions : undefined,
         reviewedAt: new Date().toISOString(),
         decisions,
       });
@@ -216,7 +247,10 @@ export function OwnerLeadEvaluationWorkspace() {
 
   const resetPacket = () => {
     setWorkspace(null);
+    setFirstPassDecisions({});
     setDecisions({});
+    setRevealedLeadIds([]);
+    setLegacyRevealedLeadIds([]);
     setSelectedLeadId(null);
     setMessage(null);
   };
@@ -354,7 +388,7 @@ export function OwnerLeadEvaluationWorkspace() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full border border-white/[0.09] bg-white/[0.03] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Business {currentIndex + 1} of 50</span>
-                    <span className={cn("rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em]", LABEL_TONES[currentEntry.engineAssessment.label])}>Engine says {readable(currentEntry.engineAssessment.label)}</span>
+                    {currentRevealed ? <span className={cn("rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em]", LABEL_TONES[currentEntry.engineAssessment.label])}>Engine says {readable(currentEntry.engineAssessment.label)}</span> : <span className="rounded-full border border-white/[0.09] bg-white/[0.03] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Engine verdict hidden</span>}
                   </div>
                   <h2 id="evaluation-business-name" className="mt-3 text-2xl font-semibold tracking-[-0.035em] text-white">{currentEntry.businessName}</h2>
                   <p className="mt-1.5 text-sm text-zinc-500">{readable(currentEntry.city)} · {readable(currentEntry.niche)} · {readable(currentEntry.audit.classification)}</p>
@@ -368,7 +402,7 @@ export function OwnerLeadEvaluationWorkspace() {
 
             <div className="grid gap-6 p-4 sm:p-6 2xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
               <div className="min-w-0 space-y-6">
-                <section aria-labelledby="quality-scores-heading">
+                {currentRevealed ? <section aria-labelledby="quality-scores-heading">
                   <h3 id="quality-scores-heading" className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500">Five separate quality scores</h3>
                   <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
                     {SCORE_LABELS.map((score) => {
@@ -381,13 +415,16 @@ export function OwnerLeadEvaluationWorkspace() {
                       );
                     })}
                   </dl>
-                </section>
+                </section> : <section className="rounded-xl border border-emerald-300/15 bg-emerald-300/[0.035] p-4" aria-label="Engine verdict hidden">
+                  <h3 className="text-sm font-semibold text-emerald-100">Make your first-pass judgment first</h3>
+                  <p className="mt-1 text-xs leading-5 text-zinc-400">The engine verdict and scores stay hidden until you save a label and at least one reason for this exact business.</p>
+                </section>}
 
                 <section aria-labelledby="quality-proof-heading">
                   <div className="flex items-end justify-between gap-3">
                     <div>
-                      <h3 id="quality-proof-heading" className="text-sm font-semibold text-white">Proof behind the engine&apos;s verdict</h3>
-                      <p className="mt-1 text-xs leading-5 text-zinc-500">Inspect the actual observation before agreeing.</p>
+                      <h3 id="quality-proof-heading" className="text-sm font-semibold text-white">Evidence for your judgment</h3>
+                      <p className="mt-1 text-xs leading-5 text-zinc-500">Review the source observations before making your call.</p>
                     </div>
                     <a href={currentEntry.sourceEvidenceUrl} target="_blank" rel="noreferrer" className="v2-focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-emerald-300 hover:text-emerald-200">Source record <ExternalLink className="size-3" aria-hidden="true" /></a>
                   </div>
@@ -414,7 +451,7 @@ export function OwnerLeadEvaluationWorkspace() {
               <section className="self-start rounded-2xl border border-white/[0.08] bg-[#090b0e] p-4 sm:p-5" aria-labelledby="owner-verdict-heading">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 id="owner-verdict-heading" className="text-base font-semibold text-white">Your verdict</h3>
+                    <h3 id="owner-verdict-heading" className="text-base font-semibold text-white">{currentRevealed ? "Your final judgment" : "Your first-pass judgment"}</h3>
                     <p className="mt-1 text-xs leading-5 text-zinc-500">Judge the opportunity, not whether an email exists.</p>
                   </div>
                   {currentEntry.ownerReview.label !== "UNREVIEWED" ? <LockKeyhole className="size-4 text-zinc-500" aria-label="Recorded review" /> : null}
@@ -428,15 +465,20 @@ export function OwnerLeadEvaluationWorkspace() {
                   </div>
                 ) : (
                   <>
+                    {currentRevealed ? <div className="mt-4 rounded-xl border border-white/[0.08] bg-white/[0.025] p-3" aria-label="Saved first-pass judgment">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Before reveal, you said</p>
+                      <p className="mt-1 text-sm font-semibold text-zinc-200">{readable(firstPassDecisions[currentEntry.leadId]?.label ?? "Unrecorded")}</p>
+                      {firstPassDecisions[currentEntry.leadId]?.reasons.length ? <p className="mt-1 text-[11px] leading-4 text-zinc-500">{firstPassDecisions[currentEntry.leadId]?.reasons.map(readable).join(" · ")}</p> : null}
+                    </div> : null}
                     <div className="mt-4 grid gap-2" role="group" aria-label="Lead quality verdict">
                       {OWNER_LABEL_OPTIONS.map((option) => {
-                        const active = currentDecision.label === option.value;
+                        const active = activeDecision.label === option.value;
                         return (
                           <button
                             type="button"
                             key={option.value}
                             aria-pressed={active}
-                            onClick={() => chooseLabel(option.value)}
+                            onClick={() => chooseLabel(option.value, reviewPhase)}
                             className={cn(
                               "v2-focus-ring min-h-14 rounded-xl border px-3 py-2.5 text-left transition-colors",
                               active ? LABEL_TONES[option.value] : "border-white/[0.08] bg-white/[0.025] text-zinc-300 hover:border-white/[0.16] hover:bg-white/[0.05]",
@@ -449,13 +491,13 @@ export function OwnerLeadEvaluationWorkspace() {
                       })}
                     </div>
 
-                    {currentDecision.label ? (
+                    {activeDecision.label ? (
                       <fieldset className="mt-5">
                         <legend className="text-xs font-semibold text-zinc-200">Why? Choose at least one.</legend>
                         <div className="mt-2 space-y-1.5">
-                          {OWNER_REASON_OPTIONS[currentDecision.label].map((reason) => (
+                          {OWNER_REASON_OPTIONS[activeDecision.label].map((reason) => (
                             <label key={reason.value} className="flex min-h-10 cursor-pointer items-center gap-3 rounded-lg border border-white/[0.07] bg-white/[0.018] px-3 py-2 text-xs text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200">
-                              <input type="checkbox" checked={currentDecision.reasons.includes(reason.value)} onChange={() => toggleReason(reason.value)} className="size-4 accent-emerald-400" />
+                              <input type="checkbox" checked={activeDecision.reasons.includes(reason.value)} onChange={() => toggleReason(reason.value, reviewPhase)} className="size-4 accent-emerald-400" />
                               {reason.label}
                             </label>
                           ))}
@@ -463,15 +505,16 @@ export function OwnerLeadEvaluationWorkspace() {
                       </fieldset>
                     ) : null}
 
-                    <label className="mt-5 block text-xs font-semibold text-zinc-200" htmlFor={`owner-note-${currentEntry.leadId}`}>Optional note</label>
+                    <label className="mt-5 block text-xs font-semibold text-zinc-200" htmlFor={`owner-note-${reviewPhase}-${currentEntry.leadId}`}>Optional note</label>
                     <Textarea
-                      id={`owner-note-${currentEntry.leadId}`}
-                      value={currentDecision.notes}
+                      id={`owner-note-${reviewPhase}-${currentEntry.leadId}`}
+                      value={activeDecision.notes}
                       maxLength={500}
-                      placeholder="What did the engine miss or get right?"
+                      placeholder={currentRevealed ? "What did the engine miss or get right?" : "What supports your first-pass judgment?"}
                       className="mt-2 min-h-24 border-white/[0.1] bg-black/20 text-zinc-200 placeholder:text-zinc-700"
-                      onChange={(event) => updateCurrent({ ...currentDecision, notes: event.currentTarget.value })}
+                      onChange={(event) => updateCurrent({ ...activeDecision, notes: event.currentTarget.value }, reviewPhase)}
                     />
+                    {!currentRevealed ? <Button className="mt-5 min-h-11 w-full" disabled={!isCompleteOwnerLabelingDecision(currentFirstPass)} onClick={revealCurrent}>Save first pass and reveal engine verdict</Button> : null}
                   </>
                 )}
 

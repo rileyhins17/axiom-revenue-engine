@@ -139,13 +139,20 @@ provider, or spend. It refuses to begin review with fewer or more than the fixed
 cohort growth cannot invalidate completed labels.
 
 Riley can review any convenient batch instead of finishing all 50 in one sitting.
-The authenticated Quality Lab at `/leads/evaluation` now provides the owner
-workflow in source: load the exact prepared checkpoint, inspect the business,
-five scores, and URL-backed evidence, choose Strong/Weak/Wrong plus a reason,
-and download `owner-reviews.json`. Drafts stay in that browser and are restored
-only when the exact same packet digest is loaded again. The screen has no
-database or provider binding and cannot change qualification, assess consent,
-contact anyone, send, deploy, or spend.
+The authenticated Quality Lab at `/leads/evaluation` now provides a two-pass
+owner workflow in source. Load the exact prepared checkpoint, inspect the
+business and URL-backed observations, then choose **Strong**, **Weak**, or
+**Wrong** with at least one reason before revealing the engine's label and five
+scores for that business. Record a final judgment after the reveal and download
+`owner-reviews.json`. The export keeps both first-pass and final judgments; the
+existing checkpoint recorder carries the final judgment into the next packet.
+First-pass history therefore remains in the exported file and is not yet in the
+next packet. Drafts stay in that browser and are restored only for the exact
+same packet digest and business IDs. The visible workflow is blind before the
+first pass, but the current validation response still includes the engine
+assessment in browser data; a server-side blind boundary remains future work.
+The screen has no database or provider binding and cannot change qualification,
+assess consent, contact anyone, send, deploy, or spend.
 
 Record the downloaded batch as a new checkpoint with:
 
@@ -163,8 +170,10 @@ to staging.
 
 ## What Riley will do
 
-For each business, the app will show its website capture, the engine's scores,
-and the proof behind every finding. Riley chooses one label:
+For each business, the app first shows the website capture and source-backed
+observations while hiding the engine verdict and scores in the interface. Riley
+chooses a first-pass label, then compares it with the engine and records a final
+label:
 
 - `Strong` — Axiom should seriously consider contacting this business.
 - `Weak` — it is a real business, but the opportunity is not good enough.
