@@ -1,8 +1,9 @@
 # Provider and budget plan
 
-**Planning date:** 2026-09-20, America/Toronto. **Status:** proposal only. No
+**Planning date:** 2026-09-20; provider-policy check: 2026-09-23, America/Toronto. **Status:** proposal only. No
 provider account, key, resource activation, purchase, migration, deployment, or
-send is authorized by this document. The current [master plan](MASTER_PLAN.md)
+send is authorized by this document. Current incremental provider spend is C$0.
+The current [master plan](MASTER_PLAN.md)
 is authoritative for sequencing and stop boundaries.
 
 ## Capability inventory
@@ -19,9 +20,13 @@ but their current remote deployment, billing state, data, and usage are
 unverified. No R2 bucket, Queue, mailbox, Cloudflare Email Routing destination,
 Resend account/API key, Hunter account, OpenAI account/key, Jev key, Vercel
 account, paid source, or verification purchase is established by this inventory.
-Public DNS observed on 2026-09-21 shows Cloudflare root MX/SPF, DMARC quarantine,
-and a Resend verification token; it does not prove active forwarding, a provider
-account/key, sender verification, complete DKIM, or send readiness. The shadow
+Public DNS queried on 2026-09-23 shows Cloudflare root MX/SPF, DMARC quarantine,
+a Resend verification token, two distinct TXT values under `resend._domainkey`,
+and SPF/MX records under `send` that point to Amazon SES infrastructure. This
+proves only that public records exist; it does not prove active forwarding,
+which Resend domain/account owns them, which DKIM value is current, a provider
+account/key, sender verification, or policy permission/send readiness. The
+Cloudflare destinations and rules remain unverified. The shadow
 Workflow is deliberately inert: no route,
 schedule, queue producer/consumer, provider credential, or execution path is
 present.
@@ -55,51 +60,68 @@ guarantee. ([Workers pricing](https://developers.cloudflare.com/workers/platform
 [Workflows](https://developers.cloudflare.com/workflows/reference/pricing/),
 [Browser Run](https://developers.cloudflare.com/browser-run/pricing/))
 
-The selected first-pilot mail route has **zero paid mailbox seats**. Cloudflare
-Email Routing is the inbound route to verified existing owner destinations.
-Cloudflare's current Email Service separates inbound Email Routing from outbound
-Email Sending: Routing is available on Workers Free and Paid with unlimited
-inbound messages, while sending to arbitrary recipients requires Workers Paid.
-Sending only to verified destination addresses is free on either plan, including
-when only Email Routing is configured. This verified-destination allowance can
-support owner-controlled sink tests; it does not enable free replies to arbitrary
-prospects. Resend remains the selected conditional outbound/reply adapter for a
-zero-paid-mailbox pilot. If Cloudflare forwarding plus the gated Resend route or
-a separately reviewed free owner-only send-as route cannot meet reply ownership
-and privacy requirements, mail activation remains blocked. Paid mailboxes and
-Workspace seats remain out of scope unless Riley explicitly reverses the
-zero-paid-mailbox decision. ([Cloudflare Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/),
-[Cloudflare Email Service limits](https://developers.cloudflare.com/email-service/platform/limits/),
-[Cloudflare routing addresses](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/))
+The selected inbound route has **zero paid mailbox seats**. Cloudflare Email
+Routing forwards inbound messages to verified existing owner destinations.
+Cloudflare's current FAQ says Email Service is intended only for transactional
+email; therefore its paid outbound capability is not a selected route for cold
+prospecting. Resend's current AUP expressly prohibits unsolicited messages,
+including cold outreach, and requires explicit opt-in. No provider is selected
+for cold email until a vendor's current policy and a lawful route are proven
+compatible with Axiom's exact sending use. Owner-managed calls and separately
+approved manual tasks are prioritized meanwhile. ([Cloudflare Email Service
+FAQ](https://developers.cloudflare.com/email-service/reference/faq/), [Resend
+Acceptable Use Policy](https://resend.com/legal/acceptable-use))
 
-Cloudflare Email Sending is a **Beta alternate**, not a second adapter to build
-alongside the first pilot route. If Axiom's Workers Paid entitlement and domain
-access are verified, compare it with Resend through one owner-controlled sink
-spike before changing the selected route. It supports reply and threading
-headers, but inbound Routing does not appear in outbound event subscriptions;
-the app would have to own that reply/event join and its retention policy. The
-published 3,000/month included sending quota does not prove the initial daily
-limit for Axiom's account. ([Cloudflare send API](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/),
+Cloudflare Email Routing is available on Workers Free and Paid with unlimited
+inbound messages. Sending to arbitrary recipients requires Workers Paid, and
+the published Email Sending allowance is 3,000/month before usage charges;
+sends to verified destination addresses are free on either plan. These account
+limits do not override the current transactional-only product guidance or prove
+Axiom's actual account quota. Resend Free publishes 3,000/month, 100/day, three
+domains and one webhook endpoint for US$0/month, but that published price and
+capacity cannot be treated as permission for unsolicited prospecting. A
+Resend Free setup may be evaluated only for explicit opt-in or transactional
+messages if current terms permit that exact use and account eligibility is
+verified. No account is established, no sender is connected, and current
+incremental provider spend is C$0. ([Cloudflare Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/),
+[Cloudflare limits](https://developers.cloudflare.com/email-service/platform/limits/),
+[Resend pricing](https://resend.com/pricing), [Resend AUP](https://resend.com/legal/acceptable-use))
+
+Cloudflare Email Sending is a **Beta transactional alternative**, not a cold
+marketing route. Do not build or activate it for prospecting under current
+guidance. If an owner later evaluates it for a policy-permitted transactional
+use, the app must separately prove sending-domain ownership, quota, reply/event
+handling, suppression and retention. ([Cloudflare Email Service FAQ](https://developers.cloudflare.com/email-service/reference/faq/),
+[Cloudflare send API](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/),
 [headers](https://developers.cloudflare.com/email-service/reference/headers/),
 [event subscriptions](https://developers.cloudflare.com/email-service/platform/event-subscriptions/),
 [limits](https://developers.cloudflare.com/email-service/platform/limits/))
 
-**Provider-page check: 2026-09-23.** Resend's published Free plan lists 3,000
-emails/month, a 100/day limit, three domains, one webhook endpoint and 30-day
-provider-side data retention. These are published plan features, not evidence
-that Axiom has an eligible Free account, usable quota, a verified sending domain
-or sender, an API key, a webhook secret, or an acceptable privacy route. A free
-plan does not authorize overages or establish the account's actual billing and
-usage controls. Before activation, verify the live plan and billing state,
-Cloudflare destination/rule status, Resend domain records and sender, and signed
-webhook/event handling in the owner-controlled accounts. Prove the human-triggered
-reply round trip with owner-controlled inboxes and a verified `From` and
-Cloudflare-routed `Reply-To`; no prospect send is part of that readiness check.
-([Resend pricing](https://resend.com/pricing),
-[Resend send API](https://resend.com/docs/api-reference/emails/send-email),
+**Provider-page and DNS check: 2026-09-23.** Resend's published Free plan lists
+3,000 emails/month, a 100/day limit, three domains, one webhook endpoint and
+30-day provider-side data retention. Its current AUP (updated 2026-08-27)
+prohibits unsolicited mail, specifically cold outreach, and requires every
+recipient to have explicitly opted in. Therefore this plan does not select
+Resend for cold first-touch. Cloudflare's FAQ says Email Service is currently
+intended only for transactional email; its paid arbitrary-recipient send
+feature is not a substitute for a cold-email sender. ([Resend pricing](https://resend.com/pricing),
+[Resend AUP](https://resend.com/legal/acceptable-use), [Cloudflare Email Service
+FAQ](https://developers.cloudflare.com/email-service/reference/faq/))
+
+Live public DNS confirms root Cloudflare MX records, Cloudflare SPF, DMARC
+quarantine, a `resend-domain-verification` TXT token, two distinct TXT values at
+`resend._domainkey`, and an Amazon SES SPF/MX pair at `send`. The duplicate DKIM
+selector values require owner-account inspection; do not replace either record
+based on the DNS observation alone. DNS cannot prove Cloudflare destination
+ownership/rules, which Resend account owns the domain, verified sender/key,
+quota/billing state, or current provider permission. A no-prospect sink round
+trip can be planned after an owner verifies destinations and rules, confirms a
+permitted sender route, and an approved implementation exists. No provider
+activation, email, purchase or send happened in this audit; incremental provider
+spend remains C$0. ([Cloudflare routing addresses](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/),
+[Cloudflare route setup](https://developers.cloudflare.com/email-service/get-started/route-emails/),
 [Resend domain verification](https://resend.com/docs/add-a-domain),
-[Resend webhook verification](https://resend.com/docs/webhooks/verify-webhooks-requests),
-[Cloudflare Postmaster](https://developers.cloudflare.com/email-service/reference/postmaster/))
+[Resend webhook verification](https://resend.com/docs/webhooks/verify-webhooks-requests))
 
 Hunter Free is the proposed low-volume verifier: $0, no card, 50 shared monthly
 credits across finding and verification, and 0.5 credit per verification on
@@ -136,8 +158,8 @@ actual provider tax/account treatment must be confirmed at checkout.
 
 | Item | Monthly planning amount |
 |---|---:|
-| Cloudflare Email Routing inbound | C$0.00 published route price; account/destination state unverified |
-| Resend Free outbound candidate | C$0.00 published plan price; account/domain/key/quota state unverified |
+| Cloudflare Email Routing inbound | C$0.00 published route price; account/destination/rule state unverified |
+| Resend Free | C$0.00 published plan; not selected for cold email; opt-in/transactional account, domain, key and quota state unverified |
 | Workers Paid: US$5 × 1.38 | C$6.90 |
 | Domain renewal reserve | C$2.00 |
 | Paid source | C$0.00 |
@@ -208,9 +230,11 @@ US$20/seat/month monthly would cost about C$55.20 for two seats before tax,
 without replacing evidence storage, inbound routing, or verification. ([HubSpot pricing](https://www.hubspot.com/pricing/sales?tier=starter))
 
 Before any activation, recheck: current plan/currency/tax; account ownership
-and recovery; provider terms, retention, and region; exact model/version and
-price; prepaid minimum and refund/expiry rules; actual Cloudflare bindings and
-usage; Cloudflare destination/routing and Resend deliverability/reply/suppression
+and recovery; provider terms for the exact recipient-consent model, retention,
+and region; exact model/version and price; prepaid minimum and refund/expiry
+rules; actual Cloudflare bindings and usage; Cloudflare destination/routing;
+any permitted opt-in/transactional Resend deliverability, reply and suppression
 readiness; source licence and price; Hunter shared-credit state; and a current
-ledger receipt. Then obtain an
+ledger receipt. A cold-email adapter remains unselected until vendor policy and
+the legal route are both proven. Then obtain an
 explicit owner approval for the exact account, cap, cohort, and cash outlay.

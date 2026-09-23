@@ -53,16 +53,19 @@ include it in public logs.
   prove active forwarding destinations, a Resend account/key, sender
   verification, complete DKIM, or send readiness. Treat these addresses as
   planned sender/routing identities, not proof of paid mailbox capacity.
-- The zero-paid-mailbox target is Cloudflare forwarding to each owner's existing
-  verified destination inbox for inbound mail, with a typed Resend outbound/reply
-  adapter only after the account, key, domain, webhook, legal and suppression
-  gates pass. Cloudflare forwarding cannot itself send replies from the custom
-  domain; M4 must prove either the app's human-triggered Resend reply flow or a
-  separately reviewed free owner-only send-as route. If those zero-cost routes
-  cannot satisfy reply ownership or privacy gates, mail activation remains
-  blocked. Do not build a mailbox farm or buy Workspace seats; paid mailboxes
-  and Workspace are out of scope unless Riley explicitly reverses the
-  zero-paid-mailbox decision.
+- The zero-paid-mailbox inbound target is Cloudflare forwarding to each owner's
+  existing verified destination inbox. Forwarding cannot send from the custom
+  domain. The [current Resend acceptable-use policy](https://resend.com/legal/acceptable-use)
+  bans unsolicited cold outreach and requires explicit opt-in; [Cloudflare Email
+  Service](https://developers.cloudflare.com/email-service/reference/faq/) says
+  outbound sending is for transactional mail. Neither is an approved cold
+  first-touch route. Resend may be evaluated for permitted opted-in replies or
+  transactional messages only after its account, sender, webhook, legal, and
+  suppression gates pass. No such route is connected or verified now. Until a
+  provider-permitted, lawful zero-paid-mailbox first-touch route is proven,
+  owner-led manual calls and other separately governed tasks are the acquisition
+  path. Do not build a mailbox farm or buy Workspace seats; paid mailboxes and
+  Workspace are out of scope unless Riley explicitly reverses that decision.
 - Riley confirmed on 2026-09-20 that no OpenAI API keys are available. OpenAI
   source/model configuration is not a provisioned service. Jev, OpenAI, mailbox,
   source and verification account readiness must be recorded separately from code.
