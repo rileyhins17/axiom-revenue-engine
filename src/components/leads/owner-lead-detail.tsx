@@ -626,12 +626,12 @@ function ContactReviewSection({ data }: { data: OwnerLeadDetailResponse }) {
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#76591f]">Owner checkpoint</p>
             <h2 id="contact-review" className="mt-1 text-lg font-semibold text-[#1a3124]">Contact review not recorded</h2>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-[#76591f]">
-              These routes can be inspected, but the Revenue Engine cannot claim Riley or Aidan reviewed this exact contact packet. Keep it in research until a signed local review receipt exists.
+              These contact details are available to inspect, but neither owner has recorded a review of this exact set. Keep the business in research until that review is saved.
             </p>
           </div>
         </div>
         <p className="mt-4 rounded-xl border border-[#e4ebe2] bg-[#f8faf6] p-3 text-[11px] leading-5 text-[#617367]">
-          Consent is unassessed. This screen cannot approve qualification, outreach, or sending.
+          Permission to contact has not been assessed. This screen cannot approve the business for outreach or send a message.
         </p>
       </section>
     );

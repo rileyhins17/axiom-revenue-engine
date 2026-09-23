@@ -740,12 +740,9 @@ export default async function DashboardPage() {
         </div>
         <div className="page-header-actions">
           <RefreshButton />
-          <div className="rounded-lg border border-[#dce5dd] bg-white px-3 py-1.5 text-right text-[11px] text-[#52645a]">
+          <div className="rounded-lg border border-[#dce5dd] bg-white px-3 py-2 text-right text-[11px] text-[#52645a]">
           <div className="font-medium text-[#20352c]">
             {new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: BUSINESS_TZ }).format(new Date())}
-          </div>
-          <div className="text-[10.5px] text-[#52645a]">
-            {formatAppDateTime(new Date(), { hour: "numeric", minute: "2-digit" }, "")}
           </div>
           </div>
         </div>
@@ -768,13 +765,13 @@ export default async function DashboardPage() {
       ) : null}
 
       {!automationRead.unavailable && automation.settings.emergencyPaused ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-rose-200 bg-[#fff1ef] px-5 py-4 text-sm text-[#602b25]" role="alert" aria-live="polite">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 rounded-2xl border border-rose-200 bg-[#fff1ef] px-5 py-4 text-sm text-[#602b25] sm:flex sm:items-center" role="alert" aria-live="polite">
           <ShieldAlert className="size-5 shrink-0 text-rose-700" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="font-semibold">System stop is on</p>
             <p className="mt-1 text-[#81534e]">The latest status says new intake, queueing, and sending are blocked.</p>
           </div>
-          <Link href="/settings" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-rose-300 bg-white px-4 text-sm font-semibold text-[#602b25] hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700">
+          <Link href="/settings" className="col-span-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-rose-300 bg-white px-4 text-sm font-semibold text-[#602b25] hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700 sm:w-auto">
             Review safety <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
         </div>
