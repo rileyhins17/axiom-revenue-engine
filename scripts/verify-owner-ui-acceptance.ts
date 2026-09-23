@@ -1743,7 +1743,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "mobile Settings";
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Settings & safety" }).waitFor();
-    await page.getByRole("heading", { name: "Emergency stop" }).waitFor();
+    await page.getByRole("heading", { name: "Emergency stop", exact: true }).waitFor();
     await assertResponsive(page, "mobile Settings");
     await assertWcag(page, "mobile Settings");
     await page.screenshot({ path: join(outputDirectory, "settings-mobile.png"), fullPage: true });
