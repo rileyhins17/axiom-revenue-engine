@@ -1,5 +1,75 @@
 # Current status — Axiom Revenue Engine
 
+## Offline legacy-history review checkpoint; production goal remains open
+
+**Updated:** 2026-09-22 (America/Toronto). **Verified code commit:** `a67dca7`
+(`feat(revenue): add offline legacy contact history review`). This is a local M4
+review aid, not the M4 exit gate or a production release. M1's synthetic offline
+flow remains complete; M2 has **0/10 real engine assessments**; M3–M7 and
+production remain incomplete.
+
+One explicitly supplied standalone SQLite snapshot can now be checked and
+projected into a private, read-only legacy-to-v2 contact-history report. The
+report binds a snapshot hash and pinned as-of time, nominates domain, business
+phone, phone-contact and email-contact identity matches without approving a
+merge, and keeps prior suppressions, sends, bounces, replies, contradictory
+send timestamps and unreviewed matches blocked. Legacy `Lead` state is labelled
+reported rather than confirmed contact. The output omits message content and
+raw contact values. **No real or production snapshot has been processed.**
+The report does not verify a real snapshot's migration ledger or import any
+history; those remain separate release checks. See [ADR 0047](adr/0047-reconcile-legacy-contact-history-offline-before-v2-outreach.md)
+and the [runbook](RUNBOOK.md#review-legacy-contact-history-offline-before-v2-outreach).
+
+The dated [provisional M2 source-rights review](reviews/2026-09-22-m2-provisional-source-rights.md)
+found no affirmative basis for retained full-page HTML among the proposed ten.
+Eight remain `DERIVED_FACTS_ONLY` for a later exact reviewed operation; two
+sites returned 403 and remain blocked. The ten are **evaluation candidates,
+not a calling list**. Their exact identity/disposition review is pending;
+Aidan's aggregate feedback that most sites are decent does not decide each
+case. No M2 capture or assessment followed this review.
+
+**Verification:** 23 focused reconciliation tests passed. On the final code,
+`npm run check:safety`, `npm test -- --test-concurrency=1` (725 tests: 722
+passed, zero failed, three expected Windows skips), `npm run typecheck`,
+`npm run lint`, `npm run build:cloudflare`, and
+`npx wrangler deploy --env="" --dry-run --autoconfig false` passed. The separately
+run `npm run test:owner-ui` passed after both build operations: desktop list
+438 ms, dossier 161 ms, M2 review 7,095 ms, 1440 px and 390 px layouts, nine
+WCAG scans, synthetic task/stop checks, and zero external requests. The
+independent Luna diff review found no actionable P1/P2 issue. All tests used
+synthetic data or local fakes and contacted no prospect.
+
+**Production, automation and spend:** no deployment, remote migration, provider
+activation, live inbox operation, prospect capture, contact, send or external
+outreach occurred. Live production remains unverified. Autonomous intake,
+queue, follow-up and send remain off. The C$50/month ceiling is unchanged;
+incremental engine-provider spend is C$0. `wrangler whoami` at 2026-09-23
+02:20 UTC reported an expired local login. Resend's published free tier was
+refreshed in the provider plan, but Axiom account, sender, destination routing,
+webhook, reply round trip and actual billing state are unverified. No paid
+mailbox or Google Workspace is assumed.
+
+**Owner decisions and blockers:** exact dispositions for the proposed ten and
+whether to keep two access-blocked sites in the evaluation; source-specific
+rights, terms, robots and retention for the first supervised M2 request; a
+separately authorized private snapshot/retention route for actual legacy
+history review; Cloudflare owner sign-in and free mail-route verification;
+staging backup, migration, rollback and release gates. A local report cannot
+clear legacy stops, consent, sender or reply requirements. No live send is
+authorized.
+
+Next three concrete actions:
+
+1. Record Riley/Aidan's per-business M2 identity, city, niche and independence
+   dispositions, including the keep-or-replace choice for the two blocked sites.
+2. Prepare the exact reviewed M2 source-policy and retention packet, then gate
+   one supervised real capture and assessment; inspect evidence and cost before
+   the rest of the cohort.
+3. Obtain a separately approved standalone private history snapshot, verify
+   its migration provenance and review the offline reconciliation; restore
+   Cloudflare access and prove the zero-paid-mailbox reply path before M4
+   contact/send work.
+
 ## Manual business stop checkpoint; production goal remains open
 
 **Updated:** 2026-09-22 (America/Toronto). **Verified code commit:** `eb53e7f`
