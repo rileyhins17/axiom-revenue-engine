@@ -5,6 +5,21 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## OPS-014 — Owner UI acceptance failed under a long Windows path
+
+- **Symptom:** `npm run test:owner-ui` in a clean clone under the session temp
+  folder failed with `SqliteError: unable to open database file` from
+  `Database.backup` before the server started.
+- **Root cause:** the M2 fixture's backup files use long token names under
+  `data/kw-evaluation`; with a ~150-character checkout root the full path
+  exceeded the Windows 260-character limit.
+- **Proven fix:** the same commit passed after moving the clean clone to a
+  short root (`C:\Users\riley\.codex\worktrees\rv`).
+- **Prevention/test:** run clean-checkout verification from a short root on
+  Windows; if the error appears, check path length before suspecting code.
+- **Affected area:** Windows clean-checkout verification of owner acceptance.
+- **Verifying commit:** `254b1b6`.
+
 ## DATA-013 — Windows checkout changed canonical migration bytes
 
 - **Symptom:** M2 setup fixtures in a new Windows worktree reported that the
