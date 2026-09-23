@@ -1,5 +1,40 @@
 # Current status — Axiom Revenue Engine
 
+## M3 answer key complete; next is automatic discovery and website checking
+
+**Updated:** 2026-09-23 (America/Toronto) by Claude Code. Local, unpushed.
+
+**Owner direction (Riley, 2026-09-23):** the engine, not Claude or Codex,
+must find the businesses. The 50 hand-checked businesses are therefore the
+**answer key** for grading the engine, not the operating method.
+
+**M3: 50/50 judged, balanced** (Kitchener 18, Waterloo 15, Cambridge 17;
+roofing 14, HVAC 19, landscaping 17): ten M2 plus forty from a
+research pre-screen of 55 candidates (5 unreachable). Each has a sealed
+desktop-and-phone assessment (ADR 0059 route) in ignored
+`data/kw-evaluation/m2-website-need/`. The pinned selection is
+`m3-selection-2026-09-23.json` (SHA-256 `d7848b6e…16fb`); labels are in
+`m3-reviewer-labels-2026-09-23.json`. `npx tsx scripts/summarize-m3-evaluation.ts`
+rebuilds the summary: website need 4 `REBUILD`, 21 `MINOR_IMPROVEMENT`, 25
+`NO_OPPORTUNITY`; reviewer labels 8 STRONG, 34 WEAK, 8 WRONG. The mechanical
+need rule agrees with the reviewer on **38/50 (76%)**: STRONG precision 1.0,
+recall 0.5; WRONG recall 0 (the rule cannot see lead-generation fronts,
+group brands or multi-location pages). This is below the 85% gate, which is
+the useful result: the automatic engine must add identity filtering and a less
+strict rebuild signal for critical phone or call-path failures. Both labels come
+from the same delegated reviewer, so this is not owner agreement; owner
+agreement remains **not measured**.
+
+**Next three concrete actions:**
+
+1. Build automatic discovery (start with OpenStreetMap/Overpass: free, ODbL
+   storage with attribution) and measure its coverage of the 50 known businesses.
+2. Build the automatic headless website checker (phone width, tap-to-call,
+   quote path, sideways scroll, stale year, CMS age, lead-gen template signals)
+   and grade it against the answer key; do not raise targets to pass.
+3. Owner actions in the [owner action packet](reviews/2026-09-23-owner-action-packet.md)
+   remain open (repo private, D1 read token, Email Routing rules, National DNCL).
+
 ## M2 complete locally: ten real website-need assessments (Claude, delegated)
 
 **Updated:** 2026-09-23 (America/Toronto) by Claude Code (Opus 5.5) in the
@@ -39,7 +74,16 @@ verified.** A 7-day whole-account D1 Read token was prepared at Cloudflare's
 review screen but **not created**. Claude created no token and changed no
 Cloudflare state.
 
-**Verification.** CHECKS_PLACEHOLDER
+**Verification (commit `254b1b6`).** Safety passed. Full suite: 874 tests,
+849 passed, 20 failed, 5 skipped; all 20 failures came from an orphaned
+`.m2-0069-setup.lock` left by a Codex run at 13:57 (PID 5292, no longer
+running; see OPS-012). The lock was quarantined (renamed, not deleted) and the
+two affected files then passed 22/22. Typecheck and lint passed. A clean clone
+of `254b1b6` built the Cloudflare bundle (1,768 files scanned, 0 secret values
+removed) and passed default and staging no-upload dry runs. Owner browser
+acceptance passed from a short-path clean clone (17 WCAG page scans, desktop
+1440 px / mobile 390 px, zero external requests); an earlier attempt under the
+long temp path failed on the Windows path limit (GOTCHA OPS-014).
 
 **Production, automation, spend.** Staging and legacy production Workers/D1,
 providers and all autonomy stops are unchanged. No prospect was contacted,

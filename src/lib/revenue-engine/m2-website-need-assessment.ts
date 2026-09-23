@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { privateKwM2ReceiptCanonicalDigest } from "./private-kw-m2-canonical";
-import type { M2ManualWebsiteObservationTarget } from "./m2-manual-website-observation";
 
 /**
  * A delegated, evidence-backed website-need assessment for one saved M2 identity.
@@ -16,7 +15,8 @@ export const M2_WEBSITE_NEED_ASSESSMENT_VERSION = "kw-m2-website-need-assessment
 export const M2_WEBSITE_NEED_AUDIT_VERSION = "kw-m2-browser-view-audit-v1" as const;
 export const M2_WEBSITE_NEED_SOURCE_DECISION = "adr-0059-delegated-browser-view-derived-facts-v1" as const;
 
-const ReviewIdSchema = z.string().regex(/^M2-(0[1-9]|10)$/);
+/** M2 uses M2-01..M2-10; the M3 extension adds M3-01..M3-40. */
+const ReviewIdSchema = z.string().regex(/^(M2-(0[1-9]|10)|M3-(0[1-9]|[1-3][0-9]|40))$/);
 const DigestSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const TimestampSchema = z.string().datetime({ offset: true });
 const HttpUrlSchema = z.string().url().refine((value) => ["http:", "https:"].includes(new URL(value).protocol));
@@ -43,6 +43,9 @@ const FindingSchema = z.object({
   }
 });
 export type M2WebsiteNeedFinding = z.infer<typeof FindingSchema>;
+
+/** The business a website-need assessment is bound to. */
+export type M2WebsiteNeedTarget = { reviewId: string; businessName: string; approvedWebsiteUrl: string; businessIdentityDigest: string };
 
 export const M2WebsiteNeedCommandSchema = z.object({
   commandId: z.string().uuid(),
@@ -112,12 +115,12 @@ const contactOrCopySignals = [
 /**
  * The fixed need rule. REBUILD needs at least three major-or-critical issues, one
  * of them conversion-critical (the plan's "three supported observations including
- * a conversion-critical issue"). A homepage viewed at only one width is INCOMPLETE.
+ * a conversion-critical issue"). The approved entry page viewed at only one width is INCOMPLETE.
  */
 export function deriveM2WebsiteNeed(input: Pick<M2WebsiteNeedCommand, "pagesViewed" | "findings">, approvedWebsiteUrl: string): WebsiteNeed {
   const home = new URL(approvedWebsiteUrl);
   const homeViews = new Set(input.pagesViewed
-    .filter((page) => new URL(page.url).origin === home.origin && new URL(page.url).pathname === "/")
+    .filter((page) => new URL(page.url).origin === home.origin && new URL(page.url).pathname === home.pathname)
     .flatMap((page) => page.viewports));
   if (!homeViews.has("DESKTOP") || !homeViews.has("PHONE")) return "INCOMPLETE";
   const issues = input.findings.filter((finding) => finding.kind === "ISSUE");
@@ -136,7 +139,7 @@ function sameOriginWithoutSecrets(value: string, approved: URL, label: string) {
 
 export function buildM2WebsiteNeedAssessment(
   commandInput: unknown,
-  target: M2ManualWebsiteObservationTarget,
+  target: M2WebsiteNeedTarget,
   assessedAt: string,
 ): M2WebsiteNeedAssessment {
   const command = M2WebsiteNeedCommandSchema.parse(commandInput);

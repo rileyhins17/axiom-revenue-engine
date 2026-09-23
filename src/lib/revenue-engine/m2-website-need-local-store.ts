@@ -2,17 +2,17 @@ import { randomUUID } from "node:crypto";
 import { link, lstat, mkdir, open, readFile, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
-import type { M2ManualWebsiteObservationTarget } from "./m2-manual-website-observation";
 import {
   buildM2WebsiteNeedAssessment,
   M2WebsiteNeedCommandSchema,
   verifyM2WebsiteNeedAssessment,
   type M2WebsiteNeedAssessment,
+  type M2WebsiteNeedTarget,
 } from "./m2-website-need-assessment";
 
 export const M2_WEBSITE_NEED_DEFAULT_ROOT = path.join(process.cwd(), "data", "kw-evaluation", "m2-website-need");
 const MAX_RECORD_BYTES = 32_768;
-const FILENAME = /^(M2-(?:0[1-9]|10))-([a-f0-9]{64})\.json$/;
+const FILENAME = /^(M2-(?:0[1-9]|10)|M3-(?:0[1-9]|[1-3][0-9]|40))-([a-f0-9]{64})\.json$/;
 
 async function safeRoot(rootDir: string) {
   await mkdir(rootDir, { recursive: true });
@@ -40,7 +40,7 @@ export async function listM2WebsiteNeedAssessments(rootDir = M2_WEBSITE_NEED_DEF
 }
 
 /** The newest assessment per business that still matches the current saved identity. */
-export function currentM2WebsiteNeedAssessments(records: M2WebsiteNeedAssessment[], targets: M2ManualWebsiteObservationTarget[]) {
+export function currentM2WebsiteNeedAssessments(records: M2WebsiteNeedAssessment[], targets: M2WebsiteNeedTarget[]) {
   const current = new Map<string, M2WebsiteNeedAssessment>();
   for (const target of targets) {
     const matching = records
@@ -53,7 +53,7 @@ export function currentM2WebsiteNeedAssessments(records: M2WebsiteNeedAssessment
 
 export async function saveM2WebsiteNeedAssessment(
   commandInput: unknown,
-  target: M2ManualWebsiteObservationTarget,
+  target: M2WebsiteNeedTarget,
   options: { rootDir?: string; clock?: () => Date } = {},
 ): Promise<{ status: "SAVED" | "ALREADY_SAVED"; assessment: M2WebsiteNeedAssessment }> {
   const command = M2WebsiteNeedCommandSchema.parse(commandInput);
