@@ -20,6 +20,11 @@ function Prospect({ prospect }: { prospect: EngineProspect }) {
     <a href={prospect.websiteUrl} target="_blank" rel="noreferrer noopener" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline">
       Open their website <ExternalLink className="size-3" aria-hidden="true" />
     </a>
+    {prospect.decision?.decision === "WORTH_A_CALL" && prospect.callNotes.length ? <details className="mt-2 rounded-lg bg-muted/40 p-3 text-sm">
+      <summary className="cursor-pointer font-medium">What to mention on the call (draft)</summary>
+      <ul className="mt-2 list-disc space-y-1 pl-5">{prospect.callNotes.map((note) => <li key={note}>{note}</li>)}</ul>
+      <p className="mt-2 text-xs text-muted-foreground">Only say what you can see on their site yourself. No promises about results or pricing until the offer is approved.</p>
+    </details> : null}
     {prospect.decision
       ? <p className="mt-2 text-xs font-medium">{prospect.decision.decidedBy === "RILEY" ? "Riley" : "Aidan"}: {prospect.decision.decision === "WORTH_A_CALL" ? "worth a call" : `not a fit (${REASON_TEXT[prospect.decision.reason ?? "OTHER"]})`}</p>
       : <ProspectDecisionButtons websiteUrl={prospect.websiteUrl} />}

@@ -57,3 +57,13 @@ test("display names prefer the declared name, then the title part matching the a
   assert.equal(businessDisplayName("https://koebelsroofing.ca/", "www.koebelsroofing.ca", "Koebel's Roofing"), "Koebel's Roofing");
   assert.equal(businessDisplayName("https://www.duritelandscaping.com/", "DuRite Landscaping"), "DuRite Landscaping");
 });
+
+test("reason codes map to at most two factual call notes", async () => {
+  const { callNotes } = await import("./engine-lead-rules");
+  const decision = classifyEngineLead("https://synthetic-roofing.example/", signals({ phoneLayoutWidth: 980, phoneScrollWidth: 980, phoneTapToCall: false, quoteAction: false, copyrightYear: 2010 }), 2026);
+  assert.deepEqual(decision.codes, ["NO_PHONE_LAYOUT", "STALE_FOOTER", "NO_CALL_OR_QUOTE"]);
+  const notes = callNotes(decision.codes);
+  assert.equal(notes.length, 2);
+  assert.ok(notes.every((note) => !/\$|guarantee|increase|more customers/i.test(note)));
+  assert.deepEqual(callNotes(["WORKS"]), []);
+});

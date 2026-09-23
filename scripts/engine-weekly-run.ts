@@ -59,7 +59,7 @@ export async function engineWeeklyRun(args: string[], env = process.env) {
   const startedAt = new Date();
   type RunResult = {
     placeId: string; city: string; niche: string; websiteUrl: string | null; name: string | null; siteName?: string | null;
-    label: "STRONG" | "WEAK" | "WRONG" | "NO_WEBSITE" | "NOT_CHECKED"; reasons: string[];
+    label: "STRONG" | "WEAK" | "WRONG" | "NO_WEBSITE" | "NOT_CHECKED"; reasons: string[]; codes?: string[];
     auditClassification?: string; capturedAt?: string;
   };
   const results: RunResult[] = [];
@@ -79,7 +79,7 @@ export async function engineWeeklyRun(args: string[], env = process.env) {
       const decision = classifyEngineLead(business.websiteUrl, capture.signals, startedAt.getUTCFullYear());
       results.push({
         placeId: business.placeId, city: business.city, niche: business.niche, websiteUrl: capture.signals.finalUrl,
-        name: capture.signals.siteTitle ?? null, siteName: capture.signals.siteName ?? null, label: decision.label, reasons: decision.reasons,
+        name: capture.signals.siteTitle ?? null, siteName: capture.signals.siteName ?? null, label: decision.label, reasons: decision.reasons, codes: decision.codes,
         auditClassification: capture.audit.classification, capturedAt: capture.audit.capturedAt,
       });
     }

@@ -3,11 +3,12 @@ import path from "node:path";
 
 import { getCloudflareBindings } from "@/lib/cloudflare";
 
+import { callNotes } from "./engine-lead-rules";
 import { latestProspectDecisions, listProspectDecisions, websiteKey } from "./engine-prospect-decisions";
 import { businessDisplayName } from "./engine-site-capture";
 
 export type EngineProspect = {
-  key: string; name: string; websiteUrl: string; city: string; niche: string; reasons: string[];
+  key: string; name: string; websiteUrl: string; city: string; niche: string; reasons: string[]; callNotes: string[];
   decision: { decision: "WORTH_A_CALL" | "NOT_A_FIT"; reason: string | null; decidedBy: "RILEY" | "AIDAN"; decidedAt: string } | null;
 };
 export type EngineRunReview =
@@ -25,7 +26,7 @@ export async function readLatestEngineRun(root = process.cwd()): Promise<EngineR
     if (!latest) return { status: "NONE" };
     const run = JSON.parse(await readFile(path.join(dir, latest), "utf8")) as {
       finishedAt: string; source: string; counts: Record<string, number>;
-      results: { placeId: string; label: string; name: string | null; siteName?: string | null; websiteUrl: string | null; city: string; niche: string; reasons: string[] }[];
+      results: { placeId: string; label: string; name: string | null; siteName?: string | null; websiteUrl: string | null; city: string; niche: string; reasons: string[]; codes?: string[] }[];
     };
     const decisions = latestProspectDecisions(await listProspectDecisions(root));
     const prospects = run.results.filter((result) => result.label === "STRONG" && result.websiteUrl).map((result): EngineProspect => {
@@ -33,6 +34,7 @@ export async function readLatestEngineRun(root = process.cwd()): Promise<EngineR
       return {
         key: result.placeId, name: businessDisplayName(result.websiteUrl!, result.name, result.siteName),
         websiteUrl: result.websiteUrl!, city: result.city, niche: result.niche, reasons: result.reasons,
+        callNotes: callNotes(result.codes ?? []),
         decision: saved ? { decision: saved.decision, reason: saved.reason, decidedBy: saved.decidedBy, decidedAt: saved.decidedAt } : null,
       };
     });
