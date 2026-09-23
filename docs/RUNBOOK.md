@@ -52,6 +52,38 @@
 - Reconcile lead, send, reply, suppression, opportunity, client, and cost totals.
 - Keep legacy tables/resources through the 30-day stability window.
 
+## Review legacy contact history offline before v2 outreach
+
+This is a local M4 review report, not an import, send gate, or release. No
+production snapshot has been processed by the current implementation. Obtain
+any real snapshot through a separately approved backup/export and retention
+decision; never point this command at a live D1 file, a provider, or an inbox.
+
+1. Place one standalone SQLite copy directly under ignored `data/`. It must
+   contain the legacy contact-history tables and current v2 business/stop
+   tables, with no `-wal`, `-shm`, or `-journal` sidecars. Keep the copy private.
+2. Choose and record the exact UTC as-of time for the review. Run:
+
+   ```powershell
+   npx tsx scripts/report-legacy-v2-history.ts --database data/legacy-v2-snapshot.sqlite --as-of 2026-09-22T12:00:00.000Z --output data/legacy-v2-report.json
+   ```
+
+   Replace the example time and filenames with the actual reviewed snapshot.
+   The output is created once; an existing output is never overwritten.
+3. Check the snapshot and schema digests, table counts, candidate identities,
+   per-business blockers, source event references, and unresolved reasons. A
+   missing or incompatible table, malformed timestamp, changed file, or
+   ambiguous history is a stop for review, not evidence of no prior contact.
+   The required-column check and schema digest do not prove the migration
+   ledger or origin of a real snapshot; verify those separately before relying
+   on the report for a release decision.
+4. Record owner dispositions outside the report. This command cannot approve
+   a merge, lift a stop, infer consent, import data, or authorize a message.
+   Keep the snapshot/report until an explicit private-retention decision is
+   made; do not treat the example date as a deletion schedule.
+
+See [ADR 0047](adr/0047-reconcile-legacy-contact-history-offline-before-v2-outreach.md).
+
 ## Prepare an isolated staging console release
 
 This procedure identifies one exact candidate for the existing isolated console.
@@ -434,12 +466,13 @@ decision, outreach, sending, deployment, remote database, or spend.
 
 ## M2 research scope and current authorization preparation
 
-Obtain the separate private research decision before collecting real candidate
-records. The [prepared research scope](reviews/2026-09-21-m2-public-research-scope.md)
-defines the proposed zero-cost manual research operation and remains pending
-until the owner decides. Research notes cannot supply Riley's or Aidan's
-identity, market, niche or independence review. Prepare the source plan from
-actual research evidence and the exact-ten manifest after that recorded review.
+The [bounded public research scope](reviews/2026-09-21-m2-public-research-scope.md)
+was approved and completed on 2026-09-22. It produced ten proposed businesses
+for M2 evaluation, not a calling list or ten approved assessments. Their exact
+identity, city, niche and independence dispositions still need Riley's or
+Aidan's review. Research notes cannot supply that owner decision. Prepare the
+source plan from actual research evidence and the exact-ten manifest after
+the recorded review.
 
 The authorization CLI requires an explicit review-policy JSON in addition to
 the source plan and reviewed manifest. Its seven input/output paths must be

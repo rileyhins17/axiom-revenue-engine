@@ -69,6 +69,19 @@ unless Riley explicitly reverses the zero-paid-mailbox decision. ([Cloudflare Em
 [Resend pricing](https://resend.com/pricing?product=transactional),
 [Resend domain verification](https://resend.com/docs/add-a-domain))
 
+The 2026-09-22 official-page refresh still shows a Resend Free option with a
+100/day sending limit, three custom domains, one webhook endpoint and 30-day
+provider-side data retention. These published features fit the proposed tiny
+pilot on paper; they do not establish that Axiom has a free account, an active
+sender/domain, a signing secret, or an acceptable privacy route. Cloudflare
+Email Routing cannot send a custom-domain reply by itself, so an owner-triggered
+Resend reply round trip with a verified `From` and `Reply-To` must be proven
+using owner-controlled inboxes before any external pilot. Verify live plan,
+billing/overage, destination/rule status, domain records, signed webhook and
+event handling in the actual accounts. ([Resend pricing](https://resend.com/pricing),
+[Resend send API](https://resend.com/docs/api-reference/emails/send-email),
+[Cloudflare Postmaster](https://developers.cloudflare.com/email-service/reference/postmaster/))
+
 Hunter Free is the proposed low-volume verifier: $0, no card, 50 shared monthly
 credits across finding and verification, and 0.5 credit per verification on
 its all-in-one plan. Credits reset and do not roll over; Free users cannot buy

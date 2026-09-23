@@ -88,6 +88,13 @@ target environment; the committed migration is not a deployed schema. It does
 not replace contact-level suppression, legal/consent review, or legacy-history
 reconciliation, and it does not enable sending.
 
+The M4 legacy-history report can compare old suppressions, contact attempts,
+bounces, and replies with v2 business identities from one private, standalone
+SQLite snapshot. It runs offline, proposes identity candidates for owner review,
+and leaves unresolved history blocked. No real snapshot has been processed or
+imported yet. See the [offline reconciliation runbook](docs/RUNBOOK.md#review-legacy-contact-history-offline-before-v2-outreach)
+for the exact local command and limits.
+
 ### Local M1 offline dossier checkpoint
 
 The integrated M1 CLI accepts only the bounded direct-child paths and identities below. Prepare a new local SQLite with the canonical private-KW migrations, generate the canonical synthetic source/materialization/manifest/invocation inputs, and then run the same command twice without changing any path or ID:
