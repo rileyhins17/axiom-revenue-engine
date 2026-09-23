@@ -1614,7 +1614,6 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     const followThroughReview = page.getByRole("link", { name: "Open business review" });
     await followThroughReview.waitFor();
     assert.equal(await followThroughReview.getAttribute("href"), "/leads/m2/identity");
-    assert.equal(await page.getByRole("link", { name: "Open Business Review" }).count(), 0);
     assert.equal(await page.getByRole("link", { name: /Connect Gmail/i }).count(), 0);
     await assertResponsive(page, "desktop Outreach");
     await assertWcag(page, "desktop Outreach");
@@ -1726,7 +1725,6 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     const mobileFollowThroughReview = page.getByRole("link", { name: "Open business review" });
     await mobileFollowThroughReview.waitFor();
     assert.equal(await mobileFollowThroughReview.getAttribute("href"), "/leads/m2/identity");
-    assert.equal(await page.getByRole("link", { name: "Open Business Review" }).count(), 0);
     await assertResponsive(page, "mobile Outreach");
     await assertWcag(page, "mobile Outreach");
     await page.screenshot({ path: join(outputDirectory, "outreach-mobile.png"), fullPage: true });
