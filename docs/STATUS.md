@@ -1,5 +1,54 @@
 # Current status — Axiom Revenue Engine
 
+## Manual observed-reply checkpoint; production goal remains open
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
+`aaafdc5`. This local M4 slice lets an owner record a short factual summary of
+an email reply against the exact saved business and email contact. The save
+atomically creates a dated owner task. Exact retries return the same record;
+stopped businesses, suppressed contacts, mismatched contacts, and missing guard
+tables block new records. Business detail preserves reply history, while Today
+shows open reply actions and their overdue state. It does not connect an inbox,
+send mail, or complete the M4 release gate. See [ADR 0051](adr/0051-link-manually-observed-replies-to-owner-actions.md).
+
+**Verification:** the full isolated suite completed with **806 tests: 802
+passed, zero failed, four Windows symlink skips**. Ten final focused tests,
+safety configuration, typecheck, lint, and `git diff --check` passed. The final
+source passed a production-style Cloudflare build and Wrangler dry run; the dry
+run did not deploy. Synthetic owner browser acceptance passed at 1440 px and
+390 px, scanned 17 pages for accessibility, made zero external requests, and
+verified a saved reply, its Today task, completion, reload, exact-email stop,
+and rejected anonymous/cross-site writes. The final no-current-contact history
+display adjustment passed focused tests after that browser run. These checks
+prove local behavior, not a provider round trip or production operation.
+
+**Production, automation, provider, and spend:** no deployment, remote
+migration, provider activation, prospect contact, send, or outreach occurred.
+Production remains unverified. Autonomous intake, queue, follow-up, and send
+remain off. The C$50/month ceiling is unchanged and incremental provider spend
+is C$0. No paid mailbox or Google Workspace dependency was introduced.
+
+**Decisions and blockers:** Riley explicitly delegated the ten M2 business
+identity judgments to Codex on 2026-09-23. The evidence review is in progress;
+no Riley or Aidan review is being claimed, and the ten decisions have not been
+saved. The existing owner-only ledger must not be filled under a false owner
+identity. M2 remains 0/10 real assessments and M3 remains 0/50 real judged
+dossiers. Source rights, a supervised real capture, the private legacy-contact
+snapshot, verified free inbound/outbound reply routing, backup, rollback, and
+release gates remain open.
+
+Next three concrete actions:
+
+1. Finish the bounded source-backed review of all ten M2 identities, including
+   the blocked and Cambridge cases, and save decisions with accurate delegated
+   reviewer provenance. Do not imply website weakness from identity evidence.
+2. Review source rights and retention for the resulting cohort, then complete
+   one supervised real capture and the ten traceable M2 assessments before
+   building the real 50-case Quality Lab set.
+3. Prove a C$0-paid-mailbox reply route and reconcile legacy contact history
+   before any M4 send gate; keep automation off until legal, sender, inbound,
+   suppression, budget, backup, and release proofs pass.
+
 ## Blind Quality Lab checkpoint; production goal remains open
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
