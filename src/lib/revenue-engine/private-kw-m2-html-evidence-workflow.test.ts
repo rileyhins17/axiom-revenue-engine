@@ -315,6 +315,36 @@ test("fresh workflow seals a bounded local receipt and exact replay performs zer
     assert.equal(requests, beforeReplay);
 });
 
+test("derived-only capture preserves bounded HTML structure and rejects a redigested omitted summary", async () => {
+  const chain = approvedChain(8, "DERIVED_FACTS_ONLY");
+  const receiptStore = memoryReceiptStore();
+  const evidenceStore = fakeEvidenceStore();
+  let requests = 0;
+  const request = { requestId: "29292929-2929-4929-8929-292929292929", requestedAt: "2026-09-21T15:00:00.000Z", businessId: chain.sourcePlan.records[0]!.business.id,
+    researchPacket: chain.researchPacket, authorization: chain.authorization, ownerEnvelope: chain.ownerEnvelope, manifest: chain.manifest, sourcePlan: chain.sourcePlan, researchPolicy: chain.researchPolicy };
+  const fresh = await executePrivateKwM2HtmlEvidence(request, { transport: fakeTransport(() => { requests += 1; }), store: evidenceStore, receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(fresh.status, "COMPLETE");
+  assert(fresh.pages.every((page) => page.storageOutcome === "DERIVED_FACTS_ONLY" && page.structure?.version === "kw-html-structure-v1"));
+  const home = fresh.pages.find((page) => page.pageKind === "HOME")!;
+  assert.equal(home.structure?.hasTitle, true);
+  assert(home.structure?.actionKinds.includes("PHONE"));
+  assert.equal(home.structure?.internalLinkKindCounts.CONTACT, 1);
+  assert.equal(JSON.stringify(fresh).includes("+15195550123"), false);
+  const beforeReplay = requests;
+  const replay = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), store: evidenceStore, receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.deepEqual(replay, fresh);
+  assert.equal(requests, beforeReplay);
+  const tampered = structuredClone(fresh) as unknown as MutableReceipt;
+  const tamperedHome = (tampered.pages as Array<Record<string, unknown>>).find((page) => page.pageKind === "HOME")!;
+  delete tamperedHome.structure;
+  redigestReceipt(tampered);
+  receiptStore.values.set(fresh.operationId, tampered as unknown as PrivateKwM2WebsiteEvidenceReceipt);
+  evidenceStore.resetReplay();
+  const rejected = await executePrivateKwM2HtmlEvidence({ ...request, replayMode: "EXACT_REPLAY" }, { transport: fakeTransport(() => { requests += 1; }), store: evidenceStore, receiptStore, clock: () => new Date("2026-09-21T15:00:00.000Z") });
+  assert.equal(rejected.stopReason, "REPLAY_MISMATCH");
+  assert.equal(requests, beforeReplay);
+});
+
 test("trusted reloader uses the same receipt validator through a pathless read seam", async () => {
   const chain = approvedChain();
   const receiptStore = memoryReceiptStore();

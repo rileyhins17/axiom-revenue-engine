@@ -3,6 +3,7 @@ import { z } from "zod";
 import { PrivateKwM2HtmlAuditReceiptSchema } from "@/lib/revenue-engine/private-kw-m2-html-audit";
 import { PrivateKwPublicHttpTransportReceiptSchema } from "@/lib/revenue-engine/private-kw-public-http-transport";
 import { PrivateKwSourcePolicyDecisionSchema } from "@/lib/revenue-engine/private-kw-source-policy";
+import { PrivateKwHtmlStructureSchema } from "@/lib/revenue-engine/private-kw-html-structure";
 
 export const PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION = "kw-m2-html-evidence-workflow-v1";
 export const PRIVATE_KW_M2_HTML_EVIDENCE_PARTIAL_WORKFLOW_VERSION = "kw-m2-html-evidence-workflow-v2";
@@ -29,11 +30,16 @@ export const PageReceiptSchema = z.object({
   outcome: z.enum(["CAPTURED", "FAILED", "REJECTED"]), statusCode: z.number().int().min(0).max(599), redirectCount: z.number().int().nonnegative().max(20),
   bodyBytes: z.number().int().nonnegative().max(1_048_576), contentDigest: DigestSchema.nullable(),
   factsDigest: DigestSchema.nullable(),
+  structure: PrivateKwHtmlStructureSchema.optional(),
   storageOutcome: z.enum(["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY", "BLOCKED", "NOT_PERSISTED_SUBPAGE", "NONE"]),
   storageRefs: z.object({ contentRef: z.string().nullable(), metadataRef: z.string().nullable(), factsRef: z.string().nullable(), receiptRef: z.string().nullable() }).strict(),
   failureCode: z.string().trim().min(1).max(120).nullable(),
   failedPageTransportReceiptIds: z.array(z.number().int().positive()).min(1).max(100).optional(),
-}).strict();
+}).strict().superRefine((page, context) => {
+  if (page.structure && (page.outcome !== "CAPTURED" || page.storageOutcome !== "DERIVED_FACTS_ONLY")) {
+    context.addIssue({ code: "custom", path: ["structure"], message: "Structural facts require captured derived-only evidence." });
+  }
+});
 export const PageSelectionSchema = z.object({
   selectionVersion: z.literal("kw-m2-html-page-selection-v1"), selectionKind: z.literal("HTML_ONLY_DETERMINISTIC"),
   businessId: z.string().trim().min(1).max(128), sourceIdentityDigest: DigestSchema,

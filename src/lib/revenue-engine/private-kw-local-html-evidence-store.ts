@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
+import { PrivateKwHtmlStructureSchema } from "@/lib/revenue-engine/private-kw-html-structure";
 
 import {
   assertPrivateKwM2ApprovalChain,
@@ -49,6 +50,7 @@ const FactsSchema = z.object({
   claimIds: z.array(z.string().regex(/^[A-Za-z0-9:_-]{1,120}$/)).max(50),
   limitations: z.array(z.string().max(200)).max(20),
   confidence: z.enum(["HIGH", "MEDIUM", "LOW", "UNKNOWN"]),
+  structure: PrivateKwHtmlStructureSchema.optional(),
 }).strict();
 
 export type PrivateKwFacts = z.infer<typeof FactsSchema>;

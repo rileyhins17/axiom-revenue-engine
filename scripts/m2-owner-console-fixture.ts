@@ -22,7 +22,10 @@ const OUTCOMES = [
  * outcomes so the native sealed receipt can be inspected in the same run.
  */
 export async function createM2OwnerConsoleFixture() {
-  const run = await createRun(OUTCOMES.map((outcome) => ({ outcome })), true);
+  const run = await createRun(OUTCOMES.map((outcome, index) => ({
+    outcome,
+    ...(index === 4 ? { retention: "DERIVED_FACTS_ONLY" as const } : {}),
+  })), true);
   try {
     const selected = run.operations.map((operation, index) => ({
       index,

@@ -1016,27 +1016,67 @@ async function assertBusinessStopRoutesBlocked(page: Page) {
 }
 
 async function assertM2Review(page: Page, fixture: Awaited<ReturnType<typeof createM2OwnerConsoleFixture>>, label: string) {
-  await page.getByRole("heading", { level: 1, name: "Local research console" }).waitFor();
-  await assertOwnerPageTitle(page, "M2 Local Review | Axiom Revenue Engine");
-  const businesses = page.getByRole("list", { name: "M2 businesses", exact: true }).locator(":scope > li");
+  await page.getByRole("heading", { level: 1, name: "Business review" }).waitFor();
+  await assertOwnerPageTitle(page, "Business Review | Axiom Revenue Engine");
+  const businesses = page.getByRole("list", { name: "Businesses to review", exact: true }).locator(":scope > li");
   assert.equal(await businesses.count(), 10, `${label} must account for all ten businesses.`);
-  const expected = ["Assessment saved", "Research review", "Blocked", "Blocked", "Assessment saved",
-    "Research review", "Assessment saved", "Assessment saved", "Assessment saved", "Research review"];
+  const expected = ["Website captured", "More research needed", "Review stopped", "Review stopped", "Website captured",
+    "More research needed", "Website captured", "Website captured", "Website captured", "More research needed"];
   for (const [index, business] of fixture.selected.entries()) {
     const entry = businesses.nth(index);
-    await entry.getByRole("heading", { name: business.businessName, exact: true }).waitFor();
+    await entry.getByRole("button", { name: `Open ${business.businessName} review` }).waitFor();
     await entry.getByText(expected[index]!, { exact: true }).waitFor();
-    await entry.getByText("Next step:", { exact: true }).waitFor();
-    assert.equal(await entry.getByRole("link", { name: "Source", exact: true }).count(), 1);
   }
-  await businesses.nth(9).getByText("FAILED", { exact: true }).waitFor();
+  const mobile = (page.viewportSize()?.width ?? 1440) < 768;
+  const firstDetail = page.getByRole("region", { name: `${fixture.selected[0]!.businessName} website review` });
+  if (mobile) assert.equal(await firstDetail.isVisible(), false, `${label} must open a business before showing its dossier.`);
+  else await firstDetail.waitFor();
+  await businesses.nth(4).getByRole("button", { name: `Open ${fixture.selected[4]!.businessName} review` }).click();
+  const derivedDetail = page.getByRole("region", { name: `${fixture.selected[4]!.businessName} website review` });
+  await derivedDetail.waitFor();
+  assert.equal(await page.getByRole("region", { name: /website review$/ }).count(), 1, `${label} must render only the selected dossier.`);
+  const pageClues = derivedDetail.getByText(/Page clues: Page title/).first();
+  await pageClues.waitFor();
+  await pageClues.click();
+  await derivedDetail.getByText(/Page title: found · Search description: not found/).first().waitFor();
+  await derivedDetail.getByText(/Links to other pages:.*service.*about.*contact/).first().waitFor();
+  await pageClues.click();
+  await derivedDetail.getByText("Not assessed", { exact: true }).waitFor();
+  await derivedDetail.getByText("No outreach is authorized from this review. No message or call can be sent here.").waitFor();
+  assert.equal(await derivedDetail.getByRole("link", { name: "Open website" }).count(), 1);
+  if (mobile) {
+    assert.equal(await page.getByRole("list", { name: "Businesses to review", exact: true }).isVisible(), false);
+    await assertWcag(page, `${label} selected detail`);
+    await derivedDetail.getByRole("button", { name: "Back to businesses" }).click();
+    await page.getByRole("list", { name: "Businesses to review", exact: true }).waitFor();
+    assert.equal(await businesses.nth(4).getByRole("button").getAttribute("aria-pressed"), "true");
+  }
   assert.equal(await page.locator("[data-owner-content] input[type='file'], [data-owner-content] form").count(), 0);
-  await assertReadOnlyOwnerSurface(page, label);
+  assert.equal(await page.locator("[data-owner-content] form, [data-owner-content] button[type='submit'], [data-owner-content] a[href^='mailto:'], [data-owner-content] a[href^='tel:']").count(), 0,
+    `${label} must not expose a send, contact, or submission control.`);
+  assert.equal(await page.locator("main#main-content").count(), 1);
+  assert.equal(await page.locator("h1").count(), 1);
   await assertResponsive(page, label);
   await assertReducedMotion(page, label);
-  // Include expanded evidence details in accessibility coverage.
-  await businesses.first().getByText("Limitations and retention", { exact: true }).click();
   await assertWcag(page, label);
+}
+
+async function assertM2MobileNavigationClear(page: Page, titleSelector: string, finalSelector: string, label: string) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const top = await page.evaluate((selector) => {
+    const header = document.querySelector("header.v2-header")?.getBoundingClientRect();
+    const title = document.querySelector(selector)?.getBoundingClientRect();
+    return header && title ? { headerBottom: header.bottom, titleTop: title.top } : null;
+  }, titleSelector);
+  assert(top && top.headerBottom <= top.titleTop + 1, `${label} top navigation obscures the title: ${JSON.stringify(top)}`);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const bottom = await page.evaluate((selector) => {
+    const finalElement = document.querySelector(selector)?.getBoundingClientRect();
+    const navigation = document.querySelector("nav[aria-label='Primary']")?.getBoundingClientRect();
+    return finalElement && navigation ? { contentBottom: finalElement.bottom, navigationTop: navigation.top } : null;
+  }, finalSelector);
+  assert(bottom && bottom.contentBottom <= bottom.navigationTop + 1, `${label} bottom navigation obscures the final content: ${JSON.stringify(bottom)}`);
+  await page.evaluate(() => window.scrollTo(0, 0));
 }
 
 async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2Fixture: Awaited<ReturnType<typeof createM2OwnerConsoleFixture>>) {
@@ -1132,7 +1172,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await anonymousResponse.dispose();
     await anonymousPage.goto("/leads/m2", { waitUntil: "load" });
     await anonymousPage.waitForURL("**/sign-in");
-    assert.equal(await anonymousPage.getByRole("list", { name: "M2 businesses", exact: true }).count(), 0);
+    assert.equal(await anonymousPage.getByRole("list", { name: "Businesses to review", exact: true }).count(), 0);
     assert.deepEqual(anonymousErrors, [], "Unauthenticated redirect raised a script error.");
     await anonymous.close();
 
@@ -1425,7 +1465,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "desktop M2 research console";
     const m2Start = performance.now();
     await page.goto("/leads/m2", { waitUntil: "domcontentloaded" });
-    await page.getByRole("list", { name: "M2 businesses", exact: true }).waitFor();
+    await page.getByRole("list", { name: "Businesses to review", exact: true }).waitFor();
     const desktopM2ReadyMs = Math.round(performance.now() - m2Start);
     assert(desktopM2ReadyMs <= OWNER_M2_BUDGET_MS, `The durable M2 review exceeded ${OWNER_M2_BUDGET_MS} ms.`);
     await assertM2Review(page, m2Fixture, "desktop M2 review");
@@ -1475,7 +1515,12 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "mobile M2 research console";
     await page.goto("/leads/m2", { waitUntil: "domcontentloaded" });
     await assertM2Review(page, m2Fixture, "mobile M2 review");
-    await page.screenshot({ path: join(outputDirectory, "m2-review-mobile.png"), fullPage: true });
+    await assertM2MobileNavigationClear(page, "[data-owner-content] h1", "[aria-label='Businesses to review'] > li:last-child", "mobile M2 queue");
+    await page.screenshot({ path: join(outputDirectory, "m2-review-mobile.png") });
+    await page.getByRole("button", { name: `Open ${m2Fixture.selected[4]!.businessName} review` }).click();
+    await page.getByRole("region", { name: `${m2Fixture.selected[4]!.businessName} website review` }).waitFor();
+    await assertM2MobileNavigationClear(page, "[aria-label$='website review'] h2", "[aria-label$='website review'] > div:last-child > p:last-child", "mobile M2 detail");
+    await page.screenshot({ path: join(outputDirectory, "m2-review-mobile-detail.png") });
 
     assert.deepEqual(externalRequests, [], "The owner acceptance browser attempted an external request.");
     await Promise.all(drainScriptDiagnostics.map((drain) => drain()));
@@ -1548,7 +1593,7 @@ async function run() {
     await waitForServer(baseUrl, server);
     result = await runBrowserAcceptance(baseUrl, outputDirectory, m2Fixture);
     assert.deepEqual(readSetupFile(resolve(m2Fixture.databasePath)).identity, m2DatabaseIdentity, "Browser inspection must leave the M2 database unchanged.");
-    for (const name of ["m2-review-desktop.png", "m2-review-mobile.png"]) {
+    for (const name of ["m2-review-desktop.png", "m2-review-mobile.png", "m2-review-mobile-detail.png"]) {
       await copyFile(join(outputDirectory, name), join(OUTPUT_ROOT, name));
     }
     success = true;

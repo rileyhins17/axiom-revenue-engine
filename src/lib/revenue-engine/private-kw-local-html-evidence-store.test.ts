@@ -247,6 +247,16 @@ function facts() {
     claimIds: ["claim:service-1"],
     limitations: ["HTML-only; browser claims unknown"],
     confidence: "MEDIUM" as const,
+    structure: {
+      version: "kw-html-structure-v1" as const,
+      hasTitle: true,
+      hasMetaDescription: false,
+      actionKinds: ["PHONE", "QUOTE"] as ["PHONE", "QUOTE"],
+      formCount: 1,
+      formsWithEnabledSubmitCount: 1,
+      trustSignals: ["REVIEW"] as ["REVIEW"],
+      internalLinkKindCounts: { HOME: 0, SERVICE: 1, ABOUT: 1, CONTACT: 1, OTHER: 0 },
+    },
   };
 }
 
@@ -701,9 +711,11 @@ test("derived facts hash the capture without writing the body or personal contac
   const reloaded = await store.reloadPrivateKwHtmlEvidence(result);
   assert.equal(reloaded.outcome, "DERIVED_FACTS_ONLY");
   assert.equal("bytes" in reloaded, false);
+  assert.deepEqual(reloaded.facts.facts.structure, facts().structure);
   const files = await allStoredText();
   assert.equal(files.some((value) => value.includes("owner@example.test")), false);
   assert.equal(files.some((value) => value.includes("public facts")), false);
+  assert.equal((await snapshot()).some((name) => /\.html$/i.test(name)), false);
 });
 
 test("derived facts reject unknown body-like fields and forged raw references", async () => {

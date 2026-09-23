@@ -707,11 +707,22 @@ manufactures a report. Existing COMPLETE/research/blocked receipts retain v1.
 
 ## M2 local owner research console
 
-The admin-only `/leads/m2` page presents the saved local run as assessments,
-research reviews, policy blocks, pending work or unavailable evidence. Source
-links, page outcomes, capture times, retention and HTML limitations remain
-visible. Every selected business is accounted for in the recorded order.
+The admin-only `/leads/m2` Business Review presents the saved local run as a
+searchable business list and one selected website review. On mobile, opening a
+business hides the queue overview and the owner can return to the list.
+Plain-language statuses separate
+captured pages, missing research and stopped checks, while the next step and
+unassessed website-fit state stay visible. Source links, page outcomes, capture
+times, retention and HTML limitations remain available. Every selected business
+is accounted for in the recorded order.
 An assessment saved here still means UNKNOWN qualification and zero scores.
+For new `DERIVED_FACTS_ONLY` captures, each captured page can also show a
+bounded structural summary: title/description presence, detected action kinds,
+form counts, trust signal markers and internal-link hints. Page clues are collapsed
+by default so repeated parser details do not bury the owner decision. These are
+HTML clues, not proof of visual placement, working controls or rebuild need. No source body,
+page copy, contact details, screenshot or rendered DOM is retained by this mode.
+Older receipts without the optional summary remain readable. See [ADR 0048](adr/0048-project-text-free-html-structure-into-m2-review.md).
 
 Configure an existing run in the local Node server's ignored environment file:
 
@@ -721,7 +732,7 @@ AXIOM_M2_LOCAL_REVIEW_RUN=data/kw-evaluation/assessment-run.json
 ```
 
 Restart that local server and sign in with an existing admin account. The Leads
-page links to the research console. Do not change `DATABASE_PATH` to the M2
+page links to Business Review. Do not change `DATABASE_PATH` to the M2
 shadow database: normal app authentication and the research database are
 separate. The fixed server-configured run path is restricted to a direct JSON
 child of `data/kw-evaluation`. The browser cannot choose paths or upload reports.

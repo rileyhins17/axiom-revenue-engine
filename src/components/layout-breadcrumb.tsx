@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquareText, User } from "lucide-react";
+import { Building2, MessageSquareText, User } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { getNavItemForPath } from "@/lib/navigation";
@@ -8,6 +8,17 @@ import { getNavItemForPath } from "@/lib/navigation";
 export function LayoutBreadcrumb() {
   const pathname = usePathname();
   const route = getNavItemForPath(pathname);
+
+  if (pathname === "/leads/m2") {
+    return (
+      <div className="flex min-w-0 items-center gap-3 text-sm">
+        <div className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/[0.09] bg-white/[0.035]">
+          <Building2 className="size-3.5 text-zinc-300" aria-hidden="true" />
+        </div>
+        <span className="truncate font-semibold tracking-tight text-white">Business review</span>
+      </div>
+    );
+  }
 
   if (pathname?.match(/^\/lead\/\d+/)) {
     return (

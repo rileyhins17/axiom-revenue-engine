@@ -35,8 +35,14 @@ errors now retain strict v2 partial receipts and research reports. Failed
 homepages, unsupported stream/redirect failures and storage conflicts remain
 unsealed and stop without a report.
 
-The admin-only `/leads/m2` research console independently verifies saved local
-evidence and shows each selected business, page failures and next review step.
+The admin-only `/leads/m2` Business Review independently verifies saved local
+evidence. Its searchable business list, plain-language status, selected website
+review, page clues and next step let an owner review one business at a time on
+desktop or mobile. On phones, opening a business goes directly to its review
+instead of repeating the queue overview. Derived-only page clues expand on
+demand; visual quality and qualification remain unknown. The page does not
+retain HTML, contact values or screenshots in that mode. It does not establish
+website fit or outreach readiness.
 It is disabled by default and unavailable on Cloudflare. A Node server with an
 existing approved local run can set `AXIOM_M2_LOCAL_REVIEW_ENABLED=1` and
 `AXIOM_M2_LOCAL_REVIEW_RUN=data/kw-evaluation/<run>.json`. The equivalent read-only

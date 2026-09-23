@@ -20,6 +20,7 @@ import { evaluatePrivateKwRobotsPolicy, PrivateKwSourcePolicyDecisionSchema, typ
 import { PrivateKwPublicHttpTransportReceiptSchema } from "@/lib/revenue-engine/private-kw-public-http-transport";
 import { capturePublicWebsiteDocument, WebsiteCaptureResultSchema, type WebsiteCaptureResult } from "@/lib/revenue-engine/website-capture";
 import { extractHtmlPageFacts, type HtmlPageFacts } from "@/lib/revenue-engine/html-page-facts";
+import { projectPrivateKwHtmlStructure } from "@/lib/revenue-engine/private-kw-html-structure";
 import { defaultWebsitePageSelectionPolicy, planWebsitePages, WebsitePageSelectionPlanSchema, type WebsitePageSelectionPlan } from "@/lib/revenue-engine/website-page-selection";
 import { buildPrivateKwM2HtmlAuditReceipt, type PrivateKwM2HtmlAuditReceipt } from "@/lib/revenue-engine/private-kw-m2-html-audit";
 import { createPrivateKwM2HtmlEvidenceReceiptStore, privateKwM2ReceiptCanonicalDigest, type PrivateKwM2HtmlEvidenceReceiptStore } from "@/lib/revenue-engine/private-kw-m2-html-evidence-receipt";
@@ -92,14 +93,15 @@ function projectPlan(plan: WebsitePageSelectionPlan, identity: Identity) {
 function projectFacts(facts: HtmlPageFacts, expectedServices: string[], expectedLocations: string[]): PrivateKwFacts {
   void expectedServices;
   void expectedLocations;
-  return { canonicalUrl: facts.url, serviceObservations: [], locationObservations: [], claimIds: ["html:page-kind:" + facts.pageKind.toLocaleLowerCase("en-CA"), facts.complete ? "html:facts-complete" : "html:facts-incomplete"], limitations: ["HTML_ONLY", "VISUAL_UNKNOWN", "CONTACT_DATA_DISCARDED"], confidence: facts.complete ? "HIGH" : "UNKNOWN" };
+  return { canonicalUrl: facts.url, serviceObservations: [], locationObservations: [], claimIds: ["html:page-kind:" + facts.pageKind.toLocaleLowerCase("en-CA"), facts.complete ? "html:facts-complete" : "html:facts-incomplete"], limitations: ["HTML_ONLY", "VISUAL_UNKNOWN", "CONTACT_DATA_DISCARDED"], confidence: facts.complete ? "HIGH" : "UNKNOWN", structure: projectPrivateKwHtmlStructure(facts) };
 }
 function refs(value: PrivateKwHtmlEvidenceRef) {
   return { contentRef: "contentRef" in value ? value.contentRef : null, metadataRef: "metadataRef" in value ? value.metadataRef : null, factsRef: "factsRef" in value ? value.factsRef : null, receiptRef: "receiptRef" in value ? value.receiptRef : null };
 }
 function makePage(pageKind: "HOME" | "SERVICE" | "ABOUT" | "CONTACT", capture: WebsiteCaptureResult, facts: HtmlPageFacts | null, storageOutcome: z.infer<typeof PageReceiptSchema>["storageOutcome"], storageRefs: z.infer<typeof PageReceiptSchema>["storageRefs"], failedPageTransportReceiptIds?: number[]) {
   const failedWitness = failedPageTransportReceiptIds?.length ? { failedPageTransportReceiptIds } : {};
-  return PageReceiptSchema.parse({ pageKind, requestedUrl: capture.requestedUrl ?? "https://invalid.invalid/", finalUrl: capture.finalUrl, capturedAt: capture.capturedAt, outcome: capture.outcome, statusCode: capture.statusCode, redirectCount: capture.redirectCount, bodyBytes: capture.bodyBytes, contentDigest: capture.outcome === "CAPTURED" ? capture.contentDigest : null, factsDigest: facts ? digest(projectFacts(facts, [], [])) : null, storageOutcome, storageRefs, failureCode: capture.failure?.code ?? null, ...failedWitness });
+  const derived = facts ? projectFacts(facts, [], []) : null;
+  return PageReceiptSchema.parse({ pageKind, requestedUrl: capture.requestedUrl ?? "https://invalid.invalid/", finalUrl: capture.finalUrl, capturedAt: capture.capturedAt, outcome: capture.outcome, statusCode: capture.statusCode, redirectCount: capture.redirectCount, bodyBytes: capture.bodyBytes, contentDigest: capture.outcome === "CAPTURED" ? capture.contentDigest : null, factsDigest: derived ? digest(derived) : null, ...(storageOutcome === "DERIVED_FACTS_ONLY" && derived ? { structure: derived.structure } : {}), storageOutcome, storageRefs, failureCode: capture.failure?.code ?? null, ...failedWitness });
 }
 function sourcePolicySummary(policy: PrivateKwSourcePolicyDecision | null) {
   return policy ? PrivateKwSourcePolicyDecisionSchema.parse(policy) : null;
@@ -274,7 +276,7 @@ async function validateSealedReplay(receipt: PrivateKwM2WebsiteEvidenceReceipt, 
       const metadata = reloaded.metadata;
       if (metadata.businessId !== receipt.businessId || metadata.sourceId !== input.identity.sourceRecordId || metadata.requestedUrl !== page.requestedUrl || metadata.finalUrl !== page.finalUrl || metadata.sourcePageUrl !== input.identity.approvedWebsiteUrl || metadata.capturedAt !== page.capturedAt || metadata.statusCode !== page.statusCode || metadata.redirectCount !== page.redirectCount || metadata.authorizationDigest !== receipt.authorizationDigest || metadata.authorizationExpiresAt !== receipt.authorizationExpiresAt || metadata.sourcePolicyVersion !== policy.policyVersion || digest(metadata.sourcePolicyDecision) !== digest(policy) || digest(metadata.transportReceipts) !== digest(transport.slice(0, policy.networkRequestCount)) || metadata.retentionDecision !== page.storageOutcome || metadata.contentRef !== page.storageRefs.contentRef || metadata.metadataRef !== page.storageRefs.metadataRef || (page.storageOutcome === "DERIVED_FACTS_ONLY" && reloaded.outcome === "DERIVED_FACTS_ONLY" && reloaded.facts.factsRef !== page.storageRefs.factsRef)) throw new Error("REPLAY_DURABLE_METADATA_MISMATCH");
       if (reloaded.outcome === "RAW_HTML_ALLOWED" && createHash("sha256").update(reloaded.bytes).digest("hex") !== page.contentDigest) throw new Error("REPLAY_CONTENT_DIGEST_MISMATCH");
-      if (reloaded.outcome === "DERIVED_FACTS_ONLY" && digest(reloaded.facts.facts) !== page.factsDigest) throw new Error("REPLAY_FACTS_DIGEST_MISMATCH");
+      if (reloaded.outcome === "DERIVED_FACTS_ONLY" && (digest(reloaded.facts.facts) !== page.factsDigest || digest(reloaded.facts.facts.structure) !== digest(page.structure))) throw new Error("REPLAY_FACTS_DIGEST_MISMATCH");
       if (reloaded.metadata.parentReceiptDigest !== digest({ identity: receipt.sourceIdentity.sourceIdentityDigest, page: page.pageKind, contentDigest: page.contentDigest, pageSelectionDigest: digest(receipt.pageSelection) })) throw new Error("REPLAY_PARENT_DIGEST_MISMATCH");
       if (page.pageKind === "HOME") homepageWitness = { statusCode: reloaded.metadata.statusCode ?? page.statusCode, redirectCount: reloaded.metadata.redirectCount ?? page.redirectCount, finalUrl: page.finalUrl!, capturedAt: page.capturedAt, contentDigest: page.contentDigest! };
     } else if (page.storageOutcome !== "NONE") throw new Error("REPLAY_FAILED_PAGE_STORAGE");

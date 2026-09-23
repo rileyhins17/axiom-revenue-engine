@@ -99,6 +99,8 @@ test("projects the current HTML assessment plan into a non-qualifying owner doss
   assert.equal(parsed.htmlEvidence.domArtifactRef, null);
   assert.deepEqual(parsed.htmlEvidence.unknownLimitations, plan.context.evidence.audit!.unknownLimitations);
   assert.equal(parsed.htmlEvidence.pages.length, 4);
+  assert(parsed.htmlEvidence.pages.every((page) => page.storageOutcome === "DERIVED_FACTS_ONLY" && page.structure?.version === "kw-html-structure-v1"));
+  assert.deepEqual(parsed.htmlEvidence.pages.map((page) => page.structure), plan.context.evidence.pages.map((page) => page.structure));
   assert.equal(parsed.classification.value, "UNKNOWN");
   assert.equal(parsed.classification.authority, "NON_QUALIFYING_HTML_ONLY");
   assert.equal(parsed.qualification.band, "RESEARCH");

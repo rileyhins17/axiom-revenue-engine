@@ -10,6 +10,7 @@ import {
 } from "@/lib/revenue-engine/private-kw-m2-html-assessment";
 import { privateKwM2ReceiptCanonicalDigest } from "@/lib/revenue-engine/private-kw-m2-canonical";
 import { PrivateKwM2WebsiteEvidenceReceiptSchema } from "@/lib/revenue-engine/private-kw-m2-html-evidence-schema";
+import { PrivateKwHtmlStructureSchema } from "@/lib/revenue-engine/private-kw-html-structure";
 
 const DigestSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const TimestampSchema = z.string().datetime({ offset: true });
@@ -39,6 +40,7 @@ const PageSchema = z.object({
   bodyBytes: z.number().int().nonnegative().max(1_048_576),
   contentDigest: DigestSchema,
   factsDigest: DigestSchema.nullable(),
+  structure: PrivateKwHtmlStructureSchema.optional(),
   storageOutcome: z.enum(["RAW_HTML_ALLOWED", "DERIVED_FACTS_ONLY"]),
   storageRefs: z.object({
     contentRef: z.string().nullable(),
@@ -197,8 +199,8 @@ export function projectPrivateKwM2OwnerLeadDetail(plan: PrivateKwM2HtmlAssessmen
       finalUrl: home.finalUrl,
       capturedAt: home.capturedAt,
       retentionDisposition: home.storageOutcome,
-      pages: evidence.pages.map(({ pageKind, requestedUrl, finalUrl, capturedAt, statusCode, redirectCount, bodyBytes, contentDigest, factsDigest, storageOutcome, storageRefs }) => ({
-        pageKind, requestedUrl, finalUrl: finalUrl!, capturedAt, statusCode, redirectCount, bodyBytes, contentDigest: contentDigest!, factsDigest, storageOutcome: storageOutcome as "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY", storageRefs,
+      pages: evidence.pages.map(({ pageKind, requestedUrl, finalUrl, capturedAt, statusCode, redirectCount, bodyBytes, contentDigest, factsDigest, structure, storageOutcome, storageRefs }) => ({
+        pageKind, requestedUrl, finalUrl: finalUrl!, capturedAt, statusCode, redirectCount, bodyBytes, contentDigest: contentDigest!, factsDigest, ...(structure ? { structure } : {}), storageOutcome: storageOutcome as "RAW_HTML_ALLOWED" | "DERIVED_FACTS_ONLY", storageRefs,
       })),
       unknownLimitations: evidence.audit!.unknownLimitations,
       browserEvidence: false,

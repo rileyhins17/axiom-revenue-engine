@@ -133,7 +133,7 @@ export function OwnerLeadList({ data }: { data: OwnerLeadListResponse }) {
         actions={
           <>
           <Button asChild variant="outline" size="sm">
-            <Link href={"/leads/m2" as Route} prefetch={false}>Open research console <ArrowUpRight aria-hidden="true" /></Link>
+            <Link href={"/leads/m2" as Route} prefetch={false}>Review business research <ArrowUpRight aria-hidden="true" /></Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/leads/evaluation">Open Quality Lab <ArrowUpRight aria-hidden="true" /></Link>
