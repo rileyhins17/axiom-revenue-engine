@@ -1,5 +1,65 @@
 # Current status — Axiom Revenue Engine
 
+## Business Review redesign checkpoint; production goal remains open
+
+**Updated:** 2026-09-22 (America/Toronto). **Verified code commit:** `5219871`
+(`feat(revenue): redesign local business review`). This is a local M2
+owner-review usability checkpoint, not
+the M2 exit gate or a production release. M1's synthetic offline flow remains
+complete; M2 has **0/10 real engine assessments**; M3–M7 and production remain
+incomplete.
+
+The admin-only, disabled-by-default `/leads/m2` page is now a light, searchable
+Business Review that keeps the ten saved businesses in a compact queue and
+opens one website review at a time. Phone layout uses separate list and detail
+views, skips repeated overview content and provides a back action.
+Plain-language statuses, the next review step and
+explicitly unassessed website fit are prominent; source and technical records
+remain expandable. A captured page is not presented as a good website or a
+qualified opportunity, and the page has no contact or send action. New
+`DERIVED_FACTS_ONLY` captures retain a bounded, text-free HTML structure
+summary in their sealed facts and page receipt. It gives the owner expandable
+page clues without saving raw HTML, page copy, screenshots or contact values.
+Older receipts remain readable. See [ADR 0048](adr/0048-project-text-free-html-structure-into-m2-review.md)
+and the [runbook](RUNBOOK.md#m2-local-owner-research-console).
+
+**Verification:** `npm run check:safety`, `npm test -- --test-concurrency=1`
+(729 tests: 726 passed, zero failed, three expected Windows skips),
+`npm run typecheck`, `npm run lint`, `npm run build:cloudflare`, and
+`npx wrangler deploy --env="" --dry-run --autoconfig false` passed on the
+final code. The separately run `npm run test:owner-ui` passed after all builds
+and dry runs had exited: desktop list 390 ms, dossier 124 ms, M2 review
+4,829 ms, 1440 px and 390 px layouts, mobile top/bottom navigation clearance,
+nine WCAG scans, synthetic task/stop checks and zero external requests. All
+checks used synthetic businesses and local fakes, not prospects. A GPT-6 Luna
+independent usability/safety review found no actionable P1/P2 issue.
+
+**Production, automation and spend:** no deployment, remote migration, provider
+activation, live inbox operation, prospect capture, contact, send or external
+outreach occurred. Live production remains unverified. Autonomous intake,
+queue, follow-up and send remain off. The C$50/month ceiling is unchanged and
+incremental engine-provider spend is C$0. The last checked local Cloudflare
+login was expired; a dry run does not restore account access. No paid mailbox
+or Google Workspace is assumed.
+
+**Owner decisions and blockers:** Riley/Aidan's per-business identity and
+disposition review for the proposed ten, including the two access-blocked
+sites; source-specific rights and retention for the first supervised M2
+request; a separately authorized private legacy-history snapshot; Cloudflare
+owner access and proof of the zero-paid-mailbox reply route; staging backup,
+migration, rollback and release gates. This UI does not authorize outreach or
+resolve the remaining M2–M7 work.
+
+Next three concrete actions:
+
+1. Record the per-business identity, city, niche, independence and keep/replace
+   dispositions for the proposed ten evaluation candidates.
+2. Prepare the exact reviewed M2 source-policy and retention packet; gate one
+   supervised real capture and assessment, then inspect its evidence and cost.
+3. Verify the private history snapshot and zero-paid-mailbox reply route under
+   separate gates before M4 contact work; restore Cloudflare access for the
+   later staged release process.
+
 ## Offline legacy-history review checkpoint; production goal remains open
 
 **Updated:** 2026-09-22 (America/Toronto). **Verified code commit:** `a67dca7`
