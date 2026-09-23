@@ -38,7 +38,7 @@ passed. The Cloudflare command was a dry run and did not deploy. The final
 `npm run test:owner-ui` passed against the committed UI after the build and dry
 run had exited: 1440 px desktop and 390 px phone, 17 WCAG scans, zero external
 requests, and the owner-task retry/create/reload/complete flow. Desktop list,
-dossier and M2 review loaded in 879 ms, 108 ms and 4,732 ms against their
+dossier and M2 review loaded in 946 ms, 813 ms and 4,817 ms against their
 10,000/15,000/15,000 ms budgets. The M2 decision-preparer tests passed, as did
 the focused browser-diagnostics tests. Only synthetic fixtures were used; no
 prospect data or provider was contacted.
