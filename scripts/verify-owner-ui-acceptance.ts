@@ -1292,7 +1292,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     const dossierStart = performance.now();
     await page.keyboard.press("Enter");
     await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
-    await page.getByText("Next action", { exact: true }).waitFor();
+    await page.locator("section[aria-labelledby='owner-next-step']").getByText("Next action", { exact: true }).waitFor();
     await page.getByText(/Website finding/).first().waitFor();
     await page.getByRole("heading", { level: 2, name: "Do not contact" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Owner tasks" }).waitFor();
