@@ -1584,12 +1584,12 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
     const todayReview = page.getByRole("region", { name: "Today owner action desk" });
-    await todayReview.getByRole("heading", { name: "Confirm which businesses should move to research" }).waitFor();
+    await todayReview.getByRole("heading", { name: "Check the proposed business list" }).waitFor();
     await todayReview.getByRole("heading", { name: "Replies and follow-ups" }).waitFor();
     await todayReview.getByRole("heading", { name: "Safety and email status" }).waitFor();
     await todayReview.getByText("Email route", { exact: true }).waitFor();
     await todayReview.getByText("Not verified", { exact: true }).waitFor();
-    const todayBusinessReview = todayReview.getByRole("link", { name: "Review proposed businesses" });
+    const todayBusinessReview = todayReview.getByRole("link", { name: "Open business review" });
     await todayBusinessReview.waitFor();
     assert.equal(await todayBusinessReview.getAttribute("href"), "/leads/m2/identity");
     assert.equal(await page.getByText("Safety gated", { exact: true }).count(), 0,
@@ -1610,7 +1610,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.getByRole("heading", { name: "Email is not ready" }).waitFor();
     await page.getByRole("heading", { name: "Client follow-ups" }).waitFor();
     await page.getByRole("heading", { name: "Automation stop" }).waitFor();
-    const followThroughReview = page.getByRole("link", { name: "Review proposed businesses" });
+    const followThroughReview = page.getByRole("link", { name: "Open business review" });
     await followThroughReview.waitFor();
     assert.equal(await followThroughReview.getAttribute("href"), "/leads/m2/identity");
     assert.equal(await page.getByRole("link", { name: "Open Business Review" }).count(), 0);
@@ -1635,7 +1635,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "desktop Settings";
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Settings & safety" }).waitFor();
-    await page.getByRole("heading", { name: "Business email" }).waitFor();
+    await page.getByRole("heading", { name: "Business email readiness" }).waitFor();
     assert.equal(await page.getByRole("link", { name: /Connect Gmail/i }).count(), 0);
     await assertResponsive(page, "desktop Settings");
     await assertWcag(page, "desktop Settings");
@@ -1710,7 +1710,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "mobile Today safety";
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
-    await page.getByRole("region", { name: "Today owner action desk" }).getByRole("link", { name: "Review proposed businesses" }).waitFor();
+    await page.getByRole("region", { name: "Today owner action desk" }).getByRole("link", { name: "Open business review" }).waitFor();
     assert.equal(await page.getByRole("link", { name: "Connect now" }).count(), 0,
       "The phone Today view must not offer Gmail OAuth as the next owner action.");
     await assertResponsive(page, "mobile Today safety");
@@ -1722,7 +1722,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.getByRole("heading", { level: 1, name: "Follow-through" }).waitFor();
     await page.getByRole("heading", { name: "Email is not ready" }).waitFor();
     await page.getByRole("heading", { name: "Client follow-ups" }).waitFor();
-    const mobileFollowThroughReview = page.getByRole("link", { name: "Review proposed businesses" });
+    const mobileFollowThroughReview = page.getByRole("link", { name: "Open business review" });
     await mobileFollowThroughReview.waitFor();
     assert.equal(await mobileFollowThroughReview.getAttribute("href"), "/leads/m2/identity");
     assert.equal(await page.getByRole("link", { name: "Open Business Review" }).count(), 0);
@@ -1744,7 +1744,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     stage = "mobile Settings";
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Settings & safety" }).waitFor();
-    await page.getByRole("heading", { name: "System stop" }).waitFor();
+    await page.getByRole("heading", { name: "Emergency stop" }).waitFor();
     await assertResponsive(page, "mobile Settings");
     await assertWcag(page, "mobile Settings");
     await page.screenshot({ path: join(outputDirectory, "settings-mobile.png"), fullPage: true });

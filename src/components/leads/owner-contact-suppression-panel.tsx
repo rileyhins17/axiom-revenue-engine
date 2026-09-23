@@ -31,12 +31,11 @@ function errorMessage(value: unknown, fallback: string) {
   return isRecord(value) && typeof value.error === "string" && value.error.trim() ? value.error : fallback;
 }
 
-function parseSuppression(value: unknown, businessId: string): ContactSuppression {
+function parseSuppression(value: unknown, businessId: string, contactPointId: string): ContactSuppression {
   if (!isRecord(value)
     || typeof value.suppressionId !== "string"
     || value.businessId !== businessId
-    || typeof value.contactPointId !== "string"
-    || !value.contactPointId.trim()
+    || value.contactPointId !== contactPointId
     || (value.reason !== "UNSUBSCRIBE" && value.reason !== "COMPLAINT" && value.reason !== "BOUNCE")
     || typeof value.note !== "string"
     || typeof value.actorUserId !== "string"
@@ -101,7 +100,7 @@ function EmailPointRow({ businessId, contact }: { businessId: string; contact: O
       if (!isRecord(body) || !(body.suppression === null || isRecord(body.suppression))) {
         throw new Error("The saved email stop response could not be read.");
       }
-      const saved = body.suppression === null ? null : parseSuppression(body.suppression, businessId);
+      const saved = body.suppression === null ? null : parseSuppression(body.suppression, businessId, contact.contactPointId);
       if (sequence.current !== current) return;
       setSuppression(saved);
       setState("ready");
@@ -111,7 +110,7 @@ function EmailPointRow({ businessId, contact }: { businessId: string; contact: O
       setState("unavailable");
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "The saved email stop is unavailable right now." });
     }
-  }, [businessId, endpoint]);
+  }, [businessId, contact.contactPointId, endpoint]);
 
   React.useEffect(() => {
     setObservedAtLocal(localDateTimeValue());
@@ -140,7 +139,7 @@ function EmailPointRow({ businessId, contact }: { businessId: string; contact: O
       const body: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(errorMessage(body, "The email stop could not be saved."));
       if (!isRecord(body) || !isRecord(body.suppression)) throw new Error("The saved email stop could not be verified.");
-      const posted = parseSuppression(body.suppression, businessId);
+      const posted = parseSuppression(body.suppression, businessId, contact.contactPointId);
       if (posted.contactPointId !== contact.contactPointId || posted.suppressionId !== `contact-suppression:${idempotencyKey}` || posted.reason !== command.reason ||
           posted.note !== command.note || posted.observedAt !== command.observedAt) {
         throw new Error("The saved email stop did not match this exact command.");
@@ -152,7 +151,7 @@ function EmailPointRow({ businessId, contact }: { businessId: string; contact: O
       if (!readbackResponse.ok || !isRecord(readbackBody) || !isRecord(readbackBody.suppression)) {
         throw new Error("The save may have reached the server, but its current status could not be confirmed.");
       }
-      const readback = parseSuppression(readbackBody.suppression, businessId);
+      const readback = parseSuppression(readbackBody.suppression, businessId, contact.contactPointId);
       if (readback.suppressionId !== `contact-suppression:${idempotencyKey}` || readback.reason !== command.reason ||
           readback.note !== command.note || readback.observedAt !== command.observedAt) {
         throw new Error("The readback did not match this exact command. The saved status remains uncertain.");
@@ -197,7 +196,7 @@ function EmailPointRow({ businessId, contact }: { businessId: string; contact: O
           </div>
           <label className="grid gap-1.5 text-xs font-semibold text-[#405347]">Short observation summary<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={300} required disabled={pending} rows={2} placeholder="Example: Unsubscribe request received by owner" className="v2-focus-ring min-h-16 resize-y rounded-lg border border-[#d5dfd6] bg-white px-3 py-2 text-sm font-normal leading-5 text-[#263b2d] placeholder:text-[#87968b]" /><span className="font-normal text-[#617367]">Do not paste or include any part of the incoming message.</span></label>
           <label className="flex items-start gap-2 text-xs leading-5 text-[#405347]"><input type="checkbox" checked={personallyObserved} onChange={(event) => setPersonallyObserved(event.target.checked)} disabled={pending} className="v2-focus-ring mt-0.5 size-4 accent-[#315c3b]" /><span>I personally observed this event. I am recording only its type, time, and a short summary; I am not pasting message content.</span></label>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950"><p className="font-semibold">This permanently blocks {contact.value} for this business.</p><p className="text-amber-900">Matching later email records inherit the stop. There is no release control in this panel.</p></div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950"><p className="break-all font-semibold">This permanently blocks {contact.value} for this business.</p><p className="text-amber-900">Matching later email records inherit the stop. There is no release control in this panel.</p></div>
           <button type="submit" disabled={pending || state !== "ready" || !personallyObserved || !note.trim() || !observedAtLocal} className="v2-focus-ring inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-4 text-xs font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-50 sm:w-fit">{pending ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" /> : <ShieldAlert className="size-3.5" aria-hidden="true" />}{pending ? "Saving email stop…" : "Record do not email"}</button>
         </form>}
     </article>

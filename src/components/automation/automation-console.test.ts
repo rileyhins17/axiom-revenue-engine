@@ -41,11 +41,14 @@ function statusData(emergencyPaused: boolean): AutomationOperatorConsoleData {
   } as AutomationOperatorConsoleData;
 }
 
-test("follow-through page points owners to identity review and human client actions", () => {
+test("follow-through page avoids inventing a next review and keeps business and client routes clear", () => {
   const html = renderConsole({ data: statusData(false) });
 
   assert.match(html, /<h1[^>]*>Follow-through<\/h1>/);
-  assert.match(html, /Review proposed businesses/);
+  assert.match(html, /Check the proposed business list/);
+  assert.match(html, /see saved decisions and anything that still needs a decision/);
+  assert.match(html, /Open business review/);
+  assert.doesNotMatch(html, /Your next review|Review the proposed businesses|Review proposed businesses/);
   assert.match(html, /href="\/leads\/m2\/identity"/);
   assert.doesNotMatch(html, /href="\/leads\/m2"/);
   assert.match(html, /Client follow-ups/);
@@ -54,7 +57,7 @@ test("follow-through page points owners to identity review and human client acti
   assert.match(html, /owner inbox and reply path/);
 
   const restrictedHtml = renderConsole({ data: statusData(false), canOpenBusinessReview: false });
-  assert.match(restrictedHtml, /An admin owner can review the proposed businesses/);
+  assert.match(restrictedHtml, /An admin owner can open the business review/);
   assert.doesNotMatch(restrictedHtml, /href="\/leads\/m2\/identity"/);
 });
 

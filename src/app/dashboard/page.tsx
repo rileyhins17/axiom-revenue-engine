@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Bot,
+  Building2,
   CheckCircle2,
   Clock,
   Clock3,
@@ -784,16 +785,16 @@ export default async function DashboardPage() {
           <div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:px-8">
             <div className="min-w-0">
               <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.13em] text-[#537262]">
-                <span className="grid size-7 place-items-center rounded-lg bg-[#eaf3e9] text-[#145943]">01</span>
-                Next action · Business review
+                <span className="grid size-7 place-items-center rounded-lg bg-[#eaf3e9] text-[#145943]"><Building2 className="size-4" aria-hidden="true" /></span>
+                Business review
               </p>
-              <h2 id="today-next-action" className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#20352c] sm:text-[1.75rem]">Confirm which businesses should move to research</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#52645a]">Check each business name and location, then keep it, replace it, or pause for more research. Saving this private review does not start research or contact anyone.</p>
+              <h2 id="today-next-action" className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#20352c] sm:text-[1.75rem]">Check the proposed business list</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#52645a]">See saved choices and anything that still needs a decision. Opening this private review does not start research or contact anyone.</p>
             </div>
             <div className="lg:min-w-[210px] lg:text-right">
               {canOpenBusinessReview ? (
                 <Link href="/leads/m2/identity" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#145943] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#104a37] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943] lg:w-auto">
-                  Review proposed businesses <ArrowRight className="size-4" aria-hidden="true" />
+                  Open business review <ArrowRight className="size-4" aria-hidden="true" />
                 </Link>
               ) : (
                 <p className="rounded-xl border border-[#e4ebe2] bg-[#f8faf7] px-4 py-3 text-sm leading-5 text-[#53675a]">A named owner can complete this review.</p>
@@ -862,7 +863,7 @@ export default async function DashboardPage() {
             <div className="flex items-center justify-between gap-3 rounded-lg border border-[#e5eae4] bg-white px-3.5 py-2.5">
               <span className="text-sm text-[#53675a]">System stop</span>
               <span className={`text-sm font-semibold ${automationRead.unavailable ? "text-amber-800" : automation.settings.emergencyPaused ? "text-rose-800" : "text-[#53675a]"}`}>
-                {automationRead.unavailable ? "Unknown" : automation.settings.emergencyPaused ? "On" : "Not active at last check"}
+                {automationRead.unavailable ? "Unknown" : automation.settings.emergencyPaused ? "On" : "Off at last check"}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-[#fff8e8] px-3.5 py-2.5">

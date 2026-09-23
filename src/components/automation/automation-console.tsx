@@ -61,7 +61,7 @@ export function AutomationConsole({ data, canOpenBusinessReview, canControlEmerg
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#426e58]">Axiom Web · Owner workspace</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-[#172c25] sm:text-4xl">Follow-through</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#52665a]">
-            Review proposed businesses, keep client next steps moving, and check whether email is ready to use.
+            Track client follow-ups and check operational readiness.
           </p>
         </div>
         <button
@@ -88,14 +88,14 @@ export function AutomationConsole({ data, canOpenBusinessReview, canControlEmerg
       ) : null}
 
       <section aria-label="Follow-through actions" className="grid gap-4 lg:grid-cols-12">
-        <section aria-labelledby="follow-through-next-step" className="relative overflow-hidden rounded-[22px] border border-[#dce6dc] bg-[#f0f3e9] p-5 sm:p-7 lg:col-span-7">
+        <section aria-labelledby="follow-through-business-review" className="relative overflow-hidden rounded-[22px] border border-[#dce6dc] bg-[#f0f3e9] p-5 sm:p-7 lg:col-span-7">
           <div className="absolute inset-y-0 left-0 w-1.5 bg-[#12573f]" aria-hidden="true" />
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#426e58]">Your next review</p>
-          <h2 id="follow-through-next-step" className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#172c25] sm:text-[28px]">
-            Review the proposed businesses
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#426e58]">Business review</p>
+          <h2 id="follow-through-business-review" className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#172c25] sm:text-[28px]">
+            Check the proposed business list
           </h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-[#52665a]">
-            Choose which candidates belong in the evaluation set. This step records identity decisions; it does not qualify businesses or approve contact.
+            Open the list to see saved decisions and anything that still needs a decision. Opening it does not start research or contact anyone.
           </p>
           {canOpenBusinessReview ? (
             <Link
@@ -103,11 +103,11 @@ export function AutomationConsole({ data, canOpenBusinessReview, canControlEmerg
               prefetch={false}
               className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#12573f] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0f4834] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#197255]"
             >
-              Review proposed businesses <ArrowRight className="size-4" aria-hidden="true" />
+              Open business review <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
           ) : (
             <p className="mt-5 rounded-lg border border-[#dbe5da] bg-white/80 px-4 py-3 text-sm leading-5 text-[#52665a]">
-              An admin owner can review the proposed businesses.
+              An admin owner can open the business review.
             </p>
           )}
         </section>
