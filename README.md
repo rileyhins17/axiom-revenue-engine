@@ -85,6 +85,8 @@ evidence insufficient. The note is stored only in ignored local evaluation
 data, can be reloaded, and stays `UNKNOWN / RESEARCH` with no contact or send
 authority. It is unavailable in the hosted app and does not count as a real M2
 website assessment. Riley is not required to perform this optional step.
+See [ADR 0058](docs/adr/0058-keep-manual-m2-facts-separate-from-assessment.md)
+for the evidence and attribution boundary.
 
 ## Read the plan
 
