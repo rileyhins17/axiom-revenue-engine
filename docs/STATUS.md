@@ -1,5 +1,18 @@
 # Current status — Axiom Revenue Engine
 
+**Reply route (2026-09-23, Claude via Riley's Chrome, owner-approved):** in the
+getaxiom.ca Email Routing (Cloudflare account `fe468a56…`), destination
+`rileyhinsperger@gmail.com` is **Verified** and rule `riley@getaxiom.ca` →
+that inbox is **Active**. MX points to Cloudflare (route1–3) and SPF includes
+Cloudflare. A test from Riley's Gmail to riley@ was logged by Cloudflare as
+**Forwarded** at 23:32 UTC; Gmail shows only the Sent copy because it merges
+self-sent loops, so a test from a different sender is the remaining proof.
+Destination `aidan.magee2@icloud.com` was added and is **Pending** Aidan's
+click on Cloudflare's verification email; the `aidan@` rule is then to be
+created. The old `research@getaxiom.ca` destination is still Pending and can
+never verify. Catch-all remains disabled. Riley clarified that no getaxiom.ca
+mailboxes exist; these are free forwarding aliases (receive only).
+
 **Owner decision (Riley, 2026-09-23):** keep the GitHub repository **public**;
 do not make it private (private-repo Actions usage can cost money and fail
 builds). A visibility change was started and cancelled before GitHub's sudo
