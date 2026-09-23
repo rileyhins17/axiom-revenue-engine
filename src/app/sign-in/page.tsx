@@ -1,7 +1,6 @@
 "use client";
 
 import type { Route } from "next";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 import { Activity, LockKeyhole, ShieldCheck } from "lucide-react";
@@ -69,7 +68,7 @@ function SignInForm() {
       ]}
       formTitle="Welcome back"
       formDescription="Sign in with your approved Axiom operations account."
-      footer={<>Need access? <Link className="font-medium text-emerald-300 hover:text-emerald-200" href="/sign-up">Request an operator account</Link></>}
+      footer={<>Operator accounts are provisioned privately by Axiom.</>}
     >
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">

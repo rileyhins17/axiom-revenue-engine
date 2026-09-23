@@ -162,6 +162,10 @@ export function shouldSkipCloudMapsDetailPages(env: Pick<ReturnType<typeof getSe
   return !env.CLOUD_SCRAPE_DETAIL_PAGES_ENABLED;
 }
 
+export function shouldDisableLegacyCloudCrawler() {
+  return true;
+}
+
 export function isTransientCloudBrowserError(message: string) {
   return /browser.*429|429.*browser|rate limit exceeded/i.test(message);
 }
@@ -396,6 +400,11 @@ async function runClaimedJob(job: ScrapeJobRecord, existingDedupeKeys: string[])
 }
 
 export async function runCloudScrapeWorker() {
+  // The legacy crawler cannot safely pin DNS across browser redirects. Keep
+  // this entry point inert until a separately reviewed capture path replaces it.
+  if (shouldDisableLegacyCloudCrawler()) {
+    return { claimed: false, reason: "Legacy browser crawler is disabled" };
+  }
   const bindings = getCloudflareBindings();
   if (!bindings?.BROWSER) {
     return { claimed: false, reason: "Browser Rendering binding unavailable" };

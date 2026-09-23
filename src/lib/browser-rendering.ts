@@ -1,4 +1,5 @@
 import { getCloudflareBindings } from "@/lib/cloudflare";
+import { normalizePublicWebsiteUrl } from "@/lib/revenue-engine/public-website-url";
 
 export interface AutomationLocator {
   click(): Promise<void>;
@@ -110,6 +111,15 @@ const BLOCKED_URL_PATTERNS: RegExp[] = [
   /bat\.bing\.com/i,
 ];
 
+export function isAllowedLegacyCrawlerRequestUrl(value: string) {
+  try {
+    normalizePublicWebsiteUrl(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function applyScrapeResourceBlocking(context: unknown): Promise<void> {
   try {
     const ctx = context as { route?: (pattern: string | RegExp, handler: (route: unknown) => unknown) => Promise<void> };
@@ -122,16 +132,19 @@ export async function applyScrapeResourceBlocking(context: unknown): Promise<voi
       };
       try {
         const req = r.request();
+        const url = req.url();
+        if (!isAllowedLegacyCrawlerRequestUrl(url)) {
+          return r.abort();
+        }
         if (BLOCKED_RESOURCE_TYPES.has(req.resourceType())) {
           return r.abort();
         }
-        const url = req.url();
         if (BLOCKED_URL_PATTERNS.some((re) => re.test(url))) {
           return r.abort();
         }
         return r.continue();
       } catch {
-        return r.continue().catch(() => undefined);
+        return r.abort().catch(() => undefined);
       }
     });
   } catch (error) {

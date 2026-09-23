@@ -4,6 +4,7 @@ import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 
 import { writeAuditEvent } from "@/lib/audit";
+import { assertOperatorSignupAllowed } from "@/lib/auth-signup-policy";
 import { getClientIp, getCloudflareBindings } from "@/lib/cloudflare";
 import { getAllowedEmails, getServerEnv, getTrustedOrigins, isAdminEmail } from "@/lib/env";
 import { ensureLocalDatabaseDirectory, getLocalDatabasePath } from "@/lib/local-sqlite";
@@ -80,6 +81,18 @@ export function getAuth() {
         }
 
         if (ctx.path === "/sign-up/email") {
+          try {
+            assertOperatorSignupAllowed({
+              appBaseUrl: env.APP_BASE_URL,
+              cloudflareDatabaseBound: Boolean(bindings?.DB),
+              localSyntheticSignupFlag: process.env.AXIOM_LOCAL_SYNTHETIC_SIGNUP,
+            });
+          } catch {
+            throw new APIError("FORBIDDEN", {
+              message: "Operator accounts are provisioned privately. Sign in with an existing account.",
+            });
+          }
+
           const email = String(ctx.body?.email || "").trim().toLowerCase();
           if (!email || !isAllowedEmail(email)) {
             throw new APIError("FORBIDDEN", {

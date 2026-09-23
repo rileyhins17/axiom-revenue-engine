@@ -148,6 +148,14 @@ Read `AGENTS.md` and the required documents before changes. Use Node.js 22+, npm
 
 `npm run dev` starts the console. `npm run cf:engine:dev` inspects the locked engine scaffold. Neither command is permission to contact a provider, run real acquisition, sync an inbox, send, migrate remotely or deploy. Existing guarded private-KW commands are documented in the runbook; their approval and trusted-input requirements remain.
 
+Public operator signup is disabled. The isolated owner-browser test alone can
+create a synthetic account on loopback with its process-only fixture flag;
+Cloudflare cannot use that path. A fresh live environment needs a separately
+verified private admin bootstrap. Legacy Gmail delivery and the deployed
+Browser Rendering crawler are also hard-disabled at their entry points. The
+manual Gmail reply route checks stops and suppressions as a second boundary.
+These release-containment decisions are recorded in [ADR 0054](docs/adr/0054-quarantine-legacy-public-signup-gmail-and-browser-crawler.md).
+
 On an authenticated v2 lead dossier, the **Do not contact** panel records one
 manual business-level owner stop with a reason and note. The saved stop blocks
 route presentation in both the dossier and ranked list. An unreadable stop

@@ -687,6 +687,7 @@ function startNextServer(baseUrl: string, databasePath: string, logLines: string
     AGENT_SHARED_SECRET: "",
     AUTH_ALLOWED_EMAILS: FIXTURE_EMAIL,
     AUTH_ADMIN_EMAILS: FIXTURE_EMAIL,
+    AXIOM_LOCAL_SYNTHETIC_SIGNUP: "1",
     AXIOM_M2_LOCAL_REVIEW_ENABLED: "1",
     AXIOM_M2_LOCAL_REVIEW_RUN: m2RunPath,
     AUTH_ALLOWED_ORIGINS: baseUrl,
