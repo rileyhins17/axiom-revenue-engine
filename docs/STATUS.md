@@ -36,7 +36,8 @@ and manifest path, not a new UI or live-provider test.
 HTML retention permission for Service 1st, Roofsaver, or Jaro. Service 1st has
 the clearest public robots and privacy pages for a possible conservative
 derived-facts-only supervised case, but public robots access is not a copying
-or retention licence. Source rights, retention, and the separate capture gate
+or retention licence. The [source-rights disposition](reviews/2026-09-23-m2-service1st-source-rights-hold.md)
+records a hold on the live fetch. Source rights, retention, and the separate capture gate
 remain unresolved. There has been **no live source capture**. M2 remains **0/10
 real assessments** and M3 remains **0/50 real judged dossiers**.
 
