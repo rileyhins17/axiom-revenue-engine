@@ -5,6 +5,38 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## DATA-013 — Windows checkout changed canonical migration bytes
+
+- **Symptom:** M2 setup fixtures in a new Windows worktree reported that the
+  Revenue schema differed from canonical migrations, although the same commit
+  passed in the existing worktree.
+- **Root cause:** Git's machine-wide `core.autocrlf=true` checked migration SQL
+  out as CRLF. The private migration manifest and SQLite schema comparison use
+  exact migration content, while the repository stores those files as LF.
+- **Proven fix:** `.gitattributes` pins `migrations/*.sql` to LF. A new Windows
+  worktree then checked the SQL out as LF and the M2 setup tests passed.
+- **Prevention/test:** keep the LF attribute for all canonical SQL migrations;
+  `git ls-files --eol migrations/0069_private_kw_m2_html_assessment_lineage.sql`
+  must report `w/lf` in a fresh checkout. Run the M2 setup tests there before
+  relying on a clean-worktree full-suite result.
+- **Affected area:** local migration integrity, M2 backup/rollback verification,
+  and clean Windows worktrees.
+- **Verifying commit:** `c7c2702`.
+
+## OPS-013 — Assessment fixture assumed an ignored directory existed
+
+- **Symptom:** the first four M2 assessment tests in a clean worktree failed
+  with `ENOENT` while creating their synthetic SQLite files; later setup tests
+  could pass after making the directory themselves.
+- **Root cause:** the assessment fixture wrote directly into ignored
+  `data/kw-evaluation` before ensuring that directory existed.
+- **Proven fix:** the fixture creates its local directory before the first
+  synthetic file write.
+- **Prevention/test:** run M2 assessment acceptance in a new worktree with no
+  pre-existing ignored data directory; keep fixture setup self-contained.
+- **Affected area:** M2 local acceptance tests and clean-checkout verification.
+- **Verifying commit:** `fe1b3a5`.
+
 ## OPS-012 — Overlapping M2 tests can leave a lock that hides browser results
 
 - **Symptom:** the owner browser acceptance or setup suite exits before its
@@ -17,13 +49,15 @@ Retire entries when the architecture makes them impossible.
   checked no setup/test process was active before removing that one file. The
   full suite then passed; a separately run browser acceptance passed after a
   qualification-fixture correction.
-- **Prevention/test:** `AGENTS.md` now requires `npm test` to exit before
-  `test:owner-ui`, in addition to serializing Next/OpenNext builds. Never clear
-  a live lock or infer staleness from elapsed time alone; inspect its owner.
+- **Prevention/test:** `AGENTS.md` requires `npm test` to exit before
+  `test:owner-ui`, in addition to serializing Next/OpenNext builds. The default
+  `npm test` command places `--test-concurrency=1` before its file patterns.
+  Never clear a live lock or infer staleness from elapsed time alone; inspect
+  its owner.
 - **Affected area:** M2 local database setup, browser acceptance, and checkpoint
   verification on the shared worktree.
-- **Verifying commit:** `121601f` (serialized verification rule and passing
-  owner workflow code); this ledger entry records the observed cleanup.
+- **Verifying commits:** `121601f` (serialized verification rule and passing
+  owner workflow code) and `856ec9d` (serial full-suite command).
 
 ## DATA-011 — A realistic UI fixture bypassed the writer it claimed to represent
 
