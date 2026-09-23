@@ -110,6 +110,26 @@ for the evidence and attribution boundary.
 
 The current sequence is one complete offline dossier, ten reviewed real-business dossiers, a fixed 50-business quality evaluation, contact/approval/reply readiness, a small separately approved outreach pilot, and a proven opportunity-to-customer loop. Selective automation follows evidence of quality and owner capacity.
 
+## Weekly engine run (local)
+
+The engine finds businesses, checks their websites and shortlists prospects
+without a person or AI choosing them ([ADR 0060](docs/adr/0060-automatic-discovery-and-website-check.md)).
+
+```powershell
+npx tsx scripts/engine-weekly-run.ts --places
+```
+
+Discovery needs `AXIOM_PLACES_DISCOVERY_ENABLED=1` and a restricted
+`AXIOM_GOOGLE_PLACES_KEY` in the ignored local environment; it stops at 30
+requests per run and 200 per month. For an offline test of the loop, pass
+`--candidates <file.json>` instead. Results go to ignored
+`data/kw-evaluation/engine-runs/`. The admin-only Business Review page then
+shows **Prospects found by the engine**; Riley or Aidan marks each one **Worth
+a call** or **Not a fit**, and a worth-a-call prospect shows a factual call-notes
+draft. None of this contacts anyone. To regrade the checker against the
+50-business answer key, run `scripts/grade-engine-website-check.ts` and then
+`scripts/regrade-engine-lead-rules.ts`.
+
 ## Owner experience
 
 The owner navigation is Today, Businesses, Follow-through, Clients and Settings.

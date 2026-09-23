@@ -23,10 +23,19 @@ Per Riley's direction, businesses are found by the engine, not by an agent
   fine, 9 non-targets, 5 not loadable. The local `/leads/m2` page opens with
   "Prospects found by the engine".
 
-Verification: focused tests (places 6/6, rules 6/6, M3 4/4, website-need 6/6),
-typecheck, lint and safety pass. Full suite and clean-build checks are rerun
-at the next checkpoint. Spend C$0. No contact, send, deploy, migration or
-provider account change occurred.
+Owners can now mark each prospect **Worth a call** or **Not a fit** (append-only,
+owner-only, local; commit `1f16423`), and a worth-a-call prospect shows a
+factual call-notes draft (commit `f371422`).
+
+**Verification.** On `1f16423`: full suite 892 tests, 887 passed, 0 failed,
+5 skipped; safety, typecheck and lint passed. A short-path clean clone built the
+Cloudflare bundle (1,772 files scanned, 0 secret values), passed default and
+staging no-upload dry runs, and passed owner browser acceptance (17 WCAG page
+scans, desktop 1440 / mobile 390, zero external requests). `f371422` changes
+only call-note text mapping and its view; its focused tests (7/7), typecheck
+and lint passed. GitHub still reports the repository **public** (anonymous
+API check, 2026-09-23); nothing has been pushed. Spend C$0. No contact, send,
+deploy, migration or provider account change occurred.
 
 **Next three concrete actions:** (1) once the owner creates the Places key,
 run the first real discovery and grade coverage against the answer key;
