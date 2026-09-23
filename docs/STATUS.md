@@ -1,5 +1,72 @@
 # Current status — Axiom Revenue Engine
 
+## Commercial owner workspace redesign and private decision save; production goal remains open
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified code commit:**
+`65aa335`. This completes the local owner-workspace redesign checkpoint, not
+the M2 exit gate or a production release. M1's offline flow remains complete.
+M2 has **0/10 real engine assessments**; M3–M7 and production are open.
+
+The owner workspace now leads with a distinct dark Axiom navigation and a quiet
+light canvas. Today presents the proposed-business decision first, followed by
+replies, follow-ups, and explicit safety/email status. Businesses presents one
+readable record per company with its website finding and a direct evidence
+action. Its detail page now puts a stop-aware owner next step, the manual route
+context when qualified, and three sourced findings ahead of the recorded
+routes and history; the full website audit starts closed. Follow-through puts
+the next owner review, client actions, email
+unavailability, and the existing automation stop in separate plain-language
+sections. Clients presents the next recorded action and a clearer empty state.
+Legacy scores, queue metrics, and older email records remain available behind
+closed disclosures rather than competing with the owner's next action. The
+phone navigation uses the short **Actions** label so all five destinations fit.
+
+The local Business Review is now a one-business-at-a-time workflow with progress,
+source links, conditional checks, and a private **Save owner decisions** action.
+A named Riley or Aidan admin account must complete all ten decisions. The server
+rechecks the exact local research packet and saves an immutable, ignored ledger;
+retries of the same decisions are idempotent, while changed choices create a
+separate version. A browser draft or optional download does not count as a saved
+decision. No actual owner choices have been entered or inferred, and saving
+does not select a capturable cohort, contact anyone, or authorize external work.
+
+**Verification:** `npm run check:safety`, `npm test` (774 tests: 770 passed,
+0 failed, 4 skipped because Windows symlinks are unavailable),
+`npm run typecheck`, `npm run lint`, `git diff --check`,
+`npm run build:cloudflare`, and
+`npx wrangler deploy --env="" --dry-run --autoconfig false` passed after the UI
+changes. The Cloudflare command was a dry run and did not deploy. Isolated owner
+browser acceptance passed on synthetic data at 1440 px desktop and 390 px phone:
+17 accessibility scans, zero external requests, and the owner-task retry,
+reload, and completion lifecycle. Desktop Businesses, dossier, and M2 research
+review loaded in 980 ms, 177 ms, and 6,553 ms against their configured budgets.
+The exact-packet identity-save command, local store, and review component have
+focused tests; the browser acceptance uses a synthetic saved-research console
+and does not exercise a real owner account or the private identity-save route.
+The full serial suite passed on the same code snapshot as the browser checks
+and code commit. No live account, provider, or production path was tested.
+
+**Production, automation, and spend:** no deployment, migration, provider
+activation, live capture, prospect contact, send, or external outreach occurred.
+Live production is unverified. Autonomous intake, queue, follow-up, and send
+remain off. The C$50/month ceiling is unchanged; incremental provider spend is
+C$0. No paid mailbox or Google Workspace is assumed.
+
+**Owner decisions and blockers:** Riley/Aidan still need to review the ten
+proposed business identities, resolve the two blocked-site candidates or cohort
+shape, and approve source use and retention before any real M2 capture. The
+owner-controlled reply route, private legacy snapshot, staging backup,
+migration, rollback, and release gates remain separate.
+
+Next three concrete actions:
+
+1. Complete the ten owner identity decisions in the local review and verify the
+   saved ledger; request supported replacements where needed.
+2. Review source rights, retention, and the exact source import plan; authorize
+   one supervised real M2 capture and inspect its assessment.
+3. Verify the no-paid-mailbox owner reply route and private history snapshot,
+   then prepare a backed-up staging release with rollback proof.
+
 ## Local owner identity review is ready for human decisions; production goal remains open
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified code commits:**
