@@ -46,6 +46,7 @@
     "kw:prepare-owner-labeling": "tsx scripts/prepare-private-kw-owner-labeling.ts",
     "kw:split-owner-labeling": "tsx scripts/split-private-kw-owner-labeling.ts",
     "kw:prepare-m2-owner-decisions": "tsx scripts/prepare-private-kw-m2-owner-decisions.ts",
+    "kw:record-codex-m2-observation": "tsx scripts/record-codex-m2-manual-observation.ts",
     "kw:record-owner-labels": "tsx scripts/record-private-kw-owner-labels.ts",
     "kw:materialize-source-workflow": "tsx scripts/materialize-private-kw-source-workflow.ts",
     "kw:execute-assessment": "tsx scripts/execute-private-kw-assessment.ts",

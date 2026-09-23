@@ -64,7 +64,7 @@ function formatDate(value: string) {
 function ManualRecord({ record }: { record: M2ManualWebsiteObservation }) {
   return <li className="rounded-xl border border-[#dce9dd] bg-[#f8fbf8] p-3.5 text-sm">
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-[#5b6d62]">
-      <span>{formatDate(record.observedAt)} · {record.recordedBy === "RILEY" ? "Riley" : "Aidan"}</span>
+      <span>{formatDate(record.observedAt)} · {{ RILEY: "Riley", AIDAN: "Aidan", CODEX: "Codex" }[record.recordedBy]}</span>
       <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900">Website need: UNKNOWN</span>
       <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-800">Qualification: RESEARCH</span>
     </div>

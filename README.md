@@ -85,6 +85,11 @@ evidence insufficient. The note is stored only in ignored local evaluation
 data, can be reloaded, and stays `UNKNOWN / RESEARCH` with no contact or send
 authority. It is unavailable in the hosted app and does not count as a real M2
 website assessment. Riley is not required to perform this optional step.
+Codex can use the separate local `kw:record-codex-m2-observation` command only
+with an ignored, current, exact-page delegated source decision and a matching
+command file. Its saved note identifies Codex and retains the source-decision
+digest and a retention review date; that date does not delete the record.
+This command has no cloud or provider path and does not advance M2.
 See [ADR 0058](docs/adr/0058-keep-manual-m2-facts-separate-from-assessment.md)
 for the evidence and attribution boundary.
 

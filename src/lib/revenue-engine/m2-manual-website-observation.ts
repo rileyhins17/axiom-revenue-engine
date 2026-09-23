@@ -42,10 +42,12 @@ const M2ManualWebsiteObservationShape = z.object({
   observationVersion: z.literal(M2_MANUAL_WEBSITE_OBSERVATION_VERSION),
   observationId: z.string().regex(/^m2-manual-observation:[a-f0-9]{64}$/),
   commandId: z.string().uuid(),
-  recordedBy: z.enum(["RILEY", "AIDAN"]),
+  recordedBy: z.enum(["RILEY", "AIDAN", "CODEX"]),
   reviewId: ReviewIdSchema,
   businessName: z.string().trim().min(1).max(256),
   businessIdentityDigest: DigestSchema,
+  sourceAuthorizationDigest: DigestSchema.optional(),
+  retentionReviewDate: TimestampSchema.optional(),
   observedUrl: z.string().url(),
   observedAt: TimestampSchema,
   method: z.literal("MANUAL"),
@@ -71,6 +73,12 @@ export const M2ManualWebsiteObservationSchema = M2ManualWebsiteObservationShape.
   }
   if (value.evidenceState === "INSUFFICIENT" && hasObservation) {
     ctx.addIssue({ code: "custom", path: ["observation"], message: "Insufficient evidence cannot contain a guessed observation." });
+  }
+  if (value.recordedBy === "CODEX" && (!value.sourceAuthorizationDigest || !value.retentionReviewDate)) {
+    ctx.addIssue({ code: "custom", path: ["sourceAuthorizationDigest"], message: "Codex notes require the source authorization digest and retention review date." });
+  }
+  if (value.recordedBy !== "CODEX" && (value.sourceAuthorizationDigest || value.retentionReviewDate)) {
+    ctx.addIssue({ code: "custom", path: ["sourceAuthorizationDigest"], message: "Authorization provenance is reserved for explicitly authorized Codex notes." });
   }
 });
 export type M2ManualWebsiteObservation = z.infer<typeof M2ManualWebsiteObservationSchema>;
@@ -104,8 +112,9 @@ const forbiddenPersonalOrCopiedSignals = [
 export function buildM2ManualWebsiteObservation(
   input: unknown,
   targetInput: M2ManualWebsiteObservationTarget,
-  recordedBy: "RILEY" | "AIDAN",
+  recordedBy: "RILEY" | "AIDAN" | "CODEX",
   observedAt: string,
+  authorizationProof?: { sourceAuthorizationDigest: string; retentionReviewDate: string },
 ): Omit<M2ManualWebsiteObservation, "observationId"> {
   const command = M2ManualWebsiteObservationCommandSchema.parse(input);
   const target = M2ManualWebsiteObservationTargetSchema.parse(targetInput);
@@ -139,6 +148,7 @@ export function buildM2ManualWebsiteObservation(
     reviewId: target.reviewId,
     businessName: target.businessName,
     businessIdentityDigest: target.businessIdentityDigest,
+    ...(authorizationProof ?? {}),
     observedUrl: command.observedUrl,
     observedAt,
     method: "MANUAL",

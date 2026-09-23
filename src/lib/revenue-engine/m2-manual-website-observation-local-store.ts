@@ -19,6 +19,7 @@ const MAX_RECORD_BYTES = 8_192;
 export type M2ManualWebsiteObservationStoreOptions = {
   rootDir?: string;
   clock?: () => Date;
+  authorizationProof?: { sourceAuthorizationDigest: string; retentionReviewDate: string };
 };
 export type M2ManualWebsiteObservationSave = {
   status: "SAVED" | "ALREADY_SAVED";
@@ -130,7 +131,7 @@ export async function listM2ManualWebsiteObservations(
 export async function saveM2ManualWebsiteObservation(
   commandInput: unknown,
   targetInput: M2ManualWebsiteObservationTarget,
-  recordedBy: "RILEY" | "AIDAN",
+  recordedBy: "RILEY" | "AIDAN" | "CODEX",
   options: M2ManualWebsiteObservationStoreOptions = {},
 ): Promise<M2ManualWebsiteObservationSave> {
   const command = M2ManualWebsiteObservationCommandSchema.parse(commandInput);
@@ -158,14 +159,16 @@ export async function saveM2ManualWebsiteObservation(
         && sameCommandId.confidence === command.confidence
         && sameCommandId.evidenceState === command.evidenceState
         && sameCommandId.observation === (command.evidenceState === "OBSERVED" ? command.observation.trim().replace(/\s+/g, " ") : null)
-        && sameCommandId.recordedBy === recordedBy;
+        && sameCommandId.recordedBy === recordedBy
+        && sameCommandId.sourceAuthorizationDigest === options.authorizationProof?.sourceAuthorizationDigest
+        && sameCommandId.retentionReviewDate === options.authorizationProof?.retentionReviewDate;
       if (!sameCommand) fail("CONFLICT", "This retry key already belongs to a different manual observation.");
       return { status: "ALREADY_SAVED", observationId: sameCommandId.observationId, observedAt: sameCommandId.observedAt };
     }
 
     const now = options.clock?.() ?? new Date();
     if (!Number.isFinite(now.getTime())) fail("UNAVAILABLE", "The manual-observation clock is invalid.");
-    const record = sealM2ManualWebsiteObservation(buildM2ManualWebsiteObservation(command, target, recordedBy, now.toISOString()));
+    const record = sealM2ManualWebsiteObservation(buildM2ManualWebsiteObservation(command, target, recordedBy, now.toISOString(), options.authorizationProof));
     const targetPath = path.join(rootDir, filenameFor(record));
     const tempPath = path.join(rootDir, `.m2-observation-${randomUUID()}.partial`);
     const temp = await open(tempPath, "wx", 0o600);

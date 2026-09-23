@@ -16,6 +16,15 @@ authenticated local API is unavailable with Cloudflare bindings; the owner
 screen shows the control only for a verified local M2 console and keeps it
 collapsed until requested.
 
+Codex may use a separate local command under Riley's delegated research and
+routine-decision authority. It requires a current, source-specific decision
+bound to the exact saved identity, command, approved origin and page. The
+decision permits only own-word derived company facts, with no raw HTML, copied
+text, personal/contact data, provider calls or spend. The immutable note names
+`CODEX`, seals the decision digest and records a retention review date; that
+date is a review reminder, not automatic deletion. The decision and command
+live in ignored local files, and this route does not enable cloud capture.
+
 The record always keeps website need `UNKNOWN`, qualification `RESEARCH`,
 all scores zero and all contact, consent, outreach, send, provider, deployment
 and cost authority disabled. It never advances the real M2 assessment ledger.
@@ -32,8 +41,8 @@ preserve a useful factual clue without adding a third-party service or
 claiming that an HTML parser has judged visual quality. The local-first
 evaluation can retain an honest `UNKNOWN` result while source-specific terms
 and real assessment gates are resolved. Riley is not required to perform the
-optional entry; a future Codex-operated path needs explicit Codex attribution
-rather than writing a note under Riley's or Aidan's account.
+optional entry. Codex attribution keeps delegated research distinct from a
+note actually entered by Riley or Aidan.
 
 ## Rejected alternatives
 
@@ -49,10 +58,11 @@ rather than writing a note under Riley's or Aidan's account.
 
 ## Verification and limits
 
-Ten focused synthetic tests cover current identity selection, URL and text
-limits, immutable reload and retry, and collapsed display. The exact local
-commit `a969f10` passed the full 865-test suite, typecheck, lint, safety,
-clean Cloudflare build and no-upload default/staging dry runs, plus owner UI
-acceptance. None of that authorizes or counts a real M2 observation or
-assessment. See the [source disposition](../reviews/2026-09-23-m2-manual-facts-only-source-disposition.md)
+The initial local slice at `a969f10` passed ten focused synthetic tests, the
+full 865-test suite, typecheck, lint, safety, clean Cloudflare build and
+no-upload default/staging dry runs, plus owner UI acceptance. The later Codex
+command has focused synthetic coverage for exact source-decision binding,
+attribution, sealed provenance and retry; consult [STATUS](../STATUS.md) for
+its exact-commit verification. No real observation or assessment is counted
+by these tests. See the [source disposition](../reviews/2026-09-23-m2-manual-facts-only-source-disposition.md)
 for the current site-specific holds.
