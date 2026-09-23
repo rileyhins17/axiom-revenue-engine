@@ -23,6 +23,10 @@ const SETTLE_MS = 1_500;
 
 export type EngineSiteSignals = {
   finalUrl: string;
+  /** The business's own page title, used as its display name. */
+  siteTitle?: string | null;
+  /** The site's declared name (og:site_name), when present. */
+  siteName?: string | null;
   statusCode: number;
   copyrightYear: number | null;
   generator: string | null;
@@ -40,7 +44,7 @@ export type EngineSiteCapture =
   | { status: "UNREACHABLE"; audit: DeterministicWebsiteAuditResult; reason: string };
 
 type DesktopFacts = {
-  title: string | null; metaDescription: string | null; visibleText: string; generator: string | null;
+  title: string | null; siteName: string | null; metaDescription: string | null; visibleText: string; generator: string | null;
   actions: { kind: "PHONE" | "QUOTE" | "BOOK" | "CONTACT"; label: string; href: string | null; visible: boolean; aboveFold: boolean }[];
   forms: { visible: boolean; hasSubmitControl: boolean; disabled: boolean; actionUrl: string | null }[];
   structuredDataTypes: string[];
@@ -97,6 +101,7 @@ function readDesktop(): DesktopFacts {
   }
   return {
     title: document.title.trim().slice(0, 300) || null,
+    siteName: document.querySelector('meta[property="og:site_name"]')?.getAttribute("content")?.trim().slice(0, 120) || null,
     metaDescription: document.querySelector('meta[name="description"]')?.getAttribute("content")?.trim().slice(0, 600) || null,
     visibleText: (document.body?.innerText ?? "").slice(0, 100_000),
     generator: document.querySelector('meta[name="generator"]')?.getAttribute("content")?.slice(0, 120) ?? null,
@@ -203,7 +208,7 @@ export async function captureAndAuditSite(
     return {
       status: "CAPTURED", audit,
       signals: {
-        finalUrl: page.url(), statusCode, copyrightYear: copyrightYear(text), generator: facts.generator,
+        finalUrl: page.url(), siteTitle: facts.title?.slice(0, 120) ?? null, siteName: facts.siteName, statusCode, copyrightYear: copyrightYear(text), generator: facts.generator,
         hasStreetAddress: hasStreetAddress(text), phoneLayoutWidth: phoneFacts.layoutWidth, phoneScrollWidth: phoneFacts.scrollWidth,
         phoneTapToCall: phoneFacts.tapToCall, desktopTapToCall: facts.actions.some((action) => action.href?.startsWith("tel:") && action.visible),
         quoteAction: facts.actions.some((action) => (action.kind === "QUOTE" || action.kind === "BOOK") && action.visible),
@@ -214,4 +219,20 @@ export async function captureAndAuditSite(
     await desktop.close();
     await phone.close();
   }
+}
+
+/** A readable business name from the site's own name, title and address. */
+export function businessDisplayName(url: string, siteTitle?: string | null, siteName?: string | null): string {
+  const host = new URL(url).hostname.replace(/^www\./, "");
+  const hostKey = host.split(".")[0]!.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const generic = /^(home|welcome|index|untitled)$/i;
+  const overlap = (text: string) => {
+    const words = text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 3);
+    return words.filter((word) => hostKey.includes(word)).length;
+  };
+  if (siteName && !generic.test(siteName.trim()) && overlap(siteName) > 0) return siteName.trim();
+  const parts = (siteTitle ?? "").split(/\s[|–—:-]\s|\s\|\s?|\s?\|\s/).map((part) => part.trim()).filter((part) => part && !generic.test(part));
+  const best = parts.map((part) => ({ part, score: overlap(part) })).sort((left, right) => right.score - left.score)[0];
+  if (best && best.score > 0) return best.part.replace(/^www./i, "").slice(0, 80);
+  return host;
 }

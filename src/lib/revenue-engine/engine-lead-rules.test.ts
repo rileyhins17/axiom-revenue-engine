@@ -49,3 +49,11 @@ test("the evaluation split is fixed per review ID", () => {
   assert.equal(evaluationSplit("M3-01"), evaluationSplit("M3-01"));
   assert.ok(["TUNE", "HOLDOUT"].includes(evaluationSplit("M2-05")));
 });
+
+test("display names prefer the declared name, then the title part matching the address", async () => {
+  const { businessDisplayName } = await import("./engine-site-capture");
+  assert.equal(businessDisplayName("https://regionalair.ca/", "Furnace Repair Service | Regional Air Heating & Cooling"), "Regional Air Heating & Cooling");
+  assert.equal(businessDisplayName("https://www.nlmgalt.com/", "Home | Unrelated words"), "nlmgalt.com");
+  assert.equal(businessDisplayName("https://koebelsroofing.ca/", "www.koebelsroofing.ca", "Koebel's Roofing"), "Koebel's Roofing");
+  assert.equal(businessDisplayName("https://www.duritelandscaping.com/", "DuRite Landscaping"), "DuRite Landscaping");
+});
