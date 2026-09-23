@@ -16,7 +16,6 @@ export type AppNavItem = {
   icon: LucideIcon;
   shortcut: string;
   keywords: string[];
-  badgeKey?: "readyForTouch" | "followUp" | "replied" | "total";
 };
 
 export const APP_NAV_ITEMS: AppNavItem[] = [
@@ -37,7 +36,6 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     icon: Crosshair,
     shortcut: "⌘2",
     keywords: ["ranked", "businesses", "evidence", "leads"],
-    badgeKey: "readyForTouch",
   },
   {
     title: "Outreach",
@@ -47,7 +45,6 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     icon: Send,
     shortcut: "⌘3",
     keywords: ["approval", "message", "mailbox", "campaign", "manual task"],
-    badgeKey: "readyForTouch",
   },
   {
     title: "Revenue",
@@ -57,7 +54,6 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     icon: ChartNoAxesCombined,
     shortcut: "⌘4",
     keywords: ["crm", "deal", "client", "pipeline", "retainer", "reply"],
-    badgeKey: "replied",
   },
   {
     title: "System",

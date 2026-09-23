@@ -797,6 +797,9 @@ async function assertResponsive(page: Page, label: string) {
   assert(width.scrollWidth <= width.clientWidth + 1, `${label} overflows horizontally: ${JSON.stringify(width)}`);
   const controls = await page.locator("[data-owner-content] a[href], [data-owner-content] button").evaluateAll((elements) =>
     elements.filter((element) => {
+      // Closed disclosure content has a measurable layout box in Chromium but
+      // is not a pointer target until its summary is opened.
+      if (element.closest("details:not([open])")) return false;
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
@@ -1115,7 +1118,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     warmupPage = await context.newPage();
     attachBrowserDiagnostics(warmupPage, () => stage, diagnostics, baseUrl);
     drainScriptDiagnostics.push(await attachBrowserScriptDiagnostics(context, warmupPage, () => stage, diagnostics, outputDirectory));
-    await warmOwnerAcceptanceRoutes(warmupPage, ["/leads/m2"]);
+    await warmOwnerAcceptanceRoutes(warmupPage, ["/leads/m2", "/dashboard"]);
     await warmupPage.close();
 
     stage = "owner-action authentication gate";
@@ -1471,6 +1474,29 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await assertM2Review(page, m2Fixture, "desktop M2 review");
     await page.screenshot({ path: join(outputDirectory, "m2-review-desktop.png"), fullPage: true });
 
+    stage = "desktop Today safety";
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
+    const todayReview = page.getByRole("region", { name: "Weekly owner review" });
+    await todayReview.getByRole("heading", { name: "Check safety and readiness" }).waitFor();
+    await todayReview.getByRole("heading", { name: "Review the business shortlist" }).waitFor();
+    await todayReview.getByRole("heading", { name: "Take the next human actions" }).waitFor();
+    await todayReview.getByRole("heading", { name: "Learn from what happened" }).waitFor();
+    await todayReview.getByText("Email route", { exact: true }).waitFor();
+    await todayReview.getByText("Not verified", { exact: true }).waitFor();
+    await todayReview.getByRole("link", { name: "Open Business Review" }).waitFor();
+    assert.equal(await page.getByText("Safety gated", { exact: true }).count(), 0,
+      "The owner shell must not imply that safety is verified through a static badge.");
+    assert.equal(await page.getByText("prod", { exact: true }).count(), 0,
+      "The owner shell must not display a hard-coded production label.");
+    assert.equal(await page.getByText("Connect Gmail in Settings to restore outbound capacity", { exact: false }).count(), 0,
+      "The Today view must not direct an owner into the quarantined Gmail setup route.");
+    assert.equal(await page.getByRole("link", { name: "Connect now" }).count(), 0,
+      "The Today view must not offer Gmail OAuth as the next owner action.");
+    await assertResponsive(page, "desktop Today safety");
+    await assertWcag(page, "desktop Today safety");
+    await page.screenshot({ path: join(outputDirectory, "today-desktop.png"), fullPage: true });
+
     stage = "mobile leads";
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
@@ -1522,6 +1548,16 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await assertM2MobileNavigationClear(page, "[aria-label$='website review'] h2", "[aria-label$='website review'] > div:last-child > p:last-child", "mobile M2 detail");
     await page.screenshot({ path: join(outputDirectory, "m2-review-mobile-detail.png") });
 
+    stage = "mobile Today safety";
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
+    await page.getByRole("region", { name: "Weekly owner review" }).getByRole("link", { name: "Open Business Review" }).waitFor();
+    assert.equal(await page.getByRole("link", { name: "Connect now" }).count(), 0,
+      "The phone Today view must not offer Gmail OAuth as the next owner action.");
+    await assertResponsive(page, "mobile Today safety");
+    await assertWcag(page, "mobile Today safety");
+    await page.screenshot({ path: join(outputDirectory, "today-mobile.png"), fullPage: true });
+
     assert.deepEqual(externalRequests, [], "The owner acceptance browser attempted an external request.");
     await Promise.all(drainScriptDiagnostics.map((drain) => drain()));
     // CDP events attribute failures; caught/revoked exceptions are not new acceptance gates.
@@ -1545,7 +1581,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
       desktopM2ReadyMs,
       desktopWidth,
       mobileWidth,
-      pagesScanned: 9,
+      pagesScanned: 11,
       externalRequests: externalRequests.length,
     } satisfies AcceptanceResult;
   } catch (error) {
@@ -1593,7 +1629,7 @@ async function run() {
     await waitForServer(baseUrl, server);
     result = await runBrowserAcceptance(baseUrl, outputDirectory, m2Fixture);
     assert.deepEqual(readSetupFile(resolve(m2Fixture.databasePath)).identity, m2DatabaseIdentity, "Browser inspection must leave the M2 database unchanged.");
-    for (const name of ["m2-review-desktop.png", "m2-review-mobile.png", "m2-review-mobile-detail.png"]) {
+    for (const name of ["m2-review-desktop.png", "m2-review-mobile.png", "m2-review-mobile-detail.png", "today-desktop.png", "today-mobile.png"]) {
       await copyFile(join(outputDirectory, name), join(OUTPUT_ROOT, name));
     }
     success = true;

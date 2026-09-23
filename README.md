@@ -71,6 +71,15 @@ The current sequence is one complete offline dossier, ten reviewed real-business
 
 The intended navigation is Today, Leads, Outreach, Revenue and System. Leads/dossier and a file-based Quality Lab already exist in source; other areas still include legacy or future functionality. Each page must distinguish available, blocked, stale, empty and unavailable states.
 
+Today presents the owners' weekly review as four plain-language steps: check
+safety, review businesses, handle human actions and learn from outcomes. Business
+Review is the primary next step; legacy operator metrics sit behind Advanced
+system details. The navigation no longer uses legacy lead-score badges as if
+they counted approved business decisions. Today must not present Gmail OAuth as the path to the
+selected zero-paid-mailbox design. Missing critical status reads are shown as
+unavailable to the owner; a dashboard warning is not a runtime stop or proof
+that provider readiness has been checked.
+
 A lead should answer: who is this, what is actually wrong, why is it worth attention, what is uncertain, how may we contact them, and who acts next? Reachability is separate from account quality. Only verified email may eventually automate; the zero-paid-mailbox target uses Cloudflare inbound forwarding to existing owner destinations and a separately gated Resend outbound route. Cloudflare forwarding cannot itself send custom-domain replies; M4 must prove the human-triggered provider reply flow or a separately reviewed owner-only send-as route. Calls, forms and social DMs remain manual.
 
 The current v2 dossier source also includes a manual owner-task panel. On a

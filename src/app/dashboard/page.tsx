@@ -14,7 +14,6 @@ import {
   Filter,
   Mail,
   MailCheck,
-  PlugZap,
   Radar,
   Reply,
   Route as RouteIcon,
@@ -547,33 +546,38 @@ export default async function DashboardPage() {
   const prisma = getPrisma();
   const renderNowMs = new Date().getTime();
   const emptyFollowUps = { overdue: [], dueToday: [], stale: [], risky: [], now: new Date().toISOString() };
+  const readCritical = <T, F>(read: () => Promise<T>, fallback: F) =>
+    Promise.resolve()
+      .then(read)
+      .then((value) => ({ value, unavailable: false }))
+      .catch(() => ({ value: fallback, unavailable: true }));
 
   const [
-    automation,
-    operatorConsole,
+    automationRead,
+    operatorConsoleRead,
     scrapeJobs,
     leadCount,
     repliedCount,
     contactedCount,
     adequateToday,
-    sendsToday,
+    sendsTodayRead,
     recentTargets,
     nextTarget,
     activeTargets,
     series,
     crmStats,
-    followUps,
-    connectedRows,
+    followUpsRead,
+    connectedRowsRead,
     totalSentAllTime,
-    replyInbox,
+    replyInboxRead,
     funnel,
     qualificationRoutes,
-    messageVariants,
-    auditLog,
+    messageVariantsRead,
+    auditLogRead,
     scrapeTargetList,
   ] = await Promise.all([
-    listAutomationOverview().catch(() => emptyAutomationOverview()),
-    getAutomationOperatorConsole().catch(() => null),
+    readCritical(listAutomationOverview, emptyAutomationOverview()),
+    readCritical(getAutomationOperatorConsole, null),
     listScrapeJobs(8).catch(() => []),
     prisma.lead.count({ where: { isArchived: false } }),
     prisma.lead.count({ where: { outreachStatus: "REPLIED", isArchived: false } }),
@@ -584,7 +588,7 @@ export default async function DashboardPage() {
       return Number(r?.c || 0);
     }),
     countAdequateLeadsToday().catch(() => 0),
-    getSendsToday().catch(() => ({ total: 0, perSender: {} as Record<string, number> })),
+    readCritical(getSendsToday, { total: 0, perSender: {} as Record<string, number> }),
     listRecentScrapeTargets(5).catch(() => []),
     pickNextScrapeTarget().catch(() => null),
     countActiveScrapeTargets().catch(() => 0),
@@ -596,26 +600,38 @@ export default async function DashboardPage() {
       replied: Array(7).fill(0),
     })),
     getCrmStats().catch(() => EMPTY_CRM_STATS),
-    getFollowUpItems().catch(() => emptyFollowUps),
+    readCritical(getFollowUpItems, emptyFollowUps),
     // Direct mailbox-table check — independent of listAutomationOverview()
     // so a broken helper doesn't make the banner falsely show "not connected".
-    getDatabase()
+    readCritical(() => getDatabase()
       .prepare(`SELECT LOWER("gmailAddress") AS gmailAddress, "status", "gmailConnectionId", "dailyLimit" FROM "OutreachMailbox"`)
       .all<{ gmailAddress: string; status: string | null; gmailConnectionId: string | null; dailyLimit: number | string | null }>()
-      .then((r) => r.results ?? [])
-      .catch(() => [] as Array<{ gmailAddress: string; status: string | null; gmailConnectionId: string | null; dailyLimit: number | string | null }>),
+      .then((r) => r.results ?? []),
+      [] as Array<{ gmailAddress: string; status: string | null; gmailConnectionId: string | null; dailyLimit: number | string | null }>),
     getDatabase()
       .prepare(`SELECT COUNT(*) AS c FROM "OutreachEmail" WHERE "status" = 'sent'`)
       .first<{ c: number | string }>()
       .then((r) => Number(r?.c ?? 0))
       .catch(() => 0),
-    getReplyInbox().catch(() => [] as ReplyInboxItem[]),
+    readCritical(getReplyInbox, [] as ReplyInboxItem[]),
     getConversionFunnel().catch(() => ({ total: 0, qualified: 0, contacted: 0, replied: 0, pipeline: 0, won: 0 })),
     getQualificationRoutes().catch(() => ({ emailReady: 0, directReady: 0, socialReady: 0, needsReview: 0, disqualified: 0 })),
-    getMessageVariantMetrics().catch(() => [] as MessageVariantMetric[]),
-    getAuditLog().catch(() => [] as AuditEntry[]),
+    readCritical(getMessageVariantMetrics, [] as MessageVariantMetric[]),
+    readCritical(getAuditLog, [] as AuditEntry[]),
     getScrapeTargetList().catch(() => [] as ScrapeTargetRow[]),
   ]);
+
+  const automation = automationRead.value;
+  const operatorConsole = operatorConsoleRead.value;
+  const sendsToday = sendsTodayRead.value;
+  const followUps = followUpsRead.value;
+  const connectedRows = connectedRowsRead.value;
+  const replyInbox = replyInboxRead.value;
+  const messageVariants = messageVariantsRead.value;
+  const auditLog = auditLogRead.value;
+  const criticalStatusUnavailable = [automationRead, operatorConsoleRead, sendsTodayRead, followUpsRead, connectedRowsRead, replyInboxRead]
+    .some((read) => read.unavailable);
+  const diagnosticsUnavailable = criticalStatusUnavailable || messageVariantsRead.unavailable || auditLogRead.unavailable;
 
   const activeScrape = scrapeJobs.find((j) => j.status === "running" || j.status === "claimed") ?? null;
   const replyRate = contactedCount > 0 ? (repliedCount / contactedCount) * 100 : 0;
@@ -641,8 +657,6 @@ export default async function DashboardPage() {
   const connectedSet = new Set(connectedRows.filter(isSendableMailbox).map((r) => (r.gmailAddress || "").toLowerCase()));
   const aidanConnected = connectedSet.has("aidan@getaxiom.ca");
   const rileyConnected = connectedSet.has("riley@getaxiom.ca");
-  const connectedMailboxCount = [aidanConnected, rileyConnected].filter(Boolean).length;
-  const mailboxGapCount = EXPECTED_MAILBOX_COUNT - connectedMailboxCount;
   const followUpAttentionCount = followUps.overdue.length + followUps.dueToday.length;
   const sendCapacityRemaining = Math.max(0, globalSendCap - sendsToday.total);
   const nextQueueEmails = operatorConsole?.nextEmails ?? [];
@@ -654,33 +668,26 @@ export default async function DashboardPage() {
         [nextQueueEmail.niche, nextQueueEmail.city].filter(Boolean).join(" / "),
       ].filter(Boolean).join(" · ")
     : "No email queued";
-  const operatingMode = automation.settings.emergencyPaused
-    ? "Emergency stop"
-    : automation.engine.mode === "ACTIVE"
-      ? "Autonomous"
-      : automation.engine.mode;
+  const operatingMode = criticalStatusUnavailable
+    ? "Status unavailable"
+    : automation.settings.emergencyPaused
+      ? "Emergency stop"
+      : automation.engine.mode === "ACTIVE"
+        ? "Autonomous"
+        : automation.engine.mode;
   const riskItems = [
     automation.settings.emergencyPaused ? "Emergency stop blocks all automation" : null,
-    mailboxGapCount > 0 ? `${mailboxGapCount} sender${mailboxGapCount === 1 ? "" : "s"} disconnected` : null,
+    "Mail route not verified",
     automation.engine.blockedCount > 0 ? `${automation.engine.blockedCount} blocked sequence${automation.engine.blockedCount === 1 ? "" : "s"}` : null,
     followUpAttentionCount > 0 ? `${followUpAttentionCount} client follow-up${followUpAttentionCount === 1 ? "" : "s"} due` : null,
   ].filter((item): item is string => Boolean(item));
   const runbookItems = [
-    mailboxGapCount > 0
-      ? {
-          label: "Connect Gmail senders",
-          detail: "Restore full outbound capacity before the next send window.",
-          href: "/settings" as Route,
-          icon: <PlugZap className="size-4" />,
-          tone: "amber" as ToneKey,
-        }
-      : {
-          label: "Mailboxes armed",
-          detail: `${connectedMailboxCount}/${EXPECTED_MAILBOX_COUNT} sender accounts available.`,
-          href: "/settings" as Route,
-          icon: <MailCheck className="size-4" />,
-          tone: "emerald" as ToneKey,
-        },
+    {
+      label: "Mail route not verified",
+      detail: "No paid inbox is assumed. Cloudflare forwarding and an owner reply route have not been proven.",
+      icon: <Mail className="size-4" />,
+      tone: "amber" as ToneKey,
+    },
     automation.engine.blockedCount > 0
       ? {
           label: "Clear blocked sequences",
@@ -724,17 +731,14 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto flex max-w-[1500px] flex-col gap-6">
       <header className="page-header-main border-b border-white/[0.08] pb-6">
-        <div className="page-header-icon" aria-hidden="true">
-          <Activity className="size-5" />
-        </div>
         <div className="min-w-0 flex-1">
           <span className="v2-eyebrow inline-flex items-center gap-2 text-[10px]">
             <span className="v2-dot text-emerald-400" />
-            Operating now
+            Axiom owner review
           </span>
-          <h1 className="page-header-title">Pipeline overview</h1>
+          <h1 className="page-header-title">Today</h1>
           <p className="mt-1 text-sm text-zinc-400">
-            The decisions, bottlenecks, and next actions that need an operator today.
+            A clear 30-minute review of what needs attention and what to do next.
           </p>
         </div>
         <div className="page-header-actions">
@@ -750,6 +754,136 @@ export default async function DashboardPage() {
         </div>
       </header>
 
+      {criticalStatusUnavailable ? (
+        <div
+          className="flex flex-wrap items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-400/[0.08] px-4 py-3 text-sm"
+          role="alert"
+          aria-live="polite"
+        >
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-300" aria-hidden="true" />
+          <div>
+            <p className="font-semibold text-amber-100">Some status could not be verified</p>
+            <p className="mt-1 text-amber-100/75">
+              Email, reply, or follow-up information may be incomplete. Do not start new external work until it is checked. This warning does not pause the live system.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {!automationRead.unavailable && automation.settings.emergencyPaused ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-rose-300/25 bg-rose-500/[0.08] px-5 py-4 text-sm" role="alert" aria-live="polite">
+          <ShieldAlert className="size-5 shrink-0 text-rose-300" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-rose-100">Emergency stop is on</p>
+            <p className="mt-1 text-rose-100/75">The system reports that new intake, queueing and sending are blocked.</p>
+          </div>
+          <Link href="/settings" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-rose-200/30 bg-rose-200/10 px-4 text-sm font-semibold text-rose-100 hover:bg-rose-200/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-200">
+            Review stop settings <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
+        </div>
+      ) : null}
+
+      <section aria-label="Weekly owner review" className="rounded-[28px] bg-[#f6f8f3] p-4 text-[#263a2f] shadow-xl shadow-black/10 sm:p-6 lg:p-8">
+        <div className="mx-auto max-w-[1160px]">
+          <header className="mb-6 flex flex-col gap-4 border-b border-[#dfe7dd] pb-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#537262]">Your weekly review</p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#24382d] sm:text-3xl">A steady week starts with the right next step.</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#586d60]">Check that the system is safe, review the best business evidence, handle owner actions, then record what you learned.</p>
+            </div>
+            <span className="inline-flex min-h-9 w-fit items-center rounded-full bg-white px-3.5 text-sm font-semibold text-[#3e5b4a] ring-1 ring-inset ring-[#dce5da]">About 30 minutes</span>
+          </header>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <section aria-labelledby="today-safety" className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-inset ring-[#e4ebe2] sm:p-6">
+              <StepHeading number="01" title="Check safety and readiness" time="5 min" id="today-safety" />
+              <p className="mt-4 text-sm leading-6 text-[#5b7063]">Confirm what the system has actually checked before moving anything forward.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <StatusTile label="Emergency stop" value={automationRead.unavailable ? "Could not verify" : automation.settings.emergencyPaused ? "On" : "Not active at last check"} tone={automationRead.unavailable || automation.settings.emergencyPaused ? "warning" : "neutral"} />
+                <StatusTile label="Email route" value="Not verified" tone="warning" detail="No paid inbox is assumed. Forwarding and the owner reply route have not been proven." />
+              </div>
+              <p className="mt-3 text-xs leading-5 text-[#566a5d]">The email route has not been cleared for use. No provider readiness is assumed.</p>
+            </section>
+
+            <section aria-labelledby="today-shortlist" className="rounded-2xl bg-[#e5f1e7] p-5 shadow-sm ring-1 ring-inset ring-[#d3e6d7] sm:p-6">
+              <StepHeading number="02" title="Review the business shortlist" time="10 min" id="today-shortlist" />
+              <p className="mt-4 text-sm leading-6 text-[#4e6958]">Start with the evidence. A website capture alone does not mean a business is a good fit or ready to contact.</p>
+              <div className="mt-5 flex flex-col gap-4 rounded-xl bg-white/80 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#294333]">Business Review</p>
+                  <p className="mt-1 text-sm text-[#5b7063]">Review the current research status for each business.</p>
+                  <p className="mt-1 text-xs leading-5 text-[#566a5d]">The proposed ten are evaluation candidates, not an approved calling list.</p>
+                </div>
+                <Link href="/leads/m2" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#176443] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#125638] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">
+                  Open Business Review <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+              </div>
+            </section>
+
+            <section aria-labelledby="today-actions" className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-inset ring-[#e4ebe2] sm:p-6">
+              <StepHeading number="03" title="Take the next human actions" time="10 min" id="today-actions" />
+              <p className="mt-4 text-sm leading-6 text-[#5b7063]">Replies and client follow-ups stay with an owner. Review the item before changing its status.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-[#f6f8f5] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#53675a]">Recent replies to review</p>
+                  <p className="mt-2 text-2xl font-semibold text-[#294333]">{replyInboxRead.unavailable ? "—" : `${replyInbox.length}${replyInbox.length === 10 ? "+" : ""}`}</p>
+                  <p className="mt-1 text-xs text-[#566a5d]">{replyInboxRead.unavailable ? "Could not verify" : "Up to 10 without a recorded next sales step"}</p>
+                </div>
+                <div className="rounded-xl bg-[#f6f8f5] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#53675a]">Client actions due</p>
+                  <p className="mt-2 text-2xl font-semibold text-[#294333]">{followUpsRead.unavailable ? "—" : `${followUpAttentionCount}${followUps.overdue.length === 8 || followUps.dueToday.length === 8 ? "+" : ""}`}</p>
+                  <p className="mt-1 text-xs text-[#566a5d]">{followUpsRead.unavailable ? "Could not verify" : "Overdue or due today; up to 8 of each shown"}</p>
+                </div>
+              </div>
+              {replyInboxRead.unavailable || followUpsRead.unavailable ? (
+                <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 ring-1 ring-inset ring-amber-200">Some owner actions could not be checked. Confirm the live reply and follow-up state before starting new external work.</p>
+              ) : replyInbox.length > 0 || followUpAttentionCount > 0 ? (
+                <ul className="mt-4 divide-y divide-[#e4ebe2] rounded-xl border border-[#e4ebe2] bg-white" aria-label="Next owner actions">
+                  {replyInbox.slice(0, 3).map((item) => (
+                    <li key={`reply-${item.id}`}>
+                      <Link href={`/clients/${item.id}`} className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[#f6f8f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#176443]">
+                        <span className="min-w-0"><strong className="block truncate text-[#294333]">{item.businessName}</strong><span className="text-xs text-[#566a5d]">Reply recorded · {item.replyAgeLabel}</span></span><span className="shrink-0 font-semibold text-[#176443]">Review reply <ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>
+                      </Link>
+                    </li>
+                  ))}
+                  {[...followUps.overdue, ...followUps.dueToday].slice(0, Math.max(0, 3 - Math.min(3, replyInbox.length))).map((item) => (
+                    <li key={`follow-up-${item.id}`}>
+                      <Link href={`/clients/${item.id}`} className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[#f6f8f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#176443]">
+                        <span className="min-w-0"><strong className="block truncate text-[#294333]">{item.businessName}</strong><span className="text-xs text-[#566a5d]">{item.nextAction ?? "Client follow-up"}</span></span><span className="shrink-0 font-semibold text-[#176443]">Open action <ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-4 rounded-xl bg-[#f6f8f5] px-4 py-3 text-sm leading-6 text-[#5b7063]">No recorded replies or client actions are due in the current owner view.</p>
+              )}
+              <Link href="/clients" className="mt-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#176443] hover:text-[#104c32] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">Open client board <ArrowRight className="size-4" aria-hidden="true" /></Link>
+            </section>
+
+            <section aria-labelledby="today-learning" className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-inset ring-[#e4ebe2] sm:p-6">
+              <StepHeading number="04" title="Learn from what happened" time="5 min" id="today-learning" />
+              <p className="mt-4 text-sm leading-6 text-[#5b7063]">Keep the next decision grounded in real feedback. Record useful evidence, corrections, source gaps, and what happened after a reply.</p>
+              {messageVariantsRead.unavailable || auditLogRead.unavailable ? (
+                <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 ring-1 ring-inset ring-amber-200">Learning records could not be loaded, so no outcome summary is shown.</p>
+              ) : messageVariants.length > 0 ? (
+                <p className="mt-4 rounded-xl bg-[#f6f8f5] px-4 py-3 text-sm leading-6 text-[#4e6958]">The record contains {messageVariants.reduce((sum, item) => sum + Number(item.sent || 0), 0)} initial messages and {messageVariants.reduce((sum, item) => sum + Number(item.replied || 0), 0)} linked replies. Review conversations before drawing a conclusion.</p>
+              ) : (
+                <p className="mt-4 rounded-xl bg-[#f6f8f5] px-4 py-3 text-sm leading-6 text-[#4e6958]">No validated message-result comparisons are available yet.</p>
+              )}
+              <Link href="/clients" className="mt-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#176443] hover:text-[#104c32] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">Review recorded conversations <ArrowRight className="size-4" aria-hidden="true" /></Link>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <details className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025]">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-zinc-300 hover:bg-white/[0.035] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">
+          <span>Advanced system details</span>
+          <span className="text-xs font-normal text-zinc-500">Legacy metrics · not proof of email readiness</span>
+        </summary>
+        {diagnosticsUnavailable ? (
+          <p className="border-t border-white/10 px-5 py-4 text-sm leading-6 text-amber-100">Diagnostics are hidden because some critical status could not be verified. This screen does not pause the live system.</p>
+        ) : <div className="flex max-w-[1500px] flex-col gap-6 p-4 sm:p-6">
       <ControlRoomHero
         mode={operatingMode}
         hasRisk={riskItems.length > 0}
@@ -796,34 +930,13 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      {(!aidanConnected || !rileyConnected) ? (
-        <div
-          className="flex flex-wrap items-center gap-3 rounded-md border border-amber-400/25 bg-amber-400/[0.05] px-4 py-3 text-sm"
-          role="alert"
-          aria-live="polite"
-        >
-          <Activity className="size-4 text-amber-300" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <span className="font-medium text-amber-200">
-              {[!aidanConnected && "aidan@getaxiom.ca", !rileyConnected && "riley@getaxiom.ca"]
-                .filter(Boolean)
-                .join(" and ")}{" "}
-              not connected.
-            </span>
-            <span className="ml-2 text-amber-100/70">
-              Connect Gmail in Settings to restore outbound capacity (one-time OAuth).
-            </span>
-          </div>
-          <Link
-            href="/settings"
-            className="inline-flex items-center gap-1 rounded-md border border-amber-400/30 bg-amber-500/[0.08] px-2 py-1 text-[11px] font-semibold text-amber-200 transition hover:bg-amber-500/[0.16]"
-          >
-            Connect now
-            <ArrowRight className="size-3" aria-hidden="true" />
-          </Link>
+      <div className="flex items-start gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.05] px-4 py-3 text-sm" role="status">
+        <Mail className="mt-0.5 size-4 shrink-0 text-amber-300" aria-hidden="true" />
+        <div>
+          <p className="font-semibold text-amber-100">Mail route not verified</p>
+          <p className="mt-1 text-amber-100/75">No paid inbox is assumed. Cloudflare forwarding and an owner reply route have not been proven.</p>
         </div>
-      ) : null}
-
+      </div>
       <SendsTimeline
         upcoming={
           nextQueueEmails.map((s) => ({
@@ -1150,6 +1263,30 @@ export default async function DashboardPage() {
 
       {/* Follow-Ups panel */}
       <FollowUpsPanel data={followUps} />
+        </div>}
+      </details>
+    </div>
+  );
+}
+
+function StepHeading({ number, title, time, id }: { number: string; title: string; time: string; id: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#e8f0e7] text-xs font-bold tracking-wide text-[#315b43]" aria-hidden="true">{number}</span>
+      <div className="min-w-0 flex-1">
+        <h3 id={id} className="text-base font-semibold tracking-tight text-[#263a2f]">{title}</h3>
+        <p className="mt-0.5 text-xs font-medium text-[#5d7163]">{time}</p>
+      </div>
+    </div>
+  );
+}
+
+function StatusTile({ label, value, tone, detail }: { label: string; value: string; tone: "warning" | "neutral"; detail?: string }) {
+  return (
+    <div className={`rounded-xl p-4 ${tone === "warning" ? "bg-amber-50" : "bg-[#f6f8f5]"}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[#53675a]">{label}</p>
+      <p className={`mt-2 text-sm font-semibold ${tone === "warning" ? "text-amber-900" : "text-[#294333]"}`}>{value}</p>
+      {detail ? <p className="mt-1 text-xs leading-5 text-[#566a5d]">{detail}</p> : null}
     </div>
   );
 }
@@ -1344,7 +1481,7 @@ function ControlRoomHero({
   runbookItems: Array<{
     label: string;
     detail: string;
-    href: Route;
+    href?: Route;
     icon: ReactNode;
     tone: ToneKey;
   }>;
@@ -1440,11 +1577,11 @@ function ControlRoomHero({
           </div>
           <div className="mt-4 space-y-2">
             {runbookItems.map((item) => (
-              <Link
+              <div
                 key={item.label}
-                href={item.href}
-                className="group flex min-h-16 items-center gap-3 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3 transition hover:border-white/[0.14] hover:bg-white/[0.045]"
+                className="group relative flex min-h-16 items-center gap-3 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3 transition hover:border-white/[0.14] hover:bg-white/[0.045]"
               >
+                {item.href ? <Link href={item.href} aria-label={`${item.label}. ${item.detail}`} className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400" /> : null}
                 <span className={`grid size-9 shrink-0 place-items-center rounded-md border ${TONE[item.tone].border} ${TONE[item.tone].bg} ${TONE[item.tone].text}`}>
                   {item.icon}
                 </span>
@@ -1452,8 +1589,8 @@ function ControlRoomHero({
                   <span className="block text-sm font-semibold text-zinc-100">{item.label}</span>
                   <span className="mt-0.5 block text-xs leading-5 text-zinc-500">{item.detail}</span>
                 </span>
-                <ArrowRight className="size-4 shrink-0 text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-zinc-300" />
-              </Link>
+                {item.href ? <ArrowRight className="size-4 shrink-0 text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-zinc-300" aria-hidden="true" /> : null}
+              </div>
             ))}
           </div>
         </aside>
