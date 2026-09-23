@@ -1,6 +1,6 @@
 # Axiom Revenue Engine
 
-Axiom Web's private system for finding worthwhile local website opportunities, preserving evidence, preparing legitimate outreach, managing replies and next actions, and learning which work becomes customers and collected revenue.
+Axiom Web's internal system for finding worthwhile local website opportunities, preserving evidence, preparing legitimate outreach, managing replies and next actions, and learning which work becomes customers and collected revenue.
 
 ## Current state
 
@@ -76,6 +76,15 @@ existing approved local run can set `AXIOM_M2_LOCAL_REVIEW_ENABLED=1` and
 CLI is `npm run kw:assess-m2-html -- data/kw-evaluation/<run>.json --inspect`.
 Neither view approves assessments or publishes missing reports. See the
 [console runbook](docs/RUNBOOK.md#m2-local-owner-research-console) for setup and limits.
+
+When this local review is verified and the exact saved ten-business identity
+decisions are available, a collapsed **Optional observations** control appears
+after the business list. A named owner may record a concise, own-word,
+company-level fact from an exact public page URL, or explicitly mark the
+evidence insufficient. The note is stored only in ignored local evaluation
+data, can be reloaded, and stays `UNKNOWN / RESEARCH` with no contact or send
+authority. It is unavailable in the hosted app and does not count as a real M2
+website assessment. Riley is not required to perform this optional step.
 
 ## Read the plan
 
