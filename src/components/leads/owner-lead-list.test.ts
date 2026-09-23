@@ -137,8 +137,8 @@ function fixtureResponse(leads: OwnerLeadProjection[], options: { rejectedBusine
   };
 }
 
-test("owner lead list explains priority, separate scores, exact evidence, and a manual route", () => {
-  const html = renderToStaticMarkup(createElement(OwnerLeadList, { data: fixtureResponse([fixtureLead()]) }));
+test("owner lead list explains legacy scores, exact evidence, and a manual route", () => {
+  const html = renderToStaticMarkup(createElement(OwnerLeadList, { data: fixtureResponse([fixtureLead()]), canReviewBusinessResearch: true }));
 
   assert.match(html, /<h1[^>]*>Leads<\/h1>/);
   assert.match(html, /Ranked review queue/);
@@ -158,11 +158,13 @@ test("owner lead list explains priority, separate scores, exact evidence, and a 
   assert.match(html, /Open Quality Lab/);
   assert.match(html, /href="\/leads\/evaluation"/);
   assert.match(html, /Read-only · no outreach permission/);
+  assert.match(html, /Open Business Review/);
+  assert.match(html, /legacy scores for calibration/);
   assert.doesNotMatch(html, />Send</);
   assert.doesNotMatch(html, />Approve</);
 });
 
-test("owner lead list separates qualified review from leads that still need qualification", () => {
+test("owner lead list separates legacy preview rules from leads that still need qualification", () => {
   const needsQualification = fixtureLead({
     attention: "REVIEW",
     ownerActionable: false,
@@ -179,12 +181,12 @@ test("owner lead list separates qualified review from leads that still need qual
     data: fixtureResponse([fixtureLead(), needsQualification]),
   }));
 
-  assert.match(html, /Qualified for review/);
+  assert.match(html, /Meets legacy rules/);
   assert.match(html, /Needs qualification/);
   assert.match(html, /Qualification criteria remain unmet/);
   assert.match(html, /Rebuild Need Below 65/);
-  assert.equal(html.match(/page-metric-label">Qualified for review<\/span>[\s\S]*?page-metric-value[^>]*>(\d+)<\/span>/)?.[1], "1");
-  assert.equal(html.match(/page-metric-label">Needs qualification<\/span>[\s\S]*?page-metric-value[^>]*>(\d+)<\/span>/)?.[1], "1");
+  assert.match(html, /Meets preview rules<\/dt><dd[^>]*>1<\/dd>/);
+  assert.match(html, /Preview checks open<\/dt><dd[^>]*>1<\/dd>/);
 });
 
 test("owner lead list keeps refresh and block states explicit and surfaces rejected data", () => {
@@ -207,8 +209,9 @@ test("owner lead list keeps refresh and block states explicit and surfaces rejec
   assert.match(html, /Needs refresh/);
   assert.match(html, /Research contact route/);
   assert.match(html, /Website Audit Stale/);
-  assert.match(html, /2 current records were left out/);
-  assert.match(html, /do not act yet/);
+  assert.match(html, /1 business was left out because its evidence could not be safely verified/);
+  assert.match(html, /1 contact detail was ignored because it could not be safely verified/);
+  assert.match(html, /Check safety and status before relying on this preview/);
 });
 
 test("empty owner lead list refuses to promote legacy records", () => {
@@ -220,12 +223,18 @@ test("empty owner lead list refuses to promote legacy records", () => {
   assert.doesNotMatch(html, /Records.*active records/);
 });
 
-test("unavailable owner lead list fails closed with a plain-language recovery route", () => {
+test("unavailable owner lead list stays honest about the live stop state", () => {
   const html = renderToStaticMarkup(createElement(OwnerLeadsUnavailable));
 
-  assert.match(html, /Safety stopped/);
-  assert.match(html, /refused to guess/);
-  assert.match(html, /Check System status/);
+  assert.match(html, /Could not verify/);
+  assert.match(html, /no scores or business counts are shown/);
+  assert.match(html, /Check system status/);
   assert.match(html, /href="\/settings"/);
-  assert.match(html, /no outreach was started/i);
+  assert.match(html, /read failure does not stop live automation/i);
+});
+
+test("non-admin lead preview does not offer the admin-only Business Review route", () => {
+  const html = renderToStaticMarkup(createElement(OwnerLeadList, { data: fixtureResponse([fixtureLead()]) }));
+  assert.match(html, /Business Review access is limited to administrators/);
+  assert.doesNotMatch(html, /href="\/leads\/m2"/);
 });

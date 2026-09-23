@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Leads | Axiom Revenue Engine" };
 
 export default async function LeadsPage() {
-  await requireSession();
+  const session = await requireSession();
 
   let leads: OwnerLeadListResponse;
   try {
@@ -21,5 +21,5 @@ export default async function LeadsPage() {
     return <OwnerLeadsUnavailable />;
   }
 
-  return <OwnerLeadList data={leads} />;
+  return <OwnerLeadList data={leads} canReviewBusinessResearch={session.user.role === "admin"} />;
 }

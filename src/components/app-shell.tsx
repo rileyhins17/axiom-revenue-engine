@@ -74,7 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         Skip to main content
       </a>
       <AppSidebar />
-      <main id="main-content" tabIndex={-1} className="flex min-h-screen w-full flex-1 flex-col bg-background outline-none">
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen min-w-0 w-full flex-1 flex-col bg-background outline-none">
         <header className="v2-header sticky top-0 z-40">
           <div className="flex h-[68px] items-center gap-3 px-4 md:px-7">
             <SidebarTrigger className="v2-focus-ring rounded-md text-zinc-400 transition-colors hover:text-white" />
@@ -157,7 +157,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <HotkeyProvider>
-          <div data-owner-content className="flex-1 px-3 py-4 pb-28 sm:px-5 sm:py-6 md:px-8 md:py-8">{children}</div>
+          <div data-owner-content className="min-w-0 flex-1 px-3 py-4 pb-28 sm:px-5 sm:py-6 md:px-8 md:py-8">{children}</div>
         </HotkeyProvider>
 
         <MobileTabBar pathname={pathname} />

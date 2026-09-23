@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AlertTriangle, Power, RefreshCcw, ShieldAlert } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Power, RefreshCcw, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 type EmergencyState = {
-  emergencyPaused: boolean;
+  emergencyPaused: boolean | null;
   emergencyPausedAt: string | null;
   emergencyPausedBy: string | null;
   emergencyPauseReason: string | null;
@@ -23,28 +23,38 @@ export function EmergencyControlCard({ compact = false, initialState }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
+  useEffect(() => {
+    setState(initialState);
+  }, [initialState]);
+
   const pausedAt = useMemo(() => formatDate(state.emergencyPausedAt), [state.emergencyPausedAt]);
-  const paused = state.emergencyPaused;
+  const paused = state.emergencyPaused === true;
+  const unknown = state.emergencyPaused === null;
   const nextPaused = !paused;
-  const title = paused ? "Emergency stop engaged" : "Emergency kill switch armed";
-  const description = paused
-    ? "Automation intake, queueing, and sends are blocked until the stop is cleared."
-    : "Engage this to halt autonomous intake, queueing, and email sending across the app.";
-  const buttonLabel = paused ? "Clear stop" : "Engage stop";
+  const title = unknown ? "Stop status could not be verified" : paused ? "Emergency stop is engaged" : "Emergency stop is not engaged";
+  const description = unknown
+    ? "The stop setting could not be read. Use the one-way action below to try to engage it; do not assume the system is stopped."
+    : paused
+      ? "The saved setting says the stop is on. Clearing it may allow eligible automation to resume on a later run."
+      : "The saved setting says the stop is off. Engaging it requests a halt to autonomous intake, queueing, and sending. This does not verify provider status.";
+  const buttonLabel = paused ? "Clear stop and allow resumption" : "Engage emergency stop";
   const buttonTone = paused
-    ? "border-emerald-400/40 bg-emerald-400/[0.14] text-emerald-200 hover:bg-emerald-400/[0.22]"
-    : "border-red-400/40 bg-red-500/[0.18] text-red-200 hover:bg-red-500/[0.28]";
-  const shellTone = paused
-    ? "border-red-400/30 bg-red-500/[0.08]"
-    : "border-emerald-400/25 bg-emerald-500/[0.06]";
-  const topTone = paused ? "from-red-400/40 via-orange-400/20 to-transparent" : "from-emerald-400/30 via-cyan-400/20 to-transparent";
+    ? "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100"
+    : "border-rose-300 bg-rose-600 text-white hover:bg-rose-700";
+  const shellTone = unknown
+    ? "border-amber-200 bg-amber-50"
+    : paused
+      ? "border-rose-200 bg-rose-50"
+      : "border-[#e4ebe2] bg-[#f6f8f3]";
 
   async function submitToggle() {
     setError(null);
     const confirmed = window.confirm(
       paused
-        ? "Clear the emergency stop and resume automation?"
-        : "Engage the emergency stop and halt autonomous intake, queueing, and sending?",
+        ? "Clear the emergency stop? Eligible automation may resume on a later run. Continue only if you intend to allow that."
+        : unknown
+          ? "Try to engage the emergency stop? The setting could not be verified, and this request may fail if the system cannot save the stop. It will not resume automation."
+          : "Engage the emergency stop and request a halt to autonomous intake, queueing, and sending?",
     );
     if (!confirmed) {
       return;
@@ -65,6 +75,9 @@ export function EmergencyControlCard({ compact = false, initialState }: Props) {
       if (!response.ok) {
         throw new Error(payload.error || "Failed to update emergency stop");
       }
+      if (typeof payload.emergencyPaused !== "boolean") {
+        throw new Error("The system did not confirm the stop setting. Refresh and verify its state.");
+      }
 
       setState({
         emergencyPaused: Boolean(payload.emergencyPaused),
@@ -82,27 +95,23 @@ export function EmergencyControlCard({ compact = false, initialState }: Props) {
   }
 
   return (
-    <div className={`v2-card overflow-hidden ${shellTone}`}>
-      <div className={`h-1 bg-gradient-to-r ${topTone}`} />
+    <div className={`overflow-hidden rounded-2xl border ${shellTone}`}>
       <div className={compact ? "p-4" : "p-5"}>
         <div className={`flex ${compact ? "flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"}`}>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className={`v2-pill ${paused ? "border-red-400/30 bg-red-500/[0.12] text-red-200" : "v2-pill-accent"}`}>
-                <ShieldAlert className="size-3.5" />
-                {paused ? "Stopped" : "Armed"}
-              </span>
-              <span className="v2-pill">
-                <AlertTriangle className="size-3.5" />
-                Emergency control
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${unknown ? "bg-amber-100 text-amber-950" : paused ? "bg-rose-100 text-rose-900" : "bg-white text-[#536b5b] ring-1 ring-inset ring-[#dce5da]"}`}>
+                <ShieldAlert className="size-3.5" aria-hidden="true" />
+                {unknown ? "Could not verify" : paused ? "Stop is on" : "Stop is off"}
               </span>
             </div>
-            <h3 className="mt-3 text-base font-semibold text-white">{title}</h3>
-            <p className="mt-1 text-sm leading-6 text-zinc-400">{description}</p>
+            <h3 className="mt-3 text-base font-semibold text-[#294333]">{title}</h3>
+            <p className="mt-1 text-sm leading-6 text-[#586d60]">{description}</p>
             {paused ? (
-              <div className="mt-3 space-y-1 text-[11px] text-zinc-500">
+              <div className="mt-3 space-y-1 text-xs text-[#566a5d]">
                 <div>Paused at {pausedAt}</div>
-                <div className="font-mono text-zinc-400">{state.emergencyPausedBy || "system"}</div>
+                <div>{state.emergencyPausedBy || "Set by system"}</div>
+                {state.emergencyPauseReason ? <div>Reason: {state.emergencyPauseReason}</div> : null}
               </div>
             ) : null}
           </div>
@@ -112,18 +121,18 @@ export function EmergencyControlCard({ compact = false, initialState }: Props) {
               type="button"
               onClick={submitToggle}
               disabled={isPending}
-              className={`inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition ${buttonTone} disabled:cursor-not-allowed disabled:opacity-60`}
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] disabled:cursor-not-allowed disabled:opacity-60 ${buttonTone}`}
             >
-              <Power className="size-4" />
+              <Power className="size-4" aria-hidden="true" />
               {buttonLabel}
             </button>
             <button
               type="button"
               onClick={() => router.refresh()}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:border-white/[0.14] hover:bg-white/[0.06]"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#dce5da] bg-white px-4 py-2 text-sm font-semibold text-[#40594a] transition hover:bg-[#f6f8f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]"
             >
-              <RefreshCcw className="size-4" />
-              Refresh
+              <RefreshCcw className="size-4" aria-hidden="true" />
+              Check again
             </button>
           </div>
         </div>
@@ -131,23 +140,23 @@ export function EmergencyControlCard({ compact = false, initialState }: Props) {
         {!compact ? (
           <div className="mt-4 space-y-3">
             <label className="block">
-              <span className="mb-1.5 block text-[11px] uppercase tracking-[0.18em] text-zinc-500">Note for audit trail</span>
+              <span className="mb-1.5 block text-xs font-medium text-[#586d60]">Optional note for the record</span>
               <textarea
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
-                placeholder="Optional reason or incident note"
-                className="min-h-[96px] w-full resize-none rounded-xl border border-white/[0.08] bg-black/25 px-3 py-2.5 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-400/20"
+                placeholder="Why are you engaging or clearing the stop?"
+                className="min-h-[76px] w-full resize-y rounded-xl border border-[#dce5da] bg-white px-3 py-2.5 text-sm text-[#294333] outline-none transition placeholder:text-[#86948a] focus:border-[#176443] focus:ring-2 focus:ring-[#176443]/20"
               />
             </label>
-            <div className="text-[11px] text-zinc-500">
+            <div className="text-xs leading-5 text-[#566a5d]">
               {paused
-                ? "Clearing the stop will let the next cron tick resume naturally."
-                : "Engaging the stop does not delete data; it only halts autonomous execution."}
+                ? "Clearing the stop only changes this control. It does not verify providers, permissions, or readiness."
+                : "Engaging the stop does not delete records. It requests that autonomous work stop; verify the saved state after the request."}
             </div>
           </div>
         ) : null}
 
-        {error ? <div className="mt-3 text-sm text-red-300">{error}</div> : null}
+        {error ? <div className="mt-3 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-rose-900" role="alert">{error}</div> : null}
       </div>
     </div>
   );

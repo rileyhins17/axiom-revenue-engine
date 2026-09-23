@@ -855,6 +855,13 @@ async function assertReducedMotion(page: Page, label: string) {
 }
 
 async function assertKeyboardFlow(page: Page) {
+  // Start from a fresh document: the preceding disclosure click leaves the
+  // browser's sequential focus position inside the legacy panel.
+  await page.reload({ waitUntil: "domcontentloaded" });
+  // Next may still be streaming the loading skeleton after DOMContentLoaded.
+  // Wait for the actual owner page before focusing its disclosure.
+  await page.getByRole("link", { name: "Open Business Review" }).waitFor({ state: "visible" });
+  await page.waitForLoadState("networkidle");
   await page.locator("body").focus();
   await page.keyboard.press("Tab");
   const firstFocus = await page.evaluate(() => ({
@@ -867,6 +874,12 @@ async function assertKeyboardFlow(page: Page) {
   assert.equal(firstFocus.visible, true, "The skip link must become visible when focused.");
   await page.keyboard.press("Enter");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "main-content", "The skip link must move focus to the main landmark.");
+
+  const legacySummary = page.locator("summary:visible").filter({ hasText: "Advanced: legacy ranking, scores, and evidence" }).first();
+  await legacySummary.focus();
+  await page.keyboard.press("Enter");
+  assert.equal(await legacySummary.evaluate((element) => element.parentElement?.hasAttribute("open")), true,
+    "The legacy lead preview must open from the keyboard.");
 
   let foundDossierLink = false;
   for (let step = 0; step < 40; step += 1) {
@@ -885,6 +898,13 @@ async function assertKeyboardFlow(page: Page) {
     }
   }
   assert.equal(foundDossierLink, true, "The evidence dossier must be reachable within 40 Tab presses.");
+}
+
+async function openLegacyLeadPreview(page: Page) {
+  await page.waitForLoadState("networkidle");
+  const summary = page.locator("summary:visible").filter({ hasText: "Advanced: legacy ranking, scores, and evidence" }).first();
+  await summary.click();
+  await page.getByRole("list", { name: "Legacy scored businesses" }).waitFor();
 }
 
 async function assertMobileNavigationClear(page: Page) {
@@ -1118,7 +1138,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     warmupPage = await context.newPage();
     attachBrowserDiagnostics(warmupPage, () => stage, diagnostics, baseUrl);
     drainScriptDiagnostics.push(await attachBrowserScriptDiagnostics(context, warmupPage, () => stage, diagnostics, outputDirectory));
-    await warmOwnerAcceptanceRoutes(warmupPage, ["/leads/m2", "/dashboard"]);
+    await warmOwnerAcceptanceRoutes(warmupPage, ["/leads/m2", "/dashboard", "/automation", "/clients", "/settings"]);
     await warmupPage.close();
 
     stage = "owner-action authentication gate";
@@ -1213,6 +1233,9 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     const listStart = performance.now();
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
+    await page.getByRole("link", { name: "Open Business Review" }).waitFor();
+    await page.screenshot({ path: join(outputDirectory, "leads-desktop.png"), fullPage: true });
+    await openLegacyLeadPreview(page);
     await page.getByRole("link", { name: /Open evidence dossier/i }).first().waitFor();
     const desktopListReadyMs = Math.round(performance.now() - listStart);
     assert(desktopListReadyMs <= OWNER_LIST_BUDGET_MS, `The next owner lead was not discoverable within ${OWNER_LIST_BUDGET_MS} ms.`);
@@ -1227,7 +1250,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     const dossierStart = performance.now();
     await page.keyboard.press("Enter");
     await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
-    await page.getByRole("heading", { level: 2, name: "Why this is a strong lead" }).waitFor();
+    await page.getByRole("heading", { level: 2, name: "Why the old score flagged this business" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Website evidence" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Contact review not recorded" }).waitFor();
     await page.getByText("+15195550123", { exact: true }).waitFor();
@@ -1241,6 +1264,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await assertReadOnlyOwnerSurface(page, "desktop dossier", "[data-owner-readonly-dossier]");
     await assertResponsive(page, "desktop dossier");
     await assertReducedMotion(page, "desktop dossier");
+    await page.screenshot({ path: join(outputDirectory, "dossier-desktop.png"), fullPage: true });
 
     stage = "desktop owner-task creation";
     await page.getByRole("heading", { level: 2, name: "Owner tasks" }).waitFor();
@@ -1413,7 +1437,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
 
     stage = "ranked leads owner stop";
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
-    const rankedLeads = page.getByRole("list", { name: "Ranked leads" });
+    await openLegacyLeadPreview(page);
+    const rankedLeads = page.getByRole("list", { name: "Legacy scored businesses" });
     const stoppedLead = rankedLeads.locator("li").filter({ hasText: "Tri-City Roofing Fixture" });
     await stoppedLead.waitFor({ state: "visible" });
     assert(await stoppedLead.getByText("Blocked", { exact: true }).count() > 0,
@@ -1497,10 +1522,42 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await assertWcag(page, "desktop Today safety");
     await page.screenshot({ path: join(outputDirectory, "today-desktop.png"), fullPage: true });
 
+    stage = "desktop Outreach";
+    await page.goto("/automation", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 1, name: "Outreach" }).waitFor();
+    await page.getByRole("heading", { name: "Mail route not verified" }).waitFor();
+    await page.getByRole("link", { name: "Open Business Review" }).waitFor();
+    assert.equal(await page.getByRole("link", { name: /Connect Gmail/i }).count(), 0);
+    await assertResponsive(page, "desktop Outreach");
+    await assertWcag(page, "desktop Outreach");
+    await page.screenshot({ path: join(outputDirectory, "outreach-desktop.png"), fullPage: true });
+
+    stage = "desktop Revenue";
+    await page.goto("/clients", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 1, name: "Clients and opportunities" }).waitFor();
+    assert.equal(await page.getByText("Collected revenue", { exact: true }).count(), 0);
+    await page.getByText("No clients yet", { exact: true }).waitFor();
+    assert.equal(await page.getByRole("region", { name: /Deal stages/ }).count(), 0,
+      "An empty client board should not show a long row of empty stages.");
+    await assertResponsive(page, "desktop Revenue");
+    await assertWcag(page, "desktop Revenue");
+    await page.screenshot({ path: join(outputDirectory, "revenue-desktop.png"), fullPage: true });
+
+    stage = "desktop Settings";
+    await page.goto("/settings", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 1, name: "Settings and safety" }).waitFor();
+    await page.getByRole("heading", { name: "Mail route" }).waitFor();
+    assert.equal(await page.getByRole("link", { name: /Connect Gmail/i }).count(), 0);
+    await assertResponsive(page, "desktop Settings");
+    await assertWcag(page, "desktop Settings");
+    await page.screenshot({ path: join(outputDirectory, "settings-desktop.png"), fullPage: true });
+
     stage = "mobile leads";
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/leads", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Leads" }).waitFor();
+    await page.screenshot({ path: join(outputDirectory, "leads-mobile.png"), fullPage: true });
+    await openLegacyLeadPreview(page);
     await page.getByRole("link", { name: /Open evidence dossier/i }).first().waitFor();
     await waitForOwnerContent(page);
     await assertWcag(page, "mobile leads");
@@ -1522,6 +1579,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await assertResponsive(page, "mobile dossier");
     await assertReducedMotion(page, "mobile dossier");
     await assertMobileNavigationClear(page);
+    await page.screenshot({ path: join(outputDirectory, "dossier-mobile.png"), fullPage: true });
 
     stage = "mobile quality lab";
     await page.goto("/leads/evaluation", { waitUntil: "domcontentloaded" });
@@ -1558,6 +1616,32 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await assertWcag(page, "mobile Today safety");
     await page.screenshot({ path: join(outputDirectory, "today-mobile.png"), fullPage: true });
 
+    stage = "mobile Outreach";
+    await page.goto("/automation", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 1, name: "Outreach" }).waitFor();
+    await page.getByRole("heading", { name: "Mail route not verified" }).waitFor();
+    await assertResponsive(page, "mobile Outreach");
+    await assertWcag(page, "mobile Outreach");
+    await page.screenshot({ path: join(outputDirectory, "outreach-mobile.png"), fullPage: true });
+
+    stage = "mobile Revenue";
+    await page.goto("/clients", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 1, name: "Clients and opportunities" }).waitFor();
+    await page.getByText("No clients yet", { exact: true }).waitFor();
+    assert.equal(await page.getByText("No clients in this stage yet").count(), 0,
+      "An empty phone board should not repeat every stage before its empty state.");
+    await assertResponsive(page, "mobile Revenue");
+    await assertWcag(page, "mobile Revenue");
+    await page.screenshot({ path: join(outputDirectory, "revenue-mobile.png"), fullPage: true });
+
+    stage = "mobile Settings";
+    await page.goto("/settings", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 1, name: "Settings and safety" }).waitFor();
+    await page.getByRole("heading", { name: "System stop" }).waitFor();
+    await assertResponsive(page, "mobile Settings");
+    await assertWcag(page, "mobile Settings");
+    await page.screenshot({ path: join(outputDirectory, "settings-mobile.png"), fullPage: true });
+
     assert.deepEqual(externalRequests, [], "The owner acceptance browser attempted an external request.");
     await Promise.all(drainScriptDiagnostics.map((drain) => drain()));
     // CDP events attribute failures; caught/revoked exceptions are not new acceptance gates.
@@ -1581,7 +1665,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
       desktopM2ReadyMs,
       desktopWidth,
       mobileWidth,
-      pagesScanned: 11,
+      pagesScanned: 17,
       externalRequests: externalRequests.length,
     } satisfies AcceptanceResult;
   } catch (error) {
@@ -1629,7 +1713,14 @@ async function run() {
     await waitForServer(baseUrl, server);
     result = await runBrowserAcceptance(baseUrl, outputDirectory, m2Fixture);
     assert.deepEqual(readSetupFile(resolve(m2Fixture.databasePath)).identity, m2DatabaseIdentity, "Browser inspection must leave the M2 database unchanged.");
-    for (const name of ["m2-review-desktop.png", "m2-review-mobile.png", "m2-review-mobile-detail.png", "today-desktop.png", "today-mobile.png"]) {
+    for (const name of [
+      "m2-review-desktop.png", "m2-review-mobile.png", "m2-review-mobile-detail.png",
+      "today-desktop.png", "today-mobile.png",
+      "leads-desktop.png", "leads-mobile.png", "dossier-desktop.png", "dossier-mobile.png",
+      "outreach-desktop.png", "outreach-mobile.png",
+      "revenue-desktop.png", "revenue-mobile.png",
+      "settings-desktop.png", "settings-mobile.png",
+    ]) {
       await copyFile(join(outputDirectory, name), join(OUTPUT_ROOT, name));
     }
     success = true;

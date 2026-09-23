@@ -541,7 +541,8 @@ async function getScrapeTargetList(): Promise<ScrapeTargetRow[]> {
 }
 
 export default async function DashboardPage() {
-  await requireSession();
+  const session = await requireSession();
+  const canOpenBusinessReview = session.user.role === "admin";
 
   const prisma = getPrisma();
   const renderNowMs = new Date().getTime();
@@ -814,9 +815,13 @@ export default async function DashboardPage() {
                   <p className="mt-1 text-sm text-[#5b7063]">Review the current research status for each business.</p>
                   <p className="mt-1 text-xs leading-5 text-[#566a5d]">The proposed ten are evaluation candidates, not an approved calling list.</p>
                 </div>
-                <Link href="/leads/m2" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#176443] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#125638] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">
-                  Open Business Review <ArrowRight className="size-4" aria-hidden="true" />
-                </Link>
+                {canOpenBusinessReview ? (
+                  <Link href="/leads/m2" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#176443] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#125638] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">
+                    Open Business Review <ArrowRight className="size-4" aria-hidden="true" />
+                  </Link>
+                ) : (
+                  <p className="rounded-xl bg-[#f1f5ef] px-4 py-3 text-sm font-medium text-[#53675a]">An admin owner needs to open Business Review.</p>
+                )}
               </div>
             </section>
 

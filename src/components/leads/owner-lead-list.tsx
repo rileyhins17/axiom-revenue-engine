@@ -4,6 +4,7 @@ import {
   Ban,
   Building2,
   CheckCircle2,
+  ChevronDown,
   ExternalLink,
   FileSearch,
   Globe2,
@@ -21,7 +22,6 @@ import type { Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
 import { ownerLeadDetailPath } from "@/lib/revenue-engine/owner-lead-identity";
 import type { OwnerLeadProjection } from "@/lib/revenue-engine/owner-lead-projection";
 import type { OwnerLeadListResponse } from "@/lib/revenue-engine/owner-lead-read-model";
@@ -32,8 +32,8 @@ const ATTENTION_COPY: Record<
   { label: string; explanation: string; className: string; icon: LucideIcon }
 > = {
   READY_FOR_REVIEW: {
-    label: "Qualified for review",
-    explanation: "Current evidence supports an owner decision.",
+    label: "Meets legacy rules",
+    explanation: "The old score passed its preview rules. This does not approve contact.",
     className: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
     icon: CheckCircle2,
   },
@@ -51,13 +51,13 @@ const ATTENTION_COPY: Record<
   },
   NEEDS_REFRESH: {
     label: "Needs refresh",
-    explanation: "Some evidence is stale or incomplete, so this lead cannot be trusted yet.",
+    explanation: "Some evidence is stale or incomplete, so this preview needs checking.",
     className: "border-amber-400/25 bg-amber-400/10 text-amber-100",
     icon: RefreshCcw,
   },
   BLOCKED: {
     label: "Blocked",
-    explanation: "A safety, suppression, or business-fit rule prevents action.",
+    explanation: "A safety, suppression, or business-fit rule prevents contact action.",
     className: "border-rose-400/25 bg-rose-400/10 text-rose-100",
     icon: Ban,
   },
@@ -113,96 +113,128 @@ function qualificationStatusMessage(lead: OwnerLeadProjection) {
   return "Website qualification is incomplete. Research or refresh this business before making a decision.";
 }
 
-export function OwnerLeadList({ data }: { data: OwnerLeadListResponse }) {
-  const omittedCount = data.summary.rejectedBusinesses + data.summary.ignoredContactRows;
+export function OwnerLeadList({ data, canReviewBusinessResearch = false }: {
+  data: OwnerLeadListResponse;
+  canReviewBusinessResearch?: boolean;
+}) {
+  const rejectedBusinesses = data.summary.rejectedBusinesses;
+  const ignoredContactRows = data.summary.ignoredContactRows;
   const needsQualificationCount = data.leads.filter((lead) => lead.attention === "REVIEW" || lead.attention === "RESEARCH").length;
 
   return (
     <div className="mx-auto flex max-w-[1500px] flex-col gap-5">
-      <PageHeader
-        eyebrow="Evidence-first pipeline"
-        title="Leads"
-        description="The best businesses to review, why they matter, and the safest reachable route. Every score stays separate so you can correct the engine."
-        icon={Sparkles}
-        status={
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/20 bg-amber-300/[0.07] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-100">
-            <ShieldCheck className="size-3" aria-hidden="true" />
-            Read-only shadow view
-          </span>
-        }
-        actions={
-          <>
-          <Button asChild variant="outline" size="sm">
-            <Link href={"/leads/m2" as Route} prefetch={false}>Review business research <ArrowUpRight aria-hidden="true" /></Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/leads/evaluation">Open Quality Lab <ArrowUpRight aria-hidden="true" /></Link>
-          </Button>
-          </>
-        }
-        metrics={[
-          {
-            label: "Qualified for review",
-            value: data.summary.readyForReview,
-            detail: "owner decisions",
-            tone: "positive",
-          },
-          {
-            label: "Needs qualification",
-            value: needsQualificationCount,
-            detail: "do not treat as sales leads",
-            tone: "warning",
-          },
-          {
-            label: "Needs refresh",
-            value: data.summary.needsRefresh,
-            detail: "do not act yet",
-            tone: "warning",
-          },
-          {
-            label: "Blocked",
-            value: data.summary.blocked,
-            detail: "safety held",
-            tone: data.summary.blocked > 0 ? "warning" : "default",
-          },
-        ]}
-      />
-
-      <section
-        aria-labelledby="lead-review-queue"
-        className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0e1014]"
-      >
-        <div className="flex flex-col gap-3 border-b border-white/[0.07] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div>
-            <h2 id="lead-review-queue" className="text-sm font-semibold text-zinc-100">
-              Ranked review queue
-            </h2>
-            <p className="mt-1 text-xs leading-5 text-zinc-500">
-              Ranked from current audit evidence. No email, call, form, or social action can start here.
+      <header className="rounded-2xl border border-[#e1e9df] bg-[#f6f8f3] p-5 text-[#1a3124] shadow-sm sm:p-7">
+        <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#406849]">Axiom · Lead score preview</p>
+        <div className="mt-3 flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
+          <div className="max-w-2xl">
+            <h1 className="text-3xl font-semibold tracking-tight text-[#14291d] sm:text-4xl">Leads</h1>
+            <p className="mt-2 text-sm leading-6 text-[#5d6d62]">
+              This page contains legacy scores for calibration. Business Review is separate and shows saved research for each business.
+            </p>
+            <p className="mt-3 flex items-start gap-2 text-sm font-medium leading-5 text-[#425b4d]">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#406849]" aria-hidden="true" />
+              A score or suggested route does not confirm contact readiness or allow outreach.
             </p>
           </div>
-          <p className="shrink-0 font-mono text-[10px] text-zinc-600">
-            Verified view · {formattedGeneratedAt(data.generatedAt)}
-          </p>
+          {canReviewBusinessResearch ? (
+            <Button asChild size="lg" className="shrink-0">
+              <Link href={"/leads/m2" as Route} prefetch={false}>
+                Open Business Review <ArrowUpRight aria-hidden="true" />
+              </Link>
+            </Button>
+          ) : (
+            <p role="note" className="max-w-xs rounded-xl border border-[#dce4da] bg-white px-4 py-3 text-sm leading-5 text-[#53645b]">
+              Business Review access is limited to administrators. This score preview does not allow business review or contact.
+            </p>
+          )}
         </div>
+      </header>
 
-        {omittedCount > 0 ? (
-          <div role="status" className="flex gap-3 border-b border-amber-300/15 bg-amber-300/[0.045] px-4 py-3 text-xs text-amber-100/90 sm:px-5">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-300" aria-hidden="true" />
-            <p>
-              {omittedCount} current {omittedCount === 1 ? "record was" : "records were"} left out because the evidence or contact data could not be safely verified. Check System before relying on them.
-            </p>
-          </div>
-        ) : null}
+      <details className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0e1014]">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold text-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-300 sm:px-5">
+          <span className="min-w-0">Advanced: legacy ranking, scores, and evidence</span>
+          <span className="flex shrink-0 items-center gap-2 text-xs font-normal text-zinc-400">
+            <span className="hidden sm:inline">Read-only shadow view · calibration</span>
+            <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+          </span>
+        </summary>
+        <div className="border-t border-white/[0.07]">
+          <header className="border-b border-white/[0.07] px-4 py-5 sm:px-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Legacy score details</p>
+                <h2 className="mt-1 text-lg font-semibold text-zinc-100">Ranked business evidence</h2>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-zinc-400">
+                  These rankings do not include the separate Business Review decision and never grant permission to contact a business.
+                </p>
+              </div>
+              <Button asChild variant="outline" size="sm" className="shrink-0">
+                <Link href="/leads/evaluation">Open Quality Lab <ArrowUpRight aria-hidden="true" /></Link>
+              </Button>
+            </div>
+            <dl className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-4" aria-label="Legacy score preview counts">
+              <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
+                <dt className="text-[10px] font-semibold text-zinc-400">Meets preview rules</dt>
+                <dd className="mt-1 font-mono text-lg font-semibold tabular-nums text-emerald-300">{data.summary.readyForReview}</dd>
+                <dd className="text-[10px] text-zinc-500">Not contact approval</dd>
+              </div>
+              <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
+                <dt className="text-[10px] font-semibold text-zinc-400">Preview checks open</dt>
+                <dd className="mt-1 font-mono text-lg font-semibold tabular-nums text-amber-300">{needsQualificationCount}</dd>
+                <dd className="text-[10px] text-zinc-500">Not a sales qualification</dd>
+              </div>
+              <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
+                <dt className="text-[10px] font-semibold text-zinc-400">Needs refresh</dt>
+                <dd className="mt-1 font-mono text-lg font-semibold tabular-nums text-amber-300">{data.summary.needsRefresh}</dd>
+                <dd className="text-[10px] text-zinc-500">Evidence may be stale</dd>
+              </div>
+              <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
+                <dt className="text-[10px] font-semibold text-zinc-400">Blocked</dt>
+                <dd className="mt-1 font-mono text-lg font-semibold tabular-nums text-rose-300">{data.summary.blocked}</dd>
+                <dd className="text-[10px] text-zinc-500">Policy or fit check</dd>
+              </div>
+            </dl>
+          </header>
 
-        {data.leads.length === 0 ? <OwnerLeadEmptyState /> : (
-          <ol className="divide-y divide-white/[0.07]" aria-label="Ranked leads">
-            {data.leads.map((lead, index) => (
-              <OwnerLeadCard key={lead.projectionKey} lead={lead} rank={index + 1} />
-            ))}
-          </ol>
-        )}
-      </section>
+          <section
+            aria-labelledby="lead-review-queue"
+            className="overflow-hidden border-t border-white/[0.08]"
+          >
+            <div className="flex flex-col gap-3 border-b border-white/[0.07] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div>
+                <h2 id="lead-review-queue" className="text-sm font-semibold text-zinc-100">
+                  Ranked review queue · legacy
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-zinc-500">
+                  Ranked from current audit evidence. No email, call, form, or social action can start here.
+                </p>
+              </div>
+              <p className="shrink-0 font-mono text-[10px] text-zinc-600">
+                Verified view · {formattedGeneratedAt(data.generatedAt)}
+              </p>
+            </div>
+
+            {rejectedBusinesses > 0 || ignoredContactRows > 0 ? (
+              <div role="status" className="flex gap-3 border-b border-amber-300/15 bg-amber-300/[0.045] px-4 py-3 text-xs text-amber-100/90 sm:px-5">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-300" aria-hidden="true" />
+                <div className="space-y-1">
+                  {rejectedBusinesses > 0 ? <p>{rejectedBusinesses} {rejectedBusinesses === 1 ? "business was left out because its evidence could not be safely verified." : "businesses were left out because their evidence could not be safely verified."}</p> : null}
+                  {ignoredContactRows > 0 ? <p>{ignoredContactRows} {ignoredContactRows === 1 ? "contact detail was ignored because it could not be safely verified." : "contact details were ignored because they could not be safely verified."}</p> : null}
+                  <p>Check safety and status before relying on this preview.</p>
+                </div>
+              </div>
+            ) : null}
+
+            {data.leads.length === 0 ? <OwnerLeadEmptyState /> : (
+              <ol className="divide-y divide-white/[0.07]" aria-label="Legacy scored businesses">
+                {data.leads.map((lead, index) => (
+                  <OwnerLeadCard key={lead.projectionKey} lead={lead} rank={index + 1} />
+                ))}
+              </ol>
+            )}
+          </section>
+        </div>
+      </details>
     </div>
   );
 }
@@ -406,28 +438,16 @@ function OwnerLeadEmptyState() {
 export function OwnerLeadsUnavailable() {
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
-      <PageHeader
-        eyebrow="Evidence-first pipeline"
-        title="Leads"
-        description="The current lead view could not be safely verified. No unverified fallback data is shown."
-        icon={AlertTriangle}
-        status={
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-300/20 bg-rose-300/[0.07] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-100">
-            Safety stopped
-          </span>
-        }
-      />
-      <section role="alert" className="rounded-2xl border border-rose-300/15 bg-[#0e1014] px-5 py-10 text-center">
-        <AlertTriangle className="mx-auto size-7 text-rose-300" aria-hidden="true" />
-        <h2 className="mt-4 text-lg font-semibold text-white">The lead queue is temporarily unavailable</h2>
-        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-zinc-400">
-          The engine refused to guess when its current evidence could not be read. This page remains read-only and no outreach was started.
+      <section role="alert" className="rounded-[28px] bg-[#f6f8f3] px-5 py-10 text-center text-[#263a2f] shadow-sm sm:px-8">
+        <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-amber-100 text-amber-800"><AlertTriangle className="size-6" aria-hidden="true" /></span>
+        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-[#806224]">Could not verify</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#24382d]">Leads</h1>
+        <h2 className="mt-3 text-lg font-semibold text-[#294333]">Business research is temporarily unavailable</h2>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#566a5d]">
+          The latest records could not be read, so no scores or business counts are shown. This page did not start outreach; the read failure does not stop live automation.
         </p>
-        <Link
-          href="/settings"
-          className="v2-focus-ring mt-5 inline-flex min-h-10 items-center justify-center rounded-lg border border-white/[0.1] bg-white/[0.035] px-4 text-xs font-semibold text-zinc-200 hover:bg-white/[0.06] hover:text-white"
-        >
-          Check System status
+        <Link href="/settings" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#176443] px-5 text-sm font-semibold text-white hover:bg-[#125638] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">
+          Check system status
         </Link>
       </section>
     </div>

@@ -288,7 +288,8 @@ test("lead dossier renders an owner-first decision, evidence, routes, and factua
   const html = renderToStaticMarkup(createElement(OwnerLeadDetail, { data: fixtureDetail() }));
 
   assert.match(html, /<h1[^>]*>Tri-City Roofing<\/h1>/);
-  assert.match(html, /Why this is a strong lead/);
+  assert.match(html, /Why the old score flagged this business/);
+  assert.match(html, /This preview does not confirm business fit, contact readiness, or permission to reach out/);
   assert.match(html, /Business fit/);
   assert.match(html, /Rebuild need/);
   assert.match(html, /Evidence confidence/);
@@ -342,7 +343,7 @@ test("lead dossier explains that an unqualified review record needs qualificatio
   assert.match(html, /Needs qualification/);
   assert.match(html, /Qualification criteria remain unmet/);
   assert.match(html, /Rebuild Need Below 65/);
-  assert.doesNotMatch(html, /Why this is a strong lead/);
+  assert.doesNotMatch(html, /Why the old score flagged this business/);
 });
 
 test("lead dossier distinguishes a healthy site from stale or blocked qualification", () => {
@@ -359,7 +360,7 @@ test("lead dossier distinguishes a healthy site from stale or blocked qualificat
     const html = renderToStaticMarkup(createElement(OwnerLeadDetail, { data }));
 
     assert.match(html, expected);
-    assert.doesNotMatch(html, /Why this is a strong lead|Qualified for review/);
+    assert.doesNotMatch(html, /Why the old score flagged this business|Meets legacy rules/);
     if (attention !== "REVIEW") assert.doesNotMatch(html, /No demonstrated website opportunity/);
   }
 });
@@ -415,9 +416,9 @@ test("unavailable and not-found dossier states remain plain-language and fail cl
   const unavailable = renderToStaticMarkup(createElement(OwnerLeadDetailUnavailable));
   const missing = renderToStaticMarkup(createElement(OwnerLeadDetailNotFound));
 
-  assert.match(unavailable, /Safety stopped/);
-  assert.match(unavailable, /refused to assemble an uncertain dossier/);
-  assert.match(unavailable, /no outreach was started/i);
+  assert.match(unavailable, /Could not verify/);
+  assert.match(unavailable, /No fallback data is shown/);
+  assert.match(unavailable, /read failure does not stop live automation/i);
   assert.match(missing, /Lead dossier not found/);
   assert.match(missing, /Legacy or incomplete data is not promoted/);
   assert.match(missing, /Return to ranked leads/);

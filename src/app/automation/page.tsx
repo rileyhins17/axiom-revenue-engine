@@ -1,12 +1,16 @@
+import type { Metadata } from "next";
+
 import { AutomationConsole } from "@/components/automation/automation-console";
 import { getAutomationOperatorConsole } from "@/lib/automation-operator-view";
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Outreach | Axiom Revenue Engine" };
 
 export default async function AutomationPage() {
-  await requireSession();
-  const data = await getAutomationOperatorConsole();
+  const session = await requireSession();
+  const data = await getAutomationOperatorConsole().catch(() => null);
 
-  return <AutomationConsole data={data} />;
+  const isAdmin = session.user.role === "admin";
+  return <AutomationConsole data={data} canOpenBusinessReview={isAdmin} canControlEmergencyStop={isAdmin} />;
 }
