@@ -3,7 +3,10 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
+  M2_CODEX_DELEGATION_SCOPE,
+  PRIVATE_KW_M2_CODEX_DELEGATED_DECISIONS_VERSION,
   PRIVATE_KW_M2_OWNER_DECISIONS_VERSION,
+  PrivateKwM2CodexDelegatedOwnerDecisionsSchema,
   PrivateKwM2OwnerDecisionsSchema,
   buildPrivateKwM2OwnerDecisionSelection,
 } from "./private-kw-m2-owner-decisions";
@@ -176,6 +179,24 @@ function replaceBlockedSelections(fixture: ReturnType<typeof createFixture>, dec
   });
 }
 
+function codexDelegatedLedger(fixture: ReturnType<typeof createFixture>) {
+  const instructionQuote = "Riley delegates these ten M2 identity selection decisions to Codex.";
+  return {
+    decisionVersion: PRIVATE_KW_M2_CODEX_DELEGATED_DECISIONS_VERSION,
+    researchReviewSha256: fixture.decisions.researchReviewSha256,
+    sourcePlanDigest: fixture.decisions.sourcePlanDigest,
+    reviewer: "CODEX",
+    delegatedBy: "RILEY",
+    medium: "CODEX_CHAT",
+    instructionQuote,
+    instructionSha256: createHash("sha256").update(instructionQuote, "utf8").digest("hex"),
+    conversationRef: "01a0c1de-dd92-7d33-827b-8aadccd47412",
+    scope: M2_CODEX_DELEGATION_SCOPE,
+    reviewedAt: "2026-09-23T15:00:00.000Z",
+    decisions: replaceBlockedSelections(fixture),
+  };
+}
+
 test("builds a plan-only exact-ten selection from explicit confirmed owner decisions", () => {
   const fixture = createFixture(true);
   const selection = buildPrivateKwM2OwnerDecisionSelection({
@@ -191,6 +212,70 @@ test("builds a plan-only exact-ten selection from explicit confirmed owner decis
   assert.equal(selection.authority.providerOperationsAuthorized, 0);
   assert.equal(selection.authority.costAuthorizedUsd, 0);
   assert(selection.selections.every((entry) => entry.sourceReview.decision === "APPROVED_FOR_BOUNDED_SHADOW_SLICE"));
+});
+
+test("accepts a truthful delegated Codex ledger and carries provenance into the selection", () => {
+  const fixture = createFixture(true);
+  const ledger = codexDelegatedLedger(fixture);
+  assert.equal(PrivateKwM2CodexDelegatedOwnerDecisionsSchema.parse(ledger).reviewer, "CODEX");
+  const selection = buildPrivateKwM2OwnerDecisionSelection({
+    ...fixture,
+    decisions: ledger,
+    researchReviewBytes: Buffer.from(JSON.stringify(fixture.researchReview)),
+    createdAt: "2026-09-23T16:00:00.000Z",
+  });
+  assert.equal(selection.selections.length, 10);
+  const sourceReview = selection.selections[0]?.sourceReview;
+  assert(sourceReview && "reviewer" in sourceReview);
+  assert.equal(sourceReview.reviewer, "CODEX");
+  assert.equal(sourceReview.delegatedBy, "RILEY");
+  assert.equal(sourceReview.medium, "CODEX_CHAT");
+  assert.equal(sourceReview.researchReviewSha256, fixture.decisions.researchReviewSha256);
+  assert.equal(sourceReview.instructionSha256, ledger.instructionSha256);
+  assert.equal(sourceReview.conversationRef, ledger.conversationRef);
+  assert.equal(sourceReview.scope, "M2_IDENTITY_SELECTION_ONLY");
+  assert.equal(selection.authority.browserCaptureAuthorized, false);
+  assert.equal(selection.authority.providerOperationsAuthorized, 0);
+  assert.equal(selection.authority.costAuthorizedUsd, 0);
+});
+
+test("delegated ledger rejects quote-hash drift, spoofed roles, wrong scope, and malformed conversation references", () => {
+  const fixture = createFixture(true);
+  const valid = codexDelegatedLedger(fixture);
+  assert.equal(PrivateKwM2CodexDelegatedOwnerDecisionsSchema.safeParse(valid).success, true);
+  for (const changed of [
+    { instructionSha256: "0".repeat(64) },
+    { reviewer: "RILEY" },
+    { delegatedBy: "AIDAN" },
+    { medium: "OWNER_UI" },
+    { scope: "M2_AND_CAPTURE" },
+    { conversationRef: "not-a-thread-id" },
+    { sourcePlanDigest: undefined },
+    { instructionQuote: undefined },
+    { extraAuthority: true },
+    { decisions: valid.decisions.map((decision, index) => index === 9 ? { ...decision, reviewId: "M2-09" } : decision) },
+  ]) {
+    assert.equal(PrivateKwM2CodexDelegatedOwnerDecisionsSchema.safeParse({ ...valid, ...changed }).success, false);
+  }
+});
+
+test("delegated selection still binds exact review bytes and source-plan digest", () => {
+  const fixture = createFixture(true);
+  const decisions = codexDelegatedLedger(fixture);
+  const input = {
+    ...fixture,
+    decisions,
+    researchReviewBytes: Buffer.from(JSON.stringify(fixture.researchReview)),
+    createdAt: "2026-09-23T16:00:00.000Z",
+  };
+  assert.throws(() => buildPrivateKwM2OwnerDecisionSelection({
+    ...input,
+    decisions: { ...decisions, researchReviewSha256: "0".repeat(64) },
+  }), /research review digest/i);
+  assert.throws(() => buildPrivateKwM2OwnerDecisionSelection({
+    ...input,
+    decisions: { ...decisions, sourcePlanDigest: "0".repeat(64) },
+  }), /source plan digest/i);
 });
 
 test("allows identity decisions before a source-plan digest exists, then validates identities against the supplied plan", () => {

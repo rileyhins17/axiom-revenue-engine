@@ -518,21 +518,26 @@ decision, outreach, sending, deployment, remote database, or spend.
 The [bounded public research scope](reviews/2026-09-21-m2-public-research-scope.md)
 was approved and completed on 2026-09-22. It produced ten proposed businesses
 for M2 evaluation, not a calling list or ten approved assessments. Their exact
-identity, city, niche and independence dispositions still need Riley's or
-Aidan's review. Research notes cannot supply that owner decision. Prepare the
-source plan from actual research evidence and the exact-ten manifest after
-the recorded review.
+identity, city, niche and independence dispositions require individual review.
+Riley delegated those ten judgments to Codex on 2026-09-23. Record Codex as the
+reviewer with the exact delegation receipt under [ADR 0052](adr/0052-record-delegated-m2-identity-review-without-impersonating-owners.md);
+do not write Riley's or Aidan's name as the person who reviewed evidence they
+did not inspect. Prepare the source plan from actual research evidence and the
+exact-ten manifest after the recorded review.
 
-The private, source-linked candidate packet is
+The original private, source-linked candidate packet is
 `data/kw-evaluation/m2-public-research-2026-09-22-review.md`; the shorter
 `m2-owner-identity-decision-2026-09-23.md` in the same ignored directory is
 the owner decision sheet. The underlying review JSON has SHA-256
 `4bf0d8c942ee253dcc4dfe965390f53f351373506e8846f4596cbde0c8a9e70c`.
 Review every proposed identity, Kitchener/Waterloo/Cambridge assignment, niche
 and company-stated independence claim; record the reviewer, date, correction or
-keep/replace/hold decision for each ID. M2-06 and M2-10 denied access and may
-remain explicitly blocked research cases; keeping either does not make it
-capturable. Aidan's aggregate observation that many sites look decent has no
+keep/replace/hold decision for each ID. M2-06 has a documented capture access
+block even though later read-only research saw identity evidence; M2-10's
+Cambridge service area does not prove an actual Cambridge base. Neither belongs
+in the exact-ten capture selection without a supported replacement or a
+separately verified correction. Aidan's aggregate observation that many sites
+look decent has no
 per-business disposition or website-fit label. A "keep" is for evaluation,
 never permission to call or email. Do not turn the research JSON's `PENDING`
 fields into approval, or infer ten separate decisions from an earlier
@@ -563,6 +568,17 @@ the operator still reviews and supplies the exact saved file to the preparer as
 `--decisions`. The screen does not fetch candidate sites automatically;
 following a source link is a separate
 owner-controlled browser visit. It grants no capture or contact.
+
+For the delegated review, leave that owner-only UI and route unchanged. Write a
+new ignored `kw-m2-codex-delegated-decisions-v1` JSON file with `reviewer` set
+to `CODEX`, `delegatedBy` set to `RILEY`, `medium` set to `CODEX_CHAT`, the exact user instruction,
+its matching SHA-256, this task's real UUID conversation reference, scope
+`M2_IDENTITY_SELECTION_ONLY`, current review-file SHA-256, source-plan digest,
+review time and exactly ten decisions. The same private preparer command below
+validates both v1 owner and delegated v2 ledgers. It preserves the reviewer and
+delegation in the shadow manifest. The v2 ledger must not be uploaded through
+the owner UI or described as a founder's firsthand assessment. It grants no
+capture, contact, database, provider, deployment, send or spend authority.
 
 The owner identity ledger binds the exact research-review SHA-256, reviewer,
 review time, and one explicit choice for every M2-01 through M2-10. It may be
@@ -599,6 +615,16 @@ Cambridge landscaping identity met the exact-location and independence rules.
 The six-query cap is exhausted; no further page opens are authorized under
 that scope. See the proposal's result and private research record for counts
 and the documented stop-rule breach during integration verification.
+
+The separate [Cambridge follow-up](reviews/2026-09-23-m2-cambridge-followup-research-proposal.md)
+then found Jaro's Property Maintenance as one supported Cambridge landscaping
+identity. Its own page states a Cambridge address and family ownership; this
+does not assess website need or prove capture rights. The original packet and
+plan remain immutable; prepare a new versioned review and source plan for the
+two supported executable replacements: Service 1st for capture-blocked M2-06
+and Jaro's for M2-10. Both must be exact supported alternates in the new review
+and source plan. The selection remains a ten-case evaluation cohort, not a
+calling list.
 
 The authorization CLI requires an explicit review-policy JSON in addition to
 the source plan and reviewed manifest. Its seven input/output paths must be

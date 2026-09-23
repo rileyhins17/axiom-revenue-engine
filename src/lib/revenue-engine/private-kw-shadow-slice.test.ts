@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -112,6 +113,45 @@ test("defines one balanced, manually reviewed ten-business slice with no executi
   assert.equal(manifest.authority.sendAuthorized, false);
   assert.equal(manifest.authority.providerOperationsAuthorized, 0);
   assert.equal(manifest.authority.costAuthorizedUsd, 0);
+});
+
+test("manifest preserves Codex delegation provenance and rejects a changed quote", () => {
+  const source = preparePrivateKwImport(sourceInput());
+  const input = inputFixture(source);
+  const instructionQuote = "Riley delegates these ten M2 identity selection decisions to Codex.";
+  const codexSourceReview = {
+    decision: "APPROVED_FOR_BOUNDED_SHADOW_SLICE",
+    reviewer: "CODEX",
+    delegatedBy: "RILEY",
+    medium: "CODEX_CHAT",
+    researchReviewSha256: "a".repeat(64),
+    instructionQuote,
+    instructionSha256: createHash("sha256").update(instructionQuote, "utf8").digest("hex"),
+    conversationRef: "01a0c1de-dd92-7d33-827b-8aadccd47412",
+    scope: "M2_IDENTITY_SELECTION_ONLY",
+    reviewedAt: "2026-08-02T15:00:00.000Z",
+    rationale: "Synthetic identity, market, niche, and independence were checked.",
+    identityConfirmed: true,
+    marketAndNicheConfirmed: true,
+    independenceConfirmed: true,
+  } as const;
+  const delegatedInput = {
+    ...input,
+    selections: input.selections.map((selection) => ({ ...selection, sourceReview: codexSourceReview })),
+  };
+  const manifest = buildPrivateKwShadowSliceManifest(source, delegatedInput);
+  assert.equal("reviewer" in manifest.records[0]!.sourceReview, true);
+  assert.deepEqual(manifest.records[0]!.sourceReview, codexSourceReview);
+  assert.equal(manifest.records.every((record) => "reviewer" in record.sourceReview && record.sourceReview.reviewer === "CODEX"), true);
+
+  const tampered = {
+    ...delegatedInput,
+    selections: delegatedInput.selections.map((selection) => ({
+      ...selection,
+      sourceReview: { ...codexSourceReview, instructionQuote: `${instructionQuote} altered` },
+    })),
+  };
+  assert.throws(() => buildPrivateKwShadowSliceManifest(source, tampered), /delegation quote SHA-256/i);
 });
 
 test("manifest identity is deterministic and rejects later tampering", () => {

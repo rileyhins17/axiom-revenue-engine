@@ -1,6 +1,9 @@
 import { pathToFileURL } from "node:url";
 
-import { buildPrivateKwM2OwnerDecisionSelection } from "../src/lib/revenue-engine/private-kw-m2-owner-decisions";
+import {
+  PrivateKwM2CodexDelegatedOwnerDecisionsSchema,
+  buildPrivateKwM2OwnerDecisionSelection,
+} from "../src/lib/revenue-engine/private-kw-m2-owner-decisions";
 import {
   readPrivateKwJson,
   resolvePrivateKwDataPath,
@@ -53,11 +56,20 @@ export async function preparePrivateKwM2OwnerDecisionSelectionFile(args: string[
     decisions: decisionsRead.value,
     createdAt: now.toISOString(),
   });
+  const delegated = PrivateKwM2CodexDelegatedOwnerDecisionsSchema.safeParse(decisionsRead.value);
   const output = await writePrivateKwJson(files.output, selection);
   return {
     output,
     selectedBusinesses: selection.selections.length,
-    reviewedBy: (decisionsRead.value as { reviewedBy: string }).reviewedBy,
+    ...(delegated.success
+      ? {
+        reviewer: delegated.data.reviewer,
+        delegatedBy: delegated.data.delegatedBy,
+        medium: delegated.data.medium,
+        conversationRef: delegated.data.conversationRef,
+        scope: delegated.data.scope,
+      }
+      : { reviewedBy: (decisionsRead.value as { reviewedBy: string }).reviewedBy }),
     reviewedAt: (decisionsRead.value as { reviewedAt: string }).reviewedAt,
     planOnly: selection.authority.planOnly,
     providerOperationsAuthorized: selection.authority.providerOperationsAuthorized,
@@ -68,7 +80,12 @@ export async function preparePrivateKwM2OwnerDecisionSelectionFile(args: string[
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   preparePrivateKwM2OwnerDecisionSelectionFile(process.argv.slice(2))
     .then((result) => {
-      console.log(`Prepared ${result.selectedBusinesses} owner-confirmed M2 identities: ${result.output}`);
+      if ("reviewer" in result) {
+        console.log(`Prepared ${result.selectedBusinesses} M2 identities reviewed by ${result.reviewer} under delegation from ${result.delegatedBy}: ${result.output}`);
+        console.log(`Delegation source: ${result.medium} ${result.conversationRef}; scope: ${result.scope}.`);
+      } else {
+        console.log(`Prepared ${result.selectedBusinesses} owner-confirmed M2 identities: ${result.output}`);
+      }
       console.log("This selection grants no capture, artifact storage, database, provider, contact, qualification, outreach, deployment, send, or spend authority.");
     })
     .catch((error) => {

@@ -13,6 +13,8 @@ import { privateKwM2Digest } from "./private-kw-m2-authorization";
 import { z } from "zod";
 
 export const PRIVATE_KW_M2_OWNER_DECISIONS_VERSION = "kw-m2-owner-decisions-v1";
+export const PRIVATE_KW_M2_CODEX_DELEGATED_DECISIONS_VERSION = "kw-m2-codex-delegated-decisions-v1";
+export const M2_CODEX_DELEGATION_SCOPE = "M2_IDENTITY_SELECTION_ONLY";
 
 const CandidateReviewSchema = z.object({
   reviewId: z.string().regex(/^M2-(0[1-9]|10)$/),
@@ -85,21 +87,48 @@ const OwnerDecisionSchema = z.discriminatedUnion("action", [
   }).strict(),
 ]);
 
-export const PrivateKwM2OwnerDecisionsSchema = z.object({
-  decisionVersion: z.literal(PRIVATE_KW_M2_OWNER_DECISIONS_VERSION),
+const OwnerDecisionsBaseShape = {
   researchReviewSha256: z.string().regex(/^[a-f0-9]{64}$/),
   sourcePlanDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  reviewedBy: z.enum(["RILEY", "AIDAN"]),
   reviewedAt: z.string().datetime({ offset: true }),
   decisions: z.array(OwnerDecisionSchema).length(10),
-}).strict().superRefine((value, context) => {
+};
+
+function requireUniqueDecisionIds(value: { decisions: Array<{ reviewId: string }> }, context: z.RefinementCtx) {
   const ids = value.decisions.map((decision) => decision.reviewId);
   if (new Set(ids).size !== 10) {
     context.addIssue({ code: "custom", path: ["decisions"], message: "Owner decisions must contain exactly one decision for each proposed M2 identity." });
   }
+}
+
+export const PrivateKwM2OwnerDecisionsSchema = z.object({
+  decisionVersion: z.literal(PRIVATE_KW_M2_OWNER_DECISIONS_VERSION),
+  ...OwnerDecisionsBaseShape,
+  reviewedBy: z.enum(["RILEY", "AIDAN"]),
+}).strict().superRefine(requireUniqueDecisionIds);
+
+export const PrivateKwM2CodexDelegatedOwnerDecisionsSchema = z.object({
+  decisionVersion: z.literal(PRIVATE_KW_M2_CODEX_DELEGATED_DECISIONS_VERSION),
+  ...OwnerDecisionsBaseShape,
+  sourcePlanDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  reviewer: z.literal("CODEX"),
+  delegatedBy: z.literal("RILEY"),
+  medium: z.literal("CODEX_CHAT"),
+  instructionQuote: z.string().min(1).max(2_000),
+  instructionSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  conversationRef: z.string().uuid(),
+  scope: z.literal(M2_CODEX_DELEGATION_SCOPE),
+}).strict().superRefine((value, context) => {
+  requireUniqueDecisionIds(value, context);
+  const actualDigest = createHash("sha256").update(value.instructionQuote, "utf8").digest("hex");
+  if (value.instructionSha256 !== actualDigest) {
+    context.addIssue({ code: "custom", path: ["instructionSha256"], message: "Delegation quote SHA-256 does not match the exact instruction text." });
+  }
 });
 
 export type PrivateKwM2OwnerDecisions = z.infer<typeof PrivateKwM2OwnerDecisionsSchema>;
+export type PrivateKwM2CodexDelegatedOwnerDecisions = z.infer<typeof PrivateKwM2CodexDelegatedOwnerDecisionsSchema>;
+export type PrivateKwM2AnyOwnerDecisions = PrivateKwM2OwnerDecisions | PrivateKwM2CodexDelegatedOwnerDecisions;
 export type PrivateKwM2ResearchReview = z.infer<typeof PrivateKwM2ResearchReviewSchema>;
 
 export type PrivateKwM2OwnerDecisionSelectionInput = {
@@ -182,7 +211,12 @@ function findReplacementSourceRecord(
 export function buildPrivateKwM2OwnerDecisionSelection(input: PrivateKwM2OwnerDecisionSelectionInput) {
   const review = PrivateKwM2ResearchReviewSchema.parse(input.researchReview);
   const sourcePlan = PrivateKwImportPlanSchema.parse(input.sourcePlan);
-  const decisions = PrivateKwM2OwnerDecisionsSchema.parse(input.decisions);
+  const decisionVersion = input.decisions && typeof input.decisions === "object" && !Array.isArray(input.decisions)
+    ? (input.decisions as Record<string, unknown>).decisionVersion
+    : undefined;
+  const decisions = decisionVersion === PRIVATE_KW_M2_CODEX_DELEGATED_DECISIONS_VERSION
+    ? PrivateKwM2CodexDelegatedOwnerDecisionsSchema.parse(input.decisions)
+    : PrivateKwM2OwnerDecisionsSchema.parse(input.decisions);
   const researchReviewSha256 = createHash("sha256").update(input.researchReviewBytes).digest("hex");
   const sourcePlanDigest = buildPrivateKwPersistencePlan(sourcePlan).sourcePlanDigest;
   if (decisions.researchReviewSha256 !== researchReviewSha256) {
@@ -203,10 +237,7 @@ export function buildPrivateKwM2OwnerDecisionSelection(input: PrivateKwM2OwnerDe
 
   const decisionsById = new Map(decisions.decisions.map((decision) => [decision.reviewId, decision]));
   const reviewById = new Map(review.selected.map((candidate) => [candidate.reviewId, candidate]));
-  const selected = [] as Array<{ businessId: string; evaluationCandidateId: string; sourceReview: {
-    decision: "APPROVED_FOR_BOUNDED_SHADOW_SLICE"; reviewedBy: "RILEY" | "AIDAN"; reviewedAt: string;
-    rationale: string; identityConfirmed: true; marketAndNicheConfirmed: true; independenceConfirmed: true;
-  } }>;
+  const selected: Array<{ businessId: string; evaluationCandidateId: string; sourceReview: z.infer<typeof PrivateKwShadowSliceInputSchema>["selections"][number]["sourceReview"] }> = [];
 
   for (const reviewId of Array.from({ length: 10 }, (_, index) => `M2-${String(index + 1).padStart(2, "0")}`)) {
     const decision = decisionsById.get(reviewId)!;
@@ -226,18 +257,36 @@ export function buildPrivateKwM2OwnerDecisionSelection(input: PrivateKwM2OwnerDe
       ? findReplacementSourceRecord(decision.replacement, review, sourcePlan)
       : findSelectedSourceRecord(candidate, sourcePlan);
     const rationale = decision.action === "REPLACE" ? decision.replacement.rationale : decision.rationale;
-    selected.push({
-      businessId: sourceRecord.business.id,
-      evaluationCandidateId: sourceRecord.evaluationCandidateId,
-      sourceReview: {
-        decision: "APPROVED_FOR_BOUNDED_SHADOW_SLICE",
+    const sourceReview = "reviewer" in decisions
+      ? {
+        decision: "APPROVED_FOR_BOUNDED_SHADOW_SLICE" as const,
+        reviewer: "CODEX" as const,
+        delegatedBy: decisions.delegatedBy,
+        medium: decisions.medium,
+        researchReviewSha256: decisions.researchReviewSha256,
+        instructionQuote: decisions.instructionQuote,
+        instructionSha256: decisions.instructionSha256,
+        conversationRef: decisions.conversationRef,
+        scope: decisions.scope,
+        reviewedAt: decisions.reviewedAt,
+        rationale,
+        identityConfirmed: true as const,
+        marketAndNicheConfirmed: true as const,
+        independenceConfirmed: true as const,
+      }
+      : {
+        decision: "APPROVED_FOR_BOUNDED_SHADOW_SLICE" as const,
         reviewedBy: decisions.reviewedBy,
         reviewedAt: decisions.reviewedAt,
         rationale,
-        identityConfirmed: true,
-        marketAndNicheConfirmed: true,
-        independenceConfirmed: true,
-      },
+        identityConfirmed: true as const,
+        marketAndNicheConfirmed: true as const,
+        independenceConfirmed: true as const,
+      };
+    selected.push({
+      businessId: sourceRecord.business.id,
+      evaluationCandidateId: sourceRecord.evaluationCandidateId,
+      sourceReview,
     });
   }
   if (selected.length !== 10) {

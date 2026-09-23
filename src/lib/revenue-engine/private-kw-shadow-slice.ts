@@ -19,7 +19,7 @@ export const PRIVATE_KW_SHADOW_SOURCE_MAX_AGE_DAYS = 90;
 const TimestampSchema = z.string().datetime({ offset: true });
 const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 
-const OwnerSourceReviewSchema = z.object({
+const LegacyOwnerSourceReviewSchema = z.object({
   decision: z.literal("APPROVED_FOR_BOUNDED_SHADOW_SLICE"),
   reviewedBy: z.enum(["RILEY", "AIDAN"]),
   reviewedAt: TimestampSchema,
@@ -28,6 +28,30 @@ const OwnerSourceReviewSchema = z.object({
   marketAndNicheConfirmed: z.literal(true),
   independenceConfirmed: z.literal(true),
 }).strict();
+
+const CodexDelegatedSourceReviewSchema = z.object({
+  decision: z.literal("APPROVED_FOR_BOUNDED_SHADOW_SLICE"),
+  reviewer: z.literal("CODEX"),
+  delegatedBy: z.literal("RILEY"),
+  medium: z.literal("CODEX_CHAT"),
+  researchReviewSha256: Sha256Schema,
+  instructionQuote: z.string().min(1).max(2_000),
+  instructionSha256: Sha256Schema,
+  conversationRef: z.string().uuid(),
+  scope: z.literal("M2_IDENTITY_SELECTION_ONLY"),
+  reviewedAt: TimestampSchema,
+  rationale: z.string().trim().min(10).max(500),
+  identityConfirmed: z.literal(true),
+  marketAndNicheConfirmed: z.literal(true),
+  independenceConfirmed: z.literal(true),
+}).strict().superRefine((value, context) => {
+  const actualDigest = createHash("sha256").update(value.instructionQuote, "utf8").digest("hex");
+  if (value.instructionSha256 !== actualDigest) {
+    context.addIssue({ code: "custom", path: ["instructionSha256"], message: "Delegation quote SHA-256 does not match the exact instruction text." });
+  }
+});
+
+const OwnerSourceReviewSchema = z.union([LegacyOwnerSourceReviewSchema, CodexDelegatedSourceReviewSchema]);
 
 const ShadowSliceSelectionSchema = z.object({
   businessId: z.string().trim().min(1).max(128),
