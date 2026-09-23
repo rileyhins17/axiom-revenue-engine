@@ -1,4 +1,4 @@
-# ADR 0047: Record observed email stops before mail activation
+# ADR 0049: Record observed email stops before mail activation
 
 - Status: local implementation; production migration and mail activation gated
 - Date: 2026-09-23

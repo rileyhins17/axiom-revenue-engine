@@ -1,8 +1,9 @@
 # Proposed bounded M2 replacement research
 
-**Prepared:** 2026-09-23, America/Toronto. **Decision:** PENDING owner review.
-This proposal grants no research, capture, retention, account, deployment, or
-contact authority by itself.
+**Prepared:** 2026-09-23, America/Toronto. **Decision:** APPROVED for the exact
+read-only replacement search below by Riley on 2026-09-23 at 09:26 EDT, through
+an explicit "Yes" reply in the Codex task. The approval grants no capture,
+retention of page bodies, account, deployment, or contact authority.
 
 The approved September 21–22 public-research operation used all 12 queries and
 its 20-business candidate allowance. Its ten proposed identities still await
@@ -55,5 +56,27 @@ owner approval is required for one bounded real capture, followed by its own
 database/setup and assessment gates. No research result is permission to call,
 email, or deploy.
 
-**Approval record:** PENDING. Record the owner, time, and exact approved scope
-here before using a search or browser tool for new replacement businesses.
+**Approval record:** Riley approved the exact operation above on 2026-09-23 at
+09:26 EDT by replying "Yes" to the bounded-search question in the Codex task.
+The caps remain 6 search queries, 24 page opens, and 8 distinct businesses;
+this is C$0 identity research only.
+
+## Result and scope accounting
+
+The private identity-research record at
+`data/kw-evaluation/2026-09-23-m2-replacement-identity-research.md` is ignored
+by Git and exists in the working checkout. The search found two
+Waterloo heating-and-cooling identities supported by their own sites for
+owner review: Comfort Air Heating & Cooling and Delta Air Systems. It found no
+Cambridge landscaping identity meeting both the exact-location and
+company-stated-independence requirements. TriCity Landscapers' site described
+Cambridge as one of three service areas, not a proven business base; it was
+downgraded from the initial research note before any selection.
+
+The total was 6 searches, 14 page opens (including failed opens), 8 distinct
+businesses, and C$0. Three integration-owner verification opens occurred after
+the six-search cap had already been reached. That did not exceed the page-open
+cap, but it **did breach the stop-on-any-cap rule** in this proposal. No further
+research opens are authorized under this approval. The extra opens only
+checked existing candidates and caused the Cambridge downgrade; there was no
+capture, login, form submission, contact, provider spend, or outreach.

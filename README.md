@@ -96,9 +96,9 @@ operator diagnostics behind a disclosure. The private business decision flow
 and saved-research console are admin-only. Each page must distinguish
 available, blocked, stale, empty and unavailable states.
 
-Today leads with a short business-review action, then replies and follow-ups,
-with a separate compact safety and email-status panel. Legacy operator metrics sit
-behind Operator details.
+Today leads with a short business-review action. Replies and follow-ups appear
+when they need attention or their status cannot be read. Email readiness lives
+in Settings, while legacy operator metrics sit behind Operator details.
 The navigation does not use lead-score badges as if they counted approved
 business decisions. Today does not present Gmail OAuth as the path to the
 selected zero-paid-mailbox design. Missing critical status reads appear as
@@ -110,13 +110,12 @@ saved assessments as ready for a decision, needing another look, or stopped.
 Each row shows why it is there and opens its evidence. The old ranking
 and detailed scores sit in a closed advanced preview, while Business Review
 remains the admin owner's primary saved-research action. That saved-research
-view now shows a compact status summary and selected-business next step; page
-sources sit under a disclosure. A business detail leads with a concise brief:
-the website finding, strongest supported source, open questions, next step,
-and three sourced findings. Owner stop and task controls follow. Contact-review
-status stays visible; recorded
-routes, history, and the full audit are available under **Research details**
-when needed.
+view shows the selected business and a short summary of captured pages; page
+sources sit under a disclosure. A business detail leads with one supported
+website finding, its source, open questions when recorded, and the next owner
+action. Owner stop and task controls follow. Contact-review status stays
+visible; recorded routes, history, and the full audit are available under
+**Research details** when needed.
 A score or suggested contact route is not a contact decision. Follow-through
 starts with the same private business decision flow and manual next steps, and labels the mail route
 unverified; it does not surface legacy Gmail connection or send controls.
@@ -157,7 +156,8 @@ local stop with reason, observed time, and short summary; it must not contain
 the message body. A later contact row with the same normalized address at that
 business inherits the stop. This requires migration 0073 and has not been
 migrated or deployed. It does not implement a provider webhook, legacy/global
-suppression reconciliation, or an outbound send gate.
+suppression reconciliation, or an outbound send gate. See
+[ADR 0049](docs/adr/0049-record-exact-email-suppression-before-mail-activation.md).
 
 The M4 legacy-history report can compare old suppressions, contact attempts,
 bounces, and replies with v2 business identities from one private, standalone

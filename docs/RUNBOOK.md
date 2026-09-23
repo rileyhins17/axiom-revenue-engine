@@ -542,7 +542,14 @@ the preparer pass.
 
 The first public-research operation exhausted its candidate and search caps.
 [The bounded replacement-search proposal](reviews/2026-09-23-m2-replacement-research-proposal.md)
-is **pending owner approval**; it authorizes no new site opens by itself.
+was approved by Riley on 2026-09-23 for its exact read-only C$0 scope. Its
+separate query, page-open, and candidate caps do not authorize capture,
+retention of page bodies, or outreach. The search is complete: two Waterloo
+heating-and-cooling identities are supported for owner review, but no
+Cambridge landscaping identity met the exact-location and independence rules.
+The six-query cap is exhausted; no further page opens are authorized under
+that scope. See the proposal's result and private research record for counts
+and the documented stop-rule breach during integration verification.
 
 The authorization CLI requires an explicit review-policy JSON in addition to
 the source plan and reviewed manifest. Its seven input/output paths must be

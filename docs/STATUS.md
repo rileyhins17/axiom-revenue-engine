@@ -1,5 +1,79 @@
 # Current status — Axiom Revenue Engine
 
+## Lean owner workspace and local quality/contact slices; production goal remains open
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
+`531e72d` (following `43a9cf9` and browser-assertion correction `d76d015`).
+This is a local checkpoint, not an M2, M3, or M4 exit gate or a production
+release. M1's offline fixture flow is complete. M2 has **0/10 real engine
+assessments**. M3's pre-reveal
+first-pass Quality Lab workflow is implemented locally, but the 50-real-case
+evaluation and frozen policy gate are still open. M4 has manual owner stop and
+exact-email suppression slices, but migrations 0072 and 0073 are only
+committed, not applied in production; legacy history, the verified sender/reply
+route, and the complete send gate remain open. M5–M7 have not passed their gates.
+
+The owner workspace now keeps the first view focused on the next decision.
+Businesses uses a compact proposed-list action instead of a tall hero and
+duplicate ten-count. Today hides an empty replies card and omits a duplicate
+email-status panel; an unavailable reply/status read still surfaces as needing
+attention. Business Review keeps the selected business, captured-page summary,
+and source links
+without a row of repeated counters. A saved business detail shows one sourced
+website finding and one owner action; recorded routes and the full audit remain
+in closed Research details. Settings keeps the emergency stop prominent with
+one visible status and action; saved metadata and the optional note are in a
+closed disclosure. The five email-readiness checks and account metadata also
+start closed. These screens cannot contact a business or authorize sending.
+
+**Verification:** safety check, focused owner/identity tests (14/14), full
+suite (785 tests: 781 passed, zero failed, four Windows symlink skips),
+typecheck, lint, Cloudflare build, `git diff --check`, and Wrangler dry run
+passed on this application code. The dry run did not deploy. Synthetic owner
+browser acceptance passed when run alone after the full suite: 1440 px desktop
+and 390 px phone, 17 accessibility scans, zero external requests, owner-task
+retry/reload/completion and rejected anonymous/cross-site writes. Desktop
+Businesses, dossier, and M2 review loaded in 849 ms, 168 ms, and 4,343 ms
+within their configured budgets. The browser fixtures are synthetic, not real
+owner decisions or real prospect assessments.
+
+**Production, automation, and spend:** no deployment, migration, provider
+activation, live capture, prospect contact, send, or external outreach occurred.
+Production remains unverified. Autonomous intake, queue, follow-up, and send
+remain off. The C$50/month ceiling is unchanged; incremental provider spend
+is C$0. No paid mailbox or Google Workspace is assumed. No email is being
+sent from a v2 business inbox; the planned Cloudflare-forwarded inbound route
+and Resend outbound/reply path still need account and end-to-end proof.
+
+**Owner decisions and blockers:** Aidan challenged the commercial fit of the
+proposed leads; an aggregate comment is not ten individual decisions. Riley or
+Aidan must review and save each identity. Riley approved the separate
+[bounded C$0 replacement search](reviews/2026-09-23-m2-replacement-research-proposal.md)
+at 09:26 EDT. It found two Waterloo heating-and-cooling identities for owner
+review, but no Cambridge landscaping identity that met the exact-location and
+company-independence rules. Its search cap is exhausted; three later
+verification opens breached its stop-on-any-cap rule, were documented, and
+caused a weak Cambridge candidate to be rejected. No further opens are
+authorized under that scope. Research does not itself select the ten. Source
+rights and retention, one supervised real capture, the owner reply path,
+private legacy snapshot, backed-up migration, rollback, and
+release gates remain separate. Synthetic UI fixtures do not count as real
+assessments or owner decisions.
+
+Next three concrete actions:
+
+1. Have Riley or Aidan review the two Waterloo candidates and the original ten
+   individually. Resolve the Cambridge gap through the
+   [pending bounded follow-up](reviews/2026-09-23-m2-cambridge-followup-research-proposal.md)
+   if approved, or a reviewed partial-cohort design, before preparing an
+   exact-ten selection.
+2. Review source rights and retention for that exact selection; authorize and
+   inspect one supervised real M2 capture before completing ten traceable
+   assessments.
+3. Prove the zero-paid-mailbox owner reply path and reconcile private legacy
+   contact history before any M4 send gate; expand Quality Lab to real cases
+   only after M2 evidence is valid.
+
 ## Owner workspace clarity and mobile review polish; production goal remains open
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified code commit:** `0d5df0c`.
