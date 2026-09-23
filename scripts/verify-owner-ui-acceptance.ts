@@ -1097,14 +1097,14 @@ async function assertM2Review(page: Page, fixture: Awaited<ReturnType<typeof cre
   const derivedDetail = page.getByRole("region", { name: `${fixture.selected[4]!.businessName} website review` });
   await derivedDetail.waitFor();
   assert.equal(await page.getByRole("region", { name: /website review$/ }).count(), 1, `${label} must render only the selected dossier.`);
-  await derivedDetail.getByText("Pages checked and source links").click();
+  await derivedDetail.getByText("Pages and source links").click();
   const pageClues = derivedDetail.getByText(/Page clues: Page title/).first();
   await pageClues.waitFor();
   await pageClues.click();
   await derivedDetail.getByText(/Page title: found · Search description: not found/).first().waitFor();
   await derivedDetail.getByText(/Links to other pages:.*service.*about.*contact/).first().waitFor();
   await pageClues.click();
-  await derivedDetail.getByText("Not assessed", { exact: true }).waitFor();
+  await derivedDetail.getByText(/Website fit, mobile experience, and contact readiness are not assessed here/).waitFor();
   await derivedDetail.getByText("No outreach is authorized from this review. No message or call can be sent here.").waitFor();
   assert.equal(await derivedDetail.getByRole("link", { name: "Open business website" }).count(), 1);
   if (mobile) {
@@ -1292,8 +1292,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     const dossierStart = performance.now();
     await page.keyboard.press("Enter");
     await page.getByRole("heading", { level: 1, name: "Tri-City Roofing Fixture" }).waitFor();
-    await page.getByText("Owner next step", { exact: true }).waitFor();
-    await page.getByRole("heading", { level: 3, name: "Top website findings" }).waitFor();
+    await page.getByText("Next action", { exact: true }).waitFor();
+    await page.getByText(/Website finding/).first().waitFor();
     await page.getByRole("heading", { level: 2, name: "Do not contact" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Owner tasks" }).waitFor();
     const researchDetails = page.locator("details").filter({ has: page.getByText("Research details", { exact: true }) }).first();
@@ -1302,8 +1302,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await researchDetails.locator(":scope > summary").click();
     await page.getByRole("heading", { level: 2, name: "Why the old score flagged this business" }).waitFor();
     await page.getByRole("heading", { level: 2, name: "Contact review not recorded" }).waitFor();
-    await page.locator("section[aria-labelledby='owner-next-step']").getByText("+15195550123", { exact: true }).waitFor();
     const recordedRoutes = page.locator("section[aria-labelledby='reachable-routes']");
+    await recordedRoutes.getByText("+15195550123", { exact: true }).waitFor();
     await recordedRoutes.getByText("https://roofing.axiomfixtures.ca/contact", { exact: true }).waitFor();
     await recordedRoutes.getByText("hello@roofing.axiomfixtures.ca", { exact: true }).waitFor();
     const desktopDossierReadyMs = Math.round(performance.now() - dossierStart);
@@ -1586,10 +1586,10 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await page.getByRole("heading", { level: 1, name: "Today" }).waitFor();
     const todayReview = page.getByRole("region", { name: "Today owner action desk" });
     await todayReview.getByRole("heading", { name: "Check the proposed business list" }).waitFor();
-    await todayReview.getByRole("heading", { name: "Replies and follow-ups" }).waitFor();
-    await todayReview.getByRole("heading", { name: "Safety and email status" }).waitFor();
-    await todayReview.getByText("Email route", { exact: true }).waitFor();
-    await todayReview.getByText("Not verified", { exact: true }).waitFor();
+    assert.equal(await todayReview.getByRole("heading", { name: "Replies and follow-ups" }).count(), 0,
+      "The empty Today view should not show a replies card when there is nothing to act on.");
+    assert.equal(await todayReview.getByRole("heading", { name: "Safety and email status" }).count(), 0,
+      "The Today view should not repeat email setup details from Settings.");
     const todayBusinessReview = todayReview.getByRole("link", { name: "Open business review" });
     await todayBusinessReview.waitFor();
     assert.equal(await todayBusinessReview.getAttribute("href"), "/leads/m2/identity");

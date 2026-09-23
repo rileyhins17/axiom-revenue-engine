@@ -284,15 +284,16 @@ function fixtureDetail(): OwnerLeadDetailResponse {
   };
 }
 
-test("lead dossier renders an owner-first decision, evidence, routes, and factual history", () => {
+test("lead dossier opens with one evidence finding and one owner action, with routes and history in research", () => {
   const html = renderToStaticMarkup(createElement(OwnerLeadDetail, { data: fixtureDetail() }));
 
   assert.match(html, /<h1[^>]*>Tri-City Roofing<\/h1>/);
-  assert.match(html, /Owner next step/);
+  assert.match(html, /Next action/);
   assert.match(html, /Review the recommended route manually/);
-  assert.match(html, /Suggested route · read-only/);
-  assert.match(html, /Top website findings/);
-  assert.match(html, /3 of 3/);
+  assert.match(html, /Website finding · Critical/);
+  assert.match(html, /Next action/);
+  assert.match(html, /Open questions:/);
+  assert.doesNotMatch(html.slice(0, html.indexOf("Research details")), /Top website findings|2 of 3|3 of 3/);
   assert.match(html, /href="https:\/\/roofing\.example\/evidence\/mobile"/);
   assert.match(html, /Full website audit and evidence details/);
   const routePosition = html.indexOf("Every recorded route");
@@ -303,7 +304,6 @@ test("lead dossier renders an owner-first decision, evidence, routes, and factua
   const auditDisclosure = html.slice(html.lastIndexOf("<details"), html.indexOf("Full website audit and evidence details"));
   assert.doesNotMatch(auditDisclosure, /\bopen(?:="")?(?:\s|>)/);
   assert.match(html, /Why the old score flagged this business/);
-  assert.match(html, /This preview does not confirm business fit, contact readiness, or permission to reach out/);
   assert.match(html, /Business fit/);
   assert.match(html, /Rebuild need/);
   assert.match(html, /Evidence confidence/);
@@ -340,7 +340,7 @@ test("lead dossier puts owner controls ahead of technical research and keeps res
   }));
 
   const actionPosition = html.indexOf("Owner action controls");
-  const nextStepPosition = html.indexOf("Owner next step");
+  const nextStepPosition = html.indexOf("Next action");
   const researchPosition = html.indexOf("Research details");
   assert.ok(actionPosition > nextStepPosition && actionPosition < researchPosition);
   assert.ok(researchPosition > -1);
@@ -379,7 +379,7 @@ test("lead dossier explains that an unqualified review record needs qualificatio
   assert.doesNotMatch(html, /Suggested route · read-only/);
 });
 
-test("lead dossier keeps only the top three findings in the summary and retains the full audit in a closed disclosure", () => {
+test("lead dossier shows one supported finding in the summary and retains the full audit in a closed disclosure", () => {
   const detail = fixtureDetail();
   detail.website.findings.push({
     ...detail.website.findings[2],
@@ -391,7 +391,7 @@ test("lead dossier keeps only the top three findings in the summary and retains 
   const summary = html.slice(0, disclosurePosition);
   const disclosure = html.slice(disclosurePosition);
 
-  assert.match(summary, /3 of 4/);
+  assert.match(summary, /The mobile navigation is not usable/);
   assert.doesNotMatch(summary, /Other/);
   assert.match(disclosure, /Other/);
   assert.match(disclosure, /<\/details>/);
@@ -435,8 +435,8 @@ test("lead dossier labels an absent owner contact review instead of implying app
   const html = renderToStaticMarkup(createElement(OwnerLeadDetail, { data: detail }));
 
   assert.match(html, /Contact review not recorded/);
-  assert.match(html, /cannot claim Riley or Aidan reviewed this exact contact packet/);
-  assert.match(html, /Consent is unassessed/);
+  assert.match(html, /neither owner has recorded a review of this exact set/);
+  assert.match(html, /Permission to contact has not been assessed/);
   assert.doesNotMatch(html, /Matches current assessment/);
 });
 

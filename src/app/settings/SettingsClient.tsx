@@ -79,53 +79,35 @@ export function SettingsClient({
 
       <section aria-labelledby="readiness-heading" className="rounded-2xl border border-[#e0e4db] bg-white p-5 shadow-sm sm:p-6">
         <div className="flex items-start gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#fff5dc] text-[#815a14]"><Mail className="size-5" aria-hidden="true" /></span>
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#fff5dc] text-[#815a14]"><Mail className="size-5" aria-hidden="true" /></span>
           <div>
             <h2 id="readiness-heading" className="text-lg font-semibold text-[#1e3027]">Business email readiness</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-[#53655a]">Email is not ready for use from this workspace. These checks are separate; completing one does not complete the others.</p>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-[#53655a]">Not ready for use. Five checks remain: incoming mail, replies, sender setup, contact eligibility, and approval of each message.</p>
           </div>
         </div>
 
-        <ol className="mt-5 divide-y divide-[#e8ebe3] border-t border-[#e8ebe3]">
-          <ReadinessStep number="1" title="Incoming mail reaches the right owner" state="Not verified" detail="The forwarding destination and actual delivery have not been proven here." />
-          <ReadinessStep number="2" title="A reply can be sent from the business address" state="Not verified" detail="A working reply path and who owns replies still need an end-to-end check." />
-          <ReadinessStep number="3" title="The sender identity and domain are approved" state="Not verified" detail="Provider access and sender-domain verification are separate from inbox forwarding." />
-          <ReadinessStep number="4" title="Each contact is eligible for the specific message" state="Required per contact" detail="Address verification alone does not establish permission to contact someone." />
-          <ReadinessStep number="5" title="The exact message has owner approval" state="Required before sending" detail="No account connection or readiness check on this page authorizes a send." />
-        </ol>
-        <p className="mt-4 rounded-xl bg-[#f6f8f3] px-4 py-3 text-xs leading-5 text-[#596b5f]">The planned setup avoids paid mailbox seats. This page does not connect a provider, buy a service, or turn on sending.</p>
+        <details className="mt-4 rounded-xl border border-[#e5e9e1] bg-[#fafbf8] px-4 py-3">
+          <summary className="cursor-pointer text-sm font-semibold text-[#315b40]">See the five checks</summary>
+          <ul className="mt-3 space-y-2 pl-5 text-sm leading-5 text-[#53655a]">
+            <li className="list-disc">Incoming mail must be shown to reach the right owner.</li>
+            <li className="list-disc">A working reply path and reply owner must be confirmed.</li>
+            <li className="list-disc">Provider access and sender-domain approval must be confirmed separately from forwarding.</li>
+            <li className="list-disc">Each contact must be eligible for the specific message; a verified address alone is not permission.</li>
+            <li className="list-disc">An owner must approve the exact message before sending.</li>
+          </ul>
+          <p className="mt-3 border-t border-[#e5e9e1] pt-3 text-xs leading-5 text-[#596b5f]">These checks are separate. This page does not connect a provider, buy a service, or turn on sending. The planned setup does not require paid Google Workspace mailboxes.</p>
+        </details>
       </section>
 
-      <section aria-labelledby="account-heading" className="rounded-2xl border border-[#e0e4db] bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex items-start gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#eaf1e9] text-[#285d3d]"><UserRound className="size-5" aria-hidden="true" /></span>
-          <div>
-            <h2 id="account-heading" className="text-lg font-semibold text-[#1e3027]">Your account</h2>
-            <p className="mt-1 text-sm text-[#53655a]">Signed in to the owner workspace.</p>
-          </div>
-        </div>
-        <dl className="mt-5 divide-y divide-[#e8ebe3] border-t border-[#e8ebe3]">
+      <details className="rounded-2xl border border-[#e0e4db] bg-white px-5 py-4 shadow-sm sm:px-6">
+        <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[#53655a]"><UserRound className="size-4" aria-hidden="true" />Account details</summary>
+        <dl aria-label="Your account" className="mt-3 divide-y divide-[#e8ebe3] border-t border-[#e8ebe3]">
           <AccountRow label="Name" value={userProfile.name || "Name not set"} />
           <AccountRow label="Email" value={userProfile.email} />
           <AccountRow label="Access" value={userProfile.role ?? "user"} capitalize />
         </dl>
-      </section>
+      </details>
     </div>
-  );
-}
-
-function ReadinessStep({ number, title, state, detail }: { number: string; title: string; state: string; detail: string }) {
-  return (
-    <li className="flex gap-3 py-4 sm:gap-4">
-      <span className="grid size-8 shrink-0 place-items-center rounded-full border border-[#dce3d9] bg-[#fafbf8] text-sm font-semibold text-[#416b55]">{number}</span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <h3 className="text-sm font-semibold text-[#24352e]">{title}</h3>
-          <span className="text-xs font-semibold text-[#79530d]">{state}</span>
-        </div>
-        <p className="mt-1 text-sm leading-5 text-[#65756a]">{detail}</p>
-      </div>
-    </li>
   );
 }
 

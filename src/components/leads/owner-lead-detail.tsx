@@ -124,13 +124,6 @@ function decisionStateCopy(lead: OwnerLeadDetailResponse["lead"]) {
   return { label: "Needs qualification", description: "Qualification criteria remain unmet; review the failed gates before treating this as a sales lead." };
 }
 
-function topWebsiteFindings(data: OwnerLeadDetailResponse) {
-  const severityOrder = { CRITICAL: 0, IMPORTANT: 1, MINOR: 2 } as const;
-  return [...data.website.findings]
-    .sort((left, right) => severityOrder[left.severity] - severityOrder[right.severity])
-    .slice(0, 3);
-}
-
 function strongestSupportedFinding(data: OwnerLeadDetailResponse) {
   const severityOrder = { CRITICAL: 0, IMPORTANT: 1, MINOR: 2 } as const;
   return [...data.website.findings]
@@ -151,15 +144,12 @@ function uncertaintySummary(data: OwnerLeadDetailResponse) {
   if (data.lead.dataQuality.state !== "CURRENT" || data.lead.dataQuality.issues.length > 0) {
     openQuestions.push(...data.lead.dataQuality.issues.map(readableCode));
   }
-  return openQuestions.length > 0
-    ? [...new Set(openQuestions)].join(" · ")
-    : "No additional gaps are recorded. Findings apply only to the pages and sources captured for this audit.";
+  return openQuestions.length > 0 ? [...new Set(openQuestions)].join(" · ") : null;
 }
 
 function OwnerNextStep({ data }: { data: OwnerLeadDetailResponse }) {
   const lead = data.lead;
   const stopped = data.operationalStopState === "STOPPED" || data.operationalStopState === "UNAVAILABLE";
-  const recommendedRoute = data.routes.find((route) => route.contactPointId === lead.route.contactPointId);
   const canReviewRoute = !stopped && lead.attention === "READY_FOR_REVIEW" && lead.ownerActionable;
   const action = stopped
     ? data.operationalStopState === "STOPPED" ? "Keep contact stopped" : "Pause contact review"
@@ -167,79 +157,33 @@ function OwnerNextStep({ data }: { data: OwnerLeadDetailResponse }) {
   const actionReason = stopped
     ? "The business stop is active or could not be checked. Recorded routes remain evidence only."
     : canReviewRoute ? lead.route.reason : decisionStateCopy(lead).description;
-  const findings = topWebsiteFindings(data);
   const strongestFinding = strongestSupportedFinding(data);
-  const supportedFindingCount = data.website.findings.filter((finding) => finding.claim).length;
   const uncertainty = uncertaintySummary(data);
 
   return (
     <section aria-labelledby="owner-next-step" className="overflow-hidden rounded-2xl border border-[#d5e5d2] bg-[#f4f8f2]">
-      <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start lg:p-6">
-        <div className="space-y-4">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#176443]">Decision brief · what was found</p>
-            <p className="mt-1 text-sm font-semibold text-[#24382d]">{readableCode(data.website.classification)} website · {supportedFindingCount} supported {supportedFindingCount === 1 ? "finding" : "findings"}</p>
-            <p className="mt-1 text-xs leading-5 text-[#53675a]">This summarizes captured website evidence; it does not establish overall business quality or permission to contact.</p>
-          </div>
-
-          <div className="rounded-xl border border-[#d5e5d2] bg-white p-3">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#566a5d]">Strongest supported evidence</p>
-            {strongestFinding?.claim ? (
-              <>
-                <p className="mt-1 text-xs font-semibold text-[#35493b]">{readableCode(strongestFinding.category)} · {SEVERITY_COPY[strongestFinding.severity].label}</p>
-                <p className="mt-1 text-[11px] leading-5 text-[#425b4d]">{strongestFinding.claim.observation}</p>
-                <a href={strongestFinding.claim.sourceUrl} target="_blank" rel="noreferrer" className="v2-focus-ring mt-1 inline-flex min-h-8 items-center gap-1 rounded-md text-[10px] font-semibold text-[#176443] hover:text-[#315740]">
-                  Inspect source · captured {formatDateTime(strongestFinding.claim.capturedAt)} <ExternalLink className="size-3" aria-hidden="true" />
-                </a>
-              </>
-            ) : <p className="mt-1 text-[11px] leading-5 text-[#76591f]">No supported website claim is available yet. Keep this business in research.</p>}
-          </div>
-
-          <div className="rounded-xl border border-[#eadfbd] bg-[#fff8e8] p-3">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#76591f]">What remains uncertain</p>
-            <p className="mt-1 text-[11px] leading-5 text-[#76591f]">{uncertainty}</p>
-          </div>
-
-          <div className="rounded-xl border border-[#d5e5d2] bg-white p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#176443]">Owner next step</p>
-            <h2 id="owner-next-step" className="mt-1 text-base font-semibold text-[#1a3124]">{action}</h2>
-            <p className="mt-1 text-xs leading-5 text-[#53675a]">{actionReason}</p>
-            {canReviewRoute && recommendedRoute ? (
-              <div className="mt-3 border-t border-[#e4ebe2] pt-3">
-                <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#566a5d]">Suggested route · read-only</p>
-                <p className="mt-1 text-sm font-semibold text-[#24382d]">{recommendedRoute.value}</p>
-                <p className="mt-1 text-[11px] leading-5 text-[#617367]">{readableCode(recommendedRoute.channel)} · {ROUTE_READINESS_COPY[recommendedRoute.readiness].label}</p>
-                <a href={recommendedRoute.sourceUrl} target="_blank" rel="noreferrer" className="v2-focus-ring mt-1 inline-flex min-h-8 items-center gap-1 rounded-md text-[10px] font-semibold text-[#176443] hover:text-[#315740]">
-                  Route evidence <ExternalLink className="size-3" aria-hidden="true" />
-                </a>
-              </div>
-            ) : null}
-            <p className="mt-3 text-[10px] leading-4 text-[#617367]">This is a review reminder only. The page cannot contact the business or approve outreach.</p>
-          </div>
+      <div className="grid gap-3 p-4 sm:p-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start lg:p-6">
+        <div className="rounded-xl border border-[#d5e5d2] bg-white p-3 sm:p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#176443]">Website finding · {strongestFinding ? SEVERITY_COPY[strongestFinding.severity].label : "Research needed"}</p>
+          {strongestFinding?.claim ? (
+            <>
+              <p className="mt-1 text-sm leading-5 text-[#35493b]">{strongestFinding.claim.observation}</p>
+              <a href={strongestFinding.claim.sourceUrl} target="_blank" rel="noreferrer" className="v2-focus-ring mt-1 inline-flex min-h-8 items-center gap-1 rounded-md text-[10px] font-semibold text-[#176443] hover:text-[#315740]">
+                View source · captured {formatDateTime(strongestFinding.claim.capturedAt)} <ExternalLink className="size-3" aria-hidden="true" />
+              </a>
+            </>
+          ) : <p className="mt-1 text-xs leading-5 text-[#76591f]">No supported website finding is recorded. Keep the business in research.</p>}
+          <p className="mt-2 border-t border-[#e4ebe2] pt-2 text-[10px] leading-4 text-[#617367]">Based on captured website evidence only; it does not establish business fit or permission to contact.</p>
+          {uncertainty ? (
+            <p className="mt-2 text-[10px] leading-4 text-[#76591f]"><span className="font-semibold">Open questions:</span> {uncertainty}</p>
+          ) : null}
         </div>
 
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-xs font-semibold text-[#35493b]">Top website findings</h3>
-            <span className="font-mono text-[10px] text-[#566a5d]">{findings.length} of {data.website.findings.length}</span>
-          </div>
-          {findings.length > 0 ? (
-            <ol className="mt-2 divide-y divide-[#e4ebe2] rounded-xl border border-[#e1e9df] bg-white">
-              {findings.map((finding) => (
-                <li key={finding.checkId} className="flex items-start justify-between gap-3 p-3">
-                  <div>
-                    <p className="text-xs font-semibold text-[#35493b]">{readableCode(finding.category)} <span className="font-normal text-[#617367]">· {SEVERITY_COPY[finding.severity].label}</span></p>
-                    <p className="mt-1 text-[11px] leading-5 text-[#425b4d]">{finding.claim?.observation ?? "This check is incomplete and has no supported claim. Manual review is required."}</p>
-                  </div>
-                  {finding.claim ? (
-                    <a href={finding.claim.sourceUrl} target="_blank" rel="noreferrer" className="v2-focus-ring inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md px-1 text-[10px] font-semibold text-[#176443] hover:text-[#315740]">
-                      Proof <ExternalLink className="size-3" aria-hidden="true" />
-                    </a>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
-          ) : <p className="mt-2 rounded-xl border border-[#e1e9df] bg-white p-3 text-xs text-[#617367]">No website findings are recorded.</p>}
+        <div className="rounded-xl border border-[#d5e5d2] bg-white p-3 sm:p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#176443]">Next action</p>
+          <h2 id="owner-next-step" className="mt-1 text-sm font-semibold text-[#1a3124]">{action}</h2>
+          <p className="mt-1 text-xs leading-5 text-[#53675a]">{actionReason}</p>
+          <p className="mt-2 text-[10px] leading-4 text-[#617367]">Review reminder only. This page cannot contact the business or approve outreach.</p>
         </div>
       </div>
     </section>
@@ -250,10 +194,6 @@ export function OwnerLeadDetail({ data, ownerControls, contactControls }: { data
   const lead = data.lead;
   const qualifiedForReview = lead.attention === "READY_FOR_REVIEW" && lead.ownerActionable;
   const decisionState = decisionStateCopy(lead);
-  const description = !qualifiedForReview
-    ? decisionState.description
-    : "Review the strongest supported website evidence, remaining gaps, and recommended owner action below.";
-
   return (
     <div data-owner-readonly-dossier className="mx-auto flex max-w-[1320px] flex-col gap-4 text-[#263a2f]">
       <Link
@@ -278,8 +218,6 @@ export function OwnerLeadDetail({ data, ownerControls, contactControls }: { data
                 </span>
               </div>
               <h1 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.04em] text-[#172d20] sm:text-4xl">{lead.business.canonicalName}</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5d6d62]">{description}</p>
-              <p className="mt-2 text-xs font-medium leading-5 text-[#53675a]">This preview does not confirm business fit, contact readiness, or permission to reach out.</p>
             </div>
           </div>
           {lead.business.websiteUrl ? (

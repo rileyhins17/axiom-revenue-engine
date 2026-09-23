@@ -800,7 +800,7 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        <section aria-labelledby="today-attention" className="overflow-hidden rounded-2xl border border-[#dce5dd] bg-white shadow-sm">
+        {replyInboxRead.unavailable || followUpsRead.unavailable || replyInbox.length > 0 || followUpAttentionCount > 0 ? <section aria-labelledby="today-attention" className="overflow-hidden rounded-2xl border border-[#dce5dd] bg-white shadow-sm">
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#e4ebe2] px-5 py-4 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -846,30 +846,7 @@ export default async function DashboardPage() {
             )}
             <Link href="/clients" className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#145943] hover:text-[#0f4634] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145943]">See all client actions <ArrowRight className="size-4" aria-hidden="true" /></Link>
           </div>
-        </section>
-
-        <section aria-labelledby="today-readiness" className="rounded-2xl border border-[#e4e9e2] bg-[#f7f9f5] px-5 py-4 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 id="today-readiness" className="text-sm font-semibold text-[#35483b]">Safety and email status</h2>
-              <p className="mt-0.5 text-xs text-[#68766c]">{operatorConsoleRead.unavailable ? "Last checked: unavailable" : `Last checked ${formatAppDateTime(operatorConsole?.generatedAt, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`}</p>
-            </div>
-            <Link href="/settings" className="inline-flex min-h-9 items-center gap-1.5 text-sm font-semibold text-[#145943] hover:underline">Review settings <ArrowRight className="size-4" aria-hidden="true" /></Link>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-[#e5eae4] bg-white px-3.5 py-2.5">
-              <span className="text-sm text-[#53675a]">System stop</span>
-              <span className={`text-sm font-semibold ${automationRead.unavailable ? "text-amber-800" : automation.settings.emergencyPaused ? "text-rose-800" : "text-[#53675a]"}`}>
-                {automationRead.unavailable ? "Unknown" : automation.settings.emergencyPaused ? "On" : "Off at last check"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-[#fff8e8] px-3.5 py-2.5">
-              <span className="text-sm text-[#745a2d]">Email route</span>
-              <span className="text-sm font-semibold text-[#745a2d]">Not verified</span>
-            </div>
-          </div>
-          <p className="mt-2 text-xs leading-5 text-[#806b45]">Forwarding and a working owner reply path have not been confirmed. Email is not cleared for use.</p>
-        </section>
+        </section> : null}
       </section>
 
       <details className="group overflow-hidden rounded-xl border border-[#dce5dd] bg-white">
