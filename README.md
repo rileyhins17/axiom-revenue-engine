@@ -167,6 +167,18 @@ migrated or deployed. It does not implement a provider webhook, legacy/global
 suppression reconciliation, or an outbound send gate. See
 [ADR 0049](docs/adr/0049-record-exact-email-suppression-before-mail-activation.md).
 
+The dossier also has a compact **Observed email replies** panel for Riley or
+Aidan to record a response they personally see in an existing inbox. Select
+the exact saved email contact, enter a short factual summary and received time,
+then assign one owner, next action, and Toronto due time. Saving creates one
+linked Owner task atomically; Today shows open actions and the business detail
+retains completed or cancelled reply history. No message body, inbox sync, or
+send occurs. Do-not-contact requests belong in the email stop control, and a
+stopped business or suppressed contact cannot acquire a new reply task. This
+local workflow requires migration 0074 and has not been migrated or deployed;
+it does not prove an actual forwarding destination or reply route. See
+[ADR 0051](docs/adr/0051-link-manually-observed-replies-to-owner-actions.md).
+
 The M4 legacy-history report can compare old suppressions, contact attempts,
 bounces, and replies with v2 business identities from one private, standalone
 SQLite snapshot. It runs offline, proposes identity candidates for owner review,

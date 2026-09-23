@@ -84,6 +84,34 @@ decision; never point this command at a live D1 file, a provider, or an inbox.
 
 See [ADR 0047](adr/0047-reconcile-legacy-contact-history-offline-before-v2-outreach.md).
 
+## Record an owner-observed v2 email reply
+
+This procedure describes the local owner console after migration 0074 is
+released. It is not inbox sync, a forwarding verification, or permission to
+send. Use it only for a response Riley or Aidan actually observed; do not
+create synthetic records in production.
+
+1. Open the saved v2 business dossier and check its stop state and exact saved
+   email contact. If the reply asks for no further email or reports a complaint,
+   record the exact-email stop first. Use the business stop as appropriate. A
+   stopped business or suppressed contact cannot receive a new reply action.
+2. Open **Observed email replies**, select the exact email contact, and enter
+   the time received and a short factual summary. Do not paste the message,
+   headers, attachments, provider IDs, or credentials. Choose a category; a
+   negative category alone does not set a contact stop.
+3. Assign Riley or Aidan, enter the next human action and Toronto due time,
+   then save once. If the result is uncertain, retry without changing the
+   details; the same command key resolves to the same saved reply and task.
+   Reload and verify the record and its linked task before doing more work.
+4. Check **Today** for open and overdue owner-recorded replies. Complete the
+   linked task in **Owner tasks** only after the action is done. Cancel only
+   when the action no longer applies; the cancelled reply stays in the business
+   record. A failed or unavailable read is not an empty inbox.
+
+The legacy inbox remains a separate earlier-system view. Reconcile its history
+before an outbound v2 gate; neither view proves Cloudflare forwarding, sender
+verification, or a human reply round trip. See [ADR 0051](adr/0051-link-manually-observed-replies-to-owner-actions.md).
+
 ## Prepare an isolated staging console release
 
 This procedure identifies one exact candidate for the existing isolated console.

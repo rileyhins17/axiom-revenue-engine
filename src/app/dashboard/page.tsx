@@ -36,6 +36,7 @@ import {
 } from "@/lib/automation-policy";
 import { countAdequateLeadsToday, getAutonomousDailyLeadCap } from "@/lib/autonomous-intake";
 import { getDatabase } from "@/lib/cloudflare";
+import { createRevenueOwnerObservedReplyD1Boundary } from "@/lib/revenue-engine/owner-observed-reply-d1";
 import { getServerEnv } from "@/lib/env";
 import { getAutomationOperatorConsole } from "@/lib/automation-operator-view";
 import { listAutomationOverview } from "@/lib/outreach-automation";
@@ -572,6 +573,7 @@ export default async function DashboardPage() {
     connectedRowsRead,
     totalSentAllTime,
     replyInboxRead,
+    ownerRepliesRead,
     funnel,
     qualificationRoutes,
     messageVariantsRead,
@@ -616,6 +618,8 @@ export default async function DashboardPage() {
       .then((r) => Number(r?.c ?? 0))
       .catch(() => 0),
     readCritical(getReplyInbox, [] as ReplyInboxItem[]),
+    readCritical(() => createRevenueOwnerObservedReplyD1Boundary(getDatabase()).listOpenReplies(),
+      [] as Array<{ replyId: string; businessId: string; businessName: string; owner: "RILEY" | "AIDAN"; actionText: string; dueAt: string }>),
     getConversionFunnel().catch(() => ({ total: 0, qualified: 0, contacted: 0, replied: 0, pipeline: 0, won: 0 })),
     getQualificationRoutes().catch(() => ({ emailReady: 0, directReady: 0, socialReady: 0, needsReview: 0, disqualified: 0 })),
     readCritical(getMessageVariantMetrics, [] as MessageVariantMetric[]),
@@ -629,9 +633,10 @@ export default async function DashboardPage() {
   const followUps = followUpsRead.value;
   const connectedRows = connectedRowsRead.value;
   const replyInbox = replyInboxRead.value;
+  const ownerReplies = ownerRepliesRead.value;
   const messageVariants = messageVariantsRead.value;
   const auditLog = auditLogRead.value;
-  const criticalStatusUnavailable = [automationRead, operatorConsoleRead, sendsTodayRead, followUpsRead, connectedRowsRead, replyInboxRead]
+  const criticalStatusUnavailable = [automationRead, operatorConsoleRead, sendsTodayRead, followUpsRead, connectedRowsRead, replyInboxRead, ownerRepliesRead]
     .some((read) => read.unavailable);
   const diagnosticsUnavailable = criticalStatusUnavailable || messageVariantsRead.unavailable || auditLogRead.unavailable;
 
@@ -800,7 +805,7 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {replyInboxRead.unavailable || followUpsRead.unavailable || replyInbox.length > 0 || followUpAttentionCount > 0 ? <section aria-labelledby="today-attention" className="overflow-hidden rounded-2xl border border-[#dce5dd] bg-white shadow-sm">
+        {replyInboxRead.unavailable || followUpsRead.unavailable || ownerRepliesRead.unavailable || ownerReplies.length > 0 || replyInbox.length > 0 || followUpAttentionCount > 0 ? <section aria-labelledby="today-attention" className="overflow-hidden rounded-2xl border border-[#dce5dd] bg-white shadow-sm">
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#e4ebe2] px-5 py-4 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -808,17 +813,24 @@ export default async function DashboardPage() {
                 <h2 id="today-attention" className="mt-1 text-xl font-semibold tracking-tight text-[#20352c]">Replies and follow-ups</h2>
               </div>
             </div>
-            {!replyInboxRead.unavailable && !followUpsRead.unavailable && (replyInbox.length > 0 || followUpAttentionCount > 0) ? (
-              <span className="rounded-full bg-[#f1f5f0] px-3 py-1 text-xs font-semibold text-[#53675a]">{replyInbox.length + followUpAttentionCount} to review</span>
+            {!replyInboxRead.unavailable && !followUpsRead.unavailable && !ownerRepliesRead.unavailable && (ownerReplies.length > 0 || replyInbox.length > 0 || followUpAttentionCount > 0) ? (
+              <span className="rounded-full bg-[#f1f5f0] px-3 py-1 text-xs font-semibold text-[#53675a]">{ownerReplies.length + replyInbox.length + followUpAttentionCount} to review</span>
             ) : null}
           </div>
           <div className="p-5 sm:px-6 sm:py-5">
-            {replyInboxRead.unavailable || followUpsRead.unavailable ? (
+            {replyInboxRead.unavailable || followUpsRead.unavailable || ownerRepliesRead.unavailable ? (
               <div className="rounded-xl border border-amber-300 bg-[#fff8e8] px-4 py-3 text-sm leading-6 text-[#583d12]" role="status">
-                Reply or follow-up status could not be checked. Open the client board and confirm before taking action.
+                Reply or follow-up status could not be checked. Review the business and client records before taking action.
               </div>
-            ) : replyInbox.length > 0 || followUpAttentionCount > 0 ? (
+            ) : ownerReplies.length > 0 || replyInbox.length > 0 || followUpAttentionCount > 0 ? (
               <ul className="divide-y divide-[#e4ebe2] overflow-hidden rounded-xl border border-[#e4ebe2] bg-white" aria-label="Immediate owner actions">
+                {ownerReplies.slice(0, 3).map((item) => (
+                  <li key={`owner-reply-${item.replyId}`}>
+                    <Link href={`/leads/${encodeURIComponent(item.businessId)}`} className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[#fbfcfa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#145943] sm:px-5">
+                      <span className="min-w-0"><strong className="block truncate text-[#20352c]">{item.businessName}</strong><span className="text-xs text-[#9a5424]">Owner-recorded reply · {new Date(item.dueAt).getTime() < renderNowMs ? "Overdue" : "Due"} {formatAppDateTime(item.dueAt)} · {item.owner === "RILEY" ? "Riley" : "Aidan"}: {item.actionText}</span></span><span className="shrink-0 font-semibold text-[#145943]">Open action <ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>
+                    </Link>
+                  </li>
+                ))}
                 {followUps.overdue.slice(0, 3).map((item) => (
                   <li key={`overdue-${item.id}`}>
                     <Link href={`/clients/${item.id}`} className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[#fbfcfa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#145943] sm:px-5">
@@ -826,14 +838,14 @@ export default async function DashboardPage() {
                     </Link>
                   </li>
                 ))}
-                {replyInbox.slice(0, Math.max(0, 3 - Math.min(3, followUps.overdue.length))).map((item) => (
+                {replyInbox.slice(0, Math.max(0, 3 - Math.min(3, ownerReplies.length + followUps.overdue.length))).map((item) => (
                   <li key={`reply-${item.id}`}>
                     <Link href={`/clients/${item.id}`} className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[#fbfcfa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#145943] sm:px-5">
-                      <span className="min-w-0"><strong className="block truncate text-[#20352c]">{item.businessName}</strong><span className="text-xs text-[#52645a]">Reply recorded · {item.replyAgeLabel}</span></span><span className="shrink-0 font-semibold text-[#145943]">Review reply <ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>
+                      <span className="min-w-0"><strong className="block truncate text-[#20352c]">{item.businessName}</strong><span className="text-xs text-[#52645a]">Earlier system reply · {item.replyAgeLabel}</span></span><span className="shrink-0 font-semibold text-[#145943]">Review reply <ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>
                     </Link>
                   </li>
                 ))}
-                {followUps.dueToday.slice(0, Math.max(0, 3 - Math.min(3, followUps.overdue.length + replyInbox.length))).map((item) => (
+                {followUps.dueToday.slice(0, Math.max(0, 3 - Math.min(3, ownerReplies.length + followUps.overdue.length + replyInbox.length))).map((item) => (
                   <li key={`due-${item.id}`}>
                     <Link href={`/clients/${item.id}`} className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[#fbfcfa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#145943] sm:px-5">
                       <span className="min-w-0"><strong className="block truncate text-[#20352c]">{item.businessName}</strong><span className="text-xs text-[#52645a]">Due today · {item.nextAction ?? "Client follow-up"}</span></span><span className="shrink-0 font-semibold text-[#145943]">Open action <ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>

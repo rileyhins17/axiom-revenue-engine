@@ -293,7 +293,7 @@ async function applyMigrations(database: SqliteDatabase) {
     .sort((left, right) => left.localeCompare(right));
   assert(migrations.length >= 60 && migrations.at(-1)?.startsWith("0068_"),
     "The owner fixture must use the complete pre-M2 migration history through 0068.");
-  const postSeedMigrations = ["0071_revenue_owner_tasks.sql", "0072_revenue_business_stop.sql", "0073_revenue_contact_suppression.sql"];
+  const postSeedMigrations = ["0071_revenue_owner_tasks.sql", "0072_revenue_business_stop.sql", "0073_revenue_contact_suppression.sql", "0074_revenue_owner_observed_replies.sql"];
   const migrationNames = await readdir(migrationsDirectory);
   for (const migration of postSeedMigrations) {
     assert(migrationNames.includes(migration), `The synthetic owner fixture requires ${migration} for owner-action acceptance.`);
@@ -1192,6 +1192,20 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     });
     const taskApiPath = `/api/v1/leads/${encodeURIComponent(FIXTURE_BUSINESS_ID)}/tasks`;
     const stopApiPath = `/api/v1/leads/${encodeURIComponent(FIXTURE_BUSINESS_ID)}/stops`;
+    const replyApiPath = `/api/v1/leads/${encodeURIComponent(FIXTURE_BUSINESS_ID)}/replies`;
+    const anonymousRepliesResponse = await anonymous.request.get(replyApiPath, { maxRedirects: 0 });
+    assert.equal(anonymousRepliesResponse.status(), 401, "Anonymous reply listing must be rejected.");
+    await anonymousRepliesResponse.dispose();
+    const anonymousReplyCreate = await anonymous.request.post(replyApiPath, {
+      maxRedirects: 0,
+      data: {
+        idempotencyKey: randomUUID(), contactPointId: "unknown", category: "QUESTION",
+        summary: "Unauthenticated synthetic reply probe", observedAt: new Date().toISOString(),
+        owner: "RILEY", action: "Do not save", dueAt: new Date().toISOString(),
+      },
+    });
+    assert.equal(anonymousReplyCreate.status(), 401, "Anonymous reply creation must be rejected.");
+    await anonymousReplyCreate.dispose();
     const anonymousTasksResponse = await anonymous.request.get(taskApiPath, { maxRedirects: 0 });
     assert.equal(anonymousTasksResponse.status(), 401,
       `Anonymous owner-task listing must return HTTP 401, got ${anonymousTasksResponse.status()}.`);
@@ -1255,6 +1269,16 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     assert.equal(crossSiteCreate.status(), 403, "An authenticated cross-site task mutation must be rejected.");
     assert.equal((await crossSiteCreate.json() as { code?: string }).code, "ORIGIN_REJECTED");
     await crossSiteCreate.dispose();
+    const crossSiteReplyCreate = await context.request.post(replyApiPath, {
+      headers: { Origin: "https://untrusted.example.invalid" },
+      data: {
+        idempotencyKey: randomUUID(), contactPointId: "unknown", category: "QUESTION",
+        summary: "Cross-site reply must not save", observedAt: new Date().toISOString(),
+        owner: "RILEY", action: "Do not save", dueAt: new Date().toISOString(),
+      },
+    });
+    assert.equal(crossSiteReplyCreate.status(), 403, "An authenticated cross-site reply mutation must be rejected.");
+    await crossSiteReplyCreate.dispose();
     const crossSiteStopCreate = await context.request.post(stopApiPath, {
       headers: { Origin: "https://untrusted.example.invalid" },
       data: { idempotencyKey: randomUUID(), reason: "OWNER_DECISION", note: "Cross-site stop mutation must be rejected." },
@@ -1325,21 +1349,6 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await assertReducedMotion(page, "desktop dossier");
     await page.evaluate(() => { if (document.scrollingElement) document.scrollingElement.scrollTop = 0; });
     await page.screenshot({ path: join(outputDirectory, "dossier-desktop.png"), fullPage: true });
-
-    stage = "desktop observed email stop";
-    await page.getByRole("button", { name: /Review \d+ email contacts?/ }).click();
-    await page.getByRole("combobox", { name: "Email contact to review" }).waitFor();
-    assert.match(await page.getByRole("combobox", { name: "Email contact to review" }).locator("option:checked").textContent() ?? "", /hello@roofing\.axiomfixtures\.ca/, "The selected contact must show the exact email before a permanent stop.");
-    await page.getByText("This permanently blocks hello@roofing.axiomfixtures.ca for this business.", { exact: true }).waitFor();
-    await page.getByRole("combobox", { name: "Observed event" }).selectOption("UNSUBSCRIBE");
-    await page.getByRole("textbox", { name: "Short observation summary" }).fill("Owner observed an unsubscribe request in the synthetic fixture.");
-    await page.getByRole("checkbox", { name: /I personally observed this event/ }).check();
-    await page.getByRole("button", { name: "Record do not email" }).click();
-    await page.getByText("Do not email this contact", { exact: true }).waitFor();
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: /Review \d+ email contacts?/ }).click();
-    await page.getByText("Do not email this contact", { exact: true }).waitFor();
-    await page.getByRole("button", { name: "Close" }).click();
 
     stage = "desktop owner-task creation";
     await page.getByRole("heading", { level: 2, name: "Owner tasks" }).waitFor();
@@ -1413,6 +1422,68 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await completedTaskRow.getByText("Completed", { exact: true }).waitFor();
     assert.equal(await completedTaskRow.getByRole("button", { name: /^(Complete|Cancel) task:/ }).count(), 0,
       "A terminal task must not expose completion or cancellation actions after reload.");
+
+    stage = "desktop owner-observed reply";
+    const replyPanel = page.locator("section[aria-labelledby='owner-observed-reply-title']");
+    await replyPanel.getByRole("heading", { name: "Observed email replies" }).waitFor();
+    await replyPanel.getByRole("button", { name: "Add reply" }).click();
+    assert.match(await replyPanel.getByRole("combobox", { name: "Email contact" }).locator("option:checked").textContent() ?? "",
+      /hello@roofing\.axiomfixtures\.ca/, "A manually observed reply must use the exact saved email contact.");
+    await replyPanel.getByRole("combobox", { name: "Reply type" }).selectOption("QUESTION");
+    await replyPanel.getByLabel("When received (Toronto)").fill(torontoDateTimeInput(-2));
+    await replyPanel.getByRole("textbox", { name: "Short factual summary" }).fill("Asked to discuss website timing next week.");
+    const replyAction = "Call about website timing";
+    await replyPanel.getByRole("textbox", { name: "Next action" }).fill(replyAction);
+    await replyPanel.getByRole("combobox", { name: "Owner" }).selectOption("AIDAN");
+    await replyPanel.getByLabel("Action due (Toronto)").fill(torontoDateTimeInput(-1));
+    await replyPanel.getByRole("button", { name: "Save reply" }).click();
+    await replyPanel.getByRole("list", { name: "Saved email replies" }).getByText("Asked to discuss website timing next week.", { exact: true }).waitFor();
+    const savedReplyResponse = await context.request.get(replyApiPath);
+    assert.equal(savedReplyResponse.status(), 200, "The saved reply should be readable after creation.");
+    const savedReplyBody = await savedReplyResponse.json() as { replies?: Array<{ taskId?: string; status?: string; contactPointId?: string }> };
+    assert.equal(savedReplyBody.replies?.length, 1, "The owner should have exactly one recorded synthetic reply.");
+    assert(savedReplyBody.replies?.[0]?.taskId, "The reply must have a durable linked action.");
+    assert.equal(savedReplyBody.replies?.[0]?.status, "OPEN", "A new reply action must remain open.");
+    await savedReplyResponse.dispose();
+    await assertWcag(page, "desktop observed email replies");
+
+    stage = "today owner-recorded overdue reply";
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    const ownerReplyAttention = page.getByRole("list", { name: "Immediate owner actions" }).locator("li").filter({ hasText: replyAction });
+    await ownerReplyAttention.waitFor();
+    await ownerReplyAttention.getByText(/Owner-recorded reply · Overdue/).waitFor();
+    await ownerReplyAttention.getByText("Tri-City Roofing Fixture", { exact: true }).waitFor();
+
+    stage = "observed reply persistence and completion";
+    await page.goto(`/leads/${encodeURIComponent(FIXTURE_BUSINESS_ID)}`, { waitUntil: "domcontentloaded" });
+    const persistedReplyPanel = page.locator("section[aria-labelledby='owner-observed-reply-title']");
+    await persistedReplyPanel.getByText("Asked to discuss website timing next week.", { exact: true }).waitFor();
+    const replyTaskRow = page.getByRole("list", { name: "Saved owner tasks" }).locator("li").filter({ hasText: replyAction });
+    await replyTaskRow.waitFor();
+    await replyTaskRow.getByText("Open", { exact: true }).waitFor();
+    await replyTaskRow.getByRole("button", { name: `Complete task: ${replyAction}` }).click();
+    await replyTaskRow.getByText("Completed", { exact: true }).waitFor();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator("section[aria-labelledby='owner-observed-reply-title']").getByText(/Next: .*Completed/).waitFor();
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    assert.equal(await page.locator("section[aria-labelledby='today-attention']").getByText(replyAction, { exact: false }).count(), 0,
+      "Completing the linked owner task must remove the reply from Today's open queue.");
+    await page.goto(`/leads/${encodeURIComponent(FIXTURE_BUSINESS_ID)}`, { waitUntil: "domcontentloaded" });
+
+    stage = "desktop observed email stop";
+    await page.getByRole("button", { name: /Review \d+ email contacts?/ }).click();
+    await page.getByRole("combobox", { name: "Email contact to review" }).waitFor();
+    assert.match(await page.getByRole("combobox", { name: "Email contact to review" }).locator("option:checked").textContent() ?? "", /hello@roofing\.axiomfixtures\.ca/, "The selected contact must show the exact email before a permanent stop.");
+    await page.getByText("This permanently blocks hello@roofing.axiomfixtures.ca for this business.", { exact: true }).waitFor();
+    await page.getByRole("combobox", { name: "Observed event" }).selectOption("UNSUBSCRIBE");
+    await page.getByRole("textbox", { name: "Short observation summary" }).fill("Owner observed an unsubscribe request in the synthetic fixture.");
+    await page.getByRole("checkbox", { name: /I personally observed this event/ }).check();
+    await page.getByRole("button", { name: "Record do not email" }).click();
+    await page.getByText("Do not email this contact", { exact: true }).waitFor();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: /Review \d+ email contacts?/ }).click();
+    await page.getByText("Do not email this contact", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Close" }).click();
 
     // Keep one open fixture action so the stop can prove that completion is
     // blocked and cancellation remains available.
@@ -1718,7 +1789,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string, m2
     await mobileResearch.locator(":scope > summary").click();
     await assertBusinessStopRoutesBlocked(page);
     await mobileResearch.locator(":scope > summary").click();
-    await page.getByRole("list", { name: "Saved owner tasks" }).getByText("Completed", { exact: true }).waitFor();
+    await page.getByRole("list", { name: "Saved owner tasks" }).getByText("Completed", { exact: true }).first().waitFor();
     await assertWcag(page, "mobile dossier");
     await assertReadOnlyOwnerSurface(page, "mobile dossier", "[data-owner-readonly-dossier] > details");
     await assertResponsive(page, "mobile dossier");
@@ -1865,6 +1936,7 @@ async function run() {
     database.exec(await readFile(join(REPOSITORY_ROOT, "migrations", "0071_revenue_owner_tasks.sql"), "utf8"));
     database.exec(await readFile(join(REPOSITORY_ROOT, "migrations", "0072_revenue_business_stop.sql"), "utf8"));
     database.exec(await readFile(join(REPOSITORY_ROOT, "migrations", "0073_revenue_contact_suppression.sql"), "utf8"));
+    database.exec(await readFile(join(REPOSITORY_ROOT, "migrations", "0074_revenue_owner_observed_replies.sql"), "utf8"));
     database.close();
     m2Fixture = await createM2OwnerConsoleFixture();
     const m2DatabaseIdentity = readSetupFile(resolve(m2Fixture.databasePath)).identity;
