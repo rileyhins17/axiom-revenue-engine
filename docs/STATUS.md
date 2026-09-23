@@ -1,5 +1,81 @@
 # Current status — Axiom Revenue Engine
 
+## Blind Quality Lab checkpoint; production goal remains open
+
+**Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
+`fc2b114` (ADR 0050, blind split, owner flow, and tests). This is a local M3
+workflow correction, not an M2 or M3 exit gate, provider activation, or
+production release. M1's offline fixture gate remains complete. M2 still has
+**0/10 real engine assessments** and its ten individual owner identity decisions
+are pending. M3 still has **0/50 real judged dossiers**. M4's local business and
+exact-email stop controls are not migrated to production; M4–M7 gates remain
+open.
+
+Quality Lab now requires a separately prepared blind evidence file. Its first
+POST and response contain 50 factual dossiers but no engine labels, scores,
+agreement/readiness summary, audit classification, severity, or conversion
+priority flags. Riley or Aidan must judge every unreviewed business and download
+a digest-bound first-pass file before loading the matching assessment file.
+The later authenticated reveal route verifies all 50 identities, first-pass
+reasons, packet digests, policy, and displayed evidence against the original
+checkpoint. Final judgments can still be downloaded and recorded in batches.
+See [ADR 0050](adr/0050-separate-blind-owner-evidence-from-engine-assessments.md)
+and the [runbook](RUNBOOK.md#resumable-kw-owner-labelling-checkpoint). This is
+procedural blindness: an owner could deliberately open the separate assessment
+file early. No real packet has been split or judged.
+
+**Verification:** the final runtime code passed `npm run check:safety`,
+typecheck, lint, `git diff --check`, a production-style Cloudflare build, a
+Wrangler dry run, and focused blind/split/first-pass tests. The dry run did not
+deploy. The full isolated suite passed **796 tests: 792 passed, zero failed,
+four Windows symlink skips** on the checkpoint candidate; a final bounded
+combined-upload limit and browser-safe import adjustment were then covered by
+focused tests, typecheck, the final build/dry run, and browser acceptance.
+Synthetic owner browser acceptance passed with the final runtime code at
+1440 px desktop and 390 px phone, 17 accessibility scans, zero external
+requests, and inspection of the blind upload request/response. It also verified
+the first-pass download, subsequent reveal, final review export, reload, and
+owner-task retry/reload/completion with rejected anonymous and cross-site
+writes. Desktop Businesses, dossier, and M2 review loaded in 830 ms, 177 ms,
+and 4,489 ms within their budgets. These are synthetic checks, not real M3
+owner judgments. The first full-suite attempt in the production worktree met
+an old M2 setup lock from an absent process; that file was left untouched and
+the successful suite ran in an isolated checkout under [OPS-012](GOTCHAS.md).
+
+**Production, automation, provider, and spend:** no deployment, migration,
+provider activation, live capture, prospect contact, send, or outreach occurred.
+Production is unverified. Autonomous intake, queue, follow-up, and send remain
+off. The C$50/month runtime ceiling is unchanged; incremental provider spend
+is C$0. There is no paid mailbox or Google Workspace dependency. This
+workstation's Wrangler CLI is installed but not authenticated, and no existing
+Cloudflare or Resend browser account session was available for a read-only
+routing check. The published DNS signals in [owner context](OWNER_CONTEXT.md)
+still do not prove a forwarding destination, verified sender, provider key,
+webhook, or human reply round trip. No v2 business email is being sent; Jev is
+not in the live path.
+
+**Owner decisions and blockers:** Riley or Aidan still needs to save a
+keep/replace/hold decision for each of the ten proposed businesses. The first
+bounded C$0 replacement search yielded two Waterloo HVAC identities for owner
+review and no independently verified Cambridge landscaping base. The separate
+[Cambridge follow-up scope](reviews/2026-09-23-m2-cambridge-followup-research-proposal.md)
+remains pending; no further prospect search occurred in this checkpoint. Source
+rights/retention, one supervised real capture, the private legacy-contact
+snapshot, a proven free Cloudflare-forwarded/Resend reply route, backup,
+rollback, and explicit release gates remain open.
+
+Next three concrete actions:
+
+1. Have Riley or Aidan save the ten individual identity decisions in Business
+   Review, including reviewed replacements for blocked identities. Resolve the
+   Cambridge gap under its separate bounded scope if approved.
+2. Review source rights and retention for the exact selection, then authorize
+   and inspect one supervised real M2 capture before completing the ten
+   traceable assessments. Use those real dossiers to begin the 50-case M3 set.
+3. Verify the zero-paid-mailbox owner reply route and reconcile private legacy
+   contact history before any M4 send gate; keep mail automation off until the
+   sender, inbound, suppression, legal, budget, backup, and release proofs pass.
+
 ## Lean owner workspace and local quality/contact slices; production goal remains open
 
 **Updated:** 2026-09-23 (America/Toronto). **Verified application commit:**
