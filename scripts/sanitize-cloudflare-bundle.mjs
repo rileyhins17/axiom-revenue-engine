@@ -47,7 +47,8 @@ function isPrivateWorkspaceFile(outputRoot, filePath) {
   if (segments.some((segment) => ["backups", "kw-evaluation", ".superpowers", ".claude", ".wrangler", ".vercel", ".git"].includes(segment))) {
     return true;
   }
-  if (segments.includes("server-functions") && segments.some((segment) => ["data", "output"].includes(segment))) {
+  if (segments.includes("server-functions") && !segments.includes("node_modules")
+    && segments.some((segment) => ["data", "output"].includes(segment))) {
     return true;
   }
   return /\.(?:sqlite|db|pem)$/i.test(filePath);

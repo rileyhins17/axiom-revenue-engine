@@ -90,3 +90,15 @@ test("sanitizer rejects ignored private data even when it contains no recognizab
     }
   }
 });
+
+test("sanitizer allows a dependency's own output directory", async () => {
+  const root = await createBundle();
+  try {
+    const dependencyFile = path.join(root, "server-functions", "default", "node_modules", "next", "dist", "build", "output", "log.js");
+    await mkdir(path.dirname(dependencyFile), { recursive: true });
+    await writeFile(dependencyFile, "export const log = () => {};\n");
+    await sanitizeCloudflareBundle(root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
