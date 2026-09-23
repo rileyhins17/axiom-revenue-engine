@@ -121,9 +121,11 @@ export function isAllowedLegacyCrawlerRequestUrl(value: string) {
 }
 
 export async function applyScrapeResourceBlocking(context: unknown): Promise<void> {
+  const ctx = context as { route?: (pattern: string | RegExp, handler: (route: unknown) => unknown) => Promise<void> };
+  if (typeof ctx?.route !== "function") {
+    throw new Error("Legacy crawler request routing is unavailable");
+  }
   try {
-    const ctx = context as { route?: (pattern: string | RegExp, handler: (route: unknown) => unknown) => Promise<void> };
-    if (typeof ctx?.route !== "function") return;
     await ctx.route("**/*", (route: unknown) => {
       const r = route as {
         request: () => { url: () => string; resourceType: () => string };
@@ -147,7 +149,7 @@ export async function applyScrapeResourceBlocking(context: unknown): Promise<voi
         return r.abort().catch(() => undefined);
       }
     });
-  } catch (error) {
-    console.warn("[browser-rendering] applyScrapeResourceBlocking failed (non-fatal):", error);
+  } catch {
+    throw new Error("Legacy crawler request routing could not be installed");
   }
 }

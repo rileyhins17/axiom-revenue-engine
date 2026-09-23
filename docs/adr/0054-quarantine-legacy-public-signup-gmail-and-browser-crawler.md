@@ -36,8 +36,10 @@ state blocks the operation.
 Keep the deployed legacy Browser Rendering crawler inert before loading policy
 or claiming a job. Its local-only discovery helper validates public HTTP(S)
 targets before navigation and aborts private, reserved, or non-web redirect
-and subresource requests. These hostname checks are defense in depth; they do
-not solve DNS rebinding, which is why the deployed crawler stays disabled.
+and subresource requests. If request interception cannot be installed, local
+crawling stops before navigation. These hostname checks are defense in depth;
+they do not solve DNS rebinding, which is why the deployed crawler stays
+disabled.
 
 Reactivation requires a new reviewed path with source rights, DNS-safe network
 isolation, current contact/consent and suppression policy, an acceptable

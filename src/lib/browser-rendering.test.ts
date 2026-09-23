@@ -3,6 +3,14 @@ import test from "node:test";
 
 import { applyScrapeResourceBlocking, isAllowedLegacyCrawlerRequestUrl } from "./browser-rendering";
 
+test("legacy crawler stops when request interception cannot be installed", async () => {
+  await assert.rejects(applyScrapeResourceBlocking({}), /request routing is unavailable/);
+  await assert.rejects(
+    applyScrapeResourceBlocking({ route: async () => { throw new Error("route install failed"); } }),
+    /request routing could not be installed/,
+  );
+});
+
 test("legacy crawler request policy allows only canonical public HTTP targets", () => {
   assert.equal(isAllowedLegacyCrawlerRequestUrl("https://example.ca/contact"), true);
   assert.equal(isAllowedLegacyCrawlerRequestUrl("http://127.0.0.1/admin"), false);
