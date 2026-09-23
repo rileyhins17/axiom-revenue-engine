@@ -142,7 +142,11 @@ test("owner lead list presents plain business details and keeps ranking details 
   const primary = html.slice(0, html.indexOf("<details")).replace(/<[^>]*>/g, " ");
 
   assert.match(html, /<h1[^>]*>Businesses<\/h1>/);
-  assert.match(primary, /Confirm who belongs on the list/);
+  assert.match(primary, /Review proposed businesses/);
+  assert.match(primary, /Confirm the names before deeper research/);
+  assert.match(primary, /Saved assessed businesses appear below/);
+  assert.match(primary, /saving choices contacts no one/);
+  assert.equal((primary.match(/\b10\b/g) ?? []).length, 1);
   assert.match(primary, /Assessed businesses/);
   assert.match(primary, /Ready for a decision/);
   assert.match(primary, /Roofing/);

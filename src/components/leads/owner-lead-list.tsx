@@ -147,29 +147,21 @@ export function OwnerLeadList({ data, canReviewBusinessResearch = false }: {
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#476351]">Research workspace</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em] text-[#172b21]">Businesses</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-[#58695f]">Start with the proposed names, then review the businesses with saved website findings.</p>
         </div>
         <span className="rounded-full border border-[#d9e5da] bg-white px-3 py-1.5 text-xs font-semibold text-[#425b49]">Private owner workspace</span>
       </header>
 
-      <section aria-labelledby="proposed-businesses-heading" className="relative overflow-hidden rounded-[28px] bg-[#14392e] p-6 text-white shadow-[0_18px_40px_-28px_rgba(15,48,35,0.75)] sm:p-8">
-        <div className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full border-[48px] border-white/[0.045]" aria-hidden="true" />
-        <div className="relative grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(180px,0.32fr)] md:items-end">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#a7dfc1]">First step · proposed businesses</p>
-            <h2 id="proposed-businesses-heading" className="mt-2 max-w-lg text-2xl font-semibold tracking-[-0.035em] sm:text-[29px]">Confirm who belongs on the list</h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-[#d5e5da]">Check the company and location for each proposed name. Saving these choices starts no contact.</p>
-            {canReviewBusinessResearch ? (
-              <Button asChild size="lg" className="mt-5 w-full justify-between rounded-xl bg-white px-5 font-semibold text-[#14392e] hover:bg-[#e9f4e9] sm:w-auto sm:min-w-64">
-                <Link href={"/leads/m2/identity" as Route} prefetch={false}>Review 10 proposed businesses <ArrowUpRight aria-hidden="true" /></Link>
-              </Button>
-            ) : <p role="note" className="mt-4 text-sm text-[#d5e5da]"><strong className="font-semibold text-white">Business research is owner-managed.</strong> An owner with administrator access can review these names.</p>}
-          </div>
-          <div className="flex items-baseline gap-3 border-t border-white/20 pt-4 md:block md:border-l md:border-t-0 md:pl-6 md:pt-0">
-            <p className="text-4xl font-semibold tracking-[-0.06em] tabular-nums">10</p>
-            <p className="text-xs font-medium leading-5 text-[#c4dacb]">proposed names to confirm<br className="hidden md:block" /> before deeper research</p>
-          </div>
+      <section aria-labelledby="proposed-businesses-heading" className="flex flex-col gap-3 rounded-2xl border border-[#d9e5da] bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#476351]">First step · proposed businesses</p>
+          <h2 id="proposed-businesses-heading" className="mt-1 text-lg font-semibold tracking-tight text-[#172b21]">Review proposed businesses</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-5 text-[#58695f]">Confirm the names before deeper research. Saved assessed businesses appear below; saving choices contacts no one.</p>
         </div>
+        {canReviewBusinessResearch ? (
+          <Button asChild size="lg" className="w-full shrink-0 justify-between rounded-xl bg-[#174e37] px-4 font-semibold text-white hover:bg-[#123f2d] focus-visible:ring-[#174e37] sm:w-auto sm:min-w-64">
+            <Link href={"/leads/m2/identity" as Route} prefetch={false}>Review 10 proposed businesses <ArrowUpRight aria-hidden="true" /></Link>
+          </Button>
+        ) : <p role="note" className="text-sm text-[#58695f]"><strong className="font-semibold text-[#20352a]">Business research is owner-managed.</strong> An owner with administrator access can review these names.</p>}
       </section>
 
       <section aria-labelledby="business-records-heading">
