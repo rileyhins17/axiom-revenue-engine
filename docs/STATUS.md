@@ -1,5 +1,26 @@
 # Current status — Axiom Revenue Engine
 
+## LIVE 2026-09-24 ~21:20 UTC: AI, private sign-in, caller bridge, v7 lead rules (`9f89654`)
+
+- Worker `acfb2cff-baf4-420c-b1b0-de9d2fda536c`; migrations through 0078 (81 receipts); stops `01111`.
+  Backup `prod-export-20260924T210741Z.sql` (SHA-256 `cb64985d…c414`); bookmark
+  `00003027-00000000-000050f0-50bebd1091f728ae40065f6aa078fce7`; rollback target `a52319e4`.
+- Sign-in: Riley/Aidan picker + 6-digit code (better-auth email OTP, hashed, 10 min, 5 tries) sent via
+  Cloudflare `send_email` binding restricted to rileyhinsperger@gmail.com and aidanmageebusiness@gmail.com.
+  Password sign-in off on live. Verified: Riley's code delivered 21:22 UTC. Aidan's destination is
+  PENDING until he clicks Cloudflare's verification email.
+- AI: Gemini 3.1 Flash-Lite call briefs + Ask AI (read-only tools, report_problem fix queue), US$5/month
+  hard cap. Inactive until the owner adds Worker secret `GEMINI_API_KEY`. `/api/mcp` is now the engine MCP
+  (read tools + fix queue), bearer `MCP_API_TOKEN`.
+- Lead rules v7 (+ parked/for-sale, under-construction): screenshot audit 4/4 flagged sites bad,
+  35/36 near-misses correctly fine. Live call list: 18 no-website + 5 weak-site, all with phones.
+- Caller bridge: `/api/caller/leads`, `/api/caller/result`, keys in Settings (migration 0078).
+  Extension PR: Mageester/axiom-caller#1 (144 tests pass).
+- Verified: npm test 905 pass / 0 fail, typecheck, lint 0 errors, safety, clean build, dry run,
+  owner UI (8 WCAG pages, desktop + 390px). Places this month: 56 of 600 (free tier).
+- Next: (1) Aidan verifies Cloudflare destination + merges PR #1; (2) owner adds GEMINI_API_KEY;
+  (3) Zoho mailbox for outreach email, then larger Places discovery with the new phone/address capture.
+
 ## LIVE: redesign + email outreach built, sending OFF (2026-09-24 ~19:02 UTC, `bafb8d9`)
 
 - New owner app: Today (scoreboards for Aidan/Riley, results funnel, follow-ups),
