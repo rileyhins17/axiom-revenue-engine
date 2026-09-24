@@ -47,7 +47,7 @@ export async function engineWeeklyRun(args: string[], env = process.env) {
   let discovery: Record<string, unknown> = {};
   if (args[0] === "--places" && args.length === 1) {
     const result = await discoverBusinesses({
-      apiKey: env.AXIOM_GOOGLE_PLACES_KEY, enabled: env.AXIOM_PLACES_DISCOVERY_ENABLED === "1", cells: CELLS, transport: fetchTransport,
+      apiKey: env.AXIOM_GOOGLE_PLACES_KEY?.trim() || undefined, enabled: env.AXIOM_PLACES_DISCOVERY_ENABLED?.trim() === "1", cells: CELLS, transport: fetchTransport,
       ledger: await readLedger(), saveLedger: (ledger) => writeFile(LEDGER_PATH, JSON.stringify(ledger) + "\n"),
     });
     source = PLACES_DISCOVERY_VERSION;

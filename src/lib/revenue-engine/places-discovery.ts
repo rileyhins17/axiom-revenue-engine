@@ -36,7 +36,7 @@ const PlaceSchema = z.object({
   types: z.array(z.string().max(80)).max(50).optional(),
   businessStatus: z.string().max(40).optional(),
 }).passthrough();
-const TextSearchResponseSchema = z.object({ places: z.array(PlaceSchema).max(20).optional(), nextPageToken: z.string().max(2000).optional() }).passthrough();
+const TextSearchResponseSchema = z.object({ places: z.array(PlaceSchema).max(20).optional(), nextPageToken: z.string().max(20_000).optional() }).passthrough();
 
 export type PlacesTransport = (request: { url: string; headers: Record<string, string>; body: string }) => Promise<{ status: number; json: unknown }>;
 export type PlacesUsageLedger = { month: string; requests: number };

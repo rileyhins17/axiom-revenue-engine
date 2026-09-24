@@ -1,5 +1,22 @@
 # Current status — Axiom Revenue Engine
 
+**Staging backup and upgrade rehearsal (2026-09-24 03:06 UTC): PASS.** Riley pasted
+the D1 Read token into ignored `.env.staging-read`. Cloudflare's native
+`d1 export` returned 401 with D1 Read (it needs D1 Edit), so per the runbook's
+least-privilege rule no write-capable token was created; instead
+`scripts/export-staging-d1-readonly.mjs` built a logical export from read-only
+queries (SQLite `quote()` literals, rowid-ordered, write-free batches checked),
+straight into ignored `backups/staging/staging-readonly-export-20260924T030623Z.sql`:
+39 tables, 107 indexes, 745 rows (matching live counts), 256,545 bytes,
+SHA-256 `48794fdd03755d9455b67409e5a7aee2c90ce81d8f6d616c5a74944a22eecb45`.
+`scripts/rehearse-staging-sql-export.ts` on that pinned file: baseline 55
+(0055) → 74 (0074), 19 applied with the recorded hashes, all 745 original rows
+preserved, stops engaged, zero foreign-key violations before/after, integrity
+ok before/after. The export excludes Cloudflare's internal `_cf_KV` table
+(unreadable to D1 Read). No remote migration, deploy or write occurred.
+Remaining release gates: fresh CI on the exact commit, a separate approved
+write/deploy step, and the release packet refresh.
+
 **Provider setup (2026-09-23, Claude via Riley's Chrome at Riley's request):**
 - Google Cloud project `axiom-revenue-engine` created and linked to the
   existing billing account (US$2/month alert already covers the account).
