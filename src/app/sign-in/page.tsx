@@ -73,7 +73,7 @@ function SignIn() {
   return <main className="relative flex min-h-svh items-center justify-center overflow-hidden bg-[#070707] px-4 text-[#f2f0ea]">
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(800px_400px_at_50%_-10%,rgba(184,137,59,0.22),transparent_70%)]" />
     <div aria-hidden="true" className="pointer-events-none absolute -inset-1/2 animate-[owner-spin_40s_linear_infinite] bg-[conic-gradient(from_0deg,transparent_0_75%,rgba(227,192,122,0.06)_85%,transparent_95%)]" />
-    <div className="owner-page-enter relative w-full max-w-md text-center">
+    <div className="owner-signin-enter relative w-full max-w-md text-center">
       {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset */}
       <img src="/axiom-logo.webp" alt="Axiom" width={200} height={54} className="mx-auto h-auto w-[200px] drop-shadow-[0_10px_30px_rgba(0,0,0,0.7)]" />
       <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.3em] text-[#a09c92]"><Lock className="size-3" aria-hidden="true" />Private</p>

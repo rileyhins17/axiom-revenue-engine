@@ -2841,7 +2841,9 @@ nav[aria-label="Primary"] .text-zinc-700,
 @keyframes owner-pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
 @keyframes owner-confetti { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
 @keyframes owner-slide-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
-.owner-page-enter { animation: owner-rise 460ms cubic-bezier(.2,.8,.2,1) both; }
+.owner-app-shell .owner-page-enter { animation: owner-rise 460ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes owner-lift { from { transform: translateY(14px); } to { transform: none; } }
+.owner-signin-enter { animation: owner-lift 600ms cubic-bezier(.2,.8,.2,1) both; }
 .owner-stagger > * { animation: owner-rise 520ms cubic-bezier(.2,.8,.2,1) both; }
 .owner-stagger > *:nth-child(1) { animation-delay: 30ms; }
 .owner-stagger > *:nth-child(2) { animation-delay: 80ms; }
