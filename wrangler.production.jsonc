@@ -29,6 +29,7 @@
     "ENGINE_EMAIL_FROM": "riley@getaxiom.ca",
     "ENGINE_EMAIL_FROM_NAME": "Riley Hinsperger",
     "ENGINE_SMTP_HOST": "smtp.zoho.com",
+    "AI_MONTHLY_BUDGET_USD": "5",
     "AUTH_ALLOWED_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
     "AUTH_ADMIN_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
     "AUTH_ALLOWED_ORIGINS": "https://operations.getaxiom.ca,https://axiom-ops-omniscient.aidan-magee2.workers.dev",

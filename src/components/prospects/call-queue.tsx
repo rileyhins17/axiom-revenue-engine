@@ -4,6 +4,8 @@ import { Check, ChevronRight, Copy, ExternalLink, MapPin, Phone, SkipForward } f
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { AiBrief } from "./ai-brief";
+
 export type QueueBusiness = {
   prospectId: string; name: string; city: string; niche: string; label: "STRONG" | "WEAK" | "NO_WEBSITE";
   reasons: string[]; phone: string; address: string | null; websiteUrl: string | null; mapsUrl: string;
@@ -42,7 +44,9 @@ function opener(business: QueueBusiness, caller: string) {
   return `Hi, this is ${caller} from Axiom Web here in Kitchener-Waterloo. I was looking at your website and noticed ${reason ?? "a few things that could be easier on a phone"}. Who looks after the website for you?`;
 }
 
-export function CallQueue({ business, remaining, caller, skipped }: { business: QueueBusiness; remaining: number; caller: string; skipped: string[] }) {
+export type QueueBrief = { opener: string; talkingPoints: string[]; objections: { objection: string; reply: string }[]; nextStep: string };
+
+export function CallQueue({ business, remaining, caller, skipped, aiReady, brief }: { business: QueueBusiness; remaining: number; caller: string; skipped: string[]; aiReady: boolean; brief: QueueBrief | null }) {
   const router = useRouter();
   const [key, setKey] = useState(() => crypto.randomUUID());
   const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -121,13 +125,15 @@ export function CallQueue({ business, remaining, caller, skipped }: { business: 
         {business.address ? <p className="mt-3 text-sm text-slate-600">{business.address}</p> : null}
       </div>
 
+      <AiBrief prospectId={business.prospectId} initial={brief} aiReady={aiReady} />
+
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">What the engine found</h3>
           <ul className="mt-3 space-y-2 text-sm">{business.reasons.length ? business.reasons.slice(0, 5).map((reason) => <li key={reason} className="flex gap-2"><ChevronRight className="mt-0.5 size-4 shrink-0 text-rose-700" aria-hidden="true" />{reason}</li>) : <li className="text-slate-600">No details recorded.</li>}</ul>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Opening line</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Quick opener (no AI)</h3>
           <p className="mt-3 text-sm leading-relaxed">{opener(business, caller)}</p>
           <p className="mt-3 text-xs text-slate-600">Goal: book a 15-minute look at a free mock-up. Don&apos;t promise results.</p>
         </div>

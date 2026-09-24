@@ -206,6 +206,8 @@ requireMatch("package.json", packageJson, /scripts\/\*\*\/\*\.test\.ts/, "TypeSc
 const productionWrangler = await readFile(new URL("../wrangler.production.jsonc", import.meta.url), "utf8");
 requireMatch("wrangler.production.jsonc", productionWrangler, /"ENGINE_EMAIL_ENABLED"\s*:\s*"false"/, "live email sending must be off in source; the owner enables it deliberately");
 requireMatch("wrangler.production.jsonc", productionWrangler, /"crons"\s*:\s*\[\s*(?:"0 14 \* \* 1-5"\s*)?\]/, "live may only schedule the gated weekday email batch");
+requireMatch("wrangler.production.jsonc", productionWrangler, /"AI_MONTHLY_BUDGET_USD"\s*:\s*"(?:[0-9]|10)"/, "the AI budget must be set and at most US$10 a month");
+forbidMatch("wrangler.production.jsonc", productionWrangler, /GEMINI_API_KEY"\s*:/, "the Gemini key is a secret, never a checked-in var");
 forbidMatch("wrangler.production.jsonc", productionWrangler, /"AUTONOMOUS_(?:QUEUE|SEND|INTAKE)_ENABLED"\s*:\s*"true"/, "legacy autonomous switches stay off on live");
 requireMatch("package.json", packageJson, /"test:owner-ui"\s*:\s*"tsx scripts\/verify-owner-ui-acceptance\.ts"/, "the owner UI acceptance gate must have a stable local command");
 requireMatch("package.json", packageJson, /"kw:prepare-import"\s*:\s*"tsx scripts\/prepare-private-kw-import\.ts"/, "the private KW import must use the guarded local CLI");

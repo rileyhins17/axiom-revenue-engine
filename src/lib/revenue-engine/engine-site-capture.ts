@@ -39,6 +39,8 @@ export type EngineSiteSignals = {
   generator: string | null;
   hasStreetAddress: boolean;
   phoneLayoutWidth: number;
+  /** The page declares a phone layout (viewport width=device-width). Null on runs before capture v-next. */
+  phoneViewportMeta?: boolean | null;
   phoneScrollWidth: number;
   phoneTapToCall: boolean;
   desktopTapToCall: boolean;
@@ -57,7 +59,7 @@ type DesktopFacts = {
   forms: { visible: boolean; hasSubmitControl: boolean; disabled: boolean; actionUrl: string | null }[];
   structuredDataTypes: string[];
 };
-type PhoneFacts = { layoutWidth: number; scrollWidth: number; menuVisible: boolean; minPrimaryTap: number | null; tapToCall: boolean };
+type PhoneFacts = { layoutWidth: number; viewportMeta: boolean; scrollWidth: number; menuVisible: boolean; minPrimaryTap: number | null; tapToCall: boolean };
 
 /* Runs inside the page. Kept dependency-free and side-effect free. */
 function readDesktop(): DesktopFacts {
@@ -129,6 +131,7 @@ function readPhone(): PhoneFacts {
   });
   return {
     layoutWidth: window.innerWidth,
+    viewportMeta: /width\s*=\s*device-width/i.test(document.querySelector('meta[name="viewport" i]')?.getAttribute("content") ?? ""),
     scrollWidth: document.documentElement.scrollWidth,
     menuVisible: top,
     minPrimaryTap: primary.length ? Math.round(Math.min(...primary.map((rect) => Math.min(rect.width, rect.height)))) : null,
@@ -254,7 +257,7 @@ export async function captureAndAuditSite(
         phone: sitePhone(facts.actions.map((action) => action.href)),
         email: siteEmail(facts.mailtos, text)?.email ?? null, emailMethod: siteEmail(facts.mailtos, text)?.method ?? null,
         streetAddress: streetAddress(text), statusCode, copyrightYear: copyrightYear(text), generator: facts.generator,
-        hasStreetAddress: hasStreetAddress(text), phoneLayoutWidth: phoneFacts.layoutWidth, phoneScrollWidth: phoneFacts.scrollWidth,
+        hasStreetAddress: hasStreetAddress(text), phoneLayoutWidth: phoneFacts.layoutWidth, phoneViewportMeta: phoneFacts.viewportMeta, phoneScrollWidth: phoneFacts.scrollWidth,
         phoneTapToCall: phoneFacts.tapToCall, desktopTapToCall: facts.actions.some((action) => action.href?.startsWith("tel:") && action.visible),
         quoteAction: facts.actions.some((action) => (action.kind === "QUOTE" || action.kind === "BOOK") && action.visible),
         wordCount: text.split(/\s+/).filter(Boolean).length,

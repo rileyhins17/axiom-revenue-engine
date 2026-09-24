@@ -16,18 +16,30 @@ test("a working site is WEAK", () => {
   assert.equal(classifyEngineLead("https://synthetic-roofing.example/", signals(), 2026).label, "WEAK");
 });
 
-test("provable call, quote, phone-layout and staleness problems are STRONG", () => {
-  const cases: Partial<EngineSiteSignals>[] = [
-    { phoneLayoutWidth: 980, phoneScrollWidth: 980 },
-    { phoneScrollWidth: 800 },
-    { generator: "WordPress 4.8.32" },
-    { copyrightYear: 2012 },
-    { phoneTapToCall: false, quoteAction: false },
-    { phoneTapToCall: false, wordCount: 120 },
-    { quoteAction: false, wordCount: 180 },
+test("a site is only called weak with two serious problems, or one serious plus one minor", () => {
+  const url = "https://synthetic-roofing.example/";
+  const strong: Partial<EngineSiteSignals>[] = [
+    { phoneViewportMeta: false, phoneLayoutWidth: 980, phoneScrollWidth: 980, copyrightYear: 2019 },
+    { phoneViewportMeta: false, phoneLayoutWidth: 980, generator: "WordPress 4.8.32" },
+    { phoneScrollWidth: 800, phoneTapToCall: false, wordCount: 120 },
+    { phoneTapToCall: false, desktopTapToCall: false, quoteAction: false, copyrightYear: 2020 },
+    { copyrightYear: 2012, generator: "WordPress 4.9" },
   ];
-  for (const overrides of cases) assert.equal(classifyEngineLead("https://synthetic-roofing.example/", signals(overrides), 2026).label, "STRONG", JSON.stringify(overrides));
-  assert.equal(classifyEngineLead("https://synthetic-roofing.example/", signals({ copyrightYear: 2021 }), 2026).label, "WEAK");
+  for (const overrides of strong) assert.equal(classifyEngineLead(url, signals(overrides), 2026).label, "STRONG", JSON.stringify(overrides));
+  const fine: Partial<EngineSiteSignals>[] = [
+    { phoneViewportMeta: true, phoneLayoutWidth: 980, phoneScrollWidth: 980 },
+    { copyrightYear: 2019 },
+    { quoteAction: false, wordCount: 180 },
+    { phoneViewportMeta: false, phoneLayoutWidth: 980 },
+    { phoneTapToCall: false, desktopTapToCall: false, quoteAction: false },
+  ];
+  for (const overrides of fine) assert.equal(classifyEngineLead(url, signals(overrides), 2026).label, "WEAK", JSON.stringify(overrides));
+});
+
+test("a declared phone layout is never reported as missing", () => {
+  const decision = classifyEngineLead("https://synthetic-roofing.example/", signals({ phoneViewportMeta: true, phoneLayoutWidth: 1200, phoneScrollWidth: 1200 }), 2026);
+  assert.equal(decision.codes.includes("NO_PHONE_LAYOUT"), false);
+  assert.equal(decision.codes.includes("SIDEWAYS_SCROLL"), false);
 });
 
 test("generic city-and-trade domains without an address and location pages are WRONG", () => {
@@ -60,7 +72,7 @@ test("display names prefer the declared name, then the title part matching the a
 
 test("reason codes map to at most two factual call notes", async () => {
   const { callNotes } = await import("./engine-lead-rules");
-  const decision = classifyEngineLead("https://synthetic-roofing.example/", signals({ phoneLayoutWidth: 980, phoneScrollWidth: 980, phoneTapToCall: false, quoteAction: false, copyrightYear: 2010 }), 2026);
+  const decision = classifyEngineLead("https://synthetic-roofing.example/", signals({ phoneLayoutWidth: 980, phoneScrollWidth: 980, phoneTapToCall: false, desktopTapToCall: false, quoteAction: false, copyrightYear: 2010 }), 2026);
   assert.deepEqual(decision.codes, ["NO_PHONE_LAYOUT", "STALE_FOOTER", "NO_CALL_OR_QUOTE"]);
   const notes = callNotes(decision.codes);
   assert.equal(notes.length, 2);

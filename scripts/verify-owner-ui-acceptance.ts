@@ -225,8 +225,8 @@ async function applyMigrations(database: SqliteDatabase) {
   const migrations = (await readdir(migrationsDirectory))
     .filter((name) => /^\d{4}_.+\.sql$/.test(name))
     .sort((left, right) => left.localeCompare(right));
-  assert(migrations.at(-1)?.startsWith("0076_"),
-    "The owner fixture must apply every migration through 0076_engine_email_outreach.");
+  assert(migrations.at(-1)?.startsWith("0077_"),
+    "The owner fixture must apply every migration through 0077_ai_call_briefs.");
   database.pragma("foreign_keys = ON");
   for (const migration of migrations) {
     database.exec(await readFile(join(migrationsDirectory, migration), "utf8"));
@@ -451,11 +451,11 @@ async function assertNav(page: Page, label: string) {
   if (isMobile) {
     const mobileItems = await page.locator("nav[aria-label='Primary'] a[href]").evaluateAll((elements) =>
       elements.map((element) => element.textContent?.trim() ?? ""));
-    assert.deepEqual(mobileItems, ["Today", "Queue", "List", "Walk-ins", "Email", "Settings"], `${label} mobile tab bar must list the six owner pages.`);
+    assert.deepEqual(mobileItems, ["Today", "Queue", "List", "Walk-ins", "Email", "Ask AI", "Settings"], `${label} mobile tab bar must list the six owner pages.`);
   } else {
     const sidebarItems = await page.locator(".owner-nav-title").evaluateAll((elements) =>
       elements.map((element) => element.textContent?.trim() ?? ""));
-    assert.deepEqual(sidebarItems, ["Today", "Call queue", "Call list", "Walk-ins", "Email", "Settings"], `${label} sidebar navigation must be the six owner pages.`);
+    assert.deepEqual(sidebarItems, ["Today", "Call queue", "Call list", "Walk-ins", "Email", "Ask AI", "Settings"], `${label} sidebar navigation must be the six owner pages.`);
   }
 }
 

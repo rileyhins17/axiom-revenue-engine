@@ -1,4 +1,4 @@
-import { CalendarDays, Footprints, Headset, List, Mail, Settings, type LucideIcon } from "lucide-react";
+import { CalendarDays, Footprints, Headset, List, Mail, Settings, Sparkles, type LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 export type AppNavItem = {
@@ -17,7 +17,8 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   { title: "Call list", label: "List", description: "Every business, filter and search", url: "/prospects" as Route, icon: List, shortcut: "⌘3", keywords: ["prospects", "list", "search", "leads", "log"] },
   { title: "Walk-ins", label: "Walk-ins", description: "Addresses and routes", url: "/walk-ins" as Route, icon: Footprints, shortcut: "⌘4", keywords: ["visit", "walk-in", "route", "door", "map"] },
   { title: "Email", label: "Email", description: "Automatic first emails", url: "/email" as Route, icon: Mail, shortcut: "⌘5", keywords: ["email", "outreach", "send", "unsubscribe"] },
-  { title: "Settings", label: "Settings", description: "Emergency stop and account", url: "/settings", icon: Settings, shortcut: "⌘6", keywords: ["stop", "safety", "account", "settings"] },
+  { title: "Ask AI", label: "Ask AI", description: "Questions about leads and the app", url: "/ask" as Route, icon: Sparkles, shortcut: "⌘6", keywords: ["ai", "ask", "assistant", "chat", "help", "question"] },
+  { title: "Settings", label: "Settings", description: "Emergency stop and account", url: "/settings", icon: Settings, shortcut: "⌘7", keywords: ["stop", "safety", "account", "settings"] },
 ];
 
 export function getNavItemForPath(pathname: string | null | undefined) {
