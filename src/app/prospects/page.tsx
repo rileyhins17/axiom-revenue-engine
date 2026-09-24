@@ -39,7 +39,7 @@ function href(current: Search, change: Partial<Search>) {
 
 function Chip({ active, to, children }: { active: boolean; to: string; children: React.ReactNode }) {
   return <Link href={to as never} aria-current={active ? "page" : undefined}
-    className={`rounded-full px-3 py-1 text-sm ${active ? "bg-slate-900 text-white" : "border border-slate-300 hover:bg-slate-100"}`}>{children}</Link>;
+    className={`rounded-full px-3 py-1 text-sm ${active ? "bg-[#0a0a0a] text-[#fbf6ea]" : "border border-slate-300 hover:bg-slate-100"}`}>{children}</Link>;
 }
 
 export default async function ProspectsPage({ searchParams }: { searchParams: Promise<Search> }) {

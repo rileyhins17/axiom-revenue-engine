@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Fraunces, Inter } from "next/font/google";
 
 import { AppShell } from "@/components/app-shell";
 import { PwaServiceWorker } from "@/components/pwa-service-worker";
@@ -7,6 +8,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { PerformanceProvider } from "@/lib/ui/performance";
 
 import "./globals.css";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap", axes: ["opsz"] });
 
 export const metadata: Metadata = {
   title: "Axiom Revenue Engine",
@@ -38,7 +42,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#f5f4ef",
+  themeColor: "#0a0a0a",
   colorScheme: "light",
 };
 
@@ -48,7 +52,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${inter.variable} ${fraunces.variable}`}>
       <body className="font-sans antialiased">
         <PerformanceProvider>
           <TooltipProvider delayDuration={0}>

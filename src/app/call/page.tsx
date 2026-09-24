@@ -34,7 +34,7 @@ export default async function CallQueuePage({ searchParams }: { searchParams: Pr
         <h1 className="text-2xl font-semibold">Call queue</h1>
         <p className="text-sm text-slate-600">One business at a time. Log what happened and the next one loads. Anyone called today is held until tomorrow.</p>
       </div>
-      {skipped.length ? <Link href={"/call" as Route} className="text-sm font-medium text-emerald-800 hover:underline">Bring back {skipped.length} skipped</Link> : null}
+      {skipped.length ? <Link href={"/call" as Route} className="text-sm font-medium text-[#7a5818] hover:underline">Bring back {skipped.length} skipped</Link> : null}
     </header>
     {row && row.phone ? <CallQueue caller={caller} remaining={queue.remaining} skipped={skipped} aiReady={aiReady} brief={brief} business={{
       prospectId: row.prospectId, name: row.name, city: row.city, niche: row.niche, label: row.label, reasons: row.reasons,

@@ -25,8 +25,9 @@ export function AppSidebar() {
       <SidebarHeader className="owner-sidebar-brand">
         <Link href="/dashboard" aria-label="Axiom Web home" className="owner-brand">
           <span className="min-w-0">
-            <span className="owner-brand-name">AXIOM<span className="owner-brand-period">.</span></span>
-            <span className="owner-brand-caption">Revenue workspace</span>
+            {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset, no optimizer on Workers */}
+            <img src="/axiom-logo.webp" alt="Axiom" width={148} height={40} className="owner-brand-logo" />
+            <span className="owner-brand-caption">Revenue engine</span>
           </span>
         </Link>
       </SidebarHeader>

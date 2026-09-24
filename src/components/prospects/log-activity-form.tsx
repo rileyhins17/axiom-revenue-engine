@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { celebrate } from "@/components/motion/celebrate";
+
 const OUTCOMES = [
   { value: "NO_ANSWER", label: "No answer" },
   { value: "VOICEMAIL", label: "Left voicemail" },
@@ -36,6 +38,7 @@ export function LogActivityForm({ prospectId, defaultChannel = "CALL" }: { prosp
         body: JSON.stringify({ idempotencyKey: key, prospectId, channel, outcome, note, followUpAt: followUpAt || null }),
       });
       if (!response.ok) throw new Error(((await response.json().catch(() => ({}))) as { error?: string }).error ?? "Could not save.");
+      if (outcome === "INTERESTED" || outcome === "MEETING_BOOKED" || outcome === "WON") celebrate();
       setState("SAVED"); setKey(crypto.randomUUID()); setOutcome(""); setNote(""); setFollowUpAt("");
       router.refresh();
     } catch (caught) {
@@ -46,11 +49,11 @@ export function LogActivityForm({ prospectId, defaultChannel = "CALL" }: { prosp
   return <div className="mt-3 space-y-3 rounded-lg border border-slate-200 p-3">
     <div className="flex gap-2" role="group" aria-label="Call or visit">
       {(["CALL", "VISIT"] as const).map((value) => <button key={value} type="button" onClick={() => setChannel(value)} aria-pressed={channel === value}
-        className={`rounded-md px-3 py-1.5 text-sm font-medium ${channel === value ? "bg-slate-900 text-white" : "border border-slate-300"}`}>{value === "CALL" ? "Call" : "Visit"}</button>)}
+        className={`rounded-md px-3 py-1.5 text-sm font-medium ${channel === value ? "bg-[#0a0a0a] text-[#fbf6ea]" : "border border-slate-300"}`}>{value === "CALL" ? "Call" : "Visit"}</button>)}
     </div>
     <div className="flex flex-wrap gap-2" role="group" aria-label="What happened">
       {OUTCOMES.map((option) => <button key={option.value} type="button" onClick={() => setOutcome(option.value)} aria-pressed={outcome === option.value}
-        className={`rounded-full px-3 py-1.5 text-xs font-medium ${outcome === option.value ? (option.value === "DO_NOT_CONTACT" ? "bg-rose-700 text-white" : "bg-emerald-700 text-white") : "border border-slate-300"}`}>{option.label}</button>)}
+        className={`rounded-full px-3 py-1.5 text-xs font-medium ${outcome === option.value ? (option.value === "DO_NOT_CONTACT" ? "bg-rose-700 text-white" : "owner-cta") : "border border-slate-300"}`}>{option.label}</button>)}
     </div>
     <label className="block text-xs font-medium">Notes
       <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} rows={2}
@@ -62,7 +65,7 @@ export function LogActivityForm({ prospectId, defaultChannel = "CALL" }: { prosp
     <div className="flex items-center gap-3">
       <button type="button" onClick={() => void save()} disabled={state === "SAVING"}
         className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{state === "SAVING" ? "Saving…" : "Save"}</button>
-      {state === "SAVED" ? <span className="text-xs text-emerald-700">Saved</span> : null}
+      {state === "SAVED" ? <span className="text-xs text-[#7a5818]">Saved</span> : null}
       {error ? <span role="alert" className="text-xs text-rose-700">{error}</span> : null}
     </div>
   </div>;

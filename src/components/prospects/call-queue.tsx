@@ -4,6 +4,8 @@ import { Check, ChevronRight, Copy, ExternalLink, MapPin, Phone, SkipForward } f
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { celebrate } from "@/components/motion/celebrate";
+
 import { AiBrief } from "./ai-brief";
 
 export type QueueBusiness = {
@@ -75,6 +77,7 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
         body: JSON.stringify({ idempotencyKey: key, prospectId: business.prospectId, channel: "CALL", outcome, note, followUpAt: followUpAt || null }),
       });
       if (!response.ok) throw new Error(((await response.json().catch(() => ({}))) as { error?: string }).error ?? "Could not save.");
+      if (outcome === "INTERESTED" || outcome === "MEETING_BOOKED" || outcome === "WON") celebrate();
       router.refresh();
     } catch (caught) {
       setSaving(false); setError(caught instanceof Error ? caught.message : "Could not save.");
@@ -97,12 +100,12 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
 
   const dial = business.phone.replace(/[^\d+]/g, "");
   return <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
-    <section className="min-w-0 space-y-4">
+    <section key={business.prospectId} className="owner-slide-in min-w-0 space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm text-slate-600">{title(business.city)} · {title(business.niche)}{business.attempts ? ` · tried ${business.attempts}×` : " · never contacted"}</p>
-            <h2 className="mt-1 text-3xl font-semibold tracking-tight">{business.name}</h2>
+            <h2 className="font-display mt-1 text-3xl tracking-tight">{business.name}</h2>
             <span className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${business.label === "NO_WEBSITE" ? "bg-amber-50 text-amber-900 ring-amber-200" : "bg-rose-50 text-rose-800 ring-rose-200"}`}>
               {business.label === "NO_WEBSITE" ? "No website" : "Weak website"}
             </span>
@@ -112,7 +115,7 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <a href={`tel:${dial}`} className="inline-flex items-center gap-3 rounded-xl bg-emerald-700 px-6 py-4 text-2xl font-semibold tabular-nums text-white shadow-sm hover:bg-emerald-800">
+          <a href={`tel:${dial}`} className="owner-cta inline-flex items-center gap-3 rounded-xl px-6 py-4 text-2xl font-semibold tabular-nums  shadow-sm ">
             <Phone className="size-6" aria-hidden="true" />{business.phone}
           </a>
           <button type="button" onClick={() => { void navigator.clipboard?.writeText(business.phone); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
@@ -152,10 +155,10 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
       <div className="grid grid-cols-2 gap-2" role="group" aria-label="Call outcome">
         {OUTCOMES.map((option) => {
           const active = outcome === option.value;
-          const tone = active ? (option.tone === "stop" || option.tone === "bad" ? "bg-rose-700 text-white border-rose-700" : option.tone === "good" ? "bg-emerald-700 text-white border-emerald-700" : "bg-slate-900 text-white border-slate-900") : "border-slate-300 hover:bg-slate-50";
+          const tone = active ? (option.tone === "stop" || option.tone === "bad" ? "bg-rose-700 text-white border-rose-700" : option.tone === "good" ? "owner-cta border-emerald-700" : "bg-[#0a0a0a] text-[#fbf6ea] border-slate-900") : "border-slate-300 hover:bg-slate-50";
           return <button key={option.value} type="button" aria-pressed={active}
             onClick={() => { setOutcome(option.value); if (NEEDS_DATE.has(option.value) && !followUpAt) setFollowUpAt(inDays(option.value === "CALL_BACK" ? 2 : 3)); }}
-            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-medium ${tone}`}>
+            className={`owner-press flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-medium ${tone}`}>
             {option.label}<kbd className={`rounded px-1.5 text-[11px] ${active ? "bg-white/20" : "bg-slate-100 text-slate-600"}`}>{option.key}</kbd>
           </button>;
         })}
@@ -179,7 +182,7 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
       {error ? <p role="alert" className="text-sm text-rose-700">{error}</p> : null}
       <div className="flex gap-2">
         <button type="button" onClick={() => void save()} disabled={saving}
-          className="flex-1 rounded-lg bg-emerald-700 px-4 py-3 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">{saving ? "Saving…" : "Save & next"}</button>
+          className="flex-1 rounded-lg owner-cta px-4 py-3 font-semibold   disabled:opacity-50">{saving ? "Saving…" : "Save & next"}</button>
         <button type="button" onClick={skip} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-3 text-sm font-medium hover:bg-slate-50"><SkipForward className="size-4" aria-hidden="true" />Skip</button>
       </div>
       <p className="text-xs text-slate-600">Keys: 1–0 outcome · N notes · Ctrl+Enter save · S skip</p>

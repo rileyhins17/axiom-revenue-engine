@@ -32,7 +32,7 @@ export function ProspectRow({ row }: { row: ProspectRowView }) {
       <td className="px-3 py-3 text-sm">{title(row.city)}<br /><span className="text-slate-600">{title(row.niche)}</span></td>
       <td className="max-w-[340px] px-3 py-3 text-sm">{row.reasons.slice(0, 2).map((reason) => <p key={reason}>{reason}</p>)}</td>
       <td className="whitespace-nowrap px-3 py-3 text-sm">
-        {row.phone ? <a href={`tel:${row.phone.replace(/[^\d+]/g, "")}`} className="font-medium tabular-nums text-emerald-800 hover:underline">{row.phone}</a> : <span className="text-slate-600">—</span>}
+        {row.phone ? <a href={`tel:${row.phone.replace(/[^\d+]/g, "")}`} className="font-medium tabular-nums text-[#7a5818] hover:underline">{row.phone}</a> : <span className="text-slate-600">—</span>}
         <div className="mt-1 flex gap-2 text-xs">
           <a href={row.mapsUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-slate-600 hover:text-slate-900"><MapPin className="size-3" aria-hidden="true" />Map</a>
           {row.websiteUrl ? <a href={row.websiteUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-slate-600 hover:text-slate-900"><ExternalLink className="size-3" aria-hidden="true" />Site</a> : null}
@@ -44,7 +44,7 @@ export function ProspectRow({ row }: { row: ProspectRowView }) {
       </td>
       <td className="px-3 py-3 text-right">
         <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}
-          className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800">{open ? "Close" : "Log"}</button>
+          className="rounded-md owner-cta px-3 py-1.5 text-sm font-semibold  ">{open ? "Close" : "Log"}</button>
       </td>
     </tr>
     {open ? <tr className="border-b border-slate-200 bg-slate-50">

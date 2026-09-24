@@ -46,7 +46,7 @@ export default async function WalkInsPage() {
     {byCity.map((group) => <div key={group.city} className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{titleCase(group.city)} <span className="text-sm font-normal text-slate-600">({group.stops.length})</span></h2>
-        <a href={routeUrl(group.stops)} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+        <a href={routeUrl(group.stops)} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-[#1a1a1a]">
           <RouteIcon className="size-4" aria-hidden="true" />Route first {Math.min(10, group.stops.length)} stops
         </a>
       </div>

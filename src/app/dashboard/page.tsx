@@ -2,6 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { ArrowRight, Footprints, Headset, Mail, Phone, Target } from "lucide-react";
 
+import { CountUp } from "@/components/motion/count-up";
 import { getDatabase } from "@/lib/cloudflare";
 import { titleCase, torontoMidnight, torontoToday } from "@/lib/prospect-format";
 import { emailSetting, sentToday } from "@/lib/revenue-engine/engine-email";
@@ -20,18 +21,20 @@ function Scoreboard({ label, today, week }: { label: string; today: Stats; week:
   const actor = label === "Aidan" ? "AIDAN" : "RILEY";
   const t = person(today, actor); const w = person(week, actor);
   const pct = Math.min(100, Math.round((t.calls / DAILY_DIAL_GOAL) * 100));
-  return <div className="rounded-xl border border-slate-200 bg-white p-4">
+  return <div className="owner-card-lift rounded-xl border border-slate-200 bg-white p-4">
     <div className="flex items-center justify-between gap-2">
       <p className="text-sm font-semibold">{label}</p>
-      <p className="flex items-center gap-1 text-xs text-slate-600"><Target className="size-3.5" aria-hidden="true" />{t.calls} / {DAILY_DIAL_GOAL} dials today</p>
+      {pct >= 100
+        ? <p className="owner-pop rounded-full bg-[#0a0a0a] px-2.5 py-0.5 text-xs font-semibold text-[#f2e3c2]">Goal hit · {t.calls} dials</p>
+        : <p className="flex items-center gap-1 text-xs text-slate-600"><Target className="size-3.5" aria-hidden="true" />{t.calls} / {DAILY_DIAL_GOAL} dials today</p>}
     </div>
     <div className="mt-2 h-2 rounded-full bg-slate-100" role="progressbar" aria-label={`${label} dials toward today's goal`} aria-valuenow={t.calls} aria-valuemin={0} aria-valuemax={DAILY_DIAL_GOAL}>
-      <div className={`h-2 rounded-full ${pct >= 100 ? "bg-amber-500" : "bg-emerald-600"}`} style={{ width: `${pct}%` }} />
+      <div className="owner-grow h-2 rounded-full bg-gradient-to-r from-[#b8893b] to-[#e3c07a]" style={{ width: `${pct}%` }} />
     </div>
     <div className="mt-3 grid grid-cols-3 gap-2 text-center">
       {[["Calls", t.calls, w.calls], ["Talked", t.conversations, w.conversations], ["Walk-ins", t.visits, w.visits]].map(([name, day, total]) =>
         <div key={name as string} className="rounded-lg bg-slate-50 p-2">
-          <p className="text-2xl font-semibold tabular-nums">{day}</p>
+          <p className="text-2xl font-semibold tabular-nums"><CountUp value={Number(day)} /></p>
           <p className="text-[11px] text-slate-600">{name} today</p>
           <p className="text-[11px] text-slate-600">{total} this week</p>
         </div>)}
@@ -56,6 +59,8 @@ export default async function TodayPage() {
   const today = torontoToday(now);
   const db = getDatabase() as unknown as ProspectDb;
   const firstName = session.user.name?.split(" ")[0] || (session.user.email?.startsWith("aidan") ? "Aidan" : "Riley");
+  const hour = Number(new Intl.DateTimeFormat("en-CA", { hour: "numeric", hourCycle: "h23", timeZone: "America/Toronto" }).format(now));
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const date = new Intl.DateTimeFormat("en-CA", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Toronto" }).format(now);
 
   let data;
@@ -82,26 +87,26 @@ export default async function TodayPage() {
   ] as const;
   const max = Math.max(1, counts.all);
 
-  return <section className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6">
+  return <section className="owner-stagger mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6">
     <header>
       <p className="text-sm text-slate-600">{date}</p>
-      <h1 className="text-2xl font-semibold">Hi {firstName}. Here&apos;s today.</h1>
+      <h1>{greeting}, {firstName}.</h1>
     </header>
 
     <div className="grid gap-4 lg:grid-cols-3">
-      <Link href={"/call" as Route} className="group min-w-0 rounded-2xl bg-emerald-700 p-6 text-white shadow-sm hover:bg-emerald-800 lg:col-span-2">
-        <p className="flex items-center gap-2 text-sm font-medium text-emerald-50"><Headset className="size-4" aria-hidden="true" />Call queue</p>
-        <p className="mt-2 text-4xl font-semibold tabular-nums">{counts.call}</p>
-        <p className="text-emerald-50">businesses ready to call{counts.followups ? `, including ${counts.followups} follow-up${counts.followups === 1 ? "" : "s"} due` : ""}</p>
-        <p className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 font-semibold text-emerald-800">Start calling <ArrowRight className="size-4 transition group-hover:translate-x-0.5" aria-hidden="true" /></p>
+      <Link href={"/call" as Route} className="group min-w-0 rounded-2xl owner-cta p-6  shadow-sm  lg:col-span-2">
+        <p className="flex items-center gap-2 text-sm font-medium text-[#e9dfc8]"><Headset className="size-4" aria-hidden="true" />Call queue</p>
+        <p className="font-display owner-gold-text mt-2 text-6xl tabular-nums"><CountUp value={counts.call} /></p>
+        <p className="text-[#e9dfc8]">businesses ready to call{counts.followups ? `, including ${counts.followups} follow-up${counts.followups === 1 ? "" : "s"} due` : ""}</p>
+        <p className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-[#f7e9c8] px-4 py-2 font-semibold text-[#0a0a0a] shadow-[0_8px_24px_-8px_rgba(227,192,122,0.6)] transition group-hover:bg-[#fbf1da]">Start calling <ArrowRight className="size-4 transition group-hover:translate-x-0.5" aria-hidden="true" /></p>
       </Link>
       <div className="grid gap-4">
-        <Link href={"/walk-ins" as Route} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 hover:border-slate-300">
+        <Link href={"/walk-ins" as Route} className="owner-card-lift min-w-0 rounded-2xl border border-slate-200 bg-white p-5">
           <p className="flex items-center gap-2 text-sm font-medium text-slate-600"><Footprints className="size-4" aria-hidden="true" />Walk-ins</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{counts.visit}</p>
           <p className="text-sm text-slate-600">with an address, routed by city</p>
         </Link>
-        <Link href={"/email" as Route} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 hover:border-slate-300">
+        <Link href={"/email" as Route} className="owner-card-lift min-w-0 rounded-2xl border border-slate-200 bg-white p-5">
           <p className="flex items-center gap-2 text-sm font-medium text-slate-600"><Mail className="size-4" aria-hidden="true" />Automatic email</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{email?.enabled ? `${emailedToday} / ${Math.min(10, email.dailyCap)}` : "Off"}</p>
           <p className="text-sm text-slate-600">{email?.enabled ? "sent today" : "approve the email to turn it on"}</p>
@@ -112,7 +117,7 @@ export default async function TodayPage() {
     {upNext.length ? <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-semibold">Up next in the queue</h2>
-        <Link href={"/call" as Route} className="text-xs font-medium text-emerald-800 hover:underline">Open the queue</Link>
+        <Link href={"/call" as Route} className="text-xs font-medium text-[#7a5818] hover:underline">Open the queue</Link>
       </div>
       <ol className="mt-3 divide-y divide-slate-100">{upNext.map((row, index) => <li key={row.prospectId} className="flex items-center gap-3 py-2.5">
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold">{index + 1}</span>
@@ -134,14 +139,14 @@ export default async function TodayPage() {
         <h2 className="font-semibold">Results so far</h2>
         <ul className="mt-3 space-y-2">{funnel.map(([label, value]) => <li key={label} className="grid grid-cols-[120px_minmax(0,1fr)_40px] items-center gap-3 text-sm">
           <span className="text-slate-600">{label}</span>
-          <span className="h-2.5 rounded-full bg-slate-100"><span className="block h-2.5 rounded-full bg-emerald-600" style={{ width: `${Math.max(value ? 2 : 0, Math.round((value / max) * 100))}%` }} /></span>
+          <span className="h-2.5 rounded-full bg-slate-100"><span className="owner-grow block h-2.5 rounded-full bg-gradient-to-r from-[#b8893b] to-[#e3c07a]" style={{ width: `${Math.max(value ? 2 : 0, Math.round((value / max) * 100))}%` }} /></span>
           <span className="text-right font-semibold tabular-nums">{value}</span>
         </li>)}</ul>
       </div>
       <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold">Follow-ups due</h2>
-          <Link href={"/prospects?view=followups" as Route} className="text-xs font-medium text-emerald-800 hover:underline">See all {counts.followups}</Link>
+          <Link href={"/prospects?view=followups" as Route} className="text-xs font-medium text-[#7a5818] hover:underline">See all {counts.followups}</Link>
         </div>
         {followups.length ? <ul className="mt-2">{followups.map((row) => <LeadRow key={row.prospectId} row={row} />)}</ul>
           : <p className="mt-3 text-sm text-slate-600">Nothing due. Pick &ldquo;Call back&rdquo; with a date and it shows up here.</p>}

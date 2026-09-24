@@ -158,7 +158,7 @@ function MobileTabBar({ pathname }: { pathname: string | null }) {
       aria-label="Primary"
       className="owner-mobile-nav fixed inset-x-0 bottom-0 z-50 px-2 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] pt-2 md:hidden"
     >
-      <div className="grid grid-cols-5 gap-1">
+      <div className="grid grid-cols-7 gap-0.5">
         {APP_NAV_ITEMS.map((item) => {
           const active = pathname === item.url || pathname?.startsWith(`${item.url}/`);
           const Icon = item.icon;

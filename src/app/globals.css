@@ -49,7 +49,7 @@
 :root {
   /* Claude Code desktop-style font stack: native system UI font + system mono.
      SF Pro on macOS, Segoe UI Variable on Windows 11, system-ui elsewhere. */
-  --font-app-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-app-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-app-mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -2746,4 +2746,116 @@ nav[aria-label="Primary"] .text-zinc-700,
 [data-owner-content] .text-zinc-600,
 [data-owner-content] .text-zinc-700 {
   color: #a1a1aa;
+}
+
+/* ==========================================================================
+   AXIOM OBSIDIAN & IVORY: owner theme (brand from getaxiom.ca)
+   Near-black #0a0a0a, warm ivory, champagne-gold accent, Fraunces + Inter.
+   ========================================================================== */
+.owner-app-shell {
+  --owner-paper: #f7f5ef;
+  --owner-white: #fffdf8;
+  --owner-ink: #0a0a0a;
+  --owner-line: #e6e1d6;
+  --owner-pine: #0a0a0a;
+  --owner-pine-soft: #efe9dc;
+  --owner-focus: #8a6420;
+  --owner-gold: #b8893b;
+  --owner-gold-deep: #8a6420;
+  --owner-gold-soft: #f4ead6;
+  background: var(--owner-paper) !important;
+  color: var(--owner-ink) !important;
+}
+.owner-app-shell .owner-main { background: radial-gradient(1200px 500px at 85% -10%, #efe7d6 0%, transparent 60%), var(--owner-paper); }
+.owner-app-shell .owner-topbar { background: rgba(247, 245, 239, 0.82); backdrop-filter: saturate(1.4) blur(14px); }
+.owner-app-shell h1, .owner-app-shell .font-display { font-family: var(--font-fraunces), Georgia, serif; font-weight: 560; letter-spacing: -0.015em; }
+.owner-app-shell h1 { font-size: clamp(1.7rem, 1.2rem + 1vw, 2.2rem); }
+
+/* Sidebar: obsidian with the brushed-metal logo */
+.owner-app-shell .owner-sidebar,
+.owner-app-shell .owner-sidebar [data-sidebar="sidebar"],
+[data-sidebar="sidebar"][data-mobile="true"] {
+  border-right: 1px solid #1c1c1c !important;
+  background: linear-gradient(180deg, #0f0f0f 0%, #0a0a0a 40%, #070707 100%) !important;
+  color: #f2f0ea !important;
+}
+.owner-app-shell .owner-brand-logo { display: block; width: 148px; height: auto; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.6)); transition: transform 400ms cubic-bezier(.2,.8,.2,1), filter 400ms ease; }
+.owner-app-shell .owner-brand:hover .owner-brand-logo { transform: translateY(-1px) scale(1.015); filter: drop-shadow(0 8px 22px rgba(184, 137, 59, 0.28)); }
+.owner-app-shell .owner-brand-caption { color: #a39f95 !important; letter-spacing: 0.18em !important; margin-top: 8px !important; }
+.owner-app-shell .owner-sidebar-brand { border-bottom-color: #1f1f1f !important; }
+.owner-app-shell .owner-sidebar-section-label { color: #8a867c !important; }
+.owner-app-shell .owner-nav-item { position: relative; color: #d6d2c8 !important; transition: background 220ms ease, color 220ms ease, transform 220ms cubic-bezier(.2,.8,.2,1) !important; }
+.owner-app-shell .owner-nav-item:hover { background: #161616 !important; color: #fff !important; transform: translateX(2px); }
+.owner-app-shell .owner-nav-item.is-active,
+.owner-app-shell .owner-nav-item[data-active="true"] {
+  border-color: #2a2418 !important;
+  background: linear-gradient(90deg, #1d1810 0%, #141414 100%) !important;
+  color: #f7ecd4 !important;
+  box-shadow: inset 0 0 0 1px rgba(184, 137, 59, 0.18), 0 8px 24px -12px rgba(184, 137, 59, 0.35);
+}
+.owner-app-shell .owner-nav-item.is-active::before,
+.owner-app-shell .owner-nav-item[data-active="true"]::before {
+  content: ""; position: absolute; left: -12px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px;
+  background: linear-gradient(180deg, #e3c07a, #b8893b); animation: owner-bar-in 380ms cubic-bezier(.2,.8,.2,1);
+}
+.owner-app-shell .owner-nav-description { color: #a09c92 !important; }
+.owner-app-shell .owner-nav-item.is-active .owner-nav-description,
+.owner-app-shell .owner-nav-item[data-active="true"] .owner-nav-description { color: #d4c29a !important; }
+.owner-app-shell .owner-sidebar-footer { border-top-color: #1f1f1f !important; color: #a09c92 !important; }
+.owner-app-shell .owner-sidebar-footer-dot { background: #b8893b !important; animation: owner-pulse 2.4s ease-out infinite; }
+
+/* Topbar controls */
+.owner-app-shell .owner-icon-button, .owner-app-shell .owner-search-trigger button { background: var(--owner-white) !important; border-color: var(--owner-line) !important; color: #3b3a36 !important; }
+.owner-app-shell .owner-icon-button:hover, .owner-app-shell .owner-search-trigger button:hover { color: var(--owner-ink) !important; border-color: #cfc6b3 !important; }
+.owner-app-shell .owner-avatar, .owner-app-shell .owner-avatar > span { background: #0a0a0a !important; color: #f2e3c2 !important; }
+.owner-app-shell .owner-breadcrumb-icon { background: var(--owner-white) !important; border-color: var(--owner-line) !important; color: #5c584f !important; }
+.owner-app-shell .owner-mobile-nav { background: rgba(10, 10, 10, 0.95) !important; border-top-color: #1f1f1f !important; backdrop-filter: blur(14px); }
+.owner-app-shell .owner-mobile-nav-item { color: #cfcac0 !important; }
+.owner-app-shell .owner-mobile-nav-item.is-active { background: #1d1810 !important; color: #f2e3c2 !important; }
+
+/* Cards: warm white, soft depth, lift on hover */
+.owner-app-shell [data-owner-content] :is(.rounded-xl, .rounded-2xl).border { border-color: var(--owner-line); }
+.owner-app-shell [data-owner-content] .bg-white { background-color: var(--owner-white); }
+.owner-card-lift { transition: transform 260ms cubic-bezier(.2,.8,.2,1), box-shadow 260ms ease, border-color 260ms ease; }
+.owner-card-lift:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -22px rgba(10, 10, 10, 0.35); border-color: #d6ccb6; }
+
+/* Primary actions: ink with a gold sheen that sweeps on hover */
+.owner-cta { position: relative; overflow: hidden; background: #0a0a0a; color: #fbf6ea; box-shadow: 0 10px 30px -12px rgba(10, 10, 10, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08); transition: transform 160ms ease, box-shadow 260ms ease, background 260ms ease; }
+.owner-cta:hover { background: #151515; box-shadow: 0 14px 34px -12px rgba(184, 137, 59, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+.owner-cta:active { transform: scale(0.975); }
+.owner-cta:disabled { opacity: 0.5; }
+.owner-cta::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, rgba(227, 192, 122, 0.35) 50%, transparent 70%); transform: translateX(-120%); transition: transform 700ms cubic-bezier(.2,.8,.2,1); pointer-events: none; }
+.owner-cta:hover::after { transform: translateX(120%); }
+.owner-hero { position: relative; overflow: hidden; background: radial-gradient(900px 300px at 110% -40%, rgba(227, 192, 122, 0.28), transparent 60%), linear-gradient(135deg, #111 0%, #0a0a0a 60%, #17130c 100%); color: #f7f1e3; }
+.owner-hero::before { content: ""; position: absolute; inset: -40%; background: conic-gradient(from 0deg, transparent 0 70%, rgba(227, 192, 122, 0.12) 80%, transparent 90%); animation: owner-spin 14s linear infinite; pointer-events: none; }
+.owner-hero > * { position: relative; }
+.owner-gold-text { background: linear-gradient(100deg, #e3c07a, #f7e4b5 45%, #d2a95c 70%, #e3c07a); -webkit-background-clip: text; background-clip: text; color: transparent; background-size: 200% auto; animation: owner-sheen 6s ease-in-out infinite; }
+
+/* Motion system */
+@keyframes owner-rise { from { opacity: 0; transform: translateY(10px) scale(0.995); } to { opacity: 1; transform: none; } }
+@keyframes owner-bar-in { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes owner-pulse { 0% { box-shadow: 0 0 0 0 rgba(184, 137, 59, 0.55); } 70% { box-shadow: 0 0 0 8px rgba(184, 137, 59, 0); } 100% { box-shadow: 0 0 0 0 rgba(184, 137, 59, 0); } }
+@keyframes owner-spin { to { transform: rotate(360deg); } }
+@keyframes owner-sheen { 0%, 100% { background-position: 0% center; } 50% { background-position: 100% center; } }
+@keyframes owner-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes owner-pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes owner-confetti { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
+@keyframes owner-slide-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+.owner-page-enter { animation: owner-rise 460ms cubic-bezier(.2,.8,.2,1) both; }
+.owner-stagger > * { animation: owner-rise 520ms cubic-bezier(.2,.8,.2,1) both; }
+.owner-stagger > *:nth-child(1) { animation-delay: 30ms; }
+.owner-stagger > *:nth-child(2) { animation-delay: 80ms; }
+.owner-stagger > *:nth-child(3) { animation-delay: 130ms; }
+.owner-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.owner-stagger > *:nth-child(5) { animation-delay: 230ms; }
+.owner-stagger > *:nth-child(6) { animation-delay: 280ms; }
+.owner-stagger > *:nth-child(n+7) { animation-delay: 320ms; }
+.owner-grow { transform-origin: left; animation: owner-grow 900ms cubic-bezier(.2,.8,.2,1) both; animation-delay: 200ms; }
+.owner-pop { animation: owner-pop 420ms cubic-bezier(.2,.8,.2,1) both; }
+.owner-slide-in { animation: owner-slide-in 360ms cubic-bezier(.2,.8,.2,1) both; }
+.owner-press { transition: transform 120ms ease, background 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+.owner-press:active { transform: scale(0.96); }
+.owner-confetti { position: fixed; pointer-events: none; z-index: 90; width: 8px; height: 12px; border-radius: 2px; animation: owner-confetti 1100ms cubic-bezier(.15,.7,.3,1) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .owner-app-shell *, .owner-app-shell *::before, .owner-app-shell *::after, .owner-confetti { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }

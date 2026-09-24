@@ -19,8 +19,8 @@ export function EmailSwitch({ enabled, templateApproved, ready }: { enabled: boo
     {enabled
       ? <button type="button" disabled={busy} onClick={() => void change({ enabled: false, approveTemplate: false })} className="w-full rounded-lg bg-rose-700 px-4 py-2.5 font-semibold text-white hover:bg-rose-800 disabled:opacity-50">Turn automatic email OFF</button>
       : templateApproved
-        ? <button type="button" disabled={busy} onClick={() => void change({ enabled: true, approveTemplate: false })} className="w-full rounded-lg bg-emerald-700 px-4 py-2.5 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">Turn automatic email ON</button>
-        : <button type="button" disabled={busy} onClick={() => void change({ enabled: false, approveTemplate: true })} className="w-full rounded-lg bg-slate-900 px-4 py-2.5 font-semibold text-white hover:bg-slate-800 disabled:opacity-50">Approve this email</button>}
+        ? <button type="button" disabled={busy} onClick={() => void change({ enabled: true, approveTemplate: false })} className="w-full rounded-lg owner-cta px-4 py-2.5 font-semibold   disabled:opacity-50">Turn automatic email ON</button>
+        : <button type="button" disabled={busy} onClick={() => void change({ enabled: false, approveTemplate: true })} className="w-full rounded-lg bg-slate-900 px-4 py-2.5 font-semibold text-white hover:bg-[#1a1a1a] disabled:opacity-50">Approve this email</button>}
     {!ready ? <p className="text-xs text-amber-800">Even when on, nothing sends until the Zoho mailbox is connected.</p> : null}
     {error ? <p role="alert" className="text-sm text-rose-700">{error}</p> : null}
   </div>;

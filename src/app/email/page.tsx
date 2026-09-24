@@ -28,7 +28,7 @@ export default async function EmailPage() {
   }
   const env = (getCloudflareBindings() ?? {}) as Record<string, unknown>;
   const ready = env.ENGINE_EMAIL_ENABLED === "true" && Boolean(env.ENGINE_SMTP_PASSWORD);
-  const status = data.enabled && ready ? { text: "Sending up to 10 a day, weekdays at 10am", tone: "bg-emerald-50 text-emerald-800 ring-emerald-200" }
+  const status = data.enabled && ready ? { text: "Sending up to 10 a day, weekdays at 10am", tone: "bg-emerald-50 text-[#7a5818] ring-emerald-200" }
     : data.enabled ? { text: "Switched on, waiting for the mailbox connection", tone: "bg-amber-50 text-amber-900 ring-amber-200" }
     : { text: "Automatic email is off", tone: "bg-slate-100 text-slate-700 ring-slate-200" };
 
