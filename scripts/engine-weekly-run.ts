@@ -36,6 +36,11 @@ async function readLedger(): Promise<PlacesUsageLedger> {
   catch { return { month: "", requests: 0 }; }
 }
 
+/** Loads the ignored local env file when present; values are never printed. */
+function loadLocalEnv() {
+  try { process.loadEnvFile(".env.local"); } catch { /* No local env file; discovery stays off. */ }
+}
+
 export async function engineWeeklyRun(args: string[], env = process.env) {
   let source: string;
   let discovered: DiscoveredBusiness[];
@@ -100,6 +105,7 @@ export async function engineWeeklyRun(args: string[], env = process.env) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  loadLocalEnv();
   engineWeeklyRun(process.argv.slice(2))
     .then((summary) => console.log(JSON.stringify(summary, null, 2)))
     .catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
