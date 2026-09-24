@@ -38,4 +38,17 @@ record covers the staging step only. Production has its own guard and gates.
 
 ## Result
 
-Filled in after execution.
+Executed 2026-09-24 ~03:50–04:10 UTC.
+- Pre-apply export identical to the rehearsed one (SHA-256 `48794fdd…ecb45`,
+  745 rows). Time Travel bookmark:
+  `00000016-00000000-000050f0-b5640c866c245f3bfc07975874e287b8`.
+- First apply: 0056–0073 succeeded; 0074 failed remotely ("incomplete input":
+  the remote splitter cut its trigger at a CASE's `END;`) and was rolled back.
+  Fixed in `8583d8f` (same rules, `SELECT RAISE … WHERE [NOT] EXISTS` form),
+  rehearsal re-run PASS, then 0074 applied.
+- After: 74 receipts ending 0074, stops `enabled=0` and all four paused flags
+  `=1`, 681 scrape targets and 2 users preserved.
+- Console built from `8583d8f` in a clean clone (1,772 files scanned, 0
+  secrets) and deployed: version `cb67ccf9-93be-40bc-80fc-a03ef8238ccc`.
+  Unauthenticated `/dashboard` redirects to `/sign-in`.
+- Not yet done: authenticated owner walkthrough on staging.
