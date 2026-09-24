@@ -71,13 +71,13 @@ export default async function TodayPage() {
   const aidan = stats.byActor.AIDAN ?? { calls: 0, visits: 0, conversations: 0 };
   const riley = stats.byActor.RILEY ?? { calls: 0, visits: 0, conversations: 0 };
 
-  return <section className="mx-auto w-full max-w-6xl space-y-6 px-6 py-8">
+  return <section className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6">
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div>
         <p className="text-sm text-slate-600">{date}</p>
         <h1 className="text-2xl font-semibold">Good to see you, {firstName}</h1>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${data.sendingOff === false ? "bg-amber-100 text-amber-900" : "bg-emerald-50 text-emerald-800"}`}>
           <ShieldCheck className="size-3.5" aria-hidden="true" />{data.sendingOff === false ? "Automatic sending is ON" : "Automatic sending is off"}
         </span>
@@ -100,16 +100,16 @@ export default async function TodayPage() {
     </div>
 
     <div className="grid gap-4 lg:grid-cols-2">
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center justify-between">
+      <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold">Follow-ups due</h2>
           <Link href={"/prospects?view=followups" as Route} className="text-xs font-medium text-emerald-800 hover:underline">All {counts.followups}</Link>
         </div>
         {followups.length ? <ul className="mt-2">{followups.map((row) => <LeadRow key={row.prospectId} row={row} />)}</ul>
           : <p className="mt-3 text-sm text-slate-600">Nothing due. When a call ends with &ldquo;call back,&rdquo; set a date and it shows up here.</p>}
       </div>
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center justify-between">
+      <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold">Best leads to call next</h2>
           <Link href={"/prospects" as Route} className="text-xs font-medium text-emerald-800 hover:underline">Call list ({counts.call})</Link>
         </div>
