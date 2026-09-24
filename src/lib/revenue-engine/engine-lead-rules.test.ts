@@ -16,22 +16,23 @@ test("a working site is WEAK", () => {
   assert.equal(classifyEngineLead("https://synthetic-roofing.example/", signals(), 2026).label, "WEAK");
 });
 
-test("a site is only called weak with two serious problems, or one serious plus one minor", () => {
+test("a site is only called weak with a visible serious problem plus supporting evidence", () => {
   const url = "https://synthetic-roofing.example/";
-  const strong: Partial<EngineSiteSignals>[] = [
-    { phoneViewportMeta: false, phoneLayoutWidth: 980, phoneScrollWidth: 980, copyrightYear: 2019 },
-    { phoneViewportMeta: false, phoneLayoutWidth: 980, generator: "WordPress 4.8.32" },
-    { phoneScrollWidth: 800, phoneTapToCall: false, wordCount: 120 },
-    { phoneTapToCall: false, desktopTapToCall: false, quoteAction: false, copyrightYear: 2020 },
-    { copyrightYear: 2012, generator: "WordPress 4.9" },
+  const strong: [string, Partial<EngineSiteSignals>][] = [
+    [url, { phoneViewportMeta: false, phoneLayoutWidth: 980, phoneScrollWidth: 980, copyrightYear: 2019 }],
+    [url, { phoneViewportMeta: false, phoneLayoutWidth: 980, generator: "WordPress 4.8.32" }],
+    [url, { phoneScrollWidth: 800, phoneTapToCall: false, wordCount: 120 }],
+    [url, { generator: "WordPress 4.9", phoneTapToCall: false, wordCount: 100 }],
+    ["http://synthetic-roofing.example/", { finalUrl: "http://synthetic-roofing.example/", phoneViewportMeta: false, phoneLayoutWidth: 980 }],
   ];
-  for (const overrides of strong) assert.equal(classifyEngineLead(url, signals(overrides), 2026).label, "STRONG", JSON.stringify(overrides));
+  for (const [site, overrides] of strong) assert.equal(classifyEngineLead(site, signals(overrides), 2026).label, "STRONG", JSON.stringify(overrides));
+  // Screenshot-reviewed false positives from the v6 run: modern or responsive sites.
   const fine: Partial<EngineSiteSignals>[] = [
-    { phoneViewportMeta: true, phoneLayoutWidth: 980, phoneScrollWidth: 980 },
-    { copyrightYear: 2019 },
-    { quoteAction: false, wordCount: 180 },
+    { phoneViewportMeta: true, phoneLayoutWidth: 980, phoneScrollWidth: 980, phoneTapToCall: false, desktopTapToCall: false, quoteAction: false },
+    { copyrightYear: 2015, phoneTapToCall: false, desktopTapToCall: false, quoteAction: false },
+    { phoneViewportMeta: false, phoneLayoutWidth: 390, quoteAction: false, wordCount: 180 },
+    { copyrightYear: 2019, quoteAction: false, wordCount: 180 },
     { phoneViewportMeta: false, phoneLayoutWidth: 980 },
-    { phoneTapToCall: false, desktopTapToCall: false, quoteAction: false },
   ];
   for (const overrides of fine) assert.equal(classifyEngineLead(url, signals(overrides), 2026).label, "WEAK", JSON.stringify(overrides));
 });
