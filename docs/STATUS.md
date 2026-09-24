@@ -1,5 +1,22 @@
 # Current status — Axiom Revenue Engine
 
+**Provider setup (2026-09-23, Claude via Riley's Chrome at Riley's request):**
+- Google Cloud project `axiom-revenue-engine` created and linked to the
+  existing billing account (US$2/month alert already covers the account).
+  Places API (New) enabled; Google's auto-created unrestricted key was deleted
+  and replaced by key "Axiom engine Places discovery", restricted to Places API
+  (New) only. Quota `SearchTextRequest per day` lowered from 75,000 to **40**
+  (verified). The key value was left for Riley to paste into ignored
+  `.env.local`; Claude did not read or store it. No Places request made yet.
+- Cloudflare account token `axiom-staging-d1-read-7d` (Aidan's account, D1 Read
+  only, expires 2026-10-01) created for the staging export; value left for
+  Riley to paste into ignored `.env.staging-read`. A pre-existing broad account
+  token `muddy-limit-694b` (D1 Read/Write + 13 more) remains active; review or
+  revoke it (owner decision).
+- Read-only staging check via the Cloudflare connector at 23:5x UTC: 55
+  receipts ending `0055_outreach_human_approval.sql`, 41 sqlite tables, all
+  stops engaged, zero rows written.
+
 **Reply route (2026-09-23, Claude via Riley's Chrome, owner-approved):** in the
 getaxiom.ca Email Routing (Cloudflare account `fe468a56…`), destination
 `rileyhinsperger@gmail.com` is **Verified** and rule `riley@getaxiom.ca` →
