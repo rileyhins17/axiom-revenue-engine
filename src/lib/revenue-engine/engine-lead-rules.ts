@@ -17,7 +17,7 @@ export const ENGINE_LEAD_RULES_VERSION = "engine-lead-rules-v7" as const;
 /** Points needed before a site is called weak, and at least one of them must be a visible, serious problem. */
 export const STRONG_THRESHOLD = 3;
 export type EngineLeadLabel = "STRONG" | "WEAK" | "WRONG";
-export type EngineReasonCode = "LOCATION_PAGE" | "GENERIC_DOMAIN" | "NO_PHONE_LAYOUT" | "WIDE_ON_PHONE" | "NO_HTTPS" | "SIDEWAYS_SCROLL" | "OLD_WORDPRESS" | "STALE_FOOTER"
+export type EngineReasonCode = "LOCATION_PAGE" | "GENERIC_DOMAIN" | "NO_PHONE_LAYOUT" | "WIDE_ON_PHONE" | "NO_HTTPS" | "PARKED_DOMAIN" | "UNDER_CONSTRUCTION" | "SIDEWAYS_SCROLL" | "OLD_WORDPRESS" | "STALE_FOOTER"
   | "NO_CALL_OR_QUOTE" | "NO_CALL_THIN" | "NO_QUOTE_THIN" | "WORKS";
 export type EngineLeadDecision = { label: EngineLeadLabel; reasons: string[]; codes: EngineReasonCode[]; score?: number };
 
@@ -42,6 +42,11 @@ export function classifyEngineLead(websiteUrl: string, signals: EngineSiteSignal
   // (1 point) are weaker evidence and can only add weight to a serious problem.
   // Calibrated by screenshot review of every flagged site (scripts/audit-weak-sites.ts).
   const found: [EngineReasonCode, string, number][] = [];
+  // Lapsed domains get resold to ad networks that redirect to throwaway hosts like ww547.<domain>/?tkn=...
+  if (/^ww\d+\./i.test(url.hostname) || url.searchParams.has("tkn")) {
+    return { label: "STRONG", reasons: ["The web address now shows a parked ad page instead of the business's site."], codes: ["PARKED_DOMAIN"], score: 9 };
+  }
+  if (signals.underConstruction) found.push(["UNDER_CONSTRUCTION", "The homepage says the website is under construction.", 3]);
   const shrunkOnPhone = signals.phoneLayoutWidth > 500;
   if (shrunkOnPhone && signals.phoneViewportMeta !== true) found.push(["NO_PHONE_LAYOUT", "No phone layout: a phone shows the shrunken desktop page.", 2]);
   else if (shrunkOnPhone) found.push(["WIDE_ON_PHONE", "Some content is wider than a phone screen, so the page zooms out.", 1]);
@@ -67,6 +72,8 @@ export function evaluationSplit(reviewId: string): "TUNE" | "HOLDOUT" {
 }
 
 const CALL_NOTE: Partial<Record<EngineReasonCode, string>> = {
+  UNDER_CONSTRUCTION: "Your homepage currently says the website is under construction.",
+  PARKED_DOMAIN: "Your web address currently opens a parked ad page instead of your website.",
   NO_HTTPS: "Your site doesn't use a secure connection, so browsers show a \"Not secure\" warning to visitors.",
   WIDE_ON_PHONE: "On a phone, part of your homepage is wider than the screen, so the page zooms out.",
   NO_PHONE_LAYOUT: "On a phone, your site shows the full desktop page shrunk down, so it is hard to read and tap.",

@@ -39,6 +39,8 @@ export type EngineSiteSignals = {
   generator: string | null;
   hasStreetAddress: boolean;
   phoneLayoutWidth: number;
+  /** The homepage itself says the site is under construction or being rebuilt. */
+  underConstruction?: boolean;
   /** The page declares a phone layout (viewport width=device-width). Null on runs before capture v-next. */
   phoneViewportMeta?: boolean | null;
   phoneScrollWidth: number;
@@ -179,6 +181,10 @@ export function siteEmail(hrefs: ReadonlyArray<string | null>, text: string): { 
   return null;
 }
 
+export function saysUnderConstruction(text: string): boolean {
+  return /\bunder (?:a )?(?:re)?construction\b|\bwebsite (?:is )?coming soon\b|\bpardon our dust\b|\bexcuse our (?:web ?)?site\b|\bsite (?:is )?being (?:re)?built\b/i.test(text);
+}
+
 export function streetAddress(text: string): string | null {
   return text.match(ADDRESS)?.[0]?.replace(/\s+/g, " ").trim().slice(0, 200) ?? null;
 }
@@ -257,7 +263,7 @@ export async function captureAndAuditSite(
         phone: sitePhone(facts.actions.map((action) => action.href)),
         email: siteEmail(facts.mailtos, text)?.email ?? null, emailMethod: siteEmail(facts.mailtos, text)?.method ?? null,
         streetAddress: streetAddress(text), statusCode, copyrightYear: copyrightYear(text), generator: facts.generator,
-        hasStreetAddress: hasStreetAddress(text), phoneLayoutWidth: phoneFacts.layoutWidth, phoneViewportMeta: phoneFacts.viewportMeta, phoneScrollWidth: phoneFacts.scrollWidth,
+        hasStreetAddress: hasStreetAddress(text), underConstruction: saysUnderConstruction(text), phoneLayoutWidth: phoneFacts.layoutWidth, phoneViewportMeta: phoneFacts.viewportMeta, phoneScrollWidth: phoneFacts.scrollWidth,
         phoneTapToCall: phoneFacts.tapToCall, desktopTapToCall: facts.actions.some((action) => action.href?.startsWith("tel:") && action.visible),
         quoteAction: facts.actions.some((action) => (action.kind === "QUOTE" || action.kind === "BOOK") && action.visible),
         wordCount: text.split(/\s+/).filter(Boolean).length,

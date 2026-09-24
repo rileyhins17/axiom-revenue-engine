@@ -37,6 +37,20 @@ test("a site is only called weak with a visible serious problem plus supporting 
   for (const overrides of fine) assert.equal(classifyEngineLead(url, signals(overrides), 2026).label, "WEAK", JSON.stringify(overrides));
 });
 
+test("a lapsed domain redirecting to a parked ad page is always a weak website", () => {
+  const decision = classifyEngineLead("https://allpro.example/", signals({ finalUrl: "http://ww547.allpro.example/?tkn=19vnMT3S" }), 2026);
+  assert.equal(decision.label, "STRONG");
+  assert.deepEqual(decision.codes, ["PARKED_DOMAIN"]);
+});
+
+test("a homepage announcing it is under construction is a weak website", async () => {
+  const { saysUnderConstruction } = await import("./engine-site-capture");
+  assert.equal(saysUnderConstruction("PLEASE EXCUSE OUR WEBSITE - CURRENTLY UNDER A RECONSTRUCTION"), true);
+  assert.equal(saysUnderConstruction("Please excuse our website, it is under reconstruction"), true);
+  assert.equal(saysUnderConstruction("We specialise in new construction and renovations"), false);
+  assert.equal(classifyEngineLead("https://synthetic-roofing.example/", signals({ underConstruction: true }), 2026).label, "STRONG");
+});
+
 test("a declared phone layout is never reported as missing", () => {
   const decision = classifyEngineLead("https://synthetic-roofing.example/", signals({ phoneViewportMeta: true, phoneLayoutWidth: 1200, phoneScrollWidth: 1200 }), 2026);
   assert.equal(decision.codes.includes("NO_PHONE_LAYOUT"), false);
