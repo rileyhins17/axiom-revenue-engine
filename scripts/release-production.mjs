@@ -45,7 +45,7 @@ if (before.stops !== "01111") stop("stops are not engaged");
 const pending = (wrangler(["d1", "migrations", "list", DATABASE, "--remote"]).stdout.match(/\b\d{4}_[a-z0-9_]+\.sql\b/g) ?? []);
 const unique = [...new Set(pending)];
 // Live is past 0074. Allowed: nothing pending, or only the next known migrations in order.
-const KNOWN = ["0075_engine_prospects_and_call_log.sql", "0076_engine_email_outreach.sql", "0077_ai_call_briefs.sql"];
+const KNOWN = ["0075_engine_prospects_and_call_log.sql", "0076_engine_email_outreach.sql", "0077_ai_call_briefs.sql", "0078_caller_tokens.sql"];
 const TARGET = KNOWN.at(-1);
 const position = KNOWN.indexOf(before.last);
 if (before.last !== "0074_revenue_owner_observed_replies.sql" && position < 0) stop("live is in an unexpected state; investigate before retrying");

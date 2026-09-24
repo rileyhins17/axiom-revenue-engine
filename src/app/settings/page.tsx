@@ -1,5 +1,7 @@
 import { SettingsClient } from "./SettingsClient";
 
+import { CallerConnect } from "@/components/settings/caller-connect";
+
 import { getPrisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 
@@ -39,10 +41,13 @@ export default async function SettingsPage() {
       };
 
   return (
-    <SettingsClient
-      userProfile={userProfile}
-      isAdmin={session.user.role === "admin"}
-      emergencyControl={emergencyControl}
-    />
+    <div className="space-y-6">
+      <SettingsClient
+        userProfile={userProfile}
+        isAdmin={session.user.role === "admin"}
+        emergencyControl={emergencyControl}
+      />
+      <div className="mx-auto w-full max-w-5xl"><CallerConnect /></div>
+    </div>
   );
 }

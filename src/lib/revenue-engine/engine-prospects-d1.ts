@@ -88,17 +88,18 @@ export async function prospectCounts(db: ProspectDb, today: string) {
  * The next business for the calling queue: callable, has a phone, not touched
  * since `dayStart`, follow-ups due first, then weakest websites and fewest tries.
  */
-export async function nextInQueue(db: ProspectDb, today: string, dayStart: string, skip: readonly string[] = []): Promise<{ row: ProspectRow | null; remaining: number }> {
+export async function nextInQueue(db: ProspectDb, today: string, dayStart: string, skip: readonly string[] = [], limit = 1): Promise<{ row: ProspectRow | null; rows: ProspectRow[]; remaining: number }> {
   const skipList = skip.slice(0, 200);
   const where = `stopped = 0 AND phone IS NOT NULL AND label IN ('STRONG','NO_WEBSITE')
     AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)
     AND (lastActivityAt IS NULL OR lastActivityAt < ?)${skipList.length ? ` AND prospectId NOT IN (${skipList.map(() => "?").join(",")})` : ""}`;
   const binds = [today, dayStart, ...skipList];
   const [rows, count] = await Promise.all([
-    db.prepare(`SELECT * FROM (${LATEST}) WHERE ${where} ORDER BY (followUpAt IS NULL), CASE label WHEN 'STRONG' THEN 0 ELSE 1 END, attempts ASC, city, name LIMIT 1`).bind(...binds).all<Record<string, unknown>>(),
+    db.prepare(`SELECT * FROM (${LATEST}) WHERE ${where} ORDER BY (followUpAt IS NULL), CASE label WHEN 'STRONG' THEN 0 ELSE 1 END, attempts ASC, city, name LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))}`).bind(...binds).all<Record<string, unknown>>(),
     db.prepare(`SELECT COUNT(*) AS n FROM (${LATEST}) WHERE ${where}`).bind(...binds).first<{ n: number }>(),
   ]);
-  return { row: rows.results[0] ? parseRow(rows.results[0]) : null, remaining: Number(count?.n ?? 0) };
+  const parsed = rows.results.map(parseRow);
+  return { row: parsed[0] ?? null, rows: parsed, remaining: Number(count?.n ?? 0) };
 }
 
 /** History for many businesses in one query (newest first per business). */
