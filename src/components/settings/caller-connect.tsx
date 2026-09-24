@@ -12,10 +12,10 @@ export function CallerConnect() {
   const [fresh, setFresh] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const load = useCallback(async () => {
-    const response = await fetch("/api/caller/tokens", { credentials: "same-origin" }).catch(() => null);
-    if (response?.ok) setTokens(((await response.json()) as { tokens: Token[] }).tokens);
-  }, []);
+  const load = useCallback(() => fetch("/api/caller/tokens", { credentials: "same-origin" })
+    .then((response) => response.ok ? response.json() as Promise<{ tokens: Token[] }> : null)
+    .then((body) => { if (body) setTokens(body.tokens); })
+    .catch(() => undefined), []);
   useEffect(() => { void load(); }, [load]);
 
   async function post(body: unknown) {

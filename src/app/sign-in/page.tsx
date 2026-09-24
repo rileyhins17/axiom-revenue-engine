@@ -51,7 +51,13 @@ function SignIn() {
 
   async function sendCode(owner: OwnerKey) {
     setBusy(true); setError(null);
-    const result = await authClient.emailOtp.sendVerificationOtp({ email: OWNER_LOGINS[owner].account, type: "sign-in" }).catch(() => null);
+    const request = () => authClient.emailOtp.sendVerificationOtp({ email: OWNER_LOGINS[owner].account, type: "sign-in" }).catch(() => null);
+    let result = await request();
+    // A freshly deployed Worker can fail its very first request; retry once before showing an error.
+    if (!result || (result.error && (result.error.status ?? 500) >= 500)) {
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      result = await request();
+    }
     setBusy(false);
     if (!result || result.error) { setError(result?.error?.status === 429 ? "Too many tries. Wait a few minutes." : "Couldn't send the code. Try again."); return; }
     setStep({ kind: "code", owner });
