@@ -522,6 +522,8 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     const anonymousDashboard = await anonymous.newPage();
     await anonymousDashboard.goto("/dashboard", { waitUntil: "load" });
     await anonymousDashboard.waitForURL("**/sign-in");
+    await anonymousDashboard.getByRole("heading", { level: 1, name: "Who's signing in?" }).waitFor();
+    await anonymousDashboard.screenshot({ path: join(outputDirectory, "sign-in.png") });
     await anonymousDashboard.close();
 
     stage = "unauthenticated prospects redirect";
