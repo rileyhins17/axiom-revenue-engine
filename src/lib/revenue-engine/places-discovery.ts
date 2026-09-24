@@ -15,8 +15,8 @@ export const PLACES_DISCOVERY_VERSION = "places-text-search-discovery-v1" as con
 export const PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 /** websiteUri makes each request a Text Search Enterprise event (1,000 free per month as of 2026-09). */
 export const PLACES_FIELD_MASK = "places.id,places.displayName,places.websiteUri,places.formattedAddress,places.types,places.businessStatus,nextPageToken";
-export const PLACES_MAX_REQUESTS_PER_RUN = 30;
-export const PLACES_MAX_REQUESTS_PER_MONTH = 200;
+export const PLACES_MAX_REQUESTS_PER_RUN = 150;
+export const PLACES_MAX_REQUESTS_PER_MONTH = 600;
 /** Worst case if no free tier applied: US$28 per 1,000 Enterprise events. */
 export const PLACES_WORST_CASE_USD_PER_REQUEST = 0.028;
 
@@ -25,7 +25,12 @@ export const DiscoveryNicheSchema = z.enum(["ROOFING", "HVAC", "LANDSCAPING"]);
 export type DiscoveryCity = z.infer<typeof DiscoveryCitySchema>;
 export type DiscoveryNiche = z.infer<typeof DiscoveryNicheSchema>;
 
-const QUERY: Record<DiscoveryNiche, string> = { ROOFING: "roofing contractor", HVAC: "heating and air conditioning contractor", LANDSCAPING: "landscaping company" };
+/** Several phrasings per trade surface more businesses than one query's 60-result limit. */
+export const QUERIES: Record<DiscoveryNiche, readonly string[]> = {
+  ROOFING: ["roofing contractor", "roofer", "roof repair", "eavestrough and gutter company"],
+  HVAC: ["heating and air conditioning contractor", "furnace repair", "air conditioning installation", "HVAC company"],
+  LANDSCAPING: ["landscaping company", "lawn care service", "interlock and patio contractor", "snow removal company"],
+};
 const CITY_NAME: Record<DiscoveryCity, string> = { KITCHENER: "Kitchener", WATERLOO: "Waterloo", CAMBRIDGE: "Cambridge" };
 
 const PlaceSchema = z.object({
@@ -51,11 +56,11 @@ export type DiscoveredBusiness = {
   addressMentionsCity: boolean;
 };
 
-export function buildTextSearchRequest(city: DiscoveryCity, niche: DiscoveryNiche, apiKey: string, pageToken?: string) {
+export function buildTextSearchRequest(city: DiscoveryCity, niche: DiscoveryNiche, apiKey: string, pageToken?: string, query = QUERIES[niche][0]!) {
   return {
     url: PLACES_TEXT_SEARCH_URL,
     headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": PLACES_FIELD_MASK },
-    body: JSON.stringify({ textQuery: `${QUERY[niche]} in ${CITY_NAME[city]}, Ontario`, regionCode: "CA", languageCode: "en", pageSize: 20, ...(pageToken ? { pageToken } : {}) }),
+    body: JSON.stringify({ textQuery: `${query} in ${CITY_NAME[city]}, Ontario`, regionCode: "CA", languageCode: "en", pageSize: 20, ...(pageToken ? { pageToken } : {}) }),
   };
 }
 
@@ -77,7 +82,7 @@ function currentMonth(now: Date) {
 export async function discoverBusinesses(input: {
   apiKey: string | undefined;
   enabled: boolean;
-  cells: { city: DiscoveryCity; niche: DiscoveryNiche }[];
+  cells: { city: DiscoveryCity; niche: DiscoveryNiche; query?: string }[];
   transport: PlacesTransport;
   ledger: PlacesUsageLedger;
   saveLedger: (ledger: PlacesUsageLedger) => Promise<void>;
@@ -99,7 +104,7 @@ export async function discoverBusinesses(input: {
       ledger = { ...ledger, requests: ledger.requests + 1 };
       await input.saveLedger(ledger);
       runRequests += 1;
-      const response = await input.transport(buildTextSearchRequest(cell.city, cell.niche, input.apiKey, pageToken));
+      const response = await input.transport(buildTextSearchRequest(cell.city, cell.niche, input.apiKey, pageToken, cell.query));
       if (response.status !== 200) { stops.push(`HTTP_${response.status}`); break; }
       const parsed = TextSearchResponseSchema.parse(response.json);
       for (const place of parsed.places ?? []) {

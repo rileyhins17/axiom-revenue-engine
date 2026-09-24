@@ -67,3 +67,11 @@ test("reason codes map to at most two factual call notes", async () => {
   assert.ok(notes.every((note) => !/\$|guarantee|increase|more customers/i.test(note)));
   assert.deepEqual(callNotes(["WORKS"]), []);
 });
+
+test("phone and street address come from the business's own page", async () => {
+  const { sitePhone, streetAddress } = await import("./engine-site-capture");
+  assert.equal(sitePhone([null, "/contact", "tel:+1 (519) 555-0101"]), "519-555-0101");
+  assert.equal(sitePhone(["tel:911"]), null);
+  assert.equal(streetAddress("Visit us at 291 Mill St, Unit 1, Kitchener today"), "291 Mill St, Unit 1, Kitchener");
+  assert.equal(streetAddress("Serving the region"), null);
+});

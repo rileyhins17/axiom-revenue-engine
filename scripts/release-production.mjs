@@ -1,7 +1,7 @@
 // Guarded in-place live release (ADR 0061). Refuses to run unless the target,
 // backup checksum, current live state and the owner's recorded approval all match.
 //
-//   AXIOM_PRODUCTION_RELEASE_APPROVAL="UPGRADE LIVE IN PLACE 2026-09-24" \
+//   AXIOM_PRODUCTION_RELEASE_APPROVAL="RELEASE LIVE 2026-09-24 CALL LIST" \
 //   node --env-file=<env file> scripts/release-production.mjs <backup.sql> <sha256>
 // Run from a clean, built checkout: Wrangler resolves the bundle relative to the config.
 import { createHash } from "node:crypto";
@@ -13,7 +13,7 @@ const ACCOUNT = "fe468a56a5b8c7f8fc5d39e265c2f791";
 const WORKER = "axiom-ops-omniscient";
 const DATABASE = "axiom-ops-omniscient";
 const DATABASE_ID = "e42f3d48-5813-4d18-86c4-4471b55aa65e";
-const APPROVAL = "UPGRADE LIVE IN PLACE 2026-09-24";
+const APPROVAL = "RELEASE LIVE 2026-09-24 CALL LIST";
 const [backup, expectedSha] = process.argv.slice(2);
 const repo = process.cwd();
 
@@ -44,7 +44,9 @@ const pending = (wrangler(["d1", "migrations", "list", DATABASE, "--remote"]).st
 const unique = [...new Set(pending)];
 if (before.last === "0052_message_evidence_and_experiments.sql") {
   if (unique.length !== 22 || unique[0] !== "0053_fail_closed_rebuild_lockdown.sql" || unique.at(-1) !== "0074_revenue_owner_observed_replies.sql") stop(`unexpected pending list (${unique.length})`);
-} else if (before.last !== "0074_revenue_owner_observed_replies.sql" || unique.length !== 0) stop("live is in an unexpected partial state; investigate before retrying");
+} else if (before.last === "0074_revenue_owner_observed_replies.sql") {
+  if (unique.length > 1 || (unique.length === 1 && unique[0] !== "0075_engine_prospects_and_call_log.sql")) stop(`unexpected pending list after 0074 (${unique.join(",")})`);
+} else if (before.last !== "0075_engine_prospects_and_call_log.sql" || unique.length !== 0) stop("live is in an unexpected partial state; investigate before retrying");
 
 if (unique.length) {
   const bookmark = wrangler(["d1", "time-travel", "info", DATABASE]).stdout.match(/bookmark is '([^']+)'/)?.[1];
@@ -57,7 +59,7 @@ if (unique.length) {
 }
 const after = state();
 console.log("after:", JSON.stringify(after));
-if (after.last !== "0074_revenue_owner_observed_replies.sql" || after.stops !== "01111") stop("post-migration state mismatch");
+if (after.last !== "0075_engine_prospects_and_call_log.sql" || after.stops !== "01111") stop("post-migration state mismatch");
 
 const deploy = wrangler(["deploy"]);
 const version = (deploy.stdout.match(/Current Version ID: ([0-9a-f-]+)/) ?? [])[1];

@@ -27,6 +27,10 @@ export type EngineSiteSignals = {
   siteTitle?: string | null;
   /** The site's declared name (og:site_name), when present. */
   siteName?: string | null;
+  /** First tap-to-call number on the business's own homepage. */
+  phone?: string | null;
+  /** First street address in the business's own homepage text. */
+  streetAddress?: string | null;
   statusCode: number;
   copyrightYear: number | null;
   generator: string | null;
@@ -138,6 +142,22 @@ export function copyrightYear(text: string): number | null {
   return years.length ? Math.max(...years) : null;
 }
 
+const ADDRESS = /\b\d{1,5}\s+[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)?\s+(?:St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Blvd|Boulevard|Cres|Crescent|Way|Ct|Court|Pl|Place|Line|Pkwy|Parkway|Hwy|Highway)\b\.?(?:[ ,]+(?:Unit|Suite|#)\s*\w+)?(?:[ ,]+(?:Kitchener|Waterloo|Cambridge|Guelph|Breslau|Elmira|Ayr|New Hamburg)\b)?/;
+
+/** A North American number from the first tel: link, formatted for display. */
+export function sitePhone(hrefs: ReadonlyArray<string | null>): string | null {
+  for (const href of hrefs) {
+    if (!href?.toLowerCase().startsWith("tel:")) continue;
+    const digits = decodeURIComponent(href.slice(4)).replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+    if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  return null;
+}
+
+export function streetAddress(text: string): string | null {
+  return text.match(ADDRESS)?.[0]?.replace(/\s+/g, " ").trim().slice(0, 200) ?? null;
+}
+
 export function hasStreetAddress(text: string): boolean {
   return /\b\d{1,5}\s+[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)?\s+(?:St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Blvd|Boulevard|Cres|Crescent|Way|Ct|Court|Pl|Place|Line|Pkwy|Parkway|Hwy|Highway)\b/.test(text);
 }
@@ -208,7 +228,8 @@ export async function captureAndAuditSite(
     return {
       status: "CAPTURED", audit,
       signals: {
-        finalUrl: page.url(), siteTitle: facts.title?.slice(0, 120) ?? null, siteName: facts.siteName, statusCode, copyrightYear: copyrightYear(text), generator: facts.generator,
+        finalUrl: page.url(), siteTitle: facts.title?.slice(0, 120) ?? null, siteName: facts.siteName,
+        phone: sitePhone(facts.actions.map((action) => action.href)), streetAddress: streetAddress(text), statusCode, copyrightYear: copyrightYear(text), generator: facts.generator,
         hasStreetAddress: hasStreetAddress(text), phoneLayoutWidth: phoneFacts.layoutWidth, phoneScrollWidth: phoneFacts.scrollWidth,
         phoneTapToCall: phoneFacts.tapToCall, desktopTapToCall: facts.actions.some((action) => action.href?.startsWith("tel:") && action.visible),
         quoteAction: facts.actions.some((action) => (action.kind === "QUOTE" || action.kind === "BOOK") && action.visible),

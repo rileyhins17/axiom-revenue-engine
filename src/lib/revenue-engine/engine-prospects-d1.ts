@@ -1,0 +1,105 @@
+import { z } from "zod";
+
+/** Minimal D1 surface used here (real D1 in Workers, better-sqlite3 adapter in tests). */
+export type ProspectDb = {
+  prepare(sql: string): { bind(...values: unknown[]): { all<T>(): Promise<{ results: T[] }>; first<T>(): Promise<T | null>; run(): Promise<unknown> } };
+};
+
+export const PROSPECT_OUTCOMES = [
+  "NO_ANSWER", "VOICEMAIL", "GATEKEEPER", "CALL_BACK", "NOT_INTERESTED", "INTERESTED", "MEETING_BOOKED", "WON", "WRONG_NUMBER", "DO_NOT_CONTACT", "NOTE",
+] as const;
+export type ProspectOutcome = (typeof PROSPECT_OUTCOMES)[number];
+export const ProspectViewSchema = z.enum(["call", "visit", "followups", "contacted", "all"]);
+export type ProspectView = z.infer<typeof ProspectViewSchema>;
+
+export const ProspectActivityCommandSchema = z.object({
+  idempotencyKey: z.string().uuid(),
+  prospectId: z.string().min(1).max(300),
+  channel: z.enum(["CALL", "VISIT", "EMAIL", "NOTE"]),
+  outcome: z.enum(PROSPECT_OUTCOMES),
+  note: z.string().max(1000),
+  followUpAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+}).strict();
+export type ProspectActivityCommand = z.infer<typeof ProspectActivityCommandSchema>;
+
+export type ProspectRow = {
+  prospectId: string; placeId: string | null; name: string; city: string; niche: string;
+  websiteUrl: string | null; phone: string | null; address: string | null; label: "STRONG" | "WEAK" | "NO_WEBSITE";
+  reasons: string[]; lastSeenAt: string;
+  lastOutcome: ProspectOutcome | null; lastActivityAt: string | null; lastActor: string | null; followUpAt: string | null; attempts: number;
+};
+export type ProspectActivity = {
+  activityId: string; channel: string; outcome: ProspectOutcome; note: string; followUpAt: string | null; actor: string; createdAt: string;
+};
+
+const LATEST = `
+  SELECT p.*,
+    (SELECT a."outcome" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS lastOutcome,
+    (SELECT a."createdAt" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS lastActivityAt,
+    (SELECT a."actor" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS lastActor,
+    (SELECT a."followUpAt" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS followUpAt,
+    (SELECT COUNT(*) FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" AND a."channel" IN ('CALL','VISIT','EMAIL')) AS attempts,
+    EXISTS (SELECT 1 FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" AND a."outcome"='DO_NOT_CONTACT') AS stopped
+  FROM "EngineProspect" p`;
+
+const CLOSED = `('NOT_INTERESTED','WON','WRONG_NUMBER','DO_NOT_CONTACT','MEETING_BOOKED')`;
+
+function parseRow(row: Record<string, unknown>): ProspectRow {
+  let reasons: string[] = [];
+  try { reasons = JSON.parse(String(row.reasons)) as string[]; } catch { reasons = []; }
+  return {
+    prospectId: String(row.prospectId), placeId: (row.placeId as string | null) ?? null, name: String(row.name), city: String(row.city), niche: String(row.niche),
+    websiteUrl: (row.websiteUrl as string | null) ?? null, phone: (row.phone as string | null) ?? null, address: (row.address as string | null) ?? null,
+    label: row.label as ProspectRow["label"], reasons, lastSeenAt: String(row.lastSeenAt),
+    lastOutcome: (row.lastOutcome as ProspectOutcome | null) ?? null, lastActivityAt: (row.lastActivityAt as string | null) ?? null,
+    lastActor: (row.lastActor as string | null) ?? null, followUpAt: (row.followUpAt as string | null) ?? null, attempts: Number(row.attempts ?? 0),
+  };
+}
+
+/** Owner views. Call/visit lists hide stopped and closed businesses; STRONG and no-website leads first. */
+export async function listProspects(db: ProspectDb, view: ProspectView, today: string, limit = 300): Promise<ProspectRow[]> {
+  const where: Record<ProspectView, string> = {
+    call: `stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)`,
+    visit: `stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND address IS NOT NULL AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})`,
+    followups: `stopped = 0 AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})`,
+    contacted: `attempts > 0`,
+    all: `1 = 1`,
+  };
+  const order = view === "contacted" ? `lastActivityAt DESC` : `CASE label WHEN 'STRONG' THEN 0 WHEN 'NO_WEBSITE' THEN 1 ELSE 2 END, attempts ASC, city, name`;
+  const result = await db.prepare(`SELECT * FROM (${LATEST}) WHERE ${where[view]} ORDER BY ${order} LIMIT ${Math.max(1, Math.min(limit, 1000))}`)
+    .bind(...Array.from({ length: (where[view].match(/\?/g) ?? []).length }, () => today)).all<Record<string, unknown>>();
+  return result.results.map(parseRow);
+}
+
+export async function prospectCounts(db: ProspectDb, today: string) {
+  const counts = await Promise.all((["call", "visit", "followups", "contacted"] as const).map(async (view) => [view, (await listProspects(db, view, today, 1000)).length] as const));
+  return Object.fromEntries(counts) as Record<"call" | "visit" | "followups" | "contacted", number>;
+}
+
+export async function listProspectActivity(db: ProspectDb, prospectId: string): Promise<ProspectActivity[]> {
+  const result = await db.prepare(`SELECT "activityId","channel","outcome","note","followUpAt","actor","createdAt" FROM "EngineProspectActivity" WHERE "prospectId"=? ORDER BY "createdAt" DESC, rowid DESC LIMIT 50`)
+    .bind(prospectId).all<ProspectActivity>();
+  return result.results;
+}
+
+export class ProspectActivityError extends Error {
+  constructor(readonly code: "NOT_FOUND" | "STOPPED" | "CONFLICT") { super(code); }
+}
+
+/** Append one call/visit/note. Idempotent per key; a stopped business accepts notes only. */
+export async function recordProspectActivity(db: ProspectDb, input: unknown, actor: "RILEY" | "AIDAN", actorUserId: string) {
+  const command = ProspectActivityCommandSchema.parse(input);
+  const existing = await db.prepare(`SELECT "activityId","prospectId","outcome","actor" FROM "EngineProspectActivity" WHERE "idempotencyKey"=?`).bind(command.idempotencyKey).first<Record<string, unknown>>();
+  if (existing) {
+    if (existing.prospectId !== command.prospectId || existing.outcome !== command.outcome || existing.actor !== actor) throw new ProspectActivityError("CONFLICT");
+    return { status: "ALREADY_SAVED" as const, activityId: String(existing.activityId) };
+  }
+  const prospect = await db.prepare(`SELECT "prospectId" FROM "EngineProspect" WHERE "prospectId"=?`).bind(command.prospectId).first();
+  if (!prospect) throw new ProspectActivityError("NOT_FOUND");
+  const stopped = await db.prepare(`SELECT 1 AS s FROM "EngineProspectActivity" WHERE "prospectId"=? AND "outcome"='DO_NOT_CONTACT' LIMIT 1`).bind(command.prospectId).first();
+  if (stopped && command.channel !== "NOTE") throw new ProspectActivityError("STOPPED");
+  const activityId = `activity:${command.idempotencyKey}`;
+  await db.prepare(`INSERT INTO "EngineProspectActivity" ("activityId","idempotencyKey","prospectId","channel","outcome","note","followUpAt","actor","actorUserId") VALUES (?,?,?,?,?,?,?,?,?)`)
+    .bind(activityId, command.idempotencyKey, command.prospectId, command.channel, command.outcome, command.note.trim(), command.followUpAt, actor, actorUserId).run();
+  return { status: "SAVED" as const, activityId };
+}

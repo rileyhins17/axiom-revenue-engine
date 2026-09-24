@@ -7,7 +7,7 @@ import { z } from "zod";
 import { classifyEngineLead, ENGINE_LEAD_RULES_VERSION } from "../src/lib/revenue-engine/engine-lead-rules";
 import { captureAndAuditSite, ENGINE_SITE_CAPTURE_VERSION } from "../src/lib/revenue-engine/engine-site-capture";
 import {
-  discoverBusinesses, DiscoveryCitySchema, DiscoveryNicheSchema, PLACES_DISCOVERY_VERSION,
+  discoverBusinesses, DiscoveryCitySchema, QUERIES, DiscoveryNicheSchema, PLACES_DISCOVERY_VERSION,
   type DiscoveredBusiness, type PlacesTransport, type PlacesUsageLedger,
 } from "../src/lib/revenue-engine/places-discovery";
 
@@ -21,7 +21,7 @@ import {
  */
 export const ENGINE_RUNS_DIR = path.join("data", "kw-evaluation", "engine-runs");
 const LEDGER_PATH = path.join("data", "kw-evaluation", "places-usage-ledger.json");
-const CELLS = DiscoveryCitySchema.options.flatMap((city) => DiscoveryNicheSchema.options.map((niche) => ({ city, niche })));
+const CELLS = DiscoveryCitySchema.options.flatMap((city) => DiscoveryNicheSchema.options.flatMap((niche) => QUERIES[niche].map((query) => ({ city, niche, query }))));
 const CandidateFileSchema = z.object({ candidates: z.array(z.object({
   websiteUrl: z.string().url(), city: DiscoveryCitySchema, niche: DiscoveryNicheSchema,
 }).passthrough()).max(200) }).passthrough();
@@ -63,7 +63,7 @@ export async function engineWeeklyRun(args: string[], env = process.env) {
 
   const startedAt = new Date();
   type RunResult = {
-    placeId: string; city: string; niche: string; websiteUrl: string | null; name: string | null; siteName?: string | null;
+    placeId: string; city: string; niche: string; websiteUrl: string | null; name: string | null; siteName?: string | null; phone?: string | null; address?: string | null;
     label: "STRONG" | "WEAK" | "WRONG" | "NO_WEBSITE" | "NOT_CHECKED"; reasons: string[]; codes?: string[];
     auditClassification?: string; capturedAt?: string;
   };
@@ -72,7 +72,7 @@ export async function engineWeeklyRun(args: string[], env = process.env) {
   try {
     for (const business of discovered) {
       if (!business.websiteUrl) {
-        results.push({ placeId: business.placeId, city: business.city, niche: business.niche, websiteUrl: null, name: null, label: "NO_WEBSITE" as const, reasons: ["No website listed; a possible new-build lead that needs manual research."] });
+        results.push({ placeId: business.placeId, city: business.city, niche: business.niche, websiteUrl: null, name: business.displayName || null, label: "NO_WEBSITE" as const, reasons: ["No website listed; a possible new-build lead that needs manual research."] });
         continue;
       }
       const capture = await captureAndAuditSite(browser, { businessId: business.placeId, businessName: business.placeId, niche: business.niche, websiteUrl: business.websiteUrl })
@@ -84,7 +84,7 @@ export async function engineWeeklyRun(args: string[], env = process.env) {
       const decision = classifyEngineLead(business.websiteUrl, capture.signals, startedAt.getUTCFullYear());
       results.push({
         placeId: business.placeId, city: business.city, niche: business.niche, websiteUrl: capture.signals.finalUrl,
-        name: capture.signals.siteTitle ?? null, siteName: capture.signals.siteName ?? null, label: decision.label, reasons: decision.reasons, codes: decision.codes,
+        name: capture.signals.siteTitle ?? null, siteName: capture.signals.siteName ?? null, phone: capture.signals.phone ?? null, address: capture.signals.streetAddress ?? null, label: decision.label, reasons: decision.reasons, codes: decision.codes,
         auditClassification: capture.audit.classification, capturedAt: capture.audit.capturedAt,
       });
     }

@@ -60,7 +60,7 @@ test("the monthly cap stops before any request is sent and a new month resets", 
 });
 
 test("the per-run cap bounds paging across many cells", async () => {
-  const cells = Array.from({ length: 20 }, () => ({ city: "WATERLOO" as const, niche: "LANDSCAPING" as const }));
+  const cells = Array.from({ length: 60 }, () => ({ city: "WATERLOO" as const, niche: "LANDSCAPING" as const }));
   const { transport, sent } = fakeTransport([{ places: [], nextPageToken: "next" }]);
   const result = await discoverBusinesses({ apiKey: "k", enabled: true, cells, transport, ledger: { month: "2026-09", requests: 0 }, saveLedger: async () => undefined, now: NOW });
   assert.equal(sent.length, PLACES_MAX_REQUESTS_PER_RUN);

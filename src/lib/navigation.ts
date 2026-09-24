@@ -1,6 +1,7 @@
 import {
   ChartNoAxesCombined,
   Building2,
+  PhoneCall,
   ClipboardList,
   CalendarDays,
   Settings,
@@ -27,6 +28,15 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     icon: CalendarDays,
     shortcut: "⌘1",
     keywords: ["home", "overview", "status", "dashboard"],
+  },
+  {
+    title: "Call list",
+    label: "Calls",
+    description: "Prospects to call and visit",
+    url: "/prospects" as Route,
+    icon: PhoneCall,
+    shortcut: "⌘6",
+    keywords: ["call", "prospects", "cold call", "visit", "walk-in", "log"],
   },
   {
     title: "Businesses",
