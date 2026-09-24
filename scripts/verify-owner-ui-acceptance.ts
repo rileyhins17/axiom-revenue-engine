@@ -451,7 +451,7 @@ async function assertNav(page: Page, label: string) {
   if (isMobile) {
     const mobileItems = await page.locator("nav[aria-label='Primary'] a[href]").evaluateAll((elements) =>
       elements.map((element) => element.textContent?.trim() ?? ""));
-    assert.deepEqual(mobileItems, ["Today", "Calls", "Settings"], `${label} mobile tab bar must be exactly Today, Calls, Settings.`);
+    assert.deepEqual(mobileItems, ["Today", "Queue", "List", "Walk-ins", "Email", "Settings"], `${label} mobile tab bar must list the six owner pages.`);
   } else {
     const sidebarItems = await page.locator(".owner-nav-title").evaluateAll((elements) =>
       elements.map((element) => element.textContent?.trim() ?? ""));
