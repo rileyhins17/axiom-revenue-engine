@@ -225,8 +225,8 @@ async function applyMigrations(database: SqliteDatabase) {
   const migrations = (await readdir(migrationsDirectory))
     .filter((name) => /^\d{4}_.+\.sql$/.test(name))
     .sort((left, right) => left.localeCompare(right));
-  assert(migrations.at(-1)?.startsWith("0075_"),
-    "The owner fixture must apply every migration through 0075_engine_prospects_and_call_log.");
+  assert(migrations.at(-1)?.startsWith("0076_"),
+    "The owner fixture must apply every migration through 0076_engine_email_outreach.");
   database.pragma("foreign_keys = ON");
   for (const migration of migrations) {
     database.exec(await readFile(join(migrationsDirectory, migration), "utf8"));
@@ -455,7 +455,7 @@ async function assertNav(page: Page, label: string) {
   } else {
     const sidebarItems = await page.locator(".owner-nav-title").evaluateAll((elements) =>
       elements.map((element) => element.textContent?.trim() ?? ""));
-    assert.deepEqual(sidebarItems, ["Today", "Call list", "Settings"], `${label} sidebar navigation must be exactly Today, Call list, Settings.`);
+    assert.deepEqual(sidebarItems, ["Today", "Call queue", "Call list", "Walk-ins", "Email", "Settings"], `${label} sidebar navigation must be the six owner pages.`);
   }
 }
 
@@ -463,7 +463,7 @@ async function assertNav(page: Page, label: string) {
  * then load each one and wait for its 'load' event before opening the next —
  * an SSR heading is not proof that async script streaming finished. */
 export async function warmOwnerAcceptanceRoutes(page: Page, extraRoutes: string[] = []) {
-  for (const route of ["/dashboard", "/prospects", ...extraRoutes]) {
+  for (const route of ["/dashboard", "/prospects", "/call", "/walk-ins", "/email", ...extraRoutes]) {
     const response = await page.context().request.get(route);
     try {
       assert.equal(response.status(), 200, `Owner route preparation failed: ${route}`);
@@ -510,7 +510,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
       await mockPage.getByRole("heading", { level: 1, name: "Quality Lab" }).waitFor();
     });
 
-    const anonymous = await browser.newContext({ baseURL: baseUrl, serviceWorkers: "block" });
+    const anonymous = await browser!.newContext({ baseURL: baseUrl, serviceWorkers: "block" });
     await anonymous.route("**/*", async (route) => {
       const url = route.request().url();
       if (isAllowedOwnerAcceptanceUrl(url, baseUrl)) await route.continue();
@@ -561,10 +561,9 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     stage = "desktop today";
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1 }).waitFor();
-    await page.getByText("This week", { exact: true }).waitFor();
+    await page.getByText("Results so far", { exact: true }).waitFor();
     await page.getByText("Follow-ups due", { exact: true }).waitFor();
-    await page.getByText("Best leads to call next", { exact: true }).waitFor();
-    await page.getByText("Automatic sending is off", { exact: true }).waitFor();
+    await page.getByText("Start calling", { exact: false }).first().waitFor();
     await assertNav(page, "desktop Today");
     await assertWcag(page, "desktop Today");
     pagesScanned += 1;
@@ -660,6 +659,46 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await page.goto("/prospects", { waitUntil: "domcontentloaded" });
     assert.equal(await page.locator("table").getByText("Cambridge Landscape Pros", { exact: true }).count(), 0,
       "A DO_NOT_CONTACT outcome must remove the business from the To call list.");
+
+    stage = "call queue logs with the keyboard and moves on";
+    await page.goto("/call", { waitUntil: "load" });
+    await page.getByRole("heading", { level: 1, name: "Call queue" }).waitFor();
+    const firstBusiness = (await page.getByRole("heading", { level: 2 }).first().textContent())?.trim() ?? "";
+    assert(firstBusiness, "The queue must show a business.");
+    await assertWcag(page, "desktop Call queue");
+    pagesScanned += 1;
+    await page.keyboard.press("1");
+    await page.getByRole("button", { name: /No answer/ }).and(page.locator('[aria-pressed="true"]')).waitFor();
+    await page.keyboard.press("Control+Enter");
+    await page.waitForFunction((name) => {
+      const heading = document.querySelector("main h2, section h2");
+      return !heading || heading.textContent?.trim() !== name;
+    }, firstBusiness, { timeout: 15_000 });
+    await page.screenshot({ path: join(outputDirectory, "call-queue-desktop.png"), fullPage: true });
+
+    stage = "walk-ins and email pages";
+    await page.goto("/walk-ins", { waitUntil: "load" });
+    await page.getByRole("heading", { level: 1, name: "Walk-ins" }).waitFor();
+    await assertWcag(page, "desktop Walk-ins");
+    pagesScanned += 1;
+    await page.goto("/email", { waitUntil: "load" });
+    await page.getByRole("heading", { level: 1, name: "Email" }).waitFor();
+    await page.getByText("Automatic email is off", { exact: true }).waitFor();
+    await assertWcag(page, "desktop Email");
+    pagesScanned += 1;
+    await page.screenshot({ path: join(outputDirectory, "email-desktop.png"), fullPage: true });
+
+    stage = "unsubscribe page is public";
+    {
+      const anonymous = await browser!.newContext({ baseURL: baseUrl });
+      const unsubscribePage = await anonymous.newPage();
+      await unsubscribePage.goto("/unsubscribe?done=1", { waitUntil: "load" });
+      await unsubscribePage.getByText("You're unsubscribed. We won't email you again.", { exact: true }).waitFor();
+      const unknown = await anonymous.request.post("/api/unsubscribe?t=" + "x".repeat(40));
+      assert.equal(unknown.status(), 404, "An unknown unsubscribe token must not succeed.");
+      await unknown.dispose();
+      await anonymous.close();
+    }
 
     stage = "retired routes redirect to prospects";
     for (const route of ["/leads", "/leads/prospect:sunrise-roofing", "/leads/evaluation", "/leads/m2", "/leads/m2/identity",

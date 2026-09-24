@@ -71,9 +71,51 @@ export async function listProspects(db: ProspectDb, view: ProspectView, today: s
   return result.results.map(parseRow);
 }
 
+/** All list counts in one pass. */
 export async function prospectCounts(db: ProspectDb, today: string) {
-  const counts = await Promise.all((["call", "visit", "followups", "contacted"] as const).map(async (view) => [view, (await listProspects(db, view, today, 1000)).length] as const));
-  return Object.fromEntries(counts) as Record<"call" | "visit" | "followups" | "contacted", number>;
+  const row = await db.prepare(`SELECT
+      SUM(stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)) AS call,
+      SUM(stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND address IS NOT NULL AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})) AS visit,
+      SUM(stopped = 0 AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})) AS followups,
+      SUM(attempts > 0) AS contacted,
+      COUNT(*) AS total
+    FROM (${LATEST})`).bind(today, today).first<Record<string, number | null>>();
+  const n = (key: string) => Number(row?.[key] ?? 0);
+  return { call: n("call"), visit: n("visit"), followups: n("followups"), contacted: n("contacted"), all: n("total") };
+}
+
+/**
+ * The next business for the calling queue: callable, has a phone, not touched
+ * since `dayStart`, follow-ups due first, then weakest websites and fewest tries.
+ */
+export async function nextInQueue(db: ProspectDb, today: string, dayStart: string, skip: readonly string[] = []): Promise<{ row: ProspectRow | null; remaining: number }> {
+  const skipList = skip.slice(0, 200);
+  const where = `stopped = 0 AND phone IS NOT NULL AND label IN ('STRONG','NO_WEBSITE')
+    AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)
+    AND (lastActivityAt IS NULL OR lastActivityAt < ?)${skipList.length ? ` AND prospectId NOT IN (${skipList.map(() => "?").join(",")})` : ""}`;
+  const binds = [today, dayStart, ...skipList];
+  const [rows, count] = await Promise.all([
+    db.prepare(`SELECT * FROM (${LATEST}) WHERE ${where} ORDER BY (followUpAt IS NULL), CASE label WHEN 'STRONG' THEN 0 ELSE 1 END, attempts ASC, city, name LIMIT 1`).bind(...binds).all<Record<string, unknown>>(),
+    db.prepare(`SELECT COUNT(*) AS n FROM (${LATEST}) WHERE ${where}`).bind(...binds).first<{ n: number }>(),
+  ]);
+  return { row: rows.results[0] ? parseRow(rows.results[0]) : null, remaining: Number(count?.n ?? 0) };
+}
+
+/** History for many businesses in one query (newest first per business). */
+export async function listActivityFor(db: ProspectDb, prospectIds: readonly string[]): Promise<Map<string, ProspectActivity[]>> {
+  const map = new Map<string, ProspectActivity[]>();
+  for (let i = 0; i < prospectIds.length; i += 90) {
+    const chunk = prospectIds.slice(i, i + 90);
+    if (!chunk.length) continue;
+    const { results } = await db.prepare(`SELECT "prospectId","activityId","channel","outcome","note","followUpAt","actor","createdAt" FROM "EngineProspectActivity"
+      WHERE "prospectId" IN (${chunk.map(() => "?").join(",")}) ORDER BY "createdAt" DESC, rowid DESC`).bind(...chunk).all<ProspectActivity & { prospectId: string }>();
+    for (const item of results) {
+      const list = map.get(item.prospectId) ?? [];
+      if (list.length < 20) list.push(item);
+      map.set(item.prospectId, list);
+    }
+  }
+  return map;
 }
 
 export async function listProspectActivity(db: ProspectDb, prospectId: string): Promise<ProspectActivity[]> {

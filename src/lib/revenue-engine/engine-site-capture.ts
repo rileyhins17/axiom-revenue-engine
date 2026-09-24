@@ -29,6 +29,9 @@ export type EngineSiteSignals = {
   siteName?: string | null;
   /** First tap-to-call number on the business's own homepage. */
   phone?: string | null;
+  /** Business email published on its own homepage (mailto link preferred over page text). */
+  email?: string | null;
+  emailMethod?: "MAILTO_LINK" | "PAGE_TEXT" | null;
   /** First street address in the business's own homepage text. */
   streetAddress?: string | null;
   statusCode: number;
@@ -49,6 +52,7 @@ export type EngineSiteCapture =
 
 type DesktopFacts = {
   title: string | null; siteName: string | null; metaDescription: string | null; visibleText: string; generator: string | null;
+  mailtos: string[];
   actions: { kind: "PHONE" | "QUOTE" | "BOOK" | "CONTACT"; label: string; href: string | null; visible: boolean; aboveFold: boolean }[];
   forms: { visible: boolean; hasSubmitControl: boolean; disabled: boolean; actionUrl: string | null }[];
   structuredDataTypes: string[];
@@ -80,6 +84,7 @@ function readDesktop(): DesktopFacts {
     actions.push({ kind, label: label || kind, href: href ? href.slice(0, 2048) : null, visible: isVisible, aboveFold: isVisible && el.getBoundingClientRect().top < window.innerHeight });
     if (actions.length >= 100) break;
   }
+  const mailtos = Array.from(document.querySelectorAll('a[href^="mailto:" i]')).slice(0, 20).map((el) => (el.getAttribute("href") ?? "").slice(0, 400));
   const forms = Array.from(document.forms).slice(0, 30).map((form) => ({
     visible: visible(form),
     hasSubmitControl: Boolean(form.querySelector("button, input[type=submit], input[type=image]")),
@@ -109,7 +114,7 @@ function readDesktop(): DesktopFacts {
     metaDescription: document.querySelector('meta[name="description"]')?.getAttribute("content")?.trim().slice(0, 600) || null,
     visibleText: (document.body?.innerText ?? "").slice(0, 100_000),
     generator: document.querySelector('meta[name="generator"]')?.getAttribute("content")?.slice(0, 120) ?? null,
-    actions, forms, structuredDataTypes: [...new Set(structuredDataTypes)],
+    mailtos, actions, forms, structuredDataTypes: [...new Set(structuredDataTypes)],
   };
 }
 
@@ -150,6 +155,23 @@ export function sitePhone(hrefs: ReadonlyArray<string | null>): string | null {
     if (!href?.toLowerCase().startsWith("tel:")) continue;
     const digits = decodeURIComponent(href.slice(4)).replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
     if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  return null;
+}
+
+const EMAIL = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,24}/gi;
+const NOT_A_CONTACT = /(?:example\.|sentry|wixpress|godaddy|squarespace|domain\.com|yourdomain|email\.com|\.(?:png|jpe?g|gif|webp|svg)$|^(?:noreply|no-reply|donotreply)@)/i;
+
+/** A published business email: first mailto link, else first address in the page text. */
+export function siteEmail(hrefs: ReadonlyArray<string | null>, text: string): { email: string; method: "MAILTO_LINK" | "PAGE_TEXT" } | null {
+  for (const href of hrefs) {
+    if (!href?.toLowerCase().startsWith("mailto:")) continue;
+    const email = decodeURIComponent(href.slice(7).split("?")[0] ?? "").trim().toLowerCase();
+    if (/^[^\s@]+@[^\s@]+\.[a-z]{2,24}$/.test(email) && !NOT_A_CONTACT.test(email) && email.length <= 254) return { email, method: "MAILTO_LINK" };
+  }
+  for (const match of text.matchAll(EMAIL)) {
+    const email = match[0].toLowerCase();
+    if (!NOT_A_CONTACT.test(email) && email.length <= 254) return { email, method: "PAGE_TEXT" };
   }
   return null;
 }
@@ -229,7 +251,9 @@ export async function captureAndAuditSite(
       status: "CAPTURED", audit,
       signals: {
         finalUrl: page.url(), siteTitle: facts.title?.slice(0, 120) ?? null, siteName: facts.siteName,
-        phone: sitePhone(facts.actions.map((action) => action.href)), streetAddress: streetAddress(text), statusCode, copyrightYear: copyrightYear(text), generator: facts.generator,
+        phone: sitePhone(facts.actions.map((action) => action.href)),
+        email: siteEmail(facts.mailtos, text)?.email ?? null, emailMethod: siteEmail(facts.mailtos, text)?.method ?? null,
+        streetAddress: streetAddress(text), statusCode, copyrightYear: copyrightYear(text), generator: facts.generator,
         hasStreetAddress: hasStreetAddress(text), phoneLayoutWidth: phoneFacts.layoutWidth, phoneScrollWidth: phoneFacts.scrollWidth,
         phoneTapToCall: phoneFacts.tapToCall, desktopTapToCall: facts.actions.some((action) => action.href?.startsWith("tel:") && action.visible),
         quoteAction: facts.actions.some((action) => (action.kind === "QUOTE" || action.kind === "BOOK") && action.visible),

@@ -7,8 +7,11 @@ import openNextWorkerModule, {
 import { setCloudflareBindings } from "./src/lib/cloudflare";
 import { getCronTimeoutBudgets } from "./src/lib/cron-timeouts";
 import { clearServerEnvCache } from "./src/lib/env";
+import { runEngineEmailCron } from "./src/lib/revenue-engine/engine-email-worker";
 
 const worker = openNextWorkerModule;
+// Weekdays 10:00 Toronto (EDT); the sender itself refuses weekends and every closed gate.
+const ENGINE_EMAIL_CRON = "0 14 * * 1-5";
 
 export { BucketCachePurge, DOQueueHandler, DOShardedTagCache };
 
@@ -100,9 +103,17 @@ const exportedWorker = {
     setCloudflareBindings(env);
     return worker.fetch(request, env, ctx);
   },
-  async scheduled(_controller, env, ctx) {
+  async scheduled(controller, env, ctx) {
     clearServerEnvCache();
     setCloudflareBindings(env);
+    if (controller?.cron === ENGINE_EMAIL_CRON) {
+      ctx.waitUntil(
+        runEngineEmailCron(env)
+          .then((result) => console.log(JSON.stringify({ event: "engine_email", ...result })))
+          .catch((error) => console.error("[engine-email] failure:", error instanceof Error ? error.message : "unknown")),
+      );
+      return;
+    }
     ctx.waitUntil(
       runCronTasks(env).catch((error) => {
         console.error("[cron] outer failure:", error);

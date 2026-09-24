@@ -203,6 +203,10 @@ requireMatch("scripts/sanitize-cloudflare-bundle.mjs", bundleSanitizer, /private
 requireMatch("package.json", packageJson, /"cf:engine:typegen:check"\s*:\s*"[^"]*--env-file wrangler\.typegen\.env/, "engine binding generation must ignore local env files");
 requireMatch("package.json", packageJson, /"cf:engine:dry-run"\s*:/, "CI must dry-run the inert engine bundle");
 requireMatch("package.json", packageJson, /scripts\/\*\*\/\*\.test\.ts/, "TypeScript script tests must run in the complete test gate");
+const productionWrangler = await readFile(new URL("../wrangler.production.jsonc", import.meta.url), "utf8");
+requireMatch("wrangler.production.jsonc", productionWrangler, /"ENGINE_EMAIL_ENABLED"\s*:\s*"false"/, "live email sending must be off in source; the owner enables it deliberately");
+requireMatch("wrangler.production.jsonc", productionWrangler, /"crons"\s*:\s*\[\s*(?:"0 14 \* \* 1-5"\s*)?\]/, "live may only schedule the gated weekday email batch");
+forbidMatch("wrangler.production.jsonc", productionWrangler, /"AUTONOMOUS_(?:QUEUE|SEND|INTAKE)_ENABLED"\s*:\s*"true"/, "legacy autonomous switches stay off on live");
 requireMatch("package.json", packageJson, /"test:owner-ui"\s*:\s*"tsx scripts\/verify-owner-ui-acceptance\.ts"/, "the owner UI acceptance gate must have a stable local command");
 requireMatch("package.json", packageJson, /"kw:prepare-import"\s*:\s*"tsx scripts\/prepare-private-kw-import\.ts"/, "the private KW import must use the guarded local CLI");
 requireMatch("package.json", packageJson, /"kw:prepare-m2-authorization"\s*:\s*"tsx scripts\/prepare-private-kw-m2-authorization\.ts"/, "M2 authorization preparation must use the bounded local CLI");

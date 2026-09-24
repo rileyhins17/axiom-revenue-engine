@@ -17,10 +17,10 @@ const OUTCOMES = [
 ] as const;
 
 /** Log a call or visit in a few taps. Retries reuse one key, so nothing double-saves. */
-export function LogActivityForm({ prospectId }: { prospectId: string }) {
+export function LogActivityForm({ prospectId, defaultChannel = "CALL" }: { prospectId: string; defaultChannel?: "CALL" | "VISIT" }) {
   const router = useRouter();
   const [key, setKey] = useState(() => crypto.randomUUID());
-  const [channel, setChannel] = useState<"CALL" | "VISIT">("CALL");
+  const [channel, setChannel] = useState<"CALL" | "VISIT">(defaultChannel);
   const [outcome, setOutcome] = useState<string>("");
   const [note, setNote] = useState("");
   const [followUpAt, setFollowUpAt] = useState("");

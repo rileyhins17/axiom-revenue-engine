@@ -42,11 +42,13 @@ console.log("before:", JSON.stringify(before));
 if (before.stops !== "01111") stop("stops are not engaged");
 const pending = (wrangler(["d1", "migrations", "list", DATABASE, "--remote"]).stdout.match(/\b\d{4}_[a-z0-9_]+\.sql\b/g) ?? []);
 const unique = [...new Set(pending)];
-if (before.last === "0052_message_evidence_and_experiments.sql") {
-  if (unique.length !== 22 || unique[0] !== "0053_fail_closed_rebuild_lockdown.sql" || unique.at(-1) !== "0074_revenue_owner_observed_replies.sql") stop(`unexpected pending list (${unique.length})`);
-} else if (before.last === "0074_revenue_owner_observed_replies.sql") {
-  if (unique.length > 1 || (unique.length === 1 && unique[0] !== "0075_engine_prospects_and_call_log.sql")) stop(`unexpected pending list after 0074 (${unique.join(",")})`);
-} else if (before.last !== "0075_engine_prospects_and_call_log.sql" || unique.length !== 0) stop("live is in an unexpected partial state; investigate before retrying");
+// Live is past 0074. Allowed: nothing pending, or only the next known migrations in order.
+const KNOWN = ["0075_engine_prospects_and_call_log.sql", "0076_engine_email_outreach.sql"];
+const TARGET = KNOWN.at(-1);
+const position = KNOWN.indexOf(before.last);
+if (before.last !== "0074_revenue_owner_observed_replies.sql" && position < 0) stop("live is in an unexpected state; investigate before retrying");
+const expected = KNOWN.slice(position + 1);
+if (unique.join(",") !== expected.join(",")) stop(`unexpected pending list (${unique.join(",") || "none"}; expected ${expected.join(",") || "none"})`);
 
 if (unique.length) {
   const bookmark = wrangler(["d1", "time-travel", "info", DATABASE]).stdout.match(/bookmark is '([^']+)'/)?.[1];
@@ -59,7 +61,7 @@ if (unique.length) {
 }
 const after = state();
 console.log("after:", JSON.stringify(after));
-if (after.last !== "0075_engine_prospects_and_call_log.sql" || after.stops !== "01111") stop("post-migration state mismatch");
+if (after.last !== TARGET || after.stops !== "01111") stop("post-migration state mismatch");
 
 const deploy = wrangler(["deploy"]);
 const version = (deploy.stdout.match(/Current Version ID: ([0-9a-f-]+)/) ?? [])[1];

@@ -40,6 +40,12 @@ export default function manifest(): MetadataRoute.Manifest {
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
       {
+        name: "Call queue",
+        short_name: "Queue",
+        url: "/call",
+        icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
+      },
+      {
         name: "Call list",
         short_name: "Calls",
         url: "/prospects",

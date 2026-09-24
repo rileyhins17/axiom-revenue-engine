@@ -3,7 +3,8 @@ import Link from "next/link";
 
 import { ProspectRow, type ProspectRowView } from "@/components/prospects/prospect-row";
 import { getDatabase } from "@/lib/cloudflare";
-import { listProspectActivity, listProspects, prospectCounts, ProspectViewSchema, type ProspectDb, type ProspectRow as Row } from "@/lib/revenue-engine/engine-prospects-d1";
+import { historyView } from "@/lib/prospect-format";
+import { listActivityFor, listProspects, prospectCounts, ProspectViewSchema, type ProspectDb, type ProspectRow as Row } from "@/lib/revenue-engine/engine-prospects-d1";
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Toronto" });
   const db = getDatabase() as unknown as ProspectDb;
   let rows: Row[];
-  let counts: Record<string, number>;
+  let counts: Awaited<ReturnType<typeof prospectCounts>>;
   try {
     [rows, counts] = await Promise.all([listProspects(db, view, today, 1000), prospectCounts(db, today)]);
   } catch {
@@ -59,18 +60,16 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
     && (!search.kind || (search.kind === "none" ? row.label === "NO_WEBSITE" : search.kind === "bad" ? row.label === "STRONG" : row.label === "WEAK"))
     && (!q || row.name.toLowerCase().includes(q) || (row.phone ?? "").includes(q)));
   const shown = filtered.slice(0, 250);
-  const views: ProspectRowView[] = await Promise.all(shown.map(async (row) => ({
+  const history = await listActivityFor(db, shown.filter((row) => row.attempts > 0 || row.lastOutcome).map((row) => row.prospectId));
+  const views: ProspectRowView[] = shown.map((row) => ({
     prospectId: row.prospectId, name: row.name, city: row.city, niche: row.niche, label: row.label, reasons: row.reasons,
     phone: row.phone, address: row.address, websiteUrl: row.websiteUrl, mapsUrl: mapsUrl(row),
     lastOutcomeText: row.lastOutcome ? OUTCOME_TEXT[row.lastOutcome] ?? row.lastOutcome : null, lastActivity: day(row.lastActivityAt),
     followUpAt: row.followUpAt, attempts: row.attempts,
-    history: row.attempts > 0 || row.lastOutcome ? (await listProspectActivity(db, row.prospectId)).map((item) => ({
-      id: item.activityId, when: day(item.createdAt) ?? "", who: item.actor === "AIDAN" ? "Aidan" : "Riley",
-      what: `${item.channel === "VISIT" ? "Visit" : item.channel === "CALL" ? "Call" : "Note"}: ${OUTCOME_TEXT[item.outcome] ?? item.outcome}`, note: item.note, followUpAt: item.followUpAt,
-    })) : [],
-  })));
+    history: historyView(history.get(row.prospectId) ?? []),
+  }));
 
-  return <section className="mx-auto w-full max-w-7xl space-y-5 px-6 py-8">
+  return <section className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-6">
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div>
         <h1 className="text-2xl font-semibold">Call list</h1>
@@ -83,7 +82,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
     </header>
 
     <nav className="flex flex-wrap gap-2 border-b border-slate-200 pb-3" aria-label="Lists">
-      {TABS.map((tab) => <Chip key={tab.view} active={tab.view === view} to={href(search, { view: tab.view })}>{tab.label}{tab.view in counts ? ` (${counts[tab.view as keyof typeof counts]})` : ""}</Chip>)}
+      {TABS.map((tab) => <Chip key={tab.view} active={tab.view === view} to={href(search, { view: tab.view })}>{tab.label} ({counts[tab.view]})</Chip>)}
     </nav>
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="text-slate-600">City</span>
