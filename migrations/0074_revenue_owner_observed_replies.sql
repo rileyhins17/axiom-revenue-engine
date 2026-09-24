@@ -25,21 +25,21 @@ CREATE INDEX "RevenueOwnerObservedReply_business_created_idx"
 CREATE TRIGGER "RevenueOwnerObservedReply_admission"
 BEFORE INSERT ON "RevenueOwnerObservedReply"
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (
+  SELECT RAISE(ABORT, 'REVENUE_OWNER_REPLY_CONTACT_INVALID') WHERE NOT EXISTS (
     SELECT 1 FROM "RevenueContactPoint" contact
     WHERE contact."id" = NEW."contactPointId"
       AND contact."businessId" = NEW."businessId"
       AND contact."channel" = 'EMAIL'
-  ) THEN RAISE(ABORT, 'REVENUE_OWNER_REPLY_CONTACT_INVALID') END;
-  SELECT CASE WHEN EXISTS (
+  );
+  SELECT RAISE(ABORT, 'REVENUE_OWNER_REPLY_BUSINESS_STOPPED') WHERE EXISTS (
     SELECT 1 FROM "RevenueBusinessStopEvent" stop
     WHERE stop."businessId" = NEW."businessId"
-  ) THEN RAISE(ABORT, 'REVENUE_OWNER_REPLY_BUSINESS_STOPPED') END;
-  SELECT CASE WHEN EXISTS (
+  );
+  SELECT RAISE(ABORT, 'REVENUE_OWNER_REPLY_CONTACT_SUPPRESSED') WHERE EXISTS (
     SELECT 1 FROM "RevenueContactSuppressionEvent" suppression
     WHERE suppression."businessId" = NEW."businessId"
       AND suppression."contactFingerprint" = NEW."contactFingerprint"
-  ) THEN RAISE(ABORT, 'REVENUE_OWNER_REPLY_CONTACT_SUPPRESSED') END;
+  );
 END;
 
 CREATE TRIGGER "RevenueOwnerObservedReply_create_task"
