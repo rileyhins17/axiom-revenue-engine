@@ -1,5 +1,33 @@
 # Current status — Axiom Revenue Engine
 
+## LIVE: redesign + email outreach built, sending OFF (2026-09-24 ~19:02 UTC, `bafb8d9`)
+
+- New owner app: Today (scoreboards for Aidan/Riley, results funnel, follow-ups),
+  Call queue (`/call`: one business at a time, keys 1–0, Ctrl+Enter save & next),
+  Call list, Walk-ins (by city with Google Maps routes), Email, Settings.
+- Email outreach (migration 0076, ADR pending): public emails captured from each
+  business's own site with source URL + method; 10/day hard cap (DB CHECK); once per
+  business and per address; CASL footer (257 Kipling Ave) + one-click unsubscribe
+  (`/unsubscribe`, `/api/unsubscribe`), permanent suppression, bounces suppressed,
+  DNC/closed outcomes excluded, only weak-website (STRONG) businesses. Worker SMTP to
+  smtp.zoho.com:465 on cron `0 14 * * 1-5`.
+- Send gates (all must pass): `ENGINE_EMAIL_ENABLED` var (source: `"false"`,
+  enforced by check:safety and the release script), owner switch on /email,
+  owner approval of template `first-touch-v1`, `ENGINE_SMTP_PASSWORD` secret, weekday.
+- Verified: check:safety, npm test (890 pass, 0 fail), typecheck, lint (0 errors),
+  clean-clone build, dry run, test:owner-ui (7 WCAG pages, desktop + 390px, 0 external).
+- Release: backup `prod-export-20260924T190047Z.sql` (SHA-256 `efa1949e…d481`),
+  Time Travel bookmark `00003022-00000000-000050f0-9b5ac86677504cffff9a7607cf398593`,
+  0076 applied (79 receipts), stops `01111`, Worker version `a52319e4-069e-4682-a362-fc826bd22895`.
+  Rollback target `5cc824a4-a74e-42ec-831b-53a55990a59e`.
+- Live data: 199 prospects, 138 public emails (26 on weak-website businesses), 0 sends.
+- Blockers (owner): create Zoho Mail Lite for getaxiom.ca, create an app password and
+  store it as Worker secret `ENGINE_SMTP_PASSWORD`; approve the email on /email. Adding
+  Zoho MX replaces Cloudflare Email Routing for riley@.
+- Next: (1) Zoho DNS (verification TXT, MX, SPF, DKIM) once the account exists; (2) flip
+  `ENGINE_EMAIL_ENABLED` to "true" in a gated release after owner approval; (3) larger
+  Places discovery once the GCP quota is 160/day.
+
 ## LIVE: new Today + Call list UI (2026-09-24 ~13:45 UTC, commit `3360b83`)
 
 - Legacy owner pages (leads, automation, clients, vault) now redirect to
