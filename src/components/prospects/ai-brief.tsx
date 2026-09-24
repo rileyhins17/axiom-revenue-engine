@@ -1,15 +1,14 @@
 "use client";
 
 import { MessageCircleQuestion, RefreshCw, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type Brief = { opener: string; talkingPoints: string[]; objections: { objection: string; reply: string }[]; nextStep: string };
 type State = { status: "idle" | "loading" } | { status: "ready"; brief: Brief } | { status: "error"; message: string; setup: boolean };
 
-/** AI call brief. Loads automatically only when the result is already cached; otherwise one click. */
+/** AI call brief. Shows a cached brief immediately, otherwise one click. Remounted per business by its parent. */
 export function AiBrief({ prospectId, initial, aiReady }: { prospectId: string; initial: Brief | null; aiReady: boolean }) {
   const [state, setState] = useState<State>(initial ? { status: "ready", brief: initial } : { status: "idle" });
-  useEffect(() => { setState(initial ? { status: "ready", brief: initial } : { status: "idle" }); }, [prospectId, initial]);
 
   async function load() {
     setState({ status: "loading" });
