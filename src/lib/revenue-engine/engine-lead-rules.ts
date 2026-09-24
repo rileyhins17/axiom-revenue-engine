@@ -43,7 +43,8 @@ export function classifyEngineLead(websiteUrl: string, signals: EngineSiteSignal
   // Calibrated by screenshot review of every flagged site (scripts/audit-weak-sites.ts).
   const found: [EngineReasonCode, string, number][] = [];
   // Lapsed domains get resold to ad networks that redirect to throwaway hosts like ww547.<domain>/?tkn=...
-  if (/^ww\d+\./i.test(url.hostname) || url.searchParams.has("tkn")) {
+  const parkedHost = /(^|\.)(forsale\.godaddy\.com|afternic\.com|sedo\.com|dan\.com|hugedomains\.com|parkingcrew\.net|bodis\.com|sedoparking\.com)$/i.test(url.hostname);
+  if (/^ww\d+\./i.test(url.hostname) || url.searchParams.has("tkn") || parkedHost || url.searchParams.get("utm_medium") === "parkedpages") {
     return { label: "STRONG", reasons: ["The web address now shows a parked ad page instead of the business's site."], codes: ["PARKED_DOMAIN"], score: 9 };
   }
   if (signals.underConstruction) found.push(["UNDER_CONSTRUCTION", "The homepage says the website is under construction.", 3]);

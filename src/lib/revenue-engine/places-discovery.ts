@@ -14,7 +14,7 @@ import { z } from "zod";
 export const PLACES_DISCOVERY_VERSION = "places-text-search-discovery-v1" as const;
 export const PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 /** websiteUri makes each request a Text Search Enterprise event (1,000 free per month as of 2026-09). */
-export const PLACES_FIELD_MASK = "places.id,places.displayName,places.websiteUri,places.formattedAddress,places.types,places.businessStatus,nextPageToken";
+export const PLACES_FIELD_MASK = "places.id,places.displayName,places.websiteUri,places.formattedAddress,places.types,places.businessStatus,places.nationalPhoneNumber,nextPageToken";
 export const PLACES_MAX_REQUESTS_PER_RUN = 150;
 export const PLACES_MAX_REQUESTS_PER_MONTH = 600;
 /** Worst case if no free tier applied: US$28 per 1,000 Enterprise events. */
@@ -40,6 +40,7 @@ const PlaceSchema = z.object({
   formattedAddress: z.string().max(500).optional(),
   types: z.array(z.string().max(80)).max(50).optional(),
   businessStatus: z.string().max(40).optional(),
+  nationalPhoneNumber: z.string().max(40).optional(),
 }).passthrough();
 const TextSearchResponseSchema = z.object({ places: z.array(PlaceSchema).max(20).optional(), nextPageToken: z.string().max(20_000).optional() }).passthrough();
 
@@ -54,6 +55,9 @@ export type DiscoveredBusiness = {
   /** Transient, for the owner summary and de-duplication only. */
   displayName: string;
   addressMentionsCity: boolean;
+  /** Google's listed phone and address: the most reliable way to reach a trade business. */
+  phone?: string | null;
+  address?: string | null;
 };
 
 export function buildTextSearchRequest(city: DiscoveryCity, niche: DiscoveryNiche, apiKey: string, pageToken?: string, query = QUERIES[niche][0]!) {
@@ -116,6 +120,8 @@ export async function discoverBusinesses(input: {
           placeId: place.id, city: cell.city, niche: cell.niche, websiteUrl: website,
           displayName: (place.displayName?.text ?? "").slice(0, 200),
           addressMentionsCity: new RegExp(CITY_NAME[cell.city], "i").test(place.formattedAddress ?? ""),
+          phone: place.nationalPhoneNumber?.slice(0, 40) ?? null,
+          address: place.formattedAddress?.replace(/,\s*Canada$/i, "").slice(0, 200) ?? null,
         });
       }
       pageToken = parsed.nextPageToken;

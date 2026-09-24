@@ -65,14 +65,14 @@ export async function engineWeeklyRun(args: string[], env = process.env) {
   type RunResult = {
     placeId: string; city: string; niche: string; websiteUrl: string | null; name: string | null; siteName?: string | null; phone?: string | null; address?: string | null; email?: string | null; emailMethod?: string | null; emailSourceUrl?: string | null;
     label: "STRONG" | "WEAK" | "WRONG" | "NO_WEBSITE" | "NOT_CHECKED"; reasons: string[]; codes?: string[];
-    auditClassification?: string; capturedAt?: string; signals?: unknown;
+    auditClassification?: string; capturedAt?: string; signals?: unknown; googleName?: string | null;
   };
   const results: RunResult[] = [];
   const browser = await chromium.launch();
   try {
     for (const business of discovered) {
       if (!business.websiteUrl) {
-        results.push({ placeId: business.placeId, city: business.city, niche: business.niche, websiteUrl: null, name: business.displayName || null, label: "NO_WEBSITE" as const, reasons: ["No website listed; a possible new-build lead that needs manual research."] });
+        results.push({ placeId: business.placeId, city: business.city, niche: business.niche, websiteUrl: null, name: business.displayName || null, phone: business.phone ?? null, address: business.address ?? null, label: "NO_WEBSITE" as const, reasons: ["No website listed; a possible new-build lead that needs manual research."] });
         continue;
       }
       const capture = await captureAndAuditSite(browser, { businessId: business.placeId, businessName: business.placeId, niche: business.niche, websiteUrl: business.websiteUrl })
@@ -84,7 +84,7 @@ export async function engineWeeklyRun(args: string[], env = process.env) {
       const decision = classifyEngineLead(business.websiteUrl, capture.signals, startedAt.getUTCFullYear());
       results.push({
         placeId: business.placeId, city: business.city, niche: business.niche, websiteUrl: capture.signals.finalUrl,
-        name: capture.signals.siteTitle ?? null, siteName: capture.signals.siteName ?? null, phone: capture.signals.phone ?? null, address: capture.signals.streetAddress ?? null, email: capture.signals.email ?? null, emailMethod: capture.signals.emailMethod ?? null, emailSourceUrl: capture.signals.email ? capture.signals.finalUrl : null, label: decision.label, reasons: decision.reasons, codes: decision.codes,
+        name: capture.signals.siteTitle ?? null, siteName: capture.signals.siteName ?? null, phone: business.phone ?? capture.signals.phone ?? null, address: business.address ?? capture.signals.streetAddress ?? null, googleName: business.displayName || null, email: capture.signals.email ?? null, emailMethod: capture.signals.emailMethod ?? null, emailSourceUrl: capture.signals.email ? capture.signals.finalUrl : null, label: decision.label, reasons: decision.reasons, codes: decision.codes,
         auditClassification: capture.audit.classification, capturedAt: capture.audit.capturedAt, signals: capture.signals,
       });
     }

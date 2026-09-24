@@ -41,6 +41,8 @@ test("a lapsed domain redirecting to a parked ad page is always a weak website",
   const decision = classifyEngineLead("https://allpro.example/", signals({ finalUrl: "http://ww547.allpro.example/?tkn=19vnMT3S" }), 2026);
   assert.equal(decision.label, "STRONG");
   assert.deepEqual(decision.codes, ["PARKED_DOMAIN"]);
+  const forSale = classifyEngineLead("https://koebelsroofing.example/", signals({ finalUrl: "https://forsale.godaddy.com/forsale/koebelsroofing.example?utm_medium=parkedpages" }), 2026);
+  assert.deepEqual(forSale.codes, ["PARKED_DOMAIN"]);
 });
 
 test("a homepage announcing it is under construction is a weak website", async () => {
