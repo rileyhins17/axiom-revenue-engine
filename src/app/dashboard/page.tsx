@@ -1,6 +1,6 @@
 import type { Metadata, Route } from "next";
 import Link from "next/link";
-import { ArrowRight, Footprints, Headset, Mail } from "lucide-react";
+import { ArrowRight, Footprints, Headset, Mail, Phone, Target } from "lucide-react";
 
 import { getDatabase } from "@/lib/cloudflare";
 import { titleCase, torontoMidnight, torontoToday } from "@/lib/prospect-format";
@@ -14,11 +14,20 @@ export const metadata: Metadata = { title: "Today | Axiom Revenue Engine" };
 type Stats = Awaited<ReturnType<typeof prospectActivityStats>>;
 const person = (stats: Stats, actor: "AIDAN" | "RILEY") => stats.byActor[actor] ?? { calls: 0, visits: 0, conversations: 0 };
 
+const DAILY_DIAL_GOAL = 40;
+
 function Scoreboard({ label, today, week }: { label: string; today: Stats; week: Stats }) {
   const actor = label === "Aidan" ? "AIDAN" : "RILEY";
   const t = person(today, actor); const w = person(week, actor);
+  const pct = Math.min(100, Math.round((t.calls / DAILY_DIAL_GOAL) * 100));
   return <div className="rounded-xl border border-slate-200 bg-white p-4">
-    <p className="text-sm font-semibold">{label}</p>
+    <div className="flex items-center justify-between gap-2">
+      <p className="text-sm font-semibold">{label}</p>
+      <p className="flex items-center gap-1 text-xs text-slate-600"><Target className="size-3.5" aria-hidden="true" />{t.calls} / {DAILY_DIAL_GOAL} dials today</p>
+    </div>
+    <div className="mt-2 h-2 rounded-full bg-slate-100" role="progressbar" aria-label={`${label} dials toward today's goal`} aria-valuenow={t.calls} aria-valuemin={0} aria-valuemax={DAILY_DIAL_GOAL}>
+      <div className={`h-2 rounded-full ${pct >= 100 ? "bg-amber-500" : "bg-emerald-600"}`} style={{ width: `${pct}%` }} />
+    </div>
     <div className="mt-3 grid grid-cols-3 gap-2 text-center">
       {[["Calls", t.calls, w.calls], ["Talked", t.conversations, w.conversations], ["Walk-ins", t.visits, w.visits]].map(([name, day, total]) =>
         <div key={name as string} className="rounded-lg bg-slate-50 p-2">
@@ -51,7 +60,7 @@ export default async function TodayPage() {
 
   let data;
   try {
-    const [todayStats, weekStats, allStats, counts, followups, email, emailedToday] = await Promise.all([
+    const [todayStats, weekStats, allStats, counts, followups, email, emailedToday, upNext] = await Promise.all([
       prospectActivityStats(db, torontoMidnight(now)),
       prospectActivityStats(db, torontoMidnight(now, { week: true })),
       prospectActivityStats(db, "1970-01-01"),
@@ -59,12 +68,13 @@ export default async function TodayPage() {
       listProspects(db, "followups", today, 8),
       emailSetting(db).catch(() => null),
       sentToday(db, today).catch(() => 0),
+      listProspects(db, "call", today, 40),
     ]);
-    data = { todayStats, weekStats, allStats, counts, followups, email, emailedToday };
+    data = { todayStats, weekStats, allStats, counts, followups, email, emailedToday, upNext: upNext.filter((row) => row.phone && row.attempts === 0).slice(0, 5) };
   } catch {
     return <section className="mx-auto w-full max-w-6xl px-6 py-8"><h1 className="text-2xl font-semibold">Today</h1><p className="mt-2 text-sm">The call data could not be loaded. Refresh in a minute.</p></section>;
   }
-  const { todayStats, weekStats, allStats, counts, followups, email, emailedToday } = data;
+  const { todayStats, weekStats, allStats, counts, followups, email, emailedToday, upNext } = data;
   const talked = Object.values(allStats.byActor).reduce((sum, a) => sum + a.conversations, 0);
   const funnel = [
     ["Businesses found", counts.all], ["Contacted", counts.contacted], ["Real conversations", talked],
@@ -98,6 +108,21 @@ export default async function TodayPage() {
         </Link>
       </div>
     </div>
+
+    {upNext.length ? <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-semibold">Up next in the queue</h2>
+        <Link href={"/call" as Route} className="text-xs font-medium text-emerald-800 hover:underline">Open the queue</Link>
+      </div>
+      <ol className="mt-3 divide-y divide-slate-100">{upNext.map((row, index) => <li key={row.prospectId} className="flex items-center gap-3 py-2.5">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold">{index + 1}</span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{row.name}</p>
+          <p className="truncate text-xs text-slate-600">{titleCase(row.city)} · {titleCase(row.niche)} · {row.label === "NO_WEBSITE" ? "No website" : row.reasons[0]}</p>
+        </div>
+        <a href={`tel:${row.phone!.replace(/[^\d+]/g, "")}`} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium tabular-nums hover:bg-slate-50"><Phone className="size-3" aria-hidden="true" />{row.phone}</a>
+      </li>)}</ol>
+    </div> : null}
 
     <div className="grid gap-4 md:grid-cols-2">
       <Scoreboard label="Aidan" today={todayStats} week={weekStats} />

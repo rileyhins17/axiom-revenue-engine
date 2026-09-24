@@ -667,6 +667,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     assert(firstBusiness, "The queue must show a business.");
     await assertWcag(page, "desktop Call queue");
     pagesScanned += 1;
+    await page.screenshot({ path: join(outputDirectory, "call-queue-active.png"), fullPage: true });
     await page.keyboard.press("1");
     await page.getByRole("button", { name: /No answer/ }).and(page.locator('[aria-pressed="true"]')).waitFor();
     await page.keyboard.press("Control+Enter");
@@ -687,6 +688,13 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await assertWcag(page, "desktop Email");
     pagesScanned += 1;
     await page.screenshot({ path: join(outputDirectory, "email-desktop.png"), fullPage: true });
+
+    stage = "ask ai page";
+    await page.goto("/ask", { waitUntil: "load" });
+    await page.getByRole("heading", { level: 1, name: "Ask AI" }).waitFor();
+    await assertWcag(page, "desktop Ask AI");
+    pagesScanned += 1;
+    await page.screenshot({ path: join(outputDirectory, "ask-desktop.png"), fullPage: true });
 
     stage = "unsubscribe page is public";
     {
