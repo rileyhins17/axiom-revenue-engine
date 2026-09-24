@@ -4,16 +4,12 @@ import test from "node:test";
 import manifest from "@/app/manifest";
 import { APP_NAV_ITEMS, getNavItemForPath } from "@/lib/navigation";
 
-test("primary owner navigation opens the business research route", () => {
-  const leads = APP_NAV_ITEMS.find((item) => item.title === "Businesses");
-
-  assert.equal(leads?.url, "/leads");
-  assert.equal(getNavItemForPath("/leads")?.title, "Businesses");
-  assert.equal(APP_NAV_ITEMS.some((item) => item.url === "/vault"), false);
+test("owner navigation is Today, Call list and Settings only", () => {
+  assert.deepEqual(APP_NAV_ITEMS.map((item) => item.title), ["Today", "Call list", "Settings"]);
+  assert.equal(getNavItemForPath("/prospects")?.title, "Call list");
+  assert.equal(APP_NAV_ITEMS.some((item) => ["/leads", "/automation", "/clients", "/vault"].includes(item.url)), false);
 });
 
-test("installed app shortcut opens the business research route", () => {
-  const leadsShortcut = manifest().shortcuts?.find((shortcut) => shortcut.name === "Businesses");
-
-  assert.equal(leadsShortcut?.url, "/leads");
+test("installed app shortcuts open Today and the call list", () => {
+  assert.deepEqual(manifest().shortcuts?.map((shortcut) => shortcut.url), ["/dashboard", "/prospects"]);
 });

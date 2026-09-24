@@ -1,25 +1,6 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { OwnerLeadList, OwnerLeadsUnavailable } from "@/components/leads/owner-lead-list";
-import { getDatabase } from "@/lib/cloudflare";
-import {
-  readOwnerLeadList,
-  type OwnerLeadListResponse,
-} from "@/lib/revenue-engine/owner-lead-read-model";
-import { requireSession } from "@/lib/session";
-
-export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Businesses | Axiom Revenue Engine" };
-
-export default async function LeadsPage() {
-  await requireSession();
-
-  let leads: OwnerLeadListResponse;
-  try {
-    leads = await readOwnerLeadList(getDatabase(), new Date().toISOString(), 50);
-  } catch {
-    return <OwnerLeadsUnavailable />;
-  }
-
-  return <OwnerLeadList data={leads} />;
+// Retired Codex screen: the app is now Today, Call list and Settings.
+export default function RetiredPage() {
+  redirect("/prospects");
 }

@@ -204,15 +204,6 @@ requireMatch("package.json", packageJson, /"cf:engine:typegen:check"\s*:\s*"[^"]
 requireMatch("package.json", packageJson, /"cf:engine:dry-run"\s*:/, "CI must dry-run the inert engine bundle");
 requireMatch("package.json", packageJson, /scripts\/\*\*\/\*\.test\.ts/, "TypeScript script tests must run in the complete test gate");
 requireMatch("package.json", packageJson, /"test:owner-ui"\s*:\s*"tsx scripts\/verify-owner-ui-acceptance\.ts"/, "the owner UI acceptance gate must have a stable local command");
-requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /executePrivateKwContactPersistenceForLocalDatabase\(database, contactFixture\)/, "the owner dossier acceptance fixture must use the proven transactional contact executor");
-requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /FROM "RevenuePrivateKwContactPersistenceReceipt"/, "the owner dossier acceptance fixture must verify the final contact materialization receipt");
-requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /executionPath, "EXACT_REPLAY"/, "the owner dossier acceptance fixture must prove mutation-free replay");
-forbidMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /for \(const mutation of contactPersistencePlan\.mutations\)/, "the owner dossier fixture must not bypass the executor with loose planner inserts");
-for (const field of ["contactDiscoveryAuthorized", "contactVerificationAuthorized", "consentDecisionAuthorized", "qualificationAuthorized", "outreachAuthorized", "sendAuthorized"]) {
-  requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, new RegExp(`${field}: false`), `${field} must remain false in the owner dossier contact fixture`);
-}
-requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /providerOperationsAuthorized: 0/, "the owner dossier contact fixture must authorize zero provider operations");
-requireMatch("scripts/verify-owner-ui-acceptance.ts", ownerUiAcceptance, /costAuthorizedUsd: 0/, "the owner dossier contact fixture must authorize zero cost");
 requireMatch("package.json", packageJson, /"kw:prepare-import"\s*:\s*"tsx scripts\/prepare-private-kw-import\.ts"/, "the private KW import must use the guarded local CLI");
 requireMatch("package.json", packageJson, /"kw:prepare-m2-authorization"\s*:\s*"tsx scripts\/prepare-private-kw-m2-authorization\.ts"/, "M2 authorization preparation must use the bounded local CLI");
 requireMatch("package.json", packageJson, /"kw:plan-persistence"\s*:\s*"tsx scripts\/plan-private-kw-persistence\.ts"/, "private persistence planning must use the validation-only CLI");
@@ -633,7 +624,7 @@ requireMatch("src/app/api/v1/leads/evaluation/reveal/route.ts", ownerLabelingRev
 requireMatch("src/app/api/v1/leads/evaluation/reveal/route.ts", ownerLabelingRevealRoute, /validateOwnerFirstPassForReveal\(/, "owner assessment reveal must validate the completed first-pass export");
 requireMatch("src/app/api/v1/leads/evaluation/reveal/route.ts", ownerLabelingRevealRoute, /private, no-store/, "owner assessment reveal responses must not be cached publicly");
 forbidMatch("src/app/api/v1/leads/evaluation/reveal/route.ts", ownerLabelingRevealRoute, /getDatabase|D1Database|R2Bucket|\.run\s*\(|\.put\s*\(|\.delete\s*\(|export async function (?:GET|PUT|PATCH|DELETE)/, "owner assessment reveal must not read or mutate a database, artifact store, or expose another method");
-requireMatch("src/app/leads/evaluation/page.tsx", ownerLabelingPage, /await requireSession\(\)/, "the Quality Lab page must require an authenticated session");
+requireMatch("src/app/leads/evaluation/page.tsx", ownerLabelingPage, /^import \{ redirect \} from "next\/navigation";[\s\S]*redirect\("\/prospects"\)/, "the retired Quality Lab page must only redirect to the call list");
 forbidMatch("src/app/leads/evaluation/page.tsx", ownerLabelingPage, /getDatabase|fetch\s*\(|export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(/, "the Quality Lab page must not read a database, self-fetch, or expose write methods");
 requireMatch("src/components/leads/owner-lead-evaluation-workspace.tsx", ownerLabelingComponent, /fetch\("\/api\/v1\/leads\/evaluation\/validate"/, "the Quality Lab may call only its authenticated same-origin validation route");
 requireMatch("src/components/leads/owner-lead-evaluation-workspace.tsx", ownerLabelingComponent, /fetch\("\/api\/v1\/leads\/evaluation\/reveal"/, "the Quality Lab may reveal assessments only through its authenticated same-origin reveal route");
@@ -819,8 +810,7 @@ requireMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /requireApiSession
 requireMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /export async function GET\(request:\s*Request\)/, "owner lead API must remain read-only GET");
 requireMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /private, no-store/, "owner lead API responses must not be cached publicly");
 forbidMatch("src/app/api/v1/leads/route.ts", ownerLeadRoute, /export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(|fetch\s*\(/, "owner lead API must not expose mutations or provider requests");
-requireMatch("src/app/leads/page.tsx", ownerLeadsPage, /await requireSession\(\)/, "owner Leads page must require an authenticated session before reading data");
-requireMatch("src/app/leads/page.tsx", ownerLeadsPage, /readOwnerLeadList\(getDatabase\(\)/, "owner Leads page must use the versioned bounded read model directly");
+requireMatch("src/app/leads/page.tsx", ownerLeadsPage, /redirect\("\/prospects"\)/, "the retired Leads page must only redirect to the call list");
 forbidMatch("src/app/leads/page.tsx", ownerLeadsPage, /fetch\s*\(|export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(/, "owner Leads page must not self-fetch, mutate, or expose write methods");
 requireMatch("src/components/leads/owner-lead-list.tsx", ownerLeadList, /Read-only shadow view/, "owner Leads UI must state that it is a read-only shadow view");
 requireMatch("src/components/leads/owner-lead-list.tsx", ownerLeadList, /No email, call, form, or social action can start here/, "owner Leads UI must state that no channel action can start from the list");
@@ -838,8 +828,7 @@ requireMatch("src/app/api/v1/leads/[businessId]/route.ts", ownerLeadDetailRoute,
 requireMatch("src/app/api/v1/leads/[businessId]/route.ts", ownerLeadDetailRoute, /export async function GET\(/, "owner lead detail API must remain read-only GET");
 requireMatch("src/app/api/v1/leads/[businessId]/route.ts", ownerLeadDetailRoute, /private, no-store/, "owner lead detail API responses must not be cached publicly");
 forbidMatch("src/app/api/v1/leads/[businessId]/route.ts", ownerLeadDetailRoute, /export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(|fetch\s*\(/, "owner lead detail API must not expose mutations or provider requests");
-requireMatch("src/app/leads/[businessId]/page.tsx", ownerLeadDetailPage, /await requireSession\(\)/, "owner lead detail page must require an authenticated session before reading data");
-requireMatch("src/app/leads/[businessId]/page.tsx", ownerLeadDetailPage, /readOwnerLeadDetail\(getDatabase\(\)/, "owner lead detail page must use the exact versioned read model directly");
+requireMatch("src/app/leads/[businessId]/page.tsx", ownerLeadDetailPage, /redirect\("\/prospects"\)/, "the retired lead detail page must only redirect to the call list");
 forbidMatch("src/app/leads/[businessId]/page.tsx", ownerLeadDetailPage, /fetch\s*\(|export async function (?:POST|PUT|PATCH|DELETE)|\.run\s*\(/, "owner lead detail page must not self-fetch, mutate, or expose write methods");
 requireMatch("src/components/leads/owner-lead-detail.tsx", ownerLeadDetail, /This dossier is read-only/, "owner lead detail UI must state its read-only authority");
 requireMatch("src/components/leads/owner-lead-detail.tsx", ownerLeadDetail, /Preview unavailable until private evidence storage is enabled/, "owner lead detail UI must not pretend opaque artifact references are viewable screenshots");

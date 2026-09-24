@@ -1,12 +1,4 @@
-import {
-  ChartNoAxesCombined,
-  Building2,
-  PhoneCall,
-  ClipboardList,
-  CalendarDays,
-  Settings,
-  type LucideIcon,
-} from "lucide-react";
+import { CalendarDays, PhoneCall, Settings, type LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 export type AppNavItem = {
@@ -23,56 +15,29 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     title: "Today",
     label: "Today",
-    description: "Your next steps",
+    description: "Calls, follow-ups and results",
     url: "/dashboard",
     icon: CalendarDays,
     shortcut: "⌘1",
-    keywords: ["home", "overview", "status", "dashboard"],
+    keywords: ["home", "overview", "today", "dashboard", "results"],
   },
   {
     title: "Call list",
     label: "Calls",
-    description: "Prospects to call and visit",
+    description: "Businesses to call and visit",
     url: "/prospects" as Route,
     icon: PhoneCall,
-    shortcut: "⌘6",
-    keywords: ["call", "prospects", "cold call", "visit", "walk-in", "log"],
-  },
-  {
-    title: "Businesses",
-    label: "Businesses",
-    description: "Fit, need, and evidence",
-    url: "/leads",
-    icon: Building2,
     shortcut: "⌘2",
-    keywords: ["ranked", "businesses", "evidence", "leads"],
-  },
-  {
-    title: "Follow-through",
-    label: "Actions",
-    description: "Calls, replies, and next steps",
-    url: "/automation",
-    icon: ClipboardList,
-    shortcut: "⌘3",
-    keywords: ["approval", "message", "mailbox", "campaign", "manual task"],
-  },
-  {
-    title: "Clients",
-    label: "Clients",
-    description: "Clients and open deals",
-    url: "/clients" as Route,
-    icon: ChartNoAxesCombined,
-    shortcut: "⌘4",
-    keywords: ["crm", "deal", "client", "pipeline", "retainer", "reply"],
+    keywords: ["call", "prospects", "cold call", "visit", "walk-in", "log", "leads"],
   },
   {
     title: "Settings",
     label: "Settings",
-    description: "Safety and account status",
+    description: "Emergency stop and account",
     url: "/settings",
     icon: Settings,
-    shortcut: "⌘5",
-    keywords: ["runtime", "gmail", "config", "coverage", "cost", "deployment"],
+    shortcut: "⌘3",
+    keywords: ["stop", "safety", "account", "settings"],
   },
 ];
 

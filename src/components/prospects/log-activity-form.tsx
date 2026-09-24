@@ -43,21 +43,21 @@ export function LogActivityForm({ prospectId }: { prospectId: string }) {
     }
   }
 
-  return <div className="mt-3 space-y-3 rounded-lg border border-border/70 p-3">
+  return <div className="mt-3 space-y-3 rounded-lg border border-slate-200 p-3">
     <div className="flex gap-2" role="group" aria-label="Call or visit">
       {(["CALL", "VISIT"] as const).map((value) => <button key={value} type="button" onClick={() => setChannel(value)} aria-pressed={channel === value}
-        className={`rounded-md px-3 py-1.5 text-sm font-medium ${channel === value ? "bg-foreground text-background" : "border border-border"}`}>{value === "CALL" ? "Call" : "Visit"}</button>)}
+        className={`rounded-md px-3 py-1.5 text-sm font-medium ${channel === value ? "bg-slate-900 text-white" : "border border-slate-300"}`}>{value === "CALL" ? "Call" : "Visit"}</button>)}
     </div>
     <div className="flex flex-wrap gap-2" role="group" aria-label="What happened">
       {OUTCOMES.map((option) => <button key={option.value} type="button" onClick={() => setOutcome(option.value)} aria-pressed={outcome === option.value}
-        className={`rounded-full px-3 py-1.5 text-xs font-medium ${outcome === option.value ? (option.value === "DO_NOT_CONTACT" ? "bg-rose-700 text-white" : "bg-emerald-700 text-white") : "border border-border"}`}>{option.label}</button>)}
+        className={`rounded-full px-3 py-1.5 text-xs font-medium ${outcome === option.value ? (option.value === "DO_NOT_CONTACT" ? "bg-rose-700 text-white" : "bg-emerald-700 text-white") : "border border-slate-300"}`}>{option.label}</button>)}
     </div>
     <label className="block text-xs font-medium">Notes
       <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} rows={2}
-        placeholder="Who you spoke to, what they said, what to do next" className="mt-1 w-full rounded-md border border-border bg-background p-2 text-sm" />
+        placeholder="Who you spoke to, what they said, what to do next" className="mt-1 w-full rounded-md border border-slate-300 bg-white p-2 text-sm" />
     </label>
     <label className="block text-xs font-medium">Follow up on (optional)
-      <input type="date" value={followUpAt} onChange={(event) => setFollowUpAt(event.target.value)} className="mt-1 block rounded-md border border-border bg-background p-2 text-sm" />
+      <input type="date" value={followUpAt} onChange={(event) => setFollowUpAt(event.target.value)} className="mt-1 block rounded-md border border-slate-300 bg-white p-2 text-sm" />
     </label>
     <div className="flex items-center gap-3">
       <button type="button" onClick={() => void save()} disabled={state === "SAVING"}

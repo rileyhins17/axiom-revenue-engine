@@ -23,8 +23,8 @@ export const ENGINE_RUNS_DIR = path.join("data", "kw-evaluation", "engine-runs")
 const LEDGER_PATH = path.join("data", "kw-evaluation", "places-usage-ledger.json");
 const CELLS = DiscoveryCitySchema.options.flatMap((city) => DiscoveryNicheSchema.options.flatMap((niche) => QUERIES[niche].map((query) => ({ city, niche, query }))));
 const CandidateFileSchema = z.object({ candidates: z.array(z.object({
-  websiteUrl: z.string().url(), city: DiscoveryCitySchema, niche: DiscoveryNicheSchema,
-}).passthrough()).max(200) }).passthrough();
+  websiteUrl: z.string().url(), city: DiscoveryCitySchema, niche: DiscoveryNicheSchema, placeId: z.string().optional(),
+}).passthrough()).max(1000) }).passthrough();
 
 const fetchTransport: PlacesTransport = async (request) => {
   const response = await fetch(request.url, { method: "POST", headers: request.headers, body: request.body, signal: AbortSignal.timeout(15_000) });
@@ -56,7 +56,7 @@ export async function engineWeeklyRun(args: string[], env = process.env) {
   } else if (args[0] === "--candidates" && args.length === 2) {
     const file = CandidateFileSchema.parse(JSON.parse(await readFile(args[1]!, "utf8")));
     source = `candidate-file:${path.basename(args[1]!)}`;
-    discovered = file.candidates.map((candidate, index) => ({ placeId: `offline-${index}`, city: candidate.city, niche: candidate.niche, websiteUrl: candidate.websiteUrl, displayName: "", addressMentionsCity: false }));
+    discovered = file.candidates.map((candidate, index) => ({ placeId: candidate.placeId ?? `offline-${index}`, city: candidate.city, niche: candidate.niche, websiteUrl: candidate.websiteUrl, displayName: "", addressMentionsCity: false }));
   } else {
     throw new Error("Usage: engine-weekly-run --places | --candidates <file.json>");
   }

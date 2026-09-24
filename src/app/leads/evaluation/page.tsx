@@ -1,12 +1,6 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { OwnerLeadEvaluationWorkspace } from "@/components/leads/owner-lead-evaluation-workspace";
-import { requireSession } from "@/lib/session";
-
-export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Quality Lab | Axiom Revenue Engine" };
-
-export default async function LeadEvaluationPage() {
-  await requireSession();
-  return <OwnerLeadEvaluationWorkspace />;
+// Retired Codex screen: the app is now Today, Call list and Settings.
+export default function RetiredPage() {
+  redirect("/prospects");
 }

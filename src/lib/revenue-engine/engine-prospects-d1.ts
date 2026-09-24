@@ -103,3 +103,28 @@ export async function recordProspectActivity(db: ProspectDb, input: unknown, act
     .bind(activityId, command.idempotencyKey, command.prospectId, command.channel, command.outcome, command.note.trim(), command.followUpAt, actor, actorUserId).run();
   return { status: "SAVED" as const, activityId };
 }
+
+export type ProspectActivityStats = {
+  byActor: Record<string, { calls: number; visits: number; conversations: number }>;
+  interested: number; meetings: number; won: number; total: number;
+};
+
+/** Counts owner activity since a timestamp: calls, visits, real conversations and outcomes. */
+export async function prospectActivityStats(db: ProspectDb, since: string): Promise<ProspectActivityStats> {
+  const rows = (await db.prepare(`SELECT "actor","channel","outcome",COUNT(*) AS n FROM "EngineProspectActivity" WHERE "createdAt" >= ? GROUP BY "actor","channel","outcome"`)
+    .bind(since).all<{ actor: string; channel: string; outcome: string; n: number }>()).results;
+  const stats: ProspectActivityStats = { byActor: {}, interested: 0, meetings: 0, won: 0, total: 0 };
+  const talked = new Set(["GATEKEEPER", "CALL_BACK", "NOT_INTERESTED", "INTERESTED", "MEETING_BOOKED", "WON", "DO_NOT_CONTACT"]);
+  for (const row of rows) {
+    const actor = (stats.byActor[row.actor] ??= { calls: 0, visits: 0, conversations: 0 });
+    const n = Number(row.n);
+    if (row.channel === "CALL") actor.calls += n;
+    if (row.channel === "VISIT") actor.visits += n;
+    if (talked.has(row.outcome)) actor.conversations += n;
+    if (row.outcome === "INTERESTED") stats.interested += n;
+    if (row.outcome === "MEETING_BOOKED") stats.meetings += n;
+    if (row.outcome === "WON") stats.won += n;
+    if (row.channel !== "NOTE") stats.total += n;
+  }
+  return stats;
+}

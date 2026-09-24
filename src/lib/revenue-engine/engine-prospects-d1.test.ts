@@ -61,3 +61,17 @@ test("do-not-contact is permanent and history is append-only", async () => {
   assert.throws(() => db.raw.exec(`DELETE FROM "EngineProspectActivity"`), /APPEND_ONLY/);
   await assert.rejects(recordProspectActivity(db, { idempotencyKey: key(5), prospectId: "missing", channel: "CALL", outcome: "NO_ANSWER", note: "", followUpAt: null }, "AIDAN", "u"), (error) => error instanceof ProspectActivityError && error.code === "NOT_FOUND");
 });
+
+test("activity stats count calls, visits and conversations per owner", async () => {
+  const { prospectActivityStats } = await import("./engine-prospects-d1");
+  const db = database();
+  await recordProspectActivity(db, { idempotencyKey: key(6), prospectId: "a.example", channel: "CALL", outcome: "NO_ANSWER", note: "", followUpAt: null }, "AIDAN", "u");
+  await recordProspectActivity(db, { idempotencyKey: key(7), prospectId: "a.example", channel: "CALL", outcome: "INTERESTED", note: "", followUpAt: null }, "AIDAN", "u");
+  await recordProspectActivity(db, { idempotencyKey: key(8), prospectId: "place:p2", channel: "VISIT", outcome: "MEETING_BOOKED", note: "", followUpAt: null }, "RILEY", "u");
+  const stats = await prospectActivityStats(db, "2000-01-01");
+  assert.deepEqual(stats.byActor.AIDAN, { calls: 2, visits: 0, conversations: 1 });
+  assert.deepEqual(stats.byActor.RILEY, { calls: 0, visits: 1, conversations: 1 });
+  assert.equal(stats.interested, 1);
+  assert.equal(stats.meetings, 1);
+  assert.equal(stats.total, 3);
+});
