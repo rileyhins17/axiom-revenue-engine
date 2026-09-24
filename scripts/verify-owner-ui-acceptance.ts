@@ -314,6 +314,7 @@ function startNextServer(baseUrl: string, databasePath: string, logLines: string
     AUTH_ALLOWED_EMAILS: FIXTURE_EMAIL,
     AUTH_ADMIN_EMAILS: FIXTURE_EMAIL,
     AXIOM_LOCAL_SYNTHETIC_SIGNUP: "1",
+    AUTH_PASSWORD_SIGNIN: "true",
     AUTH_ALLOWED_ORIGINS: baseUrl,
     AUTONOMOUS_INTAKE_ENABLED: "false",
     AUTONOMOUS_QUEUE_ENABLED: "false",

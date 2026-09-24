@@ -207,6 +207,8 @@ const productionWrangler = await readFile(new URL("../wrangler.production.jsonc"
 requireMatch("wrangler.production.jsonc", productionWrangler, /"ENGINE_EMAIL_ENABLED"\s*:\s*"false"/, "live email sending must be off in source; the owner enables it deliberately");
 requireMatch("wrangler.production.jsonc", productionWrangler, /"crons"\s*:\s*\[\s*(?:"0 14 \* \* 1-5"\s*)?\]/, "live may only schedule the gated weekday email batch");
 requireMatch("wrangler.production.jsonc", productionWrangler, /"AI_MONTHLY_BUDGET_USD"\s*:\s*"(?:[0-9]|10)"/, "the AI budget must be set and at most US$10 a month");
+requireMatch("wrangler.production.jsonc", productionWrangler, /"AUTH_PASSWORD_SIGNIN"\s*:\s*"false"/, "live sign-in must be by emailed code only");
+requireMatch("wrangler.production.jsonc", productionWrangler, /"allowed_destination_addresses"\s*:\s*\[\s*"rileyhinsperger@gmail\.com",\s*"aidanmageebusiness@gmail\.com"\s*\]/, "sign-in codes may only be emailed to the two owner inboxes");
 forbidMatch("wrangler.production.jsonc", productionWrangler, /GEMINI_API_KEY"\s*:/, "the Gemini key is a secret, never a checked-in var");
 forbidMatch("wrangler.production.jsonc", productionWrangler, /"AUTONOMOUS_(?:QUEUE|SEND|INTAKE)_ENABLED"\s*:\s*"true"/, "legacy autonomous switches stay off on live");
 requireMatch("package.json", packageJson, /"test:owner-ui"\s*:\s*"tsx scripts\/verify-owner-ui-acceptance\.ts"/, "the owner UI acceptance gate must have a stable local command");

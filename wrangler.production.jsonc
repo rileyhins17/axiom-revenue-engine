@@ -20,6 +20,9 @@
     "binding": "ASSETS"
   },
   "services": [],
+  "send_email": [
+    { "name": "LOGIN_EMAIL", "allowed_destination_addresses": ["rileyhinsperger@gmail.com", "aidanmageebusiness@gmail.com"] }
+  ],
   "triggers": {
     "crons": ["0 14 * * 1-5"]
   },
@@ -30,6 +33,7 @@
     "ENGINE_EMAIL_FROM_NAME": "Riley Hinsperger",
     "ENGINE_SMTP_HOST": "smtp.zoho.com",
     "AI_MONTHLY_BUDGET_USD": "5",
+    "AUTH_PASSWORD_SIGNIN": "false",
     "AUTH_ALLOWED_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
     "AUTH_ADMIN_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
     "AUTH_ALLOWED_ORIGINS": "https://operations.getaxiom.ca,https://axiom-ops-omniscient.aidan-magee2.workers.dev",

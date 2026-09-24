@@ -4,6 +4,8 @@ import openNextWorkerModule, {
   DOShardedTagCache,
 } from "./.open-next/worker.js";
 
+import { EmailMessage } from "cloudflare:email";
+
 import { setCloudflareBindings } from "./src/lib/cloudflare";
 import { getCronTimeoutBudgets } from "./src/lib/cron-timeouts";
 import { clearServerEnvCache } from "./src/lib/env";
@@ -97,10 +99,39 @@ async function runCronTasks(env) {
   );
 }
 
+const LOGIN_FROM = "login@getaxiom.ca";
+
+function encodeHeader(value) {
+  return /^[\x20-\x7e]*$/.test(value) ? value : `=?UTF-8?B?${btoa(String.fromCharCode(...new TextEncoder().encode(value)))}?=`;
+}
+function base64Lines(value) {
+  return btoa(String.fromCharCode(...new TextEncoder().encode(value))).replace(/.{1,76}/g, "$&\r\n");
+}
+
+/** Sign-in codes go out through the LOGIN_EMAIL send_email binding, which Cloudflare
+ * restricts to the owners' verified inboxes (allowed_destination_addresses). */
+function installLoginEmail(env) {
+  globalThis.__axiomSendLoginEmail = env.LOGIN_EMAIL
+    ? async ({ to, subject, text, html }) => {
+        const boundary = `axiom-${crypto.randomUUID()}`;
+        const raw = [
+          `From: Axiom <${LOGIN_FROM}>`, `To: <${to}>`, `Subject: ${encodeHeader(subject)}`,
+          `Date: ${new Date().toUTCString().replace("GMT", "+0000")}`, `Message-ID: <${crypto.randomUUID()}@getaxiom.ca>`,
+          "MIME-Version: 1.0", `Content-Type: multipart/alternative; boundary="${boundary}"`, "",
+          `--${boundary}`, "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: base64", "", base64Lines(text),
+          `--${boundary}`, "Content-Type: text/html; charset=utf-8", "Content-Transfer-Encoding: base64", "", base64Lines(html),
+          `--${boundary}--`, "",
+        ].join("\r\n");
+        await env.LOGIN_EMAIL.send(new EmailMessage(LOGIN_FROM, to, raw));
+      }
+    : undefined;
+}
+
 const exportedWorker = {
   async fetch(request, env, ctx) {
     clearServerEnvCache();
     setCloudflareBindings(env);
+    installLoginEmail(env);
     return worker.fetch(request, env, ctx);
   },
   async scheduled(controller, env, ctx) {
