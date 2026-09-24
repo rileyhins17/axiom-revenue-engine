@@ -1,5 +1,26 @@
 # Current status — Axiom Revenue Engine
 
+## LIVE: operations.getaxiom.ca upgraded in place (2026-09-24 ~12:40 UTC)
+
+Owner-approved (Riley: "stage it and go live"; chose in-place, ADR 0061).
+- Staging first: 0056–0074 applied (0074 fixed for D1's splitter in
+  `8583d8f`), console `cb67ccf9`. See `docs/releases/staging/2026-09-24-migration-console-release.md`.
+- Live backup `backups/production/prod-export-20260924T120506Z.sql` (226 MB,
+  SHA-256 `f9f5a0f4…ad7a`); local rehearsal PASS (22 applied, 432,751 rows
+  preserved, integrity ok, zero FK violations, stops engaged).
+- `scripts/release-production.mjs` from clean clone at `cd4b916`: Time Travel
+  bookmark `00003017-00000000-000050f0-5de17b69a1f246753b7acec102bed083`;
+  live D1 0052 → 0074 (77 receipts); stops `01111`; Worker
+  `axiom-ops-omniscient` now version `64ad856e-07b8-42f9-8fae-74955d837cec`
+  with all autonomous switches `false` and no cron (the old version had them
+  `true`). Existing secrets and domain kept; Riley's session still valid.
+- Rollback: `wrangler rollback 9670516c-88cb-42b3-8ec2-dc48eea7a115 --name axiom-ops-omniscient`;
+  database restore from the bookmark only by explicit decision.
+- Still local-only: the engine's weekly prospect list and Worth-a-call
+  decisions (read from local files). Next: publish engine runs to D1 so they
+  appear on live. The `.env.release-write` token (D1 Edit + Workers Scripts
+  Edit) should be revoked when no longer needed (expires in 7 days).
+
 **Staging backup and upgrade rehearsal (2026-09-24 03:06 UTC): PASS.** Riley pasted
 the D1 Read token into ignored `.env.staging-read`. Cloudflare's native
 `d1 export` returned 401 with D1 Read (it needs D1 Edit), so per the runbook's
