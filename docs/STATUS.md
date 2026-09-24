@@ -1,5 +1,24 @@
 # Current status — Axiom Revenue Engine
 
+## LIVE: new Today + Call list UI (2026-09-24 ~13:45 UTC, commit `3360b83`)
+
+- Legacy owner pages (leads, automation, clients, vault) now redirect to
+  `/prospects`. Navigation is Today, Call list and Settings only. The forced
+  `dark` root class that made the light shell unreadable was removed.
+- Verified at `3360b83` in clean clone: check:safety, npm test (885 pass,
+  0 fail, 4 skipped), typecheck, lint (0 errors), build:cloudflare, dry run,
+  test:owner-ui (desktop 1440 + mobile 390, 4 WCAG pages, 0 external requests).
+- Backup `backups/production/prod-export-20260924T134305Z.sql` (SHA-256
+  `9bb52d97…5db8`); code-only release (no pending migrations, stops `01111`);
+  Worker version `5cc824a4-a74e-42ec-831b-53a55990a59e`. Rollback target:
+  `46a6e62c-a7fe-4ff5-99ff-dddfa2083d61`.
+- Live call list: 199 prospects (42 weak website, 157 site-OK/no-site), 152 with
+  a phone and 99 with an address after the re-check run `run-2026-09-24T12-56-44-852Z`.
+- Automatic sending: OFF. Places spend: C$0 (within free tier, caps 150/run, 600/month).
+- Next: (1) Zoho Mail Lite sender plus 10/day CASL-compliant email route (owner
+  must create the Zoho account); (2) raise GCP Places quota to 160/day and run
+  a larger discovery; (3) add the `aidan@` forward once Aidan verifies.
+
 ## LIVE: operations.getaxiom.ca upgraded in place (2026-09-24 ~12:40 UTC)
 
 Owner-approved (Riley: "stage it and go live"; chose in-place, ADR 0061).
