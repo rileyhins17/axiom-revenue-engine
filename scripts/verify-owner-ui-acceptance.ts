@@ -778,7 +778,7 @@ async function run() {
   } finally {
     if (database.open) database.close();
     await stopServer(server);
-    if (success) await rm(outputDirectory, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    if (success && process.env.OWNER_UI_KEEP_SCREENSHOTS !== "1") await rm(outputDirectory, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
   assert(result, "Owner UI acceptance completed without a result.");
   console.log("Owner UI acceptance passed.");
