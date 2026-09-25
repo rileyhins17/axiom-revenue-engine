@@ -109,6 +109,9 @@ CREATE TABLE CallerProjection (
 );
 CREATE INDEX CallerProjection_due ON CallerProjection(status,nextAttemptAt);
 CREATE TABLE CallerCommandGuard (id TEXT PRIMARY KEY, passed INTEGER NOT NULL CONSTRAINT caller_command_guard CHECK(passed=1));
+CREATE TRIGGER CallerStopLinkRaceGuard BEFORE INSERT ON CallerCommandGuard
+WHEN NEW.id LIKE 'stop-link:%' AND NEW.passed=0
+BEGIN SELECT RAISE(ABORT,'CALLER_STOP_LINK_CHANGED'); END;
 
 -- Peer history has a separate receipt and never replays source domain commands.
 CREATE TABLE CallerMirror (

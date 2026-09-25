@@ -1,17 +1,32 @@
+import { guardNoEngineLink } from './stop-projection';
 import { canonicalJson } from './canonical-json';
 import type { CallerDb,CallerStatement } from './database';
 import { ENGINE_WORKSPACE } from './identity';
 import { getEngineContactLink,getEngineLink } from './links';
 import { assertPeerLink,PeerError,type PeerGrant } from './peer-contract';
 import { makeCallProjection,parseProjection,projectionHash,type CallProjection,type ProjectionReceipt } from './projection-contract';
-import type { ResultEvent } from './protocol';
+import { parseResultEvent, type ResultEvent } from './protocol';
 
 export async function planEngineProjection(db:CallerDb,actorId:string,event:ResultEvent,hash:string,now:string):Promise<CallerStatement[]> {
   const link=await getEngineContactLink(db,event.contactId);
-  if(!link)return [];
-  const payload=await makeCallProjection(link,actorId,event,hash);
-  return [db.prepare(`INSERT INTO CallerProjection(deliveryKey,workspaceId,originEventId,attemptId,targetSystem,grantId,payloadJson,payloadHash,nextAttemptAt)
-    VALUES(?,?,?,?,?,?,?,?,?)`).bind(payload.projectionId,ENGINE_WORKSPACE,event.eventId,event.attemptId,'orbit',link.grantId,canonicalJson(payload),await projectionHash(payload),now)];
+  if(!link)return guardNoEngineLink(db,event.contactId);
+  const chain:{event:ResultEvent;actorId:string;hash:string}[]=[];
+  let current={event,actorId,hash};
+  for(;;){
+    if(await db.prepare('SELECT 1 FROM CallerProjection WHERE workspaceId=? AND originEventId=? AND grantId=?').bind(ENGINE_WORKSPACE,current.event.eventId,link.grantId).first())break;
+    chain.unshift(current);
+    if(!current.event.correctionOf)break;
+    const parent=await db.prepare('SELECT payloadJson,payloadHash,actorUserId FROM CallerResult WHERE workspaceId=? AND eventId=?').bind(ENGINE_WORKSPACE,current.event.correctionOf).first<{payloadJson:string;payloadHash:string;actorUserId:string}>();
+    if(!parent)throw new PeerError('MISSING_ORIGIN');
+    current={event:parseResultEvent(JSON.parse(parent.payloadJson)),actorId:parent.actorUserId,hash:parent.payloadHash};
+  }
+  // A correction after linking must include any pre-link ancestors so the peer
+  // can validate its immutable chain. Existing deliveries retain their IDs.
+  return Promise.all(chain.map(async row=>{
+    const payload=await makeCallProjection(link,row.actorId,row.event,row.hash);
+    return db.prepare(`INSERT INTO CallerProjection(deliveryKey,workspaceId,originEventId,attemptId,targetSystem,grantId,payloadJson,payloadHash,nextAttemptAt)
+      SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM CallerProjection WHERE workspaceId=? AND originEventId=? AND grantId=?)`).bind(payload.projectionId,ENGINE_WORKSPACE,row.event.eventId,row.event.attemptId,'orbit',link.grantId,canonicalJson(payload),await projectionHash(payload),now,ENGINE_WORKSPACE,row.event.eventId,link.grantId);
+  }));
 }
 type Stored={projectionId:string;originEventId:string;attemptId:string;payloadHash:string;payloadJson:string;receivedAt:string};
 const read=(db:CallerDb,originEventId:string)=>db.prepare("SELECT * FROM CallerMirror WHERE workspaceId=? AND originSystem='orbit' AND originEventId=?").bind(ENGINE_WORKSPACE,originEventId).first<Stored>();

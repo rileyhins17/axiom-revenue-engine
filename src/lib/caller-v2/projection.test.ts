@@ -102,3 +102,14 @@ test('a link changed between projection validation and commit cannot receive a s
     assert.equal(t.raw.prepare<[],{n:number}>('SELECT COUNT(*) n FROM CallerMirror').get()?.n,0);
   }finally{t.close();}
 });
+
+
+test('unresolved precise callbacks remain blocked after the agreed date begins',async()=>{
+  for(const [localDate,localTime] of [['2026-11-01','01:30'],['2027-03-14','02:30']]){
+    const f=openCallerTestDb();try{
+      const event=await engineResultFixture(f.db,{outcome:'callback',nextAction:{kind:'agreed_callback',description:'Original agreed clock',originalWords:'The agreed local clock time',localDate,localTime,timeZone:'America/Toronto',utcOffset:null,precision:'time',windowEndLocalTime:null,scheduledAt:null,timeStatus:'needs_review',provenance:'operator'}});
+      await recordEngineResult(f.db,AIDAN,event);
+      assert.equal((await readEngineCallSource(f.db,'fixture.example',Date.parse(localDate+'T05:00:00Z'))).callable,false);
+    }finally{f.close();}
+  }
+});

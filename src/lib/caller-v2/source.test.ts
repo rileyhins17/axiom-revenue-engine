@@ -31,7 +31,7 @@ test('authenticated source routes bind claim to prepared revision and reconcile 
     const token = await createCallerToken(t.db, AIDAN, 'Fixture caller');
     const send = (route: string, body?: unknown) => handleEngineCallerRequest(t.db, new Request('https://operations.getaxiom.ca/api/caller/v2/' + route, {
       method: body === undefined ? 'GET' : 'POST', headers: { Authorization: 'Bearer ' + token }, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    }), route.split('?')[0]);
+    }), route.split('?')[0],{CALLER_V2_ENABLED:'true',CALLER_V2_WORKSPACE_ID:'axiom'});
     const connection = await send('connection');
     assert.equal(connection.status, 200); assert.equal(((await connection.json()) as { actorId: string }).actorId, AIDAN.actorUserId);
     const page = await (await send('tasks')).json() as Awaited<ReturnType<typeof listEngineCallTasks>>;
@@ -54,4 +54,24 @@ test('authenticated source routes bind claim to prepared revision and reconcile 
     t.raw.prepare('UPDATE User SET emailVerified=0 WHERE id=?').run(AIDAN.actorUserId);
     assert.equal((await send('prepare', { source })).status, 401);
   } finally { t.close(); }
+});
+
+
+test('new calling defaults off for existing tokens while recovery remains available',async()=>{
+  const f=openCallerTestDb();try{
+    const token=await createCallerToken(f.db,AIDAN,'Activation fixture');
+    const source=(await listEngineCallTasks(f.db,null)).tasks[0].source;
+    const send=(route:string,body?:unknown,env?:unknown)=>handleEngineCallerRequest(f.db,new Request('https://operations.getaxiom.ca/api/caller/v2/'+route,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token},...(body?{body:JSON.stringify(body)}:{})}),route,env);
+    for(const env of [undefined,{}, {CALLER_V2_ENABLED:'true',CALLER_V2_WORKSPACE_ID:'other'}, {CALLER_V2_ENABLED:true,CALLER_V2_WORKSPACE_ID:'axiom'}]){
+      assert.equal((await send('prepare',{source},env)).status,503);
+      assert.equal((await send('tasks',undefined,env)).status,503);
+    }
+    const active={CALLER_V2_ENABLED:'true',CALLER_V2_WORKSPACE_ID:'axiom'};
+    const prepared=await (await send('prepare',{source},active)).json() as {task:{revision:string}};
+    const claim=await (await send('claims',{source,sourceRevision:prepared.task.revision,attemptId:crypto.randomUUID()},active)).json() as Claim;
+    assert.equal((await send('claims/renew',{claim,state:'armed'})).status,503);
+    assert.equal((await send('claims/reconcile',{attemptId:claim.attemptId,resolution:'not_dialed'})).status,200);
+    assert.equal((await send('stop',{source,reason:'Recovery remains enabled'})).status,200);
+    assert.equal((await send('connection')).status,200);
+  }finally{f.close();}
 });

@@ -6,10 +6,16 @@ import { assertPeerLink,linkIdentitySchema,PeerError,type LinkIdentity,type Peer
 import { makeStopProjection,parseStopProjection,stopProjectionHash,type StopProjection,type StopReceipt } from './stop-contract';
 
 export async function planEngineStopDelivery(db:CallerDb,contactKey:string,actorId:string,now:string,confirmedLink?:LinkIdentity):Promise<CallerStatement[]>{
-  const link=confirmedLink??await getEngineContactLink(db,contactKey);if(!link)return [];
+  const link=confirmedLink??await getEngineContactLink(db,contactKey);
+  if(!link)return guardNoEngineLink(db,contactKey);
   const p=await makeStopProjection(link,'revenue-engine',actorId,now);
-  return [db.prepare('INSERT INTO CallerStopDelivery(deliveryKey,workspaceId,grantId,payloadJson,payloadHash,nextAttemptAt) VALUES(?,?,?,?,?,?)')
-    .bind('stop:'+p.projectionId,ENGINE_WORKSPACE,link.grantId,canonicalJson(p),await stopProjectionHash(p),now)];
+  const condition=confirmedLink?` WHERE EXISTS(SELECT 1 FROM CallerContactControl WHERE workspaceId=? AND contactKey=? AND stopped=1) OR EXISTS(SELECT 1 FROM EngineProspectActivity WHERE prospectId=? AND outcome='DO_NOT_CONTACT')`:'';
+  return [db.prepare('INSERT INTO CallerStopDelivery(deliveryKey,workspaceId,grantId,payloadJson,payloadHash,nextAttemptAt) SELECT ?,?,?,?,?,?'+condition)
+    .bind('stop:'+p.projectionId,ENGINE_WORKSPACE,link.grantId,canonicalJson(p),await stopProjectionHash(p),now,...confirmedLink?[ENGINE_WORKSPACE,contactKey,link.engineRef.entityId]:[])];
+}
+/** A new immutable link can win once between planning and commit. Replan the entire command. */
+export async function retryEngineStopLinkRace<T>(work:()=>Promise<T>):Promise<T>{
+  try{return await work();}catch(error){if(!(error instanceof Error)||!error.message.includes('CALLER_STOP_LINK_CHANGED'))throw error;return work();}
 }
 export async function acceptEngineStop(db:CallerDb,grant:PeerGrant,input:StopProjection,now=Date.now()):Promise<StopReceipt>{
   const p=parseStopProjection(input),link=await getEngineLink(db,p.linkId);
@@ -30,4 +36,9 @@ export async function acceptEngineStop(db:CallerDb,grant:PeerGrant,input:StopPro
     db.prepare('DELETE FROM CallerCommandGuard WHERE id=?').bind(guard),
   ]);}catch(error){const winner=await read();if(winner)return receipt(winner,'already_saved');throw error;}
   return receipt({payloadHash:hash,receivedAt},'saved');
+}
+
+export function guardNoEngineLink(db:CallerDb,contactKey:string):CallerStatement[]{
+    const id='stop-link:'+crypto.randomUUID();
+    return [db.prepare('INSERT INTO CallerCommandGuard(id,passed) SELECT ?,CASE WHEN NOT EXISTS(SELECT 1 FROM CallerSourceLink WHERE workspaceId=? AND engineContactKey=?) THEN 1 ELSE 0 END').bind(id,ENGINE_WORKSPACE,contactKey),db.prepare('DELETE FROM CallerCommandGuard WHERE id=?').bind(id)];
 }

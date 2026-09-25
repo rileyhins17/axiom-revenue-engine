@@ -1,4 +1,4 @@
-import { planEngineStopDelivery } from './stop-projection';
+import { planEngineStopDelivery, retryEngineStopLinkRace } from './stop-projection';
 import type { CallerActor } from '../revenue-engine/caller-integration';
 import type { CallerDb } from './database';
 import { parseResultEvent, type ResultEvent, type Receipt } from './protocol';
@@ -17,6 +17,9 @@ export async function getEngineReceipt(db: CallerDb, actor: CallerActor, eventId
 }
 
 export async function recordEngineResult(db: CallerDb, actor: CallerActor, input: ResultEvent): Promise<Receipt> {
+  return retryEngineStopLinkRace(()=>recordEngineResultOnce(db,actor,input));
+}
+async function recordEngineResultOnce(db: CallerDb, actor: CallerActor, input: ResultEvent): Promise<Receipt> {
   const event = parseResultEvent(input); assertEngineSource(event.source);
   if (event.purpose === 'client_opportunity' || event.contactId !== await engineContactId(event.source.entityId)) throw new CallerError('NOT_FOUND', 404);
   const hash = await resultPayloadHash(actor.actorUserId, ENGINE_WORKSPACE, event);

@@ -1,3 +1,4 @@
+import { callerEnabled } from './activation';
 import { flushEngineProjectionOutbox } from './projection-outbox';
 import type { CallerDb } from './database';
 import { z } from 'zod';
@@ -36,6 +37,7 @@ export async function handleEngineCallerRequest(db: CallerDb, request: Request, 
     const flush=()=>schedule?.(async()=>{try{return await flushEngineProjectionOutbox(db,bridge());}catch{return undefined;}});
     const actor = await authenticateEngineCaller(db, request.headers.get('Authorization'));
     if (!actor) return json({ code: 'AUTH_REQUIRED', retryable: false, message: 'Connect Caller with a token from your active owner account.' }, 401);
+    if (['tasks','prepare','claims'].includes(route) && !callerEnabled(env,'axiom')) throw new CallerError('CALLING_DISABLED',503);
     if (route === 'connection' || route === 'tasks') {
       if (request.method !== 'GET') throw new CallerError('METHOD_NOT_ALLOWED', 405);
       if (route === 'connection') return json(engineIdentity(actor));
@@ -57,6 +59,7 @@ export async function handleEngineCallerRequest(db: CallerDb, request: Request, 
       }
       if (route === 'claims/renew') {
         const command = z.object({ claim: claimSchema, state: z.enum(['reserved','armed','active']) }).strict().parse(body);
+        if(command.state!=='active'&&!callerEnabled(env,'axiom'))throw new CallerError('CALLING_DISABLED',503);
         return json(await (await getEngineContactLink(db,command.claim.contactKey)?renewEngineLinkedClaim(db,actor,command.claim,command.state,bridge()):renewContactClaim(db,actor,command.claim,command.state)));
       }
       if (route === 'claims/release') {

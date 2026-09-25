@@ -112,8 +112,10 @@ test('a source change or stop between validation and the transaction cannot arm 
     try {
       const input = await command(t), reserved = await claimContact(t.db, AIDAN, input, NOW);
       const batch = t.db.batch.bind(t.db);
+      let injected=false;
       t.db.batch = async statements => {
-        if (statements.length === 3) {
+        if (!injected && statements.length === 3) {
+          injected=true;
           if (mutation === 'source') t.raw.prepare('UPDATE EngineProspect SET phone=?').run('+15195550102');
           else await setContactStop(t.db, RILEY, input.contactKey, 'Racing stop', NOW);
         }

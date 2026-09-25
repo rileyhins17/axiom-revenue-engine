@@ -1,3 +1,4 @@
+import { callerEnabled } from './activation';
 import { acceptEngineStop } from './stop-projection';
 import {engineConversionContext,reserveEngineConversionLink,finalizeEngineConversion} from './conversions';
 import { parseStopProjection } from './stop-contract';
@@ -25,9 +26,11 @@ export async function handleEnginePeerRequest(db:CallerDb,request:Request,route:
     if(operation.data==='conversion/reserve')return json(await reserveEngineConversionLink(db,grant,input));
     if(operation.data==='stop')return json(await acceptEngineStop(db,grant,parseStopProjection(input)));
     if(operation.data==='projections')return json(await acceptEngineProjection(db,grant,parseProjection(input)));
+    if(operation.data==='claims'&&!callerEnabled(env,'axiom'))throw new CallerError('CALLING_DISABLED',503);
     if(operation.data==='claims')return json(await claimPeerLinkedContact(db,peerClaimSchema.parse(input),bridge));
     if(operation.data==='claims/renew'){
       const body=z.object({actorId:z.string().min(1).max(128),claim:coordinatorClaimSchema,state:z.enum(['reserved','armed','active'])}).strict().parse(input);
+      if(body.state!=='active'&&!callerEnabled(env,'axiom'))throw new CallerError('CALLING_DISABLED',503);
       return json(await renewPeerLinkedClaim(db,body,bridge));
     }
     if(operation.data==='claims/release'){

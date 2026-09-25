@@ -1,7 +1,24 @@
 'use client';
 import { Phone } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { sourceRefSchema } from '@/lib/caller-v2/protocol';
+
+
+const CallerActivation=createContext(false);
+export function CallerActivationProvider({identity,children}:{identity:string|null;children:ReactNode}){
+  const [result,setResult]=useState<{identity:string;enabled:boolean}|null>(null);
+  useEffect(()=>{
+    if(!identity)return;
+    const controller=new AbortController();
+    void fetch('/api/caller/activation',{cache:'no-store',signal:controller.signal})
+      .then(async response=>{
+        const value=response.ok?await response.json():null;
+        if(!controller.signal.aborted)setResult({identity,enabled:Boolean(value&&typeof value==='object'&&'enabled' in value&&value.enabled===true)});
+      }).catch(()=>{if(!controller.signal.aborted)setResult({identity,enabled:false});});
+    return()=>controller.abort();
+  },[identity]);
+  return <CallerActivation.Provider value={Boolean(identity&&result?.identity===identity&&result.enabled)}>{children}</CallerActivation.Provider>;
+}
 
 export function useCallerHandoff(prospectId:string):boolean {
   const [selectedId,setSelectedId]=useState<string|null>(null);
@@ -20,6 +37,8 @@ export function useCallerHandoff(prospectId:string):boolean {
 
 /** Only a source reference crosses into the extension; Caller fetches the number. */
 export function CallerLaunch({ prospectId, label = 'Open Caller', className = '' }: { prospectId: string; label?: string; className?: string }) {
+  const enabled=useContext(CallerActivation);
+  if(!enabled)return <span className={className} title="New calls are paused for this workspace. Saved results can still sync.">Calling paused</span>;
   const source = { system: 'revenue-engine', connectionId: 'axiom-engine', workspaceId: 'axiom', entityType: 'prospect', entityId: prospectId };
   return <a href="/settings#caller" data-axiom-caller-source={JSON.stringify(source)}
     className={`inline-flex items-center gap-2 rounded-lg font-medium ${className}`} title="Open Axiom Caller. Connect the extension in Settings if it is unavailable.">

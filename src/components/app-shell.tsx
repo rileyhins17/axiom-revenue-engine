@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
+import { CallerActivationProvider } from "@/components/prospects/caller-launch";
 import { AppSidebar } from "@/components/app-sidebar";
 import { LayoutBreadcrumb } from "@/components/layout-breadcrumb";
 import { SearchTrigger } from "@/components/system/search-trigger";
@@ -65,6 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   })();
 
   return (
+    <CallerActivationProvider identity={session?.user?.email??null}>
     <SidebarProvider
       className="owner-app-shell min-h-svh bg-[#f5f4ef] text-[#202c26]"
       style={{ "--sidebar-width": "15rem" } as CSSProperties}
@@ -149,6 +151,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <MobileTabBar pathname={pathname} />
       </main>
     </SidebarProvider>
+    </CallerActivationProvider>
   );
 }
 

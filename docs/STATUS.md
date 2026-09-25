@@ -1,3 +1,17 @@
+## LOCAL ONLY 2026-09-25: final independent review fix candidate
+
+The independent whole-change review returned five Important findings and no Critical or Minor findings. The single fix pass covers delayed UI replies, unresolved callback timing, correction delivery ordering, missing callback zones, and strict workspace calling activation. Targeted regressions pass; the exact candidate's full safety/tests/types/lint/build/dry-run/browser gate is pending and will be recorded in the release manifest. Calling and scheduled sync default off. Source screens reflect the pause; ongoing call and delivery recovery remain available.
+
+No deployment, production migration, peer secrets, installed extension, real phone call or provider spend changed. Current Engine deployment identity and both deployed commits remain unverified; Orbit version72 is only partial identity evidence. Fresh production backup/restore proof, device/audio and uncoached owner acceptance remain release prerequisites. The C$50/month ceiling is unchanged; optional one-minute sync adds about43,200 invocations/app/month only after its separate gate.
+
+Next: complete the exact candidate gates; commit the verified trees and package hashes/reproducible evidence; present draft PRs and the owner device/release checklist for the final external approval step.
+
+## LOCAL ONLY 2026-09-25: final connected-calling verification candidate
+
+The local implementation now covers Engine/Orbit source calls, explicit shared links, durable stop/projection recovery, reviewed conversion, Caller history/corrections and optional Voice independent of phone facts. New race regressions cover stop/link commit order, ordinary and DNC corrections while linking, pre-link correction ancestors and stale selected history during conversion. Orbit now ranks canonical mirrored callbacks before uncalled prospects across source-page boundaries. Focused Engine26 and Orbit36 tests pass; complete release verification is recorded with exact revisions in the local release packet.
+
+Compatible published dependencies have been refreshed with lockfiles and retained/rebased Windows patches; see `docs/calling/dependency-compatibility.md`. The new migrations remain unapplied to production. Source deployments, installed extension and Phone Link were not changed; no contacts, outbound sends or paid providers were exercised. Sync scheduling remains off. Hardware/audio and uncoached Aidan/Riley acceptance remain release gates. Next: complete the required sequential Engine gate and cross-app browser checks; independent review and material fixes; prepare the exact-commit release/rollback packet for the owner's device and release gate.
+
 ## Local reviewed handoff implementation — 2026-09-25
 
 Engine owner Settings now provides reviewed conversion requests, retained status and retries. Orbit has the owner confirmation page and a durable inbox. The shared conversion hold keeps acquisition closed; Orbit commits its business/contact/link/receipt atomically, then both sides activate the mapping. Eligible Orbit client/opportunity calls retain shared ownership and both source stops. No prospect calls, production changes, paid actions or installed-extension changes were used.

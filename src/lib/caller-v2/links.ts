@@ -1,5 +1,4 @@
 import { planEngineStopDelivery } from './stop-projection';
-import { readEngineCallSource } from './source-state';
 import type { CallerActor } from '../revenue-engine/caller-integration';
 import type { CallerDb } from './database';
 import { canonicalJson } from './canonical-json';
@@ -27,12 +26,10 @@ export async function stageEngineLink(db: CallerDb, actor: CallerActor, grant: P
   if (previous) { if (!sameIdentity(previous, link)) throw new PeerError('LINK_CONFLICT'); return previous; }
   try {
     // The insert trigger checks contact ownership in the same database statement.
-    const source=await readEngineCallSource(db,link.engineRef.entityId,now);
-    const stopped=source.source.stopped||await db.prepare('SELECT 1 FROM CallerContactControl WHERE workspaceId=? AND contactKey=? AND stopped=1').bind(ENGINE_WORKSPACE,link.engineContactKey).first();
     await db.batch([db.prepare(`INSERT INTO CallerSourceLink(workspaceId,linkId,grantId,sourceEntityId,engineContactKey,orbitWorkspaceId,orbitContactId,identityJson,state,revision,confirmedBy,createdAt)
       VALUES(?,?,?,?,?,?,?,?,'pending',1,?,?)`).bind(ENGINE_WORKSPACE, link.linkId, link.grantId, link.engineRef.entityId, link.engineContactKey,
       link.orbitRef.workspaceId, link.orbitContactId, canonicalJson(link), actor.actorUserId, new Date(now).toISOString()),
-      ...stopped?await planEngineStopDelivery(db,link.engineContactKey,actor.actorUserId,new Date(now).toISOString(),link):[],
+      ...await planEngineStopDelivery(db,link.engineContactKey,actor.actorUserId,new Date(now).toISOString(),link),
     ]);
   } catch (error) {
     const winner = await getEngineLink(db, link.linkId);

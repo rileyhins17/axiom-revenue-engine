@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openCallerTestDb, AIDAN } from './test-database';
+import { openCallerTestDb, engineResultFixture, AIDAN } from './test-database';
+import { recordEngineResult } from './repository';
 import { engineContactId } from './identity';
 import { stageEngineLink, activateEngineLink, getEngineContactLink } from './links';
 import { signPeerCommand, verifyPeerCommand, peerGrant, type LinkIdentity } from './peer-contract';
-import { claimContact } from './claims';
+import { claimContact, setContactStop } from './claims';
 import { readEngineCallSource } from './source-state';
 
 const NOW=Date.parse('2026-09-25T16:00:00Z');
@@ -70,5 +71,57 @@ test('a link committed between preparation and reservation wins atomically over 
     }};
     await assert.rejects(claimContact(db,AIDAN,{entityId:'fixture.example',contactKey:l.engineContactKey,sourceRevision:source.revision,attemptId:crypto.randomUUID()},NOW),/REVISION_CONFLICT|LINK_CHECK_REQUIRED/);
     assert.equal(t.raw.prepare<[],{n:number}>('SELECT COUNT(*) n FROM CallerAttempt').get()?.n,0);
+  }finally{t.close();}
+});
+
+test('a stop and new link racing in either order retain a durable stop delivery',async()=>{
+  for(const order of ['stop-before-link','link-before-stop']){
+    const t=openCallerTestDb();try{
+      const l=await link();let injected=false;
+      const db={...t.db,batch:async(statements:Parameters<typeof t.db.batch>[0])=>{
+        if(!injected){injected=true;
+          if(order==='stop-before-link')await setContactStop(t.db,AIDAN,l.engineContactKey,'Stop',NOW,l.engineRef.entityId);
+          else await stageEngineLink(t.db,AIDAN,grant(),l,NOW);
+        }
+        return t.db.batch(statements);
+      }};
+      if(order==='stop-before-link')await stageEngineLink(db,AIDAN,grant(),l,NOW);
+      else await setContactStop(db,AIDAN,l.engineContactKey,'Stop',NOW,l.engineRef.entityId);
+      assert.equal(t.raw.prepare<[],{n:number}>('SELECT COUNT(*) n FROM CallerStopDelivery').get()?.n,1,order);
+      assert.equal(t.raw.prepare<[],{stopped:number}>('SELECT stopped FROM CallerContactControl').get()?.stopped,1);
+      assert.equal(t.raw.prepare<[],{n:number}>('SELECT COUNT(*) n FROM CallerResult').get()?.n,0);
+    }finally{t.close();}
+  }
+});
+
+test('a DNC correction racing with link creation retries its atomic result and stop together',async()=>{
+  const t=openCallerTestDb();try{
+    const original=await engineResultFixture(t.db,{outcome:'connected',nextAction:null});await recordEngineResult(t.db,AIDAN,original);
+    const l=await link();let injected=false;
+    const db={...t.db,batch:async(statements:Parameters<typeof t.db.batch>[0])=>{
+      if(!injected){injected=true;await stageEngineLink(t.db,AIDAN,grant(),l,NOW);}return t.db.batch(statements);
+    }};
+    const correction={...original,eventId:crypto.randomUUID(),correctionOf:original.eventId,outcome:'do_not_contact' as const,stopScope:'contact' as const};
+    await recordEngineResult(db,AIDAN,correction);await recordEngineResult(db,AIDAN,correction);
+    assert.equal(t.raw.prepare<[],{n:number}>('SELECT COUNT(*) n FROM CallerStopDelivery').get()?.n,1);
+    assert.equal(t.raw.prepare<[],{n:number}>('SELECT COUNT(*) n FROM CallerResult').get()?.n,2);
+    assert.equal(t.raw.prepare<[],{n:number}>('SELECT COUNT(*) n FROM CallerProjection').get()?.n,2,'The newly linked peer also needs the correction parent');
+    assert.equal(t.raw.prepare<[],{stopRevision:number}>('SELECT stopRevision FROM CallerContactControl').get()?.stopRevision,1);
+  }finally{t.close();}
+});
+
+test('an ordinary correction racing with link creation retries its atomic result and stop together',async()=>{
+  const t=openCallerTestDb();try{
+    const original=await engineResultFixture(t.db,{outcome:'connected',nextAction:null});await recordEngineResult(t.db,AIDAN,original);
+    const l=await link();let injected=false;
+    const db={...t.db,batch:async(statements:Parameters<typeof t.db.batch>[0])=>{
+      if(!injected){injected=true;await stageEngineLink(t.db,AIDAN,grant(),l,NOW);}return t.db.batch(statements);
+    }};
+    const correction={...original,eventId:crypto.randomUUID(),correctionOf:original.eventId,outcome:'connected' as const,stopScope:'none' as const};
+    await recordEngineResult(db,AIDAN,correction);await recordEngineResult(db,AIDAN,correction);
+    assert.equal(t.raw.prepare<[],{n:number}>('SELECT COUNT(*) n FROM CallerStopDelivery').get()?.n,0);
+    assert.equal(t.raw.prepare<[],{n:number}>('SELECT COUNT(*) n FROM CallerResult').get()?.n,2);
+    assert.equal(t.raw.prepare<[],{n:number}>('SELECT COUNT(*) n FROM CallerProjection').get()?.n,2,'The newly linked peer also needs the correction parent');
+    assert.equal(t.raw.prepare<[],{stopRevision:number}>('SELECT stopRevision FROM CallerContactControl').get()?.stopRevision??0,0);
   }finally{t.close();}
 });

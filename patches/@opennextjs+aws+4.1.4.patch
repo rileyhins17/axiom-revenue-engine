@@ -1,8 +1,7 @@
 diff --git a/node_modules/@opennextjs/aws/dist/build/copyTracedFiles.js b/node_modules/@opennextjs/aws/dist/build/copyTracedFiles.js
-index 9701b04..1074b0a 100644
 --- a/node_modules/@opennextjs/aws/dist/build/copyTracedFiles.js
 +++ b/node_modules/@opennextjs/aws/dist/build/copyTracedFiles.js
-@@ -228,7 +228,16 @@ File ${serverPath} does not exist
+@@ -237,7 +237,16 @@
                  symlinkSync(symlink, to);
              }
              catch (e) {

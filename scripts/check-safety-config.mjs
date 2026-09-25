@@ -897,6 +897,10 @@ forbidMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", pri
 requireMatch("wrangler.jsonc", wrangler, /"CALLER_SYNC_ENABLED"\s*:\s*"false"/, "Caller sync must default off until its release/configuration gate");
 forbidMatch("wrangler.jsonc", wrangler, /"CALLER_SYNC_ENABLED"\s*:\s*(?:"true"|true|1)/, "checked-in Caller sync must not activate a production schedule");
 
+
+requireMatch("wrangler.jsonc", wrangler, /"CALLER_V2_ENABLED"\s*:\s*"false"/, "Caller v2 must default off");
+forbidMatch("wrangler.jsonc", wrangler, /"CALLER_V2_ENABLED"\s*:\s*(?:"true"|true|1)/, "Caller v2 activation requires the release gate");
+
 if (failures.length > 0) {
   console.error("Safety configuration check failed:");
   for (const failure of failures) console.error(`- ${failure}`);

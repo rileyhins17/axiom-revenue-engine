@@ -1,5 +1,4 @@
 diff --git a/node_modules/@cloudflare/playwright/lib/index.js b/node_modules/@cloudflare/playwright/lib/index.js
-index 5bc174e..1b5e1b8 100644
 --- a/node_modules/@cloudflare/playwright/lib/index.js
 +++ b/node_modules/@cloudflare/playwright/lib/index.js
 @@ -1,6 +1,5 @@
@@ -9,7 +8,7 @@ index 5bc174e..1b5e1b8 100644
  import { timeOrigin, setTimeOrigin } from './playwright-core/src/utils/isomorphic/time.js';
  import { WebSocketTransport, transportZone } from './cloudflare/webSocketTransport.js';
  import { wrapClientApis } from './cloudflare/wrapClientApis.js';
-@@ -52,9 +51,14 @@ function extractOptions(endpoint) {
+@@ -60,9 +59,14 @@
    }
    return {};
  }
@@ -24,9 +23,9 @@ index 5bc174e..1b5e1b8 100644
 +  const bindingKey = typeof binding === "string" ? binding : Object.keys(bindings).find((key) => bindings[key] === binding);
 +  if (!bindingKey || !(bindingKey in bindings))
      throw new Error(`No binding found for ${binding}`);
-   const url = new URL(`${HTTP_FAKE_HOST}/v1/connectDevtools`);
-   url.searchParams.set("browser_binding", bindingKey);
-@@ -80,9 +84,10 @@ function getBrowserBinding(endpoint) {
+   const sessionPath = options?.sessionId ? `/${options.sessionId}` : "";
+   const url = new URL(`${HTTP_FAKE_HOST}/v1/devtools/browser${sessionPath}`);
+@@ -89,9 +93,10 @@
    if (typeof endpoint === "string" || endpoint instanceof URL) {
      const url = endpoint instanceof URL ? endpoint : new URL(endpoint);
      const binding = url.searchParams.get("browser_binding");

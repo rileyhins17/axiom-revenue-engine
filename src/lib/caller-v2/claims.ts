@@ -1,4 +1,4 @@
-import { planEngineStopDelivery } from './stop-projection';
+import { planEngineStopDelivery, retryEngineStopLinkRace } from './stop-projection';
 import { z } from 'zod';
 import {sourceRefSchema} from './protocol';
 import {conversionHandoffReceiptSchema} from './conversion-contract';
@@ -133,8 +133,8 @@ export async function setContactStop(db: CallerDb, actor: ClaimActor, contactKey
   z.string().regex(/^ec-[a-f0-9]{64}$/).parse(contactKey);
   z.string().trim().min(1).max(2000).parse(reason);
   if (entityId && contactKey !== await engineContactId(entityId)) throw new CallerError('NOT_FOUND', 404);
-  await db.batch([db.prepare(`INSERT INTO CallerContactControl(workspaceId,contactKey,sourceEntityId,stopped,stopRevision,stopReason,stoppedAt,stoppedBy,revision) VALUES(?,?,?,1,1,?,?,?,1)
-    ON CONFLICT(workspaceId,contactKey) DO UPDATE SET sourceEntityId=COALESCE(CallerContactControl.sourceEntityId,excluded.sourceEntityId),stopped=1,stopRevision=stopRevision+1,stopReason=excluded.stopReason,stoppedAt=excluded.stoppedAt,stoppedBy=excluded.stoppedBy,revision=revision+1`).bind(ENGINE_WORKSPACE, contactKey, entityId ?? null, reason, iso(now), actor.actorUserId),...await planEngineStopDelivery(db,contactKey,actor.actorUserId,iso(now))]);
+  await retryEngineStopLinkRace(async()=>db.batch([db.prepare(`INSERT INTO CallerContactControl(workspaceId,contactKey,sourceEntityId,stopped,stopRevision,stopReason,stoppedAt,stoppedBy,revision) VALUES(?,?,?,1,1,?,?,?,1)
+    ON CONFLICT(workspaceId,contactKey) DO UPDATE SET sourceEntityId=COALESCE(CallerContactControl.sourceEntityId,excluded.sourceEntityId),stopped=1,stopRevision=stopRevision+1,stopReason=excluded.stopReason,stoppedAt=excluded.stoppedAt,stoppedBy=excluded.stoppedBy,revision=revision+1`).bind(ENGINE_WORKSPACE, contactKey, entityId ?? null, reason, iso(now), actor.actorUserId),...await planEngineStopDelivery(db,contactKey,actor.actorUserId,iso(now))]));
 }
 
 async function closeAttempt(db: CallerDb, current: Control, now: number, resolution: 'not_dialed' | 'call_finished' | 'result_saved') {

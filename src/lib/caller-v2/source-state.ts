@@ -41,6 +41,7 @@ export async function readEngineCallSource(db: CallerDb, entityId: string, now =
 
 function futureCallback(action:NextAction,now:number){
   if(action.precision==='unscheduled')return false;
+  if(action.timeStatus==='needs_review'||(['time','window'].includes(action.precision)&&!action.scheduledAt))return true;
   if(action.scheduledAt)return Date.parse(action.scheduledAt)>now;
   if(!action.localDate)return false;
   if(!action.timeZone)return true;
