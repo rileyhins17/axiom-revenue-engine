@@ -263,3 +263,5 @@ Keep the legacy system read-only/rollback-capable until reconciliation and the p
 ## Connected calling local candidate
 
 See [owner acceptance](docs/calling/acceptance.md), [release/rollback gate](docs/calling/release.md), and [dependency compatibility](docs/calling/dependency-compatibility.md). The local implementation has not been deployed; production identity, backup, device/audio and uncoached owner acceptance remain separate gates.
+
+[Final local verification and remaining owner gates](docs/calling/verification.md).

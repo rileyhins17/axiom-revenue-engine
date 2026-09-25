@@ -1,3 +1,9 @@
+## LOCAL ONLY 2026-09-25: connected calling verified; owner release gate open
+
+Verified implementation `9e7d6d58df80c035a5f93bc1c484a7827e500ee1`: safety975 tests/types/lint0errors8warnings/Cloudflarebuild/no-uploaddryrun/stock 8+extended 10ownerUI at1440 / 390PASS, zero external requests. Caller `e616e2b850c0e7b6896a759cb1440f5acdd760f0` passes263 tests and Chrome/Brave journey/recovery/latency checks. Orbit `ef4b97d078ddeb550700ecf0d7d575eb05c7c618` passes2,305 tests and real signed handoff browser. All five Important review findings are fixed; no deferred minors. See docs/calling/verification.md and implementation-decisions.md.
+
+Production/installed extension remain unchanged. Both deployed commits, Engine account mapping, fresh backup/restore proof, device/audio and uncoached owner acceptance remain open. Calling and scheduledsync defaultoff; C$50/month ceiling unchanged. Next: owner reviews the three prepared draft PRs; verifies source identity/backups and approves rollout; completes device/five-journey acceptance before routine calling. No publish/merge/deploy authority is inferred.
+
 ## LOCAL ONLY 2026-09-25: final independent review fix candidate
 
 The independent whole-change review returned five Important findings and no Critical or Minor findings. The single fix pass covers delayed UI replies, unresolved callback timing, correction delivery ordering, missing callback zones, and strict workspace calling activation. Targeted regressions pass; the exact candidate's full safety/tests/types/lint/build/dry-run/browser gate is pending and will be recorded in the release manifest. Calling and scheduled sync default off. Source screens reflect the pause; ongoing call and delivery recovery remain available.
