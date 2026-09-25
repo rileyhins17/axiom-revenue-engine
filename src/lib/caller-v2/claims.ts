@@ -1,5 +1,7 @@
 import { planEngineStopDelivery } from './stop-projection';
 import { z } from 'zod';
+import {sourceRefSchema} from './protocol';
+import {conversionHandoffReceiptSchema} from './conversion-contract';
 import type { CallerActor } from '../revenue-engine/caller-integration';
 import type { CallerDb, CallerStatement } from './database';
 import { CallerError, ENGINE_WORKSPACE, engineContactId } from './identity';
@@ -37,6 +39,22 @@ async function expirePotentialCall(db: CallerDb, key: string, now: number) {
   ]);
 }
 
+/** Conversion closes acquisition. A current Orbit client/opportunity check can authorize its own relationship purpose. */
+async function callableForClaim(db:CallerDb,state:Awaited<ReturnType<typeof readEngineCallSource>>,linked?:LinkedAuthorization){
+  if(state.callable)return true;
+  if(!linked?.originSourceJson||state.source.conversion?.status!=='completed'||state.source.stopped||!state.source.phone?.trim()||state.source.lastOutcome==='WRONG_NUMBER')return false;
+  const origin=sourceRefSchema.parse(JSON.parse(linked.originSourceJson));
+  if(origin.system!=='orbit'||origin.entityType==='prospect')return false;
+  const row=await db.prepare(`SELECT j.receiptJson,l.identityJson FROM CallerConversionJob j JOIN CallerSourceLink l
+    ON l.workspaceId=j.workspaceId AND l.engineContactKey=j.contactKey AND l.grantId=j.grantId
+    WHERE j.workspaceId=? AND j.conversionId=? AND j.status='completed' AND l.linkId=? AND l.state='active' AND l.revision=?`)
+    .bind(ENGINE_WORKSPACE,state.source.conversion.id,linked.linkId,linked.linkRevision).first<{receiptJson:string;identityJson:string}>();
+  if(!row)return false;
+  const receipt=conversionHandoffReceiptSchema.parse(JSON.parse(row.receiptJson)),identity=JSON.parse(row.identityJson) as {orbitRef:{workspaceId:string;connectionId:string};orbitContactId:string};
+  return receipt.status==='completed'&&receipt.linkId===linked.linkId&&receipt.orbitContactId===identity.orbitContactId&&origin.workspaceId===identity.orbitRef.workspaceId&&origin.connectionId===identity.orbitRef.connectionId
+    &&(origin.entityType==='opportunity'||origin.entityId===receipt.clientId);
+}
+
 export async function claimContact(db: CallerDb, actor: ClaimActor, input: z.input<typeof commandSchema>, now = Date.now(), linked?: LinkedAuthorization): Promise<Claim> {
   const command = commandSchema.parse(input);
   if (command.contactKey !== await engineContactId(command.entityId)) throw new CallerError('NOT_FOUND', 404);
@@ -48,7 +66,7 @@ export async function claimContact(db: CallerDb, actor: ClaimActor, input: z.inp
   if (current?.stopped) throw new CallerError('STOPPED');
   const source = await readEngineCallSource(db, command.entityId, now);
   if (!linked?.originSourceJson && source.revision !== command.sourceRevision) throw new CallerError('REVISION_CONFLICT');
-  if (!source.callable) throw new CallerError('STOPPED');
+  if (!await callableForClaim(db,source,linked)) throw new CallerError('STOPPED');
   if (current?.phase === 'uncertain') throw new CallerError('CLAIM_UNCERTAIN');
   const previous = await readAttempt(db, command.attemptId);
   if (previous) {
@@ -98,7 +116,7 @@ export async function renewContactClaim(db: CallerDb, actor: ClaimActor, claim: 
     if (current.stopped) throw new CallerError('STOPPED');
     source = await readEngineCallSource(db, attempt.sourceEntityId, now);
     if (!attempt.originSourceJson && source.revision !== attempt.sourceRevision) throw new CallerError('REVISION_CONFLICT');
-    if (!source.callable) throw new CallerError('STOPPED');
+    if (!await callableForClaim(db,source,linked)) throw new CallerError('STOPPED');
   }
   const expiresAt = iso(now + 120_000);
   try {

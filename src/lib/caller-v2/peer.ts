@@ -1,4 +1,5 @@
 import { acceptEngineStop } from './stop-projection';
+import {engineConversionContext,reserveEngineConversionLink,finalizeEngineConversion} from './conversions';
 import { parseStopProjection } from './stop-contract';
 import { z } from 'zod';
 import type { CallerDb } from './database';
@@ -19,6 +20,9 @@ export async function handleEnginePeerRequest(db:CallerDb,request:Request,route:
     if(request.method!=='POST')throw new PeerError('METHOD_NOT_ALLOWED',405);
     const grant=peerGrant(env),input=await verifyPeerCommand(grant,operation.data,await readCallerJson(request));
     const bridge:CallerBridge={grant,send:(op,payload)=>requestPeer(grant,'orbit',op,payload,fetcher)};
+    if(operation.data==='conversion/context')return json(await engineConversionContext(db,grant,z.object({conversionId:z.string().uuid()}).strict().parse(input).conversionId));
+    if(operation.data==='conversion/finalize')return json(await finalizeEngineConversion(db,bridge,z.object({conversionId:z.string().uuid()}).strict().parse(input).conversionId));
+    if(operation.data==='conversion/reserve')return json(await reserveEngineConversionLink(db,grant,input));
     if(operation.data==='stop')return json(await acceptEngineStop(db,grant,parseStopProjection(input)));
     if(operation.data==='projections')return json(await acceptEngineProjection(db,grant,parseProjection(input)));
     if(operation.data==='claims')return json(await claimPeerLinkedContact(db,peerClaimSchema.parse(input),bridge));

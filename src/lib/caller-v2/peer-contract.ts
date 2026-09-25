@@ -38,7 +38,7 @@ export function assertPeerLink(grant: PeerGrant, input: unknown): LinkIdentity {
     throw new PeerError('PEER_SCOPE', 403);
   return link;
 }
-export const peerOperationSchema = z.enum(['links/preview', 'links/stage', 'links/activate', 'source/check', 'claims', 'claims/renew', 'claims/release', 'claims/reconcile', 'projections', 'stop']);
+export const peerOperationSchema = z.enum(['links/preview', 'links/stage', 'links/activate', 'source/check', 'claims', 'claims/renew', 'claims/release', 'claims/reconcile', 'projections', 'stop', 'conversion/request', 'conversion/receipt', 'conversion/context', 'conversion/reserve', 'conversion/finalize']);
 export type PeerOperation = z.infer<typeof peerOperationSchema>;
 export type CallerBridge = { grant: PeerGrant; send(operation: PeerOperation, payload: unknown): Promise<unknown> };
 export async function peerActorKey(grant: Pick<PeerGrant,'grantId'|'orbitWorkspaceId'>, actorId: string) {

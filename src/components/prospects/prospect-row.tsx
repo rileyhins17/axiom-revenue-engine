@@ -2,6 +2,8 @@
 
 import { ExternalLink, MapPin } from "lucide-react";
 import { useState } from "react";
+import Link from 'next/link';
+import type {Route} from 'next';
 
 import { LogActivityForm } from "./log-activity-form";
 import { CallerLaunch, useCallerHandoff } from "./caller-launch";
@@ -26,7 +28,7 @@ export function ProspectRow({ row }: { row: ProspectRowView }) {
   const [open, setOpen] = useState(false);
   const badge = BADGE[row.label];
   return <>
-    <tr className="border-b border-slate-200 align-top hover:bg-slate-50">
+    <tr id={`prospect-${row.prospectId}`} className="border-b border-slate-200 align-top hover:bg-slate-50">
       <td className="px-3 py-3">
         <p className="font-medium">{row.name}</p>
         <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${badge.className}`}>{badge.text}</span>
@@ -55,6 +57,7 @@ export function ProspectRow({ row }: { row: ProspectRowView }) {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Log a call or visit</p>
             {callerSelected?<p role="status">This record is open in Caller. Review and save the result there.</p>:<LogActivityForm prospectId={row.prospectId} />}
+            <Link className="mt-3 inline-block text-sm underline" href={('/settings?conversionSource='+encodeURIComponent(row.prospectId)+'#orbit-handoff') as Route}>Create or link a confirmed client in Orbit</Link>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">History</p>

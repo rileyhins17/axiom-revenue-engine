@@ -24,9 +24,19 @@ Caller can explicitly check linked delivery status after its source receipt. The
 
 ## Remaining Task 12 work
 
-- Mirrored history/statistics/source eligibility in product read paths; full source and setup browser acceptance.
+- Full source and setup browser acceptance. Mirrored canonical history, statistics and current callback eligibility are now wired into product reads.
 - Expand status/repair display into Caller history (saved-call status exists).
 - More fault tests for expiry, concurrent runners, timeout/budget, deleted contacts and correction ordering.
 - Final source/browser gates, deployment identity, and device/release acceptance.
 
 The root development packet includes `bridge-smoke.test.ts`, an offline two-repository harness. From the Orbit checkout, `node --import tsx --test ../bridge-smoke.test.ts` exercises both actual HTTP handlers, HMAC requests, shared claims, local results, both projection directions and a lost-response retry. Its injected transport never uses the external network. It does not prove production configuration, Windows TEL behavior, Phone Link or audio routing.
+
+## Reviewed client handoff (local development)
+
+Engine Settings now previews the source business, confirmed phone, selected current call history and agreed work. Confirming a real client relationship creates one durable conversion job and removes that contact from Engine acquisition. An absent domain stays absent in the Orbit inbox. The actual verified Orbit workspace owner then chooses an existing business/client/contact or creates the reviewed records using a real domain. Matching domains never silently select a business.
+
+The existing Orbit conversion domain plan, current owner and revision guards, selected contact, mapping and permanent receipt commit in one transaction. No audit, monitoring or proposal starts. Engine's durable conversion hold is validated before that transaction; new Engine mappings are staged only after the Orbit receipt proves that the target exists. Lost responses resume the same conversion ID. Deleted sources do not recreate business records. Existing link identities and existing client notes are retained.
+
+After both links activate, Engine acquisition remains closed. Only a current, eligible Orbit client/opportunity call for the converted relationship can use the shared coordinator. Contact stops and active/uncertain ownership continue to block new permits. Current Orbit commercial eligibility is still required; creating a client does not invent an opportunity.
+
+Focused conversion, reservation and actual-handler bridge tests pass locally. Required full checkpoint and source-browser checks are recorded in the development ledger; hardware and release acceptance remain separate gates.

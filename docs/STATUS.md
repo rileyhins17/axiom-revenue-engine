@@ -1,4 +1,20 @@
+## Local reviewed handoff implementation — 2026-09-25
+
+Engine owner Settings now provides reviewed conversion requests, retained status and retries. Orbit has the owner confirmation page and a durable inbox. The shared conversion hold keeps acquisition closed; Orbit commits its business/contact/link/receipt atomically, then both sides activate the mapping. Eligible Orbit client/opportunity calls retain shared ownership and both source stops. No prospect calls, production changes, paid actions or installed-extension changes were used.
+
+Previous fully verified Engine checkpoint: `6dfaec7c7d6af402e86c91fe8ee60b3a2cb0276d`. Current focused Engine claims/conversion tests pass; the two actual-handler offline bridge tests pass. Orbit's corresponding local tree passes full verification: 232 test files, 2286 tests, typecheck and client/server builds. The Engine full gate is being run against an immutable clean candidate because the existing M2 release checks correctly reject uncommitted migration bytes.
+
+Next: finish source browser acceptance and the immutable Engine gate; finish Caller repair/latency and dependency refresh; complete independent review and the release/device packet. The existing C$50/month ceiling and disabled scheduled-sync trigger are unchanged.
+
 # Current status — Axiom Revenue Engine
+
+## LOCAL ONLY 2026-09-25: reviewed client handoff in progress
+
+Verified Engine checkpoint `6dfaec7` passed safety, 964 tests, typecheck, lint, Cloudflare build, Wrangler no-upload dry run and 8 owner UI pages at 1440/390 px with zero external requests. Caller checkpoint `afccb54` passed 256 tests and the offline IndexedDB browser journeys. Orbit checkpoint `e74139b` passed 2,270 tests, preflight, typecheck and build; it includes reviewed client conversion, immutable commercial corrections and currency-aware revenue. The offline cross-app signed-handler bridge passed again after that checkpoint.
+
+Uncommitted Task 14 work adds an Engine owner handoff preview, durable original-operator/grant request, exact retries, source/permission race guards and an Orbit pending inbox. Pending handoffs leave acquisition calling and never invent a missing domain or automatically create a business by matching it. Engine Settings and expanded prospect rows lead into the review. Orbit's final create/link review, conversion handshake and converted-client eligibility are still being implemented; this new tree has focused tests but has not passed the complete Engine gate.
+
+Production, installed extension data, peer secrets, automation switches and spending are unchanged. No merge, deployment, production migration or external call occurred. Next: finish Orbit's owner review and cross-platform retry/coordination; run browser/fault and latency acceptance; refresh compatible dependencies, independent review and the release/device packet. All approved tasks remain in scope.
 
 ## LOCAL ONLY 2026-09-25: linked calling implementation in progress
 

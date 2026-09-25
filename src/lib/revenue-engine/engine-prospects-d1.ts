@@ -61,11 +61,12 @@ function parseRow(row: Record<string, unknown>): ProspectRow {
 }
 
 /** Owner views. Call/visit lists hide stopped and closed businesses; STRONG and no-website leads first. */
+const NO_CONVERSION = "NOT EXISTS(SELECT 1 FROM CallerConversionJob conversion WHERE conversion.workspaceId='axiom' AND conversion.sourceEntityId=prospectId)";
 export async function listProspects(db: ProspectDb, view: ProspectView, today: string, limit = 300): Promise<ProspectRow[]> {
   const where: Record<ProspectView, string> = {
-    call: `stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)`,
+    call: `stopped = 0 AND ${NO_CONVERSION} AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)`,
     visit: `stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND address IS NOT NULL AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})`,
-    followups: `stopped = 0 AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})`,
+    followups: `stopped = 0 AND ${NO_CONVERSION} AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})`,
     contacted: `attempts > 0`,
     all: `1 = 1`,
   };
@@ -78,9 +79,9 @@ export async function listProspects(db: ProspectDb, view: ProspectView, today: s
 /** All list counts in one pass. */
 export async function prospectCounts(db: ProspectDb, today: string) {
   const row = await db.prepare(`SELECT
-      SUM(stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)) AS call,
+      SUM(stopped = 0 AND ${NO_CONVERSION} AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)) AS call,
       SUM(stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND address IS NOT NULL AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})) AS visit,
-      SUM(stopped = 0 AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})) AS followups,
+      SUM(stopped = 0 AND ${NO_CONVERSION} AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})) AS followups,
       SUM(attempts > 0) AS contacted,
       COUNT(*) AS total
     FROM (${LATEST})`).bind(today, today).first<Record<string, number | null>>();
@@ -94,7 +95,7 @@ export async function prospectCounts(db: ProspectDb, today: string) {
  */
 export async function nextInQueue(db: ProspectDb, today: string, dayStart: string, skip: readonly string[] = [], limit = 1, offset = 0): Promise<{ row: ProspectRow | null; rows: ProspectRow[]; remaining: number }> {
   const skipList = skip.slice(0, 200);
-  const where = `stopped = 0 AND phone IS NOT NULL AND label IN ('STRONG','NO_WEBSITE')
+  const where = `stopped = 0 AND ${NO_CONVERSION} AND phone IS NOT NULL AND label IN ('STRONG','NO_WEBSITE')
     AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)
     AND (lastActivityAt IS NULL OR lastActivityAt < ?)${skipList.length ? ` AND prospectId NOT IN (${skipList.map(() => "?").join(",")})` : ""}`;
   const binds = [today, dayStart, ...skipList];

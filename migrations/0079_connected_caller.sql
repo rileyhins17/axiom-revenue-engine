@@ -179,3 +179,18 @@ CREATE TABLE CallerStopDelivery (
 );
 CREATE INDEX CallerStopDelivery_due ON CallerStopDelivery(status,nextAttemptAt);
 CREATE TABLE CallerStopReceipt(workspaceId TEXT NOT NULL,projectionId TEXT NOT NULL,payloadHash TEXT NOT NULL,receivedAt TEXT NOT NULL,PRIMARY KEY(workspaceId,projectionId));
+
+CREATE TABLE CallerConversionJob (
+ workspaceId TEXT NOT NULL,conversionId TEXT NOT NULL,sourceEntityId TEXT NOT NULL,contactKey TEXT NOT NULL,grantId TEXT NOT NULL,actorId TEXT NOT NULL,
+ requestHash TEXT NOT NULL,payloadHash TEXT NOT NULL,payloadJson TEXT NOT NULL,sourceSnapshot TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('pending','retry','pending_review','link_pending','completed','review')),
+ attempts INTEGER NOT NULL DEFAULT 0,leaseOwner TEXT,leaseUntil TEXT,lastError TEXT,receiptJson TEXT,createdAt TEXT NOT NULL,
+ PRIMARY KEY(workspaceId,conversionId),UNIQUE(workspaceId,contactKey)
+);
+CREATE TABLE CallerConversionGuard(id TEXT PRIMARY KEY,passed INTEGER NOT NULL CONSTRAINT caller_conversion_guard CHECK(passed=1));
+CREATE TRIGGER CallerConversionJob_immutable BEFORE UPDATE ON CallerConversionJob
+ WHEN NEW.workspaceId<>OLD.workspaceId OR NEW.conversionId<>OLD.conversionId OR NEW.sourceEntityId<>OLD.sourceEntityId OR NEW.contactKey<>OLD.contactKey OR NEW.grantId<>OLD.grantId OR NEW.actorId<>OLD.actorId OR NEW.requestHash<>OLD.requestHash OR NEW.payloadHash<>OLD.payloadHash OR NEW.payloadJson<>OLD.payloadJson OR NEW.sourceSnapshot<>OLD.sourceSnapshot OR OLD.status='completed'
+ BEGIN SELECT RAISE(ABORT,'CALLER_IMMUTABLE'); END;
+CREATE TRIGGER CallerConversionJob_no_delete BEFORE DELETE ON CallerConversionJob BEGIN SELECT RAISE(ABORT,'CALLER_IMMUTABLE'); END;
+CREATE TRIGGER EngineProspectActivity_conversion_guard BEFORE INSERT ON EngineProspectActivity WHEN NEW.channel='CALL' AND NEW.callerEventId IS NULL
+ BEGIN SELECT CASE WHEN EXISTS(SELECT 1 FROM CallerConversionJob WHERE workspaceId='axiom' AND sourceEntityId=NEW.prospectId) THEN RAISE(ABORT,'CALLER_LINK_REQUIRED') END; END;
