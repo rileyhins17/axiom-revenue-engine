@@ -1,3 +1,7 @@
+## Rollout preparation 2026-09-25: CI runtime type refresh
+
+GitHub Actions on the connected-calling PR found the inert engine's generated runtime declarations still pinned to the prior Wrangler version. Regenerated src/engine/worker-env.d.ts with the locked Wrangler 4.140.0/workerd 1.20260923.1; its check and TypeScript pass. Runtime code and deployment controls are unchanged. The connected-calling production rollout is owner-authorized; fresh private database exports restore with unchanged original rows and zero foreign-key violations. Production remains unchanged while CI and live-source reconciliation complete. Existing budget and autonomy settings remain unchanged. Next: finish CI, reconcile the live Orbit source difference, then apply the guarded source release.
+
 ## LOCAL ONLY 2026-09-25: connected calling verified; owner release gate open
 
 Verified implementation `9e7d6d58df80c035a5f93bc1c484a7827e500ee1`: safety975 tests/types/lint0errors8warnings/Cloudflarebuild/no-uploaddryrun/stock 8+extended 10ownerUI at1440 / 390PASS, zero external requests. Caller `e616e2b850c0e7b6896a759cb1440f5acdd760f0` passes263 tests and Chrome/Brave journey/recovery/latency checks. Orbit `ef4b97d078ddeb550700ecf0d7d575eb05c7c618` passes2,305 tests and real signed handoff browser. All five Important review findings are fixed; no deferred minors. See docs/calling/verification.md and implementation-decisions.md.
@@ -2809,3 +2813,4 @@ deployment, and spend facts remain unknown or off as stated above.
 3. If M2 is approved, implement and verify its bounded capability packet while
    keeping provider, contact, deployment, outreach, send, and spend actions
    separately gated.
+
