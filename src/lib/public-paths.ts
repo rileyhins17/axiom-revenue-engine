@@ -15,6 +15,7 @@ const PUBLIC_EXACT_PATHS = new Set([
   "/api/ios-profile",
   "/unsubscribe",
   "/api/unsubscribe",
+  "/api/health",
 ]);
 
 export function isPublicPath(pathname: string) {

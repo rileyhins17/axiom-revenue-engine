@@ -12,6 +12,9 @@
     "global_fetch_strictly_public"
   ],
   "minify": true,
+  // Connected-calling settings (Caller v2 / Orbit link IDs) live only on the Worker.
+  // keep_vars stops a deploy from this file from silently removing them.
+  "keep_vars": true,
   "observability": {
     "enabled": true
   },
@@ -24,7 +27,7 @@
     { "name": "LOGIN_EMAIL", "allowed_destination_addresses": ["rileyhinsperger@gmail.com", "aidanmageebusiness@gmail.com"] }
   ],
   "triggers": {
-    "crons": ["0 14 * * 1-5"]
+    "crons": ["0 14 * * 1-5", "*/15 * * * *"]
   },
   "vars": {
     "APP_BASE_URL": "https://operations.getaxiom.ca/",

@@ -11,6 +11,18 @@ import { getCronTimeoutBudgets } from "./src/lib/cron-timeouts";
 import { clearServerEnvCache } from "./src/lib/env";
 import { runEngineEmailCron } from "./src/lib/revenue-engine/engine-email-worker";
 import { runCallerSyncTick } from "./src/lib/caller-v2/sync-tick";
+import { alertEmail, OWNER_ALERT_INBOXES, recordAndSelectAlerts, runHealthChecks } from "./src/lib/ops/health";
+
+const HEALTH_CRON = "*/15 * * * *";
+async function runHealthCron(env) {
+  const checks = await runHealthChecks(env.DB, env);
+  const alerts = await recordAndSelectAlerts(env.DB, checks);
+  const mail = alertEmail(alerts);
+  if (mail && globalThis.__axiomSendLoginEmail) {
+    for (const to of OWNER_ALERT_INBOXES) await globalThis.__axiomSendLoginEmail({ to, ...mail }).catch(() => undefined);
+  }
+  return { failing: checks.filter((c) => !c.ok).map((c) => c.key), emailed: Boolean(mail) };
+}
 
 const worker = openNextWorkerModule;
 // Weekdays 10:00 Toronto (EDT); the sender itself refuses weekends and every closed gate.
@@ -138,6 +150,13 @@ const exportedWorker = {
   async scheduled(controller, env, ctx) {
     clearServerEnvCache();
     setCloudflareBindings(env);
+    if (controller?.cron === HEALTH_CRON) {
+      installLoginEmail(env);
+      ctx.waitUntil(runHealthCron(env)
+        .then((result) => console.log(JSON.stringify({ event: "health", ...result })))
+        .catch((error) => console.error("[health] failure", error instanceof Error ? error.message : "unknown")));
+      return;
+    }
     if (controller?.cron === "* * * * *") {
       ctx.waitUntil(runCallerSyncTick(env.DB, env)
         .then((result) => console.log(JSON.stringify({ event: "caller_sync", ...result })))
