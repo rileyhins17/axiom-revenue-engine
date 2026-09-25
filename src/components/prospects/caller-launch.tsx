@@ -40,7 +40,7 @@ export function CallerLaunch({ prospectId, label = 'Open Caller', className = ''
   const enabled=useContext(CallerActivation);
   // Paused is a status, not a button: muted, never styled like the call action.
   if(!enabled)return <span className="inline-flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600" title="New calls are paused for this workspace. Saved results can still sync.">
-    <Phone className="size-4" aria-hidden="true" />Calling is paused (turn it on in Settings)
+    <Phone className="size-4" aria-hidden="true" />New calls are paused right now
   </span>;
   const source = { system: 'revenue-engine', connectionId: 'axiom-engine', workspaceId: 'axiom', entityType: 'prospect', entityId: prospectId };
   return <a href="/settings#caller" data-axiom-caller-source={JSON.stringify(source)}
