@@ -105,7 +105,7 @@ export function parseResultEvent(input: unknown): ResultEvent {
         if (at !== null) { ensure(at >= previous, 'Call timestamps are out of order'); previous = at; }
     }
     ensure(event.correctionOf !== event.eventId, 'A result cannot correct itself');
-    ensure(event.attempted !== false || (event.dialRequestedAt === null && event.connectedAt === null && event.endedAt === null && event.outcome === 'unknown'), 'A non-attempt cannot assert a call');
+    ensure(event.attempted !== false || (event.connectedAt === null && event.outcome === 'unknown'), 'A non-attempt cannot assert connection or a call outcome');
     ensure(event.outcome !== 'no_answer' || event.connectedAt === null, 'No answer cannot assert a connection');
     ensure((event.outcome === 'do_not_contact') === (event.stopScope === 'contact'), 'Contact stop must be explicit');
     ensure(event.outcome !== 'callback' || event.nextAction?.kind === 'agreed_callback', 'Callback needs the agreed next action');

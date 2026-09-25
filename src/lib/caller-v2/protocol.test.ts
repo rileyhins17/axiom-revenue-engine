@@ -5,6 +5,13 @@ import { parseResultEvent, parseReceipt, validateCallback } from './protocol';
 import { canonicalJson } from './canonical-json';
 const valid = JSON.parse(readFileSync(new URL('./fixtures.json', import.meta.url), 'utf8'));
 
+test('requesting a dialer does not establish that a call was placed', () => {
+  const cancelled = parseResultEvent({ ...valid, attempted: false, outcome: 'unknown', connectedAt: null, nextAction: null });
+  assert.equal(cancelled.attempted, false);
+  assert.equal(cancelled.dialRequestedAt, valid.dialRequestedAt);
+  assert.throws(() => parseResultEvent({ ...cancelled, connectedAt: valid.connectedAt }));
+});
+
 test('strict contract preserves agreed callback, identity and wording', () => {
   assert.deepEqual(parseResultEvent(valid), valid);
   for (const change of [{ actorId: 'other' }, { protocol: 'axiom-caller/1' }, { outcome: 'sold' }, { summary: 'x'.repeat(8001) }, { connectedAt: '2026-09-24T17:00:00.000Z' }]) {

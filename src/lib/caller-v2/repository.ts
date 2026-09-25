@@ -42,8 +42,12 @@ export async function recordEngineResult(db: CallerDb, actor: CallerActor, input
     db.prepare(`INSERT INTO EngineProspectActivity(activityId,idempotencyKey,prospectId,channel,outcome,note,followUpAt,actor,actorUserId,createdAt,callerEventId,callerAttemptId,occurredAt,callerOutcome,callerAttempted,callerConnected) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .bind(recordId, event.eventId, event.source.entityId, activity.channel, activity.outcome, activity.note, activity.followUpAt, actor.actor, actor.actorUserId, now, event.eventId, event.attemptId, event.occurredAt, event.outcome, event.attempted === null ? null : Number(event.attempted), Number(event.connectedAt !== null)),
   ];
-  if (event.stopScope === 'contact') statements.push(db.prepare(`INSERT INTO CallerContactControl(workspaceId,contactKey,stopped,stopRevision,stopReason,revision) VALUES(?,?,1,1,?,1) ON CONFLICT(workspaceId,contactKey) DO UPDATE SET stopped=1,stopRevision=stopRevision+1,stopReason=excluded.stopReason,revision=revision+1`)
-    .bind(ENGINE_WORKSPACE, attempt.contactKey, 'operator_do_not_contact'));
+  if (event.stopScope === 'contact') statements.push(db.prepare(`INSERT INTO CallerContactControl(workspaceId,contactKey,sourceEntityId,stopped,stopRevision,stopReason,stoppedAt,stoppedBy,revision) VALUES(?,?,?,1,1,?,?,?,1) ON CONFLICT(workspaceId,contactKey) DO UPDATE SET sourceEntityId=COALESCE(CallerContactControl.sourceEntityId,excluded.sourceEntityId),stopped=1,stopRevision=stopRevision+1,stopReason=excluded.stopReason,stoppedAt=excluded.stoppedAt,stoppedBy=excluded.stoppedBy,revision=revision+1`)
+    .bind(ENGINE_WORKSPACE, attempt.contactKey, event.source.entityId, 'operator_do_not_contact', now, actor.actorUserId));
+  if (!event.correctionOf) statements.push(
+    db.prepare(`UPDATE CallerAttempt SET phase='closed',closedAt=?,resolution='result_saved' WHERE workspaceId=? AND attemptId=?`).bind(now, ENGINE_WORKSPACE, event.attemptId),
+    db.prepare(`UPDATE CallerContactControl SET phase='closed',leaseUntil=?,revision=revision+1 WHERE workspaceId=? AND contactKey=? AND attemptId=? AND ownerId=?`).bind(now, ENGINE_WORKSPACE, attempt.contactKey, event.attemptId, actor.actorUserId),
+  );
   try { await db.batch(statements); }
   catch (error) {
     const existing = await read(db, event.eventId); if (existing) return replay(existing);

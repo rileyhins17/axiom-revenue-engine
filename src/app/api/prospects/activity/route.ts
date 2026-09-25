@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     return json(saved, saved.status === "SAVED" ? 201 : 200);
   } catch (error) {
     if (error instanceof ProspectActivityError) {
-      const message = { NOT_FOUND: "That business is no longer on the list.", STOPPED: "This business asked not to be contacted.", CONFLICT: "This was already saved differently. Reload." }[error.code];
+      const message = { NOT_FOUND: "That business is no longer on the list.", STOPPED: "This business asked not to be contacted.", CONFLICT: "This was already saved differently. Reload.", CLAIM_REQUIRED: "A call is open in Axiom Caller. Finish or reconcile that session there." }[error.code];
       return json({ error: message }, error.code === "NOT_FOUND" ? 404 : 409);
     }
     if (error instanceof Error && error.name === "ZodError") return json({ error: "Check the outcome and follow-up date." }, 400);

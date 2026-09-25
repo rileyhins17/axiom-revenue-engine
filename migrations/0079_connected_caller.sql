@@ -47,9 +47,12 @@ WHERE a.callerEventId IS NULL OR NOT EXISTS(SELECT 1 FROM CallerResult c WHERE c
 CREATE TABLE CallerContactControl (
   workspaceId TEXT NOT NULL,
   contactKey TEXT NOT NULL,
+  sourceEntityId TEXT,
   stopped INTEGER NOT NULL DEFAULT 0 CHECK(stopped IN (0,1)),
   stopRevision INTEGER NOT NULL DEFAULT 0,
   stopReason TEXT,
+  stoppedAt TEXT,
+  stoppedBy TEXT,
   ownerId TEXT,
   attemptId TEXT,
   phase TEXT NOT NULL DEFAULT 'closed' CHECK(phase IN ('reserved','armed','active','uncertain','closed')),
@@ -66,6 +69,7 @@ CREATE TABLE CallerAttempt (
   ownerId TEXT NOT NULL,
   phase TEXT NOT NULL CHECK(phase IN ('reserved','armed','active','uncertain','closed')),
   firstArmedAt TEXT,
+  resolution TEXT CHECK(resolution IN ('not_dialed','call_finished','result_saved') OR resolution IS NULL),
   createdAt TEXT NOT NULL,
   closedAt TEXT,
   PRIMARY KEY(workspaceId,attemptId)
@@ -89,3 +93,15 @@ CREATE TABLE CallerProjection (
   FOREIGN KEY(workspaceId,originEventId) REFERENCES CallerResult(workspaceId,eventId)
 );
 CREATE INDEX CallerProjection_due ON CallerProjection(status,nextAttemptAt);
+
+CREATE INDEX CallerContactControl_source ON CallerContactControl(workspaceId,sourceEntityId);
+-- The database guard also protects legacy token and manual web writers. A NOTE
+-- remains available for historical context without inventing a second call.
+CREATE TRIGGER EngineProspectActivity_caller_guard BEFORE INSERT ON EngineProspectActivity
+WHEN NEW.callerEventId IS NULL AND NEW.channel <> 'NOTE'
+BEGIN
+  SELECT CASE WHEN EXISTS(SELECT 1 FROM CallerContactControl c WHERE c.workspaceId='axiom'
+    AND c.sourceEntityId=NEW.prospectId AND c.stopped=1) THEN RAISE(ABORT,'CALLER_STOPPED') END;
+  SELECT CASE WHEN NEW.channel='CALL' AND EXISTS(SELECT 1 FROM CallerContactControl c WHERE c.workspaceId='axiom'
+    AND c.sourceEntityId=NEW.prospectId AND c.phase<>'closed') THEN RAISE(ABORT,'CALLER_CLAIM_REQUIRED') END;
+END;

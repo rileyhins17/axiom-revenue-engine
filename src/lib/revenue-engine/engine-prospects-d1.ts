@@ -32,7 +32,7 @@ export type ProspectActivity = {
   activityId: string; channel: string; outcome: ProspectOutcome; callerOutcome?: string | null; note: string; followUpAt: string | null; actor: string; createdAt: string;
 };
 
-const LATEST = `
+export const PROSPECT_LATEST_SQL = `
   SELECT p.*,
     (SELECT a."outcome" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastOutcome,
     (SELECT a."callerOutcome" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastCallerOutcome,
@@ -40,8 +40,10 @@ const LATEST = `
     (SELECT a."actor" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastActor,
     (SELECT a."followUpAt" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS followUpAt,
     (SELECT COUNT(*) FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" AND a."channel" IN ('CALL','VISIT','EMAIL')) AS attempts,
-    EXISTS (SELECT 1 FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" AND a."outcome"='DO_NOT_CONTACT') AS stopped
+    (EXISTS (SELECT 1 FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" AND a."outcome"='DO_NOT_CONTACT')
+      OR EXISTS (SELECT 1 FROM CallerContactControl c WHERE c.workspaceId='axiom' AND c.sourceEntityId=p.prospectId AND c.stopped=1)) AS stopped
   FROM "EngineProspect" p`;
+const LATEST = PROSPECT_LATEST_SQL;
 
 const CLOSED = `('NOT_INTERESTED','WON','WRONG_NUMBER','DO_NOT_CONTACT','MEETING_BOOKED')`;
 
@@ -90,14 +92,14 @@ export async function prospectCounts(db: ProspectDb, today: string) {
  * The next business for the calling queue: callable, has a phone, not touched
  * since `dayStart`, follow-ups due first, then weakest websites and fewest tries.
  */
-export async function nextInQueue(db: ProspectDb, today: string, dayStart: string, skip: readonly string[] = [], limit = 1): Promise<{ row: ProspectRow | null; rows: ProspectRow[]; remaining: number }> {
+export async function nextInQueue(db: ProspectDb, today: string, dayStart: string, skip: readonly string[] = [], limit = 1, offset = 0): Promise<{ row: ProspectRow | null; rows: ProspectRow[]; remaining: number }> {
   const skipList = skip.slice(0, 200);
   const where = `stopped = 0 AND phone IS NOT NULL AND label IN ('STRONG','NO_WEBSITE')
     AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)
     AND (lastActivityAt IS NULL OR lastActivityAt < ?)${skipList.length ? ` AND prospectId NOT IN (${skipList.map(() => "?").join(",")})` : ""}`;
   const binds = [today, dayStart, ...skipList];
   const [rows, count] = await Promise.all([
-    db.prepare(`SELECT * FROM (${LATEST}) WHERE ${where} ORDER BY (followUpAt IS NULL), CASE label WHEN 'STRONG' THEN 0 ELSE 1 END, attempts ASC, city, name LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))}`).bind(...binds).all<Record<string, unknown>>(),
+    db.prepare(`SELECT * FROM (${LATEST}) WHERE ${where} ORDER BY (followUpAt IS NULL), CASE label WHEN 'STRONG' THEN 0 ELSE 1 END, attempts ASC, city, name, prospectId LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))} OFFSET ${Math.max(0, Math.min(99999, Math.floor(offset)))}`).bind(...binds).all<Record<string, unknown>>(),
     db.prepare(`SELECT COUNT(*) AS n FROM (${LATEST}) WHERE ${where}`).bind(...binds).first<{ n: number }>(),
   ]);
   const parsed = rows.results.map(parseRow);
@@ -128,7 +130,7 @@ export async function listProspectActivity(db: ProspectDb, prospectId: string): 
 }
 
 export class ProspectActivityError extends Error {
-  constructor(readonly code: "NOT_FOUND" | "STOPPED" | "CONFLICT") { super(code); }
+  constructor(readonly code: "NOT_FOUND" | "STOPPED" | "CONFLICT" | "CLAIM_REQUIRED") { super(code); }
 }
 
 /** Append one call/visit/note. Idempotent per key; a stopped business accepts notes only. */
@@ -144,8 +146,14 @@ export async function recordProspectActivity(db: ProspectDb, input: unknown, act
   const stopped = await db.prepare(`SELECT 1 AS s FROM "EngineProspectActivity" WHERE "prospectId"=? AND "outcome"='DO_NOT_CONTACT' LIMIT 1`).bind(command.prospectId).first();
   if (stopped && command.channel !== "NOTE") throw new ProspectActivityError("STOPPED");
   const activityId = `activity:${command.idempotencyKey}`;
-  await db.prepare(`INSERT INTO "EngineProspectActivity" ("activityId","idempotencyKey","prospectId","channel","outcome","note","followUpAt","actor","actorUserId") VALUES (?,?,?,?,?,?,?,?,?)`)
-    .bind(activityId, command.idempotencyKey, command.prospectId, command.channel, command.outcome, command.note.trim(), command.followUpAt, actor, actorUserId).run();
+  try {
+    await db.prepare(`INSERT INTO "EngineProspectActivity" ("activityId","idempotencyKey","prospectId","channel","outcome","note","followUpAt","actor","actorUserId") VALUES (?,?,?,?,?,?,?,?,?)`)
+      .bind(activityId, command.idempotencyKey, command.prospectId, command.channel, command.outcome, command.note.trim(), command.followUpAt, actor, actorUserId).run();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('CALLER_STOPPED')) throw new ProspectActivityError('STOPPED');
+    if (error instanceof Error && error.message.includes('CALLER_CLAIM_REQUIRED')) throw new ProspectActivityError('CLAIM_REQUIRED');
+    throw error;
+  }
   return { status: "SAVED" as const, activityId };
 }
 

@@ -384,9 +384,12 @@ describe("private KW M2 setup preflight", () => {
       try { await lstat(PRIVATE_KW_M2_SETUP_LOCK_PATH); return; } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
       await writeFile(PRIVATE_KW_M2_SETUP_LOCK_PATH, "other-process\n", { flag: "wx" });
       const ownedLock = await lstat(PRIVATE_KW_M2_SETUP_LOCK_PATH, { bigint: true });
-      await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /already locked/);
-      const currentLock = await lstat(PRIVATE_KW_M2_SETUP_LOCK_PATH, { bigint: true });
-      if (currentLock.dev === ownedLock.dev && currentLock.ino === ownedLock.ino) await unlink(PRIVATE_KW_M2_SETUP_LOCK_PATH);
+      try {
+        await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /already locked/);
+      } finally {
+        const currentLock = await lstat(PRIVATE_KW_M2_SETUP_LOCK_PATH, { bigint: true });
+        if (currentLock.dev === ownedLock.dev && currentLock.ino === ownedLock.ino) await unlink(PRIVATE_KW_M2_SETUP_LOCK_PATH);
+      }
     } finally { await cleanupFixture(); }
   });
 

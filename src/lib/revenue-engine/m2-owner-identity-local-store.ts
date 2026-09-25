@@ -134,9 +134,28 @@ export async function savePrivateKwM2OwnerDecisions(
   const filename = filenameFor(ledger);
   const file = path.join(rootDir, filename);
 
+  // Windows can follow a dangling file symlink even with "wx". Reject it
+  // before opening, then verify the opened file again before writing bytes.
+  try {
+    const existing = await lstat(file);
+    if (existing.isSymbolicLink() || !existing.isFile()) {
+      fail("CONFLICT", "A conflicting owner-decision file already occupies the saved version.");
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      if (error instanceof M2OwnerIdentityLocalStoreError) throw error;
+      fail("UNAVAILABLE", "Private owner-decision storage could not be checked.", error);
+    }
+  }
   try {
     const handle = await open(file, "wx", 0o600);
     try {
+      const opened = await handle.stat();
+      const current = await lstat(file);
+      if (!opened.isFile() || current.isSymbolicLink() || !current.isFile()
+        || opened.dev !== current.dev || opened.ino !== current.ino) {
+        fail("CONFLICT", "The owner-decision destination changed before it could be saved.");
+      }
       const bytes = Buffer.from(`${JSON.stringify(ledger, null, 2)}\n`, "utf8");
       if (bytes.byteLength > MAX_LEDGER_BYTES) fail("UNAVAILABLE", "The owner-decision ledger exceeds its size limit.");
       await handle.writeFile(bytes);

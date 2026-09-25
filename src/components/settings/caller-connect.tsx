@@ -25,19 +25,19 @@ export function CallerConnect() {
     return response.json() as Promise<{ token?: string }>;
   }
 
-  return <section className="rounded-2xl border border-slate-200 bg-white p-5">
+  return <section id="caller" className="rounded-2xl border border-slate-200 bg-white p-5">
     <h2 className="flex items-center gap-2 font-semibold"><Headset className="size-4" aria-hidden="true" />Axiom Caller extension</h2>
-    <p className="mt-1 text-sm text-slate-600">Connect Aidan&apos;s calling extension so it pulls leads from the call queue and every call it saves shows up here automatically.</p>
+    <p className="mt-1 text-sm text-slate-600">Connect your Axiom Caller workspace. Results save locally first, then sync here under your account.</p>
     <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-slate-700">
       <li>Create a key below and copy it (it&apos;s only shown once).</li>
-      <li>In the extension, open <b>Connect Revenue Engine</b> and paste it.</li>
-      <li>Use <b>Pull leads from engine</b> instead of importing a list.</li>
+      <li>In the extension, expand <b>Revenue Engine &amp; Orbit</b>, choose Revenue Engine, and paste the key.</li>
+      <li>Check the displayed operator and workspace, then open a business with <b>Open Caller</b> or its call button.</li>
     </ol>
     {fresh ? <div className="owner-pop mt-4 rounded-xl border border-[#e6d6b3] bg-[#fbf3e2] p-3">
       <p className="text-xs font-semibold text-[#5c4210]">Your new key (copy it now)</p>
       <div className="mt-2 flex items-center gap-2">
         <code className="min-w-0 flex-1 truncate rounded bg-white px-2 py-1.5 text-xs ring-1 ring-[#efe2c6]">{fresh}</code>
-        <button type="button" onClick={() => { void navigator.clipboard?.writeText(fresh); setCopied(true); }} className="owner-press inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium">
+        <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(fresh); setCopied(true); } catch { setError('Copy failed. Select and copy the key manually.'); } }} className="owner-press inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium">
           {copied ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}{copied ? "Copied" : "Copy"}
         </button>
       </div>
