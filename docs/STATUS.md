@@ -1,3 +1,9 @@
+## Production connected calling rollout — 2026-09-25
+
+The owner-authorized guarded release is active: Engine source `49b45523b7e9a9d444bc56cbfaa1b716977c12c5`, Worker `ecfba54e-ce3b-4529-844f-86c2849e3219`, additive migration 0079 applied. Fresh private backups passed restoration and original-row preservation checks. Intended-workspace calling is enabled; scheduled Caller sync, general autonomy and email remain off under the existing budget/stop controls. Authenticated connection/tasks and source preparation passed through the actual Caller browser without dialing or recording a synthetic production call. The previous Worker version and private rollback bookmark are retained. See [the release record](calling/release.md) for both source versions and recovery details.
+
+Caller 0.5.2 addresses two device-discovered browser/restore integration issues, preserves the owner's imported history across restarts, and connects to both production sources. Physical Phone Link pairing/audio and uncoached operator acceptance remain owner-device checks. Historical entries below describe earlier checkpoints and do not supersede this rollout record.
+
 ## Rollout preparation 2026-09-25: CI runtime type refresh
 
 GitHub Actions on the connected-calling PR found the inert engine's generated runtime declarations still pinned to the prior Wrangler version. Regenerated src/engine/worker-env.d.ts with the locked Wrangler 4.140.0/workerd 1.20260923.1; its check and TypeScript pass. Runtime code and deployment controls are unchanged. The connected-calling production rollout is owner-authorized; fresh private database exports restore with unchanged original rows and zero foreign-key violations. Production remains unchanged while CI and live-source reconciliation complete. Existing budget and autonomy settings remain unchanged. Next: finish CI, reconcile the live Orbit source difference, then apply the guarded source release.

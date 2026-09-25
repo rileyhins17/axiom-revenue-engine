@@ -1,27 +1,28 @@
-# Connected calling release gate
+# Connected calling release — September 25, 2026
 
-The local code, automation and package are review candidates. No production migration, merge, deployment, token/grant setup, extension installation, live call or paid provider action has been performed. The final packet identifies exact commits, migration/package SHA-256 values, checks and remaining gates. Do not infer readiness from version0.5.0 alone.
+The owner-authorized production rollout is active. Engine and Orbit serve the connected-calling protocol, the additive migrations are applied, and Caller 0.5.2 is installed on the owner device. The earlier local-review packet remains an immutable historical checkpoint.
 
-Protocol versions: axiom-caller/2; separately signed peer coordination, call projections and contact-stop receipts. Upgrade all three components as a reviewed set. Retain the existing outreach/qualification/approval controls and C$50/month Engine ceiling. Pi/audio routing is outside the initial manual path.
+## Deployed source
 
-## Before production changes
+| Component | Source commit | Active Worker version |
+| --- | --- | --- |
+| Engine | `49b45523b7e9a9d444bc56cbfaa1b716977c12c5` | `ecfba54e-ce3b-4529-844f-86c2849e3219` |
+| Orbit | `a950deea85eb8bad7a90169cf8ba1584d9e16b40` | `99416ffe-d510-4096-a034-b6e7864207c2` |
 
-Verify the intended Cloudflare accounts and deployed source commits. The read-only local check could not find Engine's configured Worker in the available account (Cloudflare10007). Orbit production was observable: version72,5bdde3da-d811-437d-ba9b-1e0842f5a9cc, created2026-09-22T04:23:45Z, but no source commit annotation was provided. This is partial identity evidence, not a verified deployed commit. Resolve both mappings before rollout.
+Engine uses its maintained production configuration and branch. Orbit includes the newer live provider-metering, policy and JEV safeguards; see its live-source reconciliation note. Existing runtime budgets, autonomy stops, email restrictions and schedules were retained. New calling is enabled only for the intended workspace in each deployment. Scheduled Caller sync remains off; ordinary durable recovery remains available. Repository defaults remain off to prevent accidental activation from generic commands.
 
-Take fresh source database exports and an extension export; hash them; restore copies into isolated local databases and verify known counts/history/current revisions without contacting real sources. Current synthetic rollback/backup tests pass only for fixtures. Production backup freshness and restoration are unverified. Retain compatible rollback code and the exact migration bytes. Existing production source ambiguity is a release blocker, not permission to pick a deployment.
+Fresh private database exports were hashed and restored before rollout. The original rows passed preservation checks after the additive migrations. The remote migration runner rejected the Engine trigger syntax; the supported D1 file-import path applied the identical reviewed SQL and migration ledger entry after a local D1 rehearsal. No trigger or constraint was weakened. Exact receipts, rollback bookmarks and private exports are retained outside Git.
 
-## Ordered rollout after explicit owner approval
+Both authenticated connection and task-list endpoints returned HTTP 200 through the real installed extension browser. The selected Engine record also passed live preparation without creating a call attempt or dialing. Matching scoped peer credentials are installed on both Workers; signed bidirectional coordination and recovery are covered by the local handler tests. No artificial production results, prospect calls or paid-provider tests were used.
 
-1. Apply only the reviewed additive Engine0079 and Orbit0033 calling migrations with new calling entry points disabled. Preserve legacy history and the existing auth schemas; Orbit remains Better Auth1.7.2 because later versions change its required account.issuer contract.
-2. Deploy compatible source APIs with activation off; verify legacy reads and owner login using approved acceptance data. Confirm no new discovery, assessment, research, email or monitoring authority. Migration, deployment and spend are never tests.
-3. Validate the exported extension data and compatible recovery build, then let the owner install/update Caller. Reconnect only the intended identities. Restored active sessions stay uncertain, and queued results require original-account reconnection.
-4. After approval, set CALLER_V2_ENABLED="true" and CALLER_V2_WORKSPACE_ID to exactly "axiom" in Engine and the intended workspace ID in Orbit. Both flags default off in root and production config; tokens and peer grants cannot opt in. Missing, boolean or mismatched values stay off. Source launch controls show Calling paused until enabled. New task/preparation/reservation/arming and linked source checks are blocked while off; already-armed active heartbeats, reconciliation, results, receipts, stops and link/conversion recovery remain available. Recheck both source controls for linked calling. Create a scoped peer grant separately if linked calling is approved; confirm both records/contact explicitly. Never infer a link from matching phone/domain. Complete the device and five-journey checks in acceptance.md.
-5. Keep CALLER_SYNC_ENABLED=false until the sync-only scheduler's configuration/budget gate. Immediate best-effort sync and retained outboxes are separate. A new one-minute trigger adds approximately43,200 invocations per app per30days. Do not enable general monitoring/email schedules as a side effect.
+## Caller verification and recovery
+
+Caller 0.5.2 fixes native Window/Worker fetch binding and permits a fresh backup restore when the only connected metadata is an empty legacy-migration receipt. Preserved jobs, drafts, calls and other connected metadata still block destructive restore. The regression was reproduced before each fix; the complete suite now passes 265 tests, strict type checking and package checks. Real-browser connected journeys and native fetch in both Window and Worker contexts pass.
+
+The owner workspace uses a dedicated persistent browser profile and the application's validated backup importer. Saved leads, calls, research, transcripts and history were compared with the original snapshot across restarts. Raw extension data and the old package remain backed up separately. Old command/workflow execution state is retained in that raw backup; the supported importer deliberately clears stale execution state. Credentials are absent from portable exports and release archives.
+
+Manual Phone Link calling is the primary path. Optional ChatGPT assistance remains separate from phone facts and audio. Physical pairing, two-way audio, OS confirmation count and uncoached operator acceptance still require the owner's phone and participation. Software verification does not establish those facts.
 
 ## Rollback
 
-Disable new call entry/preparation/arming while keeping active-call reconciliation, source receipts/results, stops, durable recovery and exports available. Disable scheduled sync if faulty. Keep accepted history/stop/link tombstones and new additive tables. Roll back only to code compatible with the additive schema; never drop call tables, overwrite new outcomes with a stale source backup, or reinstall Caller v1 over IndexedDB v2. Use a compatible hotfix build or reviewed export recovery. A source receipt never proves its peer synchronized.
-
-## Local review artifacts
-
-The package contains source patches/commit inventory, source migrations with hashes, synthetic verification reports, the runnable extension folder/zip, browser fixtures and owner checklist. Draft PR descriptions identify exact maintained target branches; no branch is pushed or PR published without authorization for that external step. No secrets, owner data exports, node_modules or installed browser profiles belong in the packet.
+Pause new calling while retaining reconciliation, receipts, results, stops and exports. Previous compatible Worker versions are Engine `0d57d86c-5bbe-41f8-872c-e5dd72153951` and Orbit `5bdde3da-d811-437d-ba9b-1e0842f5a9cc`. Retain the additive schema and accepted history. A full database restore would discard later writes and requires a separately reviewed recovery decision. Do not reinstall Caller v1 over IndexedDB v2; use a compatible hotfix or the validated export/import path. A source receipt does not prove peer delivery.

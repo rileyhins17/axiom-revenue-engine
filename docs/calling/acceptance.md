@@ -1,12 +1,12 @@
 # Connected calling acceptance
 
-This is a local candidate for owner-controlled acceptance. Automated phone transport is an inert hash; no fixture may open TEL or reach a prospect. The installed extension and its data have not been modified.
+The software rollout and installed Caller 0.5.2 workspace are complete; see release.md for exact production evidence. The owner phone/audio and uncoached journeys below remain unperformed. Automated phone transport is an inert hash; no fixture may open TEL or reach a prospect.
 
 ## Repeat the automated checks
 
 Use Node 24.19.0; run `npm ci` in Caller/Engine and `pnpm install --frozen-lockfile` with pnpm10.12.1 in Orbit. Keep the three repositories beside each other.
 
-- Caller: `npm run check`, `npm run test:connected-browser`, `npm run test:fixture-browser`; then `python tests/browser_response_race.py`, `python tests/browser_worker_recovery.py` and `python tests/browser_calling_latency.py` with the already built test bundle. Install Python Playwright if absent. `CHROMIUM_PATH` selects an existing Chrome/Brave executable. Tests use fresh headless profiles and intercept every external request.
+- Caller: `npm run check`, `npm run test:native-transport`, `npm run test:connected-browser`, `npm run test:fixture-browser`; then `python tests/browser_response_race.py`, `python tests/browser_worker_recovery.py` and `python tests/browser_calling_latency.py` with the already built test bundle. Install Python Playwright if absent. `CHROMIUM_PATH` selects an existing Chrome/Brave executable. Tests use fresh headless profiles and intercept every external request.
 - Engine: safety → full tests → typecheck → lint → Cloudflare build → `npx wrangler deploy --env="" --dry-run --autoconfig false` → owner UI, all sequential. Use physical dependencies in a short Windows checkout path. Wait for all test/build processes before owner UI. No upload occurs in dry run.
 - Orbit: `pnpm verify`, then the release packet's real SSR handoff fixture. The cross-app bridge fixture runs from Orbit using `node --import tsx --test ../bridge-smoke.test.ts`; all HTTP transport is injected into actual local signed handlers.
 
