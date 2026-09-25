@@ -41,7 +41,8 @@ export default async function CallQueuePage({ searchParams }: { searchParams: Pr
       phone: row.phone, address: row.address, websiteUrl: row.websiteUrl, mapsUrl: mapsUrl(row), attempts: row.attempts, followUpAt: row.followUpAt,
       history,
     }} /> : <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
-      <p className="text-lg font-semibold">Queue is empty for today </p>
+      <div className="owner-float mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl bg-[#0a0a0a] text-2xl shadow-[0_14px_30px_-12px_rgba(184,137,59,0.6)]" aria-hidden="true">🎉</div>
+      <p className="font-display text-2xl">All caught up</p>
       <p className="mt-2 text-sm text-slate-600">Everyone with a phone number has been called today or is waiting on a follow-up date. Try walk-ins, or check back tomorrow.</p>
       <div className="mt-4 flex justify-center gap-3 text-sm font-medium">
         <Link href={"/walk-ins" as Route} className="rounded-lg border border-slate-300 px-3 py-2 hover:bg-slate-50">Walk-ins</Link>

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { celebrate } from "@/components/motion/celebrate";
+import { useToast } from "@/components/ui/toast-provider";
 
 import { AiBrief } from "./ai-brief";
 import { CallerLaunch, useCallerHandoff } from "./caller-launch";
@@ -56,11 +57,13 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
   const [note, setNote] = useState("");
   const [followUpAt, setFollowUpAt] = useState("");
   const [saving, setSaving] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    setKey(crypto.randomUUID()); setOutcome(null); setNote(""); setFollowUpAt(""); setError(null); setSaving(false);
+    setKey(crypto.randomUUID()); setOutcome(null); setNote(""); setFollowUpAt(""); setError(null); setSaving(false); setLeaving(false);
   }, [business.prospectId]);
 
   const skip = useCallback(() => {
@@ -79,11 +82,14 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
       });
       if (!response.ok) throw new Error(((await response.json().catch(() => ({}))) as { error?: string }).error ?? "Could not save.");
       if (outcome === "INTERESTED" || outcome === "MEETING_BOOKED" || outcome === "WON") celebrate();
-      router.refresh();
+      toast(`Saved · ${business.name}`, { duration: 2200 });
+      // Let the finished card slide away before the next business arrives.
+      setLeaving(true);
+      window.setTimeout(() => router.refresh(), 200);
     } catch (caught) {
       setSaving(false); setError(caught instanceof Error ? caught.message : "Could not save.");
     }
-  }, [business.prospectId, followUpAt, key, note, outcome, router, callerSelected]);
+  }, [business.name, business.prospectId, followUpAt, key, note, outcome, router, callerSelected, toast]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -101,7 +107,7 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
   }, [followUpAt, save, skip, callerSelected]);
 
   return <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
-    <section key={business.prospectId} className="owner-slide-in min-w-0 space-y-4">
+    <section key={business.prospectId} className={`${leaving ? "owner-slide-out" : "owner-slide-in"} min-w-0 space-y-4`}>
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">

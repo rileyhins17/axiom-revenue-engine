@@ -26,7 +26,7 @@ function Scoreboard({ label, today, week }: { label: string; today: Stats; week:
     <div className="flex items-center justify-between gap-2">
       <p className="text-sm font-semibold">{label}</p>
       {pct >= 100
-        ? <p className="owner-pop rounded-full bg-[#0a0a0a] px-2.5 py-0.5 text-xs font-semibold text-[#f2e3c2]">Goal hit · {t.calls} dials</p>
+        ? <p className="owner-pop inline-flex items-center gap-1 rounded-full bg-[#0a0a0a] px-2.5 py-0.5 text-xs font-semibold text-[#f2e3c2]"><span className="owner-flame" aria-hidden="true">🔥</span>Goal hit · {t.calls} dials</p>
         : <p className="flex items-center gap-1 text-xs text-slate-600"><Target className="size-3.5" aria-hidden="true" />{t.calls} / {DAILY_DIAL_GOAL} dials today</p>}
     </div>
     <div className="mt-2 h-2 rounded-full bg-slate-100" role="progressbar" aria-label={`${label} dials toward today's goal`} aria-valuenow={t.calls} aria-valuemin={0} aria-valuemax={DAILY_DIAL_GOAL}>

@@ -2861,3 +2861,66 @@ nav[aria-label="Primary"] .text-zinc-700,
 @media (prefers-reduced-motion: reduce) {
   .owner-app-shell *, .owner-app-shell *::before, .owner-app-shell *::after, .owner-confetti { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
+
+/* ==========================================================================
+   Polish round 2: micro-interactions (same Obsidian & Ivory palette)
+   ========================================================================== */
+@keyframes owner-shimmer { from { background-position: -600px 0; } to { background-position: 600px 0; } }
+@keyframes owner-slide-out { to { opacity: 0; transform: translateX(-28px) scale(0.985); } }
+@keyframes owner-check-draw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+@keyframes owner-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes owner-toast-in { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes owner-toast-bar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes owner-flicker { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.12) rotate(3deg); } }
+@keyframes owner-glow-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(184, 137, 59, 0); } 50% { box-shadow: 0 0 0 6px rgba(184, 137, 59, 0.12); } }
+@keyframes owner-row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.owner-skeleton { background: linear-gradient(90deg, #efe9dc 0%, #f8f2e4 40%, #efe9dc 80%); background-size: 1200px 100%; animation: owner-shimmer 1.4s linear infinite; border-radius: 12px; }
+.owner-slide-out { animation: owner-slide-out 220ms cubic-bezier(.4,0,1,1) forwards; }
+.owner-float { animation: owner-float 3.6s ease-in-out infinite; }
+.owner-flame { display: inline-block; animation: owner-flicker 900ms ease-in-out infinite; transform-origin: 50% 90%; }
+.owner-attention { animation: owner-glow-pulse 2.4s ease-in-out infinite; }
+.owner-check path { stroke-dasharray: 24; animation: owner-check-draw 380ms 80ms cubic-bezier(.2,.8,.2,1) both; }
+
+/* Toasts: ivory card, ink text, gold timer bar */
+.owner-toast { position: relative; overflow: hidden; animation: owner-toast-in 340ms cubic-bezier(.2,.8,.2,1) both; background: #fffdf8; color: #0a0a0a; border: 1px solid #e6d6b3; box-shadow: 0 18px 40px -18px rgba(10, 10, 10, 0.45); }
+.owner-toast-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; transform-origin: left; background: linear-gradient(90deg, #b8893b, #e3c07a); animation: owner-toast-bar linear forwards; }
+
+/* Lists: rows arrive one after another; the hovered row gets a gold edge */
+.owner-app-shell [data-owner-content] tbody > tr { animation: owner-row-in 360ms cubic-bezier(.2,.8,.2,1) both; }
+.owner-app-shell [data-owner-content] tbody > tr:hover { box-shadow: inset 3px 0 0 #b8893b; }
+.owner-app-shell [data-owner-content] tbody > tr { transition: background 160ms ease, box-shadow 160ms ease; }
+
+/* Chips and pills glide between states */
+.owner-app-shell [data-owner-content] a.rounded-full, .owner-app-shell [data-owner-content] button.rounded-full { transition: background 200ms ease, color 200ms ease, border-color 200ms ease, transform 160ms ease, box-shadow 200ms ease; }
+.owner-app-shell [data-owner-content] a.rounded-full:hover, .owner-app-shell [data-owner-content] button.rounded-full:hover { transform: translateY(-1px); }
+.owner-app-shell [data-owner-content] a.rounded-full[aria-current="page"] { box-shadow: 0 8px 20px -10px rgba(10, 10, 10, 0.55); }
+
+/* Pressed outcome buttons pop */
+.owner-app-shell [aria-pressed="true"] { animation: owner-pop 300ms cubic-bezier(.2,.8,.2,1); }
+
+/* Sidebar icons nudge on hover */
+.owner-app-shell .owner-nav-item svg { transition: transform 260ms cubic-bezier(.2,.8,.2,1); }
+.owner-app-shell .owner-nav-item:hover svg { transform: scale(1.12) rotate(-4deg); }
+
+/* Gold focus rings everywhere, and a quiet scrollbar */
+.owner-app-shell :is(a, button, input, textarea, select, [tabindex]):focus-visible { outline: 2px solid #b8893b !important; outline-offset: 2px; border-radius: 8px; }
+.owner-app-shell ::selection { background: #f4ead6; color: #0a0a0a; }
+.owner-app-shell * { scrollbar-width: thin; scrollbar-color: #d6ccb6 transparent; }
+.owner-app-shell ::-webkit-scrollbar { width: 10px; height: 10px; }
+.owner-app-shell ::-webkit-scrollbar-thumb { background: #d6ccb6; border-radius: 10px; border: 2px solid #f7f5ef; }
+
+/* Inputs lift into focus */
+.owner-app-shell [data-owner-content] :is(input, textarea, select) { transition: border-color 180ms ease, box-shadow 220ms ease; }
+.owner-app-shell [data-owner-content] :is(input, textarea, select):focus { border-color: #b8893b; box-shadow: 0 0 0 4px rgba(184, 137, 59, 0.14); outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .owner-skeleton, .owner-float, .owner-flame, .owner-attention, .owner-toast, .owner-toast-bar, .owner-slide-out { animation: none !important; }
+}
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(2) { animation-delay: 25ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(3) { animation-delay: 50ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(4) { animation-delay: 75ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(5) { animation-delay: 100ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(6) { animation-delay: 125ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(7) { animation-delay: 150ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(n+8) { animation-delay: 175ms; }
