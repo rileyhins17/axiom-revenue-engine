@@ -1,9 +1,11 @@
+import { planEngineStopDelivery } from './stop-projection';
 import type { CallerActor } from '../revenue-engine/caller-integration';
 import type { CallerDb } from './database';
 import { parseResultEvent, type ResultEvent, type Receipt } from './protocol';
 import { canonicalJson, resultPayloadHash } from './canonical-json';
 import { CallerError, ENGINE_WORKSPACE, assertEngineSource, engineContactId } from './identity';
 import { engineActivity } from './outcomes';
+import { planEngineProjection } from './projection';
 
 type Stored = { eventId: string; attemptId: string; actorUserId: string; payloadHash: string; recordId: string; receivedAt: string; payloadJson: string };
 const receipt = (row: Stored, status: Receipt['status']): Receipt => ({ protocol: 'axiom-caller/2', eventId: row.eventId, attemptId: row.attemptId, payloadHash: row.payloadHash, recordId: row.recordId, receivedAt: row.receivedAt, status });
@@ -25,8 +27,8 @@ export async function recordEngineResult(db: CallerDb, actor: CallerActor, input
   const previous = await read(db, event.eventId); if (previous) return replay(previous);
   const prospect = await db.prepare('SELECT prospectId FROM EngineProspect WHERE prospectId=?').bind(event.source.entityId).first();
   if (!prospect) throw new CallerError('NOT_FOUND', 404);
-  const attempt = await db.prepare('SELECT * FROM CallerAttempt WHERE workspaceId=? AND attemptId=?').bind(ENGINE_WORKSPACE, event.attemptId).first<{ ownerId: string; sourceEntityId: string; sourceRevision: string; contactKey: string }>();
-  if (!attempt || attempt.ownerId !== actor.actorUserId || attempt.sourceEntityId !== event.source.entityId || attempt.sourceRevision !== event.sourceRevision) throw new CallerError('CLAIM_REQUIRED');
+  const attempt = await db.prepare('SELECT * FROM CallerAttempt WHERE workspaceId=? AND attemptId=?').bind(ENGINE_WORKSPACE, event.attemptId).first<{ ownerId: string; sourceEntityId: string; sourceRevision: string; contactKey: string; resolution:string|null }>();
+  if (!attempt || attempt.resolution==='not_dialed' || attempt.ownerId !== actor.actorUserId || attempt.sourceEntityId !== event.source.entityId || attempt.sourceRevision !== event.sourceRevision) throw new CallerError('CLAIM_REQUIRED');
   if (event.correctionOf) {
     const parent = await read(db, event.correctionOf);
     if (!parent || parent.actorUserId !== actor.actorUserId || parent.attemptId !== event.attemptId) throw new CallerError('REVISION_CONFLICT');
@@ -36,7 +38,9 @@ export async function recordEngineResult(db: CallerDb, actor: CallerActor, input
     if (child) throw new CallerError('REVISION_CONFLICT');
   }
   const now = new Date().toISOString(), recordId = 'caller-' + event.eventId, activity = engineActivity(event);
+  const guardId='result:'+event.eventId;
   const statements = [
+    db.prepare(`INSERT INTO CallerCommandGuard(id,passed) VALUES(?,CASE WHEN EXISTS(SELECT 1 FROM CallerAttempt WHERE workspaceId=? AND attemptId=? AND ownerId=? AND COALESCE(resolution,'')<>'not_dialed') THEN 1 ELSE 0 END)`).bind(guardId,ENGINE_WORKSPACE,event.attemptId,actor.actorUserId),
     db.prepare(`INSERT INTO CallerResult(workspaceId,eventId,attemptId,actorUserId,actor,sourceEntityId,contactId,payloadHash,payloadJson,recordId,occurredAt,receivedAt,outcome,attempted,connectedAt,correctionOf) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .bind(ENGINE_WORKSPACE, event.eventId, event.attemptId, actor.actorUserId, actor.actor, event.source.entityId, event.contactId, hash, canonicalJson(event), recordId, event.occurredAt, now, event.outcome, event.attempted === null ? null : Number(event.attempted), event.connectedAt, event.correctionOf),
     db.prepare(`INSERT INTO EngineProspectActivity(activityId,idempotencyKey,prospectId,channel,outcome,note,followUpAt,actor,actorUserId,createdAt,callerEventId,callerAttemptId,occurredAt,callerOutcome,callerAttempted,callerConnected) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
@@ -48,18 +52,22 @@ export async function recordEngineResult(db: CallerDb, actor: CallerActor, input
     db.prepare(`UPDATE CallerAttempt SET phase='closed',closedAt=?,resolution='result_saved' WHERE workspaceId=? AND attemptId=?`).bind(now, ENGINE_WORKSPACE, event.attemptId),
     db.prepare(`UPDATE CallerContactControl SET phase='closed',leaseUntil=?,revision=revision+1 WHERE workspaceId=? AND contactKey=? AND attemptId=? AND ownerId=?`).bind(now, ENGINE_WORKSPACE, attempt.contactKey, event.attemptId, actor.actorUserId),
   );
+  if(event.stopScope==='contact')statements.push(...await planEngineStopDelivery(db,event.contactId,actor.actorUserId,now));
+  statements.push(...await planEngineProjection(db,actor.actorUserId,event,hash,now));
+  statements.push(db.prepare('DELETE FROM CallerCommandGuard WHERE id=?').bind(guardId));
   try { await db.batch(statements); }
   catch (error) {
     const existing = await read(db, event.eventId); if (existing) return replay(existing);
     if (event.correctionOf && await db.prepare('SELECT eventId FROM CallerResult WHERE workspaceId=? AND correctionOf=?').bind(ENGINE_WORKSPACE, event.correctionOf).first()) throw new CallerError('REVISION_CONFLICT');
     if (!event.correctionOf && await db.prepare('SELECT eventId FROM CallerResult WHERE workspaceId=? AND attemptId=? AND correctionOf IS NULL').bind(ENGINE_WORKSPACE, event.attemptId).first()) throw new CallerError('IDEMPOTENCY_CONFLICT');
+    if(error instanceof Error&&/caller_command_guard/.test(error.message))throw new CallerError('CLAIM_REQUIRED');
     throw error;
   }
   return receipt({ eventId: event.eventId, attemptId: event.attemptId, actorUserId: actor.actorUserId, payloadHash: hash, recordId, receivedAt: now, payloadJson: canonicalJson(event) }, 'saved');
 }
 
 export async function callerResultStats(db: CallerDb, since: string) {
-  const row = await db.prepare(`SELECT SUM(attempted=1) attempts,SUM(connectedAt IS NOT NULL) conversations,SUM(outcome='meeting_requested') meetingRequested,SUM(outcome='meeting_booked') meetingBooked FROM CallerResult r WHERE workspaceId=? AND occurredAt>=? AND NOT EXISTS(SELECT 1 FROM CallerResult c WHERE c.workspaceId=r.workspaceId AND c.correctionOf=r.eventId)`)
-    .bind(ENGINE_WORKSPACE, since).first<Record<string, number | null>>();
+  const row = await db.prepare(`SELECT SUM(callerAttempted=1) attempts,SUM(callerConnected=1) conversations,SUM(callerOutcome='meeting_requested') meetingRequested,SUM(callerOutcome='meeting_booked') meetingBooked FROM EngineProspectActivityCurrent WHERE callerEventId IS NOT NULL AND effectiveAt>=?`)
+    .bind(since).first<Record<string, number | null>>();
   return { attempts: Number(row?.attempts ?? 0), conversations: Number(row?.conversations ?? 0), meetingRequested: Number(row?.meetingRequested ?? 0), meetingBooked: Number(row?.meetingBooked ?? 0) };
 }

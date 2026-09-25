@@ -157,7 +157,8 @@ test('saving a result closes its own attempt and release retries acknowledge wit
     const input = await command(t);
     const reserved = await claimContact(t.db, AIDAN, input, NOW);
     const armed = await renewContactClaim(t.db, AIDAN, reserved, 'armed', NOW + 1000);
-    const result = await engineResultFixture(t.db, { attemptId: input.attemptId, sourceRevision: input.sourceRevision });
+    // Ownership retry coverage has no future callback; callback timing has its own regression.
+    const result = await engineResultFixture(t.db, { attemptId: input.attemptId, sourceRevision: input.sourceRevision, outcome:'connected',nextAction:null });
     await recordEngineResult(t.db, AIDAN, result);
     assert.equal(t.raw.prepare<[], { phase: string }>('SELECT phase FROM CallerContactControl').get()?.phase, 'closed');
     await releaseContactClaim(t.db, AIDAN, armed, 'completed', NOW + 2000);

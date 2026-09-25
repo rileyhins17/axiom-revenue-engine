@@ -894,6 +894,9 @@ requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", pr
 requireMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", privateKwM2HtmlReceipt, /SEALED_RECEIPT_DIGEST_MISMATCH/, "Task4 sealed receipt loader must verify the canonical operation digest");
 forbidMatch("src/lib/revenue-engine/private-kw-m2-html-evidence-receipt.ts", privateKwM2HtmlReceipt, /fetch\s*\(|@cloudflare|D1Database|R2Bucket|\.rename\s*\(/i, "Task4 sealed receipts must remain local and provider-free");
 
+requireMatch("wrangler.jsonc", wrangler, /"CALLER_SYNC_ENABLED"\s*:\s*"false"/, "Caller sync must default off until its release/configuration gate");
+forbidMatch("wrangler.jsonc", wrangler, /"CALLER_SYNC_ENABLED"\s*:\s*(?:"true"|true|1)/, "checked-in Caller sync must not activate a production schedule");
+
 if (failures.length > 0) {
   console.error("Safety configuration check failed:");
   for (const failure of failures) console.error(`- ${failure}`);

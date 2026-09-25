@@ -14,6 +14,8 @@ test('result and receipt routes authenticate the current owner, keep no-store, a
     const saved = await handleEngineCallerRequest(t.db, request(), 'results');
     assert.equal(saved.status, 201); assert.equal(saved.headers.get('Cache-Control'), 'no-store');
     const receipt = parseReceipt(await saved.json()); assert.equal(receipt.eventId, input.eventId);
+    const status=await handleEngineCallerRequest(t.db,new Request('https://operations.getaxiom.ca/api/caller/v2/deliveries/'+input.eventId,{headers:{Authorization:'Bearer '+token}}),'deliveries/'+input.eventId);
+    assert.equal(status.status,200);assert.deepEqual((await status.json() as {projections:unknown[]}).projections,[]);
     const response = await handleEngineCallerRequest(t.db, new Request('https://operations.getaxiom.ca/api/caller/v2/receipts/' + input.eventId, { headers: { Authorization: 'Bearer ' + token } }), 'receipts/' + input.eventId);
     assert.equal(response.status, 200); assert.equal(parseReceipt(await response.json()).payloadHash, receipt.payloadHash);
     assert.equal((await handleEngineCallerRequest(t.db, request({ ...input, actorId: 'other' }), 'results')).status, 400);

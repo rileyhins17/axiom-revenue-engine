@@ -8,7 +8,7 @@ export class CallerError extends Error {
   constructor(readonly code: string, readonly status = 409) { super(code); }
 }
 export function engineIdentity(actor: CallerActor) {
-  return { system: 'revenue-engine' as const, connectionId: ENGINE_CONNECTION, workspaceId: ENGINE_WORKSPACE, actorId: actor.actorUserId, protocol: 'axiom-caller/2' as const, capabilities: ['results', 'tasks', 'prepare', 'claims'] };
+  return { system: 'revenue-engine' as const, connectionId: ENGINE_CONNECTION, workspaceId: ENGINE_WORKSPACE, actorId: actor.actorUserId, protocol: 'axiom-caller/2' as const, capabilities: ['results', 'tasks', 'prepare', 'claims', 'projection_status'] };
 }
 export function assertEngineSource(source: SourceRef): void {
   if (source.system !== 'revenue-engine' || source.connectionId !== ENGINE_CONNECTION || source.workspaceId !== ENGINE_WORKSPACE || source.entityType !== 'prospect') throw new CallerError('NOT_FOUND', 404);

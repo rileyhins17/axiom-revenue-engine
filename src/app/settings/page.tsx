@@ -1,3 +1,4 @@
+import { CallerLinks } from '@/components/settings/caller-links';
 import { SettingsClient } from "./SettingsClient";
 
 import { CallerConnect } from "@/components/settings/caller-connect";
@@ -47,7 +48,7 @@ export default async function SettingsPage() {
         isAdmin={session.user.role === "admin"}
         emergencyControl={emergencyControl}
       />
-      <div className="mx-auto w-full max-w-5xl"><CallerConnect /></div>
+      <div className="mx-auto w-full max-w-5xl"><CallerConnect /><CallerLinks /></div>
     </div>
   );
 }

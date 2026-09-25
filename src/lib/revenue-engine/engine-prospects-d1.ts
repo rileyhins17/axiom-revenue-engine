@@ -36,7 +36,7 @@ export const PROSPECT_LATEST_SQL = `
   SELECT p.*,
     (SELECT a."outcome" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastOutcome,
     (SELECT a."callerOutcome" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastCallerOutcome,
-    (SELECT a.effectiveAt FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastActivityAt,
+    (SELECT a.effectiveAt FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" AND (a.callerAttempted IS NULL OR a.callerAttempted<>0) ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastActivityAt,
     (SELECT a."actor" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastActor,
     (SELECT a."followUpAt" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS followUpAt,
     (SELECT COUNT(*) FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" AND a."channel" IN ('CALL','VISIT','EMAIL')) AS attempts,

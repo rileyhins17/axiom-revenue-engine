@@ -28,6 +28,7 @@
     "crons": []
   },
   "vars": {
+    "CALLER_SYNC_ENABLED": "false",
     "APP_BASE_URL": "https://revenue.getaxiom.ca/",
     "AUTH_ALLOWED_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
     "AUTH_ADMIN_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
@@ -75,6 +76,7 @@
         "crons": []
       },
       "vars": {
+        "CALLER_SYNC_ENABLED": "false",
         "APP_BASE_URL": "https://axiom-revenue-engine-console-staging.aidan-magee2.workers.dev/",
         "AUTH_ALLOWED_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
         "AUTH_ADMIN_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",

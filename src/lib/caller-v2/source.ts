@@ -1,3 +1,4 @@
+import { getEngineContactLink } from './links';
 import type { CallerActor } from '../revenue-engine/caller-integration';
 import { nextInQueue } from '../revenue-engine/engine-prospects-d1';
 import { torontoToday, torontoMidnight } from '../prospect-format';
@@ -30,6 +31,8 @@ export async function prepareEngineCall(db: CallerDb, actor: CallerActor, input:
   const control = await db.prepare('SELECT stopped,phase FROM CallerContactControl WHERE workspaceId=? AND contactKey=?').bind(ENGINE_WORKSPACE, task.contactId).first<{ stopped: number; phase: string }>();
   if (!callable || control?.stopped) throw new CallerError('STOPPED');
   if (control?.phase === 'uncertain') throw new CallerError('CLAIM_UNCERTAIN');
+  const link=await getEngineContactLink(db,task.contactId);
+  if(link&&link.state!=='active')throw new CallerError('LINK_CHECK_REQUIRED');
   let facts: string[] = [];
   try { const values: unknown = JSON.parse(source.reasons); if (Array.isArray(values)) facts = values.filter((item): item is string => typeof item === 'string').slice(0, 30).map(item => item.slice(0, 2000)); } catch { /* Missing evidence stays visibly missing. */ }
   let url: string | null = null;
@@ -45,6 +48,6 @@ export async function prepareEngineCall(db: CallerDb, actor: CallerActor, input:
       limitations: [`Stored source last observed ${capturedAt}; no live research was performed.`, 'The listed business phone has not been verified by a call.', ...(url ? [] : ['No verified website URL is stored. This does not establish that the business has no website.']), ...(facts.length ? [] : ['No stored website findings are available.'])],
     },
     evidence: url ? facts.map((observation, index) => ({ id: `finding-${index}`, url, capturedAt, observation })) : [],
-    evidenceRevision: task.revision, allowedDecisionIds: [], coordinator: { kind: 'engine' as const, linkedContactId: null },
+    evidenceRevision: task.revision, allowedDecisionIds: [], coordinator: { kind: 'engine' as const, linkedContactId: link?.linkId??null },
   };
 }

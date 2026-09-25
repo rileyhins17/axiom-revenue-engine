@@ -5,6 +5,18 @@ import { recordEngineResult, getEngineReceipt, callerResultStats } from './repos
 import { prospectActivityStats, listProspectActivity } from '../revenue-engine/engine-prospects-d1';
 import { historyView } from '../prospect-format';
 
+test('an attempt reconciled as not dialed cannot later accept call evidence, even across a concurrent reconciliation',async()=>{
+  const t=openCallerTestDb();try{
+    const input=await engineResultFixture(t.db);
+    t.raw.prepare("UPDATE CallerAttempt SET phase='closed',resolution='not_dialed' WHERE attemptId=?").run(input.attemptId);
+    await assert.rejects(recordEngineResult(t.db,AIDAN,input),/CLAIM_REQUIRED/);
+    t.raw.prepare("UPDATE CallerAttempt SET phase='active',resolution=NULL WHERE attemptId=?").run(input.attemptId);
+    const db={...t.db,batch:async(statements:Parameters<typeof t.db.batch>[0])=>{t.raw.prepare("UPDATE CallerAttempt SET phase='closed',resolution='not_dialed' WHERE attemptId=?").run(input.attemptId);return t.db.batch(statements);}};
+    await assert.rejects(recordEngineResult(db,AIDAN,input),/CLAIM_REQUIRED/);
+    assert.equal(t.raw.prepare<[],{n:number}>('SELECT COUNT(*) n FROM CallerResult').get()?.n,0);
+  }finally{t.close();}
+});
+
 test('identical and concurrent retries produce one result and one activity; changed data conflicts', async () => {
   const t = openCallerTestDb();
   try {
