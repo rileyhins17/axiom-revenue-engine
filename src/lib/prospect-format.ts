@@ -35,3 +35,10 @@ export function historyView(items: ProspectActivity[]) {
     note: item.note, followUpAt: item.followUpAt,
   }));
 }
+
+/** North American numbers as (519) 555-0155, whatever format they were stored in. */
+export function displayPhone(phone: string | null | undefined) {
+  if (!phone) return "";
+  const digits = phone.replace(/D/g, "").replace(/^1(?=d{10}$)/, "");
+  return digits.length === 10 ? `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}` : phone.trim();
+}

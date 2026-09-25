@@ -5,7 +5,7 @@ import { ArrowRight, Footprints, Headset, Mail, Phone, Target } from "lucide-rea
 import { WhatsNew } from "@/components/help/whats-new";
 import { CountUp } from "@/components/motion/count-up";
 import { getDatabase } from "@/lib/cloudflare";
-import { titleCase, torontoMidnight, torontoToday } from "@/lib/prospect-format";
+import { displayPhone, titleCase, torontoMidnight, torontoToday } from "@/lib/prospect-format";
 import { emailSetting, sentToday } from "@/lib/revenue-engine/engine-email";
 import { listProspects, prospectActivityStats, prospectCounts, type ProspectDb, type ProspectRow } from "@/lib/revenue-engine/engine-prospects-d1";
 import { requireSession } from "@/lib/session";
@@ -49,7 +49,7 @@ function LeadRow({ row }: { row: ProspectRow }) {
       <p className="truncate text-sm font-medium">{row.name}</p>
       <p className="truncate text-xs text-slate-600">{titleCase(row.city)} · {titleCase(row.niche)}{row.followUpAt ? ` · due ${row.followUpAt}` : ""}</p>
     </div>
-    {row.phone ? <a href={`tel:${row.phone.replace(/[^\d+]/g, "")}`} className="shrink-0 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium tabular-nums hover:bg-slate-50">{row.phone}</a>
+    {row.phone ? <a href={`tel:${row.phone.replace(/[^\d+]/g, "")}`} className="shrink-0 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium tabular-nums hover:bg-slate-50">{displayPhone(row.phone)}</a>
       : <span className="shrink-0 text-xs text-slate-600">no phone</span>}
   </li>;
 }
@@ -128,7 +128,7 @@ export default async function TodayPage() {
           <p className="truncate text-sm font-medium">{row.name}</p>
           <p className="truncate text-xs text-slate-600">{titleCase(row.city)} · {titleCase(row.niche)} · {row.label === "NO_WEBSITE" ? "No website" : row.reasons[0]}</p>
         </div>
-        <a href={`tel:${row.phone!.replace(/[^\d+]/g, "")}`} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium tabular-nums hover:bg-slate-50"><Phone className="size-3" aria-hidden="true" />{row.phone}</a>
+        <a href={`tel:${row.phone!.replace(/[^\d+]/g, "")}`} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium tabular-nums hover:bg-slate-50"><Phone className="size-3" aria-hidden="true" />{displayPhone(row.phone)}</a>
       </li>)}</ol>
     </div> : null}
 

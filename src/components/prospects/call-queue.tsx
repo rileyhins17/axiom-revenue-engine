@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight, ExternalLink, MapPin, SkipForward } from "lucide-react";
+import { displayPhone } from "@/lib/prospect-format";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -115,7 +116,7 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <CallerLaunch prospectId={business.prospectId} label={`Call ${business.phone}`} className="owner-cta px-6 py-4 text-xl shadow-sm" />
+          <CallerLaunch prospectId={business.prospectId} label={`Call ${displayPhone(business.phone)}`} className="owner-cta px-6 py-4 text-xl shadow-sm" />
           <a href={business.mapsUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50"><MapPin className="size-4" aria-hidden="true" />Google Maps</a>
           {business.websiteUrl ? <a href={business.websiteUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50"><ExternalLink className="size-4" aria-hidden="true" />Their website</a> : null}
         </div>

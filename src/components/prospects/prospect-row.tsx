@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink, MapPin } from "lucide-react";
+import { displayPhone } from "@/lib/prospect-format";
 import { useState } from "react";
 import Link from 'next/link';
 import type {Route} from 'next';
@@ -36,7 +37,7 @@ export function ProspectRow({ row }: { row: ProspectRowView }) {
       <td className="px-3 py-3 text-sm">{title(row.city)}<br /><span className="text-slate-600">{title(row.niche)}</span></td>
       <td className="max-w-[340px] px-3 py-3 text-sm">{row.reasons.slice(0, 2).map((reason) => <p key={reason}>{reason}</p>)}</td>
       <td className="whitespace-nowrap px-3 py-3 text-sm">
-        {row.phone ? <CallerLaunch prospectId={row.prospectId} label={row.phone} className="tabular-nums text-[#7a5818] hover:underline" /> : <span className="text-slate-600">—</span>}
+        {row.phone ? <CallerLaunch prospectId={row.prospectId} label={displayPhone(row.phone)} className="tabular-nums text-[#7a5818] hover:underline" /> : <span className="text-slate-600">—</span>}
         <div className="mt-1 flex gap-2 text-xs">
           <a href={row.mapsUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-slate-600 hover:text-slate-900"><MapPin className="size-3" aria-hidden="true" />Map</a>
           {row.websiteUrl ? <a href={row.websiteUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-slate-600 hover:text-slate-900"><ExternalLink className="size-3" aria-hidden="true" />Site</a> : null}
