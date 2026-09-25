@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Call list | Axiom Revenue Engine" };
 
 const TABS = [
-  { view: "call", label: "To call" },
-  { view: "followups", label: "Follow-ups due" },
+  { view: "call", label: "To call (new)" },
+  { view: "followups", label: "Retries due" },
+  { view: "review", label: "Needs a decision" },
   { view: "visit", label: "Walk-ins" },
   { view: "contacted", label: "Contacted" },
   { view: "all", label: "Everything" },

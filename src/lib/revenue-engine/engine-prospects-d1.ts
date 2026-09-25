@@ -9,7 +9,7 @@ export const PROSPECT_OUTCOMES = [
   "NO_ANSWER", "VOICEMAIL", "GATEKEEPER", "CALL_BACK", "NOT_INTERESTED", "INTERESTED", "MEETING_BOOKED", "WON", "WRONG_NUMBER", "DO_NOT_CONTACT", "NOTE",
 ] as const;
 export type ProspectOutcome = (typeof PROSPECT_OUTCOMES)[number];
-export const ProspectViewSchema = z.enum(["call", "visit", "followups", "contacted", "all"]);
+export const ProspectViewSchema = z.enum(["call", "visit", "followups", "review", "contacted", "all"]);
 export type ProspectView = z.infer<typeof ProspectViewSchema>;
 
 export const ProspectActivityCommandSchema = z.object({
@@ -27,6 +27,8 @@ export type ProspectRow = {
   websiteUrl: string | null; phone: string | null; address: string | null; label: "STRONG" | "WEAK" | "NO_WEBSITE";
   reasons: string[]; lastSeenAt: string;
   lastOutcome: ProspectOutcome | null; lastCallerOutcome?: string | null; lastActivityAt: string | null; lastActor: string | null; followUpAt: string | null; attempts: number;
+  /** fresh = never called; retry = called, next attempt due on dueAt; review = called, needs a decision; closed = finished. */
+  stage?: ProspectStage; dueAt?: string | null; callAttempts?: number;
 };
 export type ProspectActivity = {
   activityId: string; channel: string; outcome: ProspectOutcome; callerOutcome?: string | null; note: string; followUpAt: string | null; actor: string; createdAt: string;
@@ -45,6 +47,29 @@ export const PROSPECT_LATEST_SQL = `
   FROM "EngineProspect" p`;
 const LATEST = PROSPECT_LATEST_SQL;
 
+export type ProspectStage = "fresh" | "retry" | "review" | "closed";
+/**
+ * Queue stages derived from the call history (nothing is written):
+ * - fresh: no call or visit yet, so it is the only thing in "To call";
+ * - retry: called, not finished, next attempt due on dueAt (the caller's date, or 2 days
+ *   after no answer / voicemail / staff, 3 days after call back / interested);
+ * - review: called with no clear next step (connected, unknown, note); needs a decision;
+ * - closed: terminal outcome, do-not-contact, or handed to Orbit.
+ * PROSPECT_LATEST_SQL itself is unchanged: Caller v2 fingerprints its columns.
+ */
+const STAGED = `SELECT staged.*, CASE
+    WHEN staged.stopped = 1 OR staged.lastOutcome IN ('NOT_INTERESTED','WON','WRONG_NUMBER','DO_NOT_CONTACT','MEETING_BOOKED')
+      OR EXISTS(SELECT 1 FROM CallerConversionJob conversion WHERE conversion.workspaceId='axiom' AND conversion.sourceEntityId=staged.prospectId) THEN 'closed'
+    WHEN staged.callAttempts = 0 THEN 'fresh'
+    WHEN staged.dueAt IS NOT NULL THEN 'retry'
+    ELSE 'review' END AS stage
+  FROM (SELECT latest.*,
+      (SELECT COUNT(*) FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=latest."prospectId" AND a."channel" IN ('CALL','VISIT')) AS callAttempts,
+      COALESCE(latest.followUpAt, CASE
+        WHEN latest.lastOutcome IN ('NO_ANSWER','VOICEMAIL','GATEKEEPER') THEN date(latest.lastActivityAt, '-4 hours', '+2 days')
+        WHEN latest.lastOutcome IN ('CALL_BACK','INTERESTED') THEN date(latest.lastActivityAt, '-4 hours', '+3 days') END) AS dueAt
+    FROM (${PROSPECT_LATEST_SQL}) latest) staged`;
+
 const CLOSED = `('NOT_INTERESTED','WON','WRONG_NUMBER','DO_NOT_CONTACT','MEETING_BOOKED')`;
 
 function parseRow(row: Record<string, unknown>): ProspectRow {
@@ -57,6 +82,8 @@ function parseRow(row: Record<string, unknown>): ProspectRow {
     lastOutcome: (row.lastOutcome as ProspectOutcome | null) ?? null, lastActivityAt: (row.lastActivityAt as string | null) ?? null,
     lastCallerOutcome: (row.lastCallerOutcome as string | null) ?? null,
     lastActor: (row.lastActor as string | null) ?? null, followUpAt: (row.followUpAt as string | null) ?? null, attempts: Number(row.attempts ?? 0),
+    stage: (row.stage as ProspectStage | undefined) ?? undefined, dueAt: (row.dueAt as string | null | undefined) ?? null,
+    callAttempts: row.callAttempts == null ? undefined : Number(row.callAttempts),
   };
 }
 
@@ -64,14 +91,15 @@ function parseRow(row: Record<string, unknown>): ProspectRow {
 const NO_CONVERSION = "NOT EXISTS(SELECT 1 FROM CallerConversionJob conversion WHERE conversion.workspaceId='axiom' AND conversion.sourceEntityId=prospectId)";
 export async function listProspects(db: ProspectDb, view: ProspectView, today: string, limit = 300): Promise<ProspectRow[]> {
   const where: Record<ProspectView, string> = {
-    call: `stopped = 0 AND ${NO_CONVERSION} AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)`,
-    visit: `stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND address IS NOT NULL AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})`,
-    followups: `stopped = 0 AND ${NO_CONVERSION} AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})`,
+    call: `stage = 'fresh' AND label IN ('STRONG','NO_WEBSITE')`,
+    visit: `stage IN ('fresh','retry') AND label IN ('STRONG','NO_WEBSITE') AND address IS NOT NULL`,
+    followups: `stage = 'retry' AND dueAt <= ?`,
+    review: `stage = 'review'`,
     contacted: `attempts > 0`,
     all: `1 = 1`,
   };
-  const order = view === "contacted" ? `lastActivityAt DESC` : `CASE label WHEN 'STRONG' THEN 0 WHEN 'NO_WEBSITE' THEN 1 ELSE 2 END, attempts ASC, city, name`;
-  const result = await db.prepare(`SELECT * FROM (${LATEST}) WHERE ${where[view]} ORDER BY ${order} LIMIT ${Math.max(1, Math.min(limit, 1000))}`)
+  const order = view === "contacted" || view === "review" ? `lastActivityAt DESC` : view === "followups" ? `dueAt, name` : `CASE label WHEN 'STRONG' THEN 0 WHEN 'NO_WEBSITE' THEN 1 ELSE 2 END, attempts ASC, city, name`;
+  const result = await db.prepare(`SELECT * FROM (${STAGED}) WHERE ${where[view]} ORDER BY ${order} LIMIT ${Math.max(1, Math.min(limit, 1000))}`)
     .bind(...Array.from({ length: (where[view].match(/\?/g) ?? []).length }, () => today)).all<Record<string, unknown>>();
   return result.results.map(parseRow);
 }
@@ -79,14 +107,16 @@ export async function listProspects(db: ProspectDb, view: ProspectView, today: s
 /** All list counts in one pass. */
 export async function prospectCounts(db: ProspectDb, today: string) {
   const row = await db.prepare(`SELECT
-      SUM(stopped = 0 AND ${NO_CONVERSION} AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)) AS call,
-      SUM(stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND address IS NOT NULL AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})) AS visit,
-      SUM(stopped = 0 AND ${NO_CONVERSION} AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})) AS followups,
+      SUM(stage = 'fresh' AND label IN ('STRONG','NO_WEBSITE')) AS call,
+      SUM(stage IN ('fresh','retry') AND label IN ('STRONG','NO_WEBSITE') AND address IS NOT NULL) AS visit,
+      SUM(stage = 'retry' AND dueAt <= ?) AS followups,
+      SUM(stage = 'retry' AND dueAt > ?) AS scheduled,
+      SUM(stage = 'review') AS review,
       SUM(attempts > 0) AS contacted,
       COUNT(*) AS total
-    FROM (${LATEST})`).bind(today, today).first<Record<string, number | null>>();
+    FROM (${STAGED})`).bind(today, today).first<Record<string, number | null>>();
   const n = (key: string) => Number(row?.[key] ?? 0);
-  return { call: n("call"), visit: n("visit"), followups: n("followups"), contacted: n("contacted"), all: n("total") };
+  return { call: n("call"), visit: n("visit"), followups: n("followups"), scheduled: n("scheduled"), review: n("review"), contacted: n("contacted"), all: n("total") };
 }
 
 /**
@@ -95,13 +125,13 @@ export async function prospectCounts(db: ProspectDb, today: string) {
  */
 export async function nextInQueue(db: ProspectDb, today: string, dayStart: string, skip: readonly string[] = [], limit = 1, offset = 0): Promise<{ row: ProspectRow | null; rows: ProspectRow[]; remaining: number }> {
   const skipList = skip.slice(0, 200);
-  const where = `stopped = 0 AND ${NO_CONVERSION} AND phone IS NOT NULL AND label IN ('STRONG','NO_WEBSITE')
-    AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)
+  const where = `phone IS NOT NULL AND label IN ('STRONG','NO_WEBSITE')
+    AND (stage = 'fresh' OR (stage = 'retry' AND dueAt <= ?))
     AND (lastActivityAt IS NULL OR lastActivityAt < ?)${skipList.length ? ` AND prospectId NOT IN (${skipList.map(() => "?").join(",")})` : ""}`;
   const binds = [today, dayStart, ...skipList];
   const [rows, count] = await Promise.all([
-    db.prepare(`SELECT * FROM (${LATEST}) WHERE ${where} ORDER BY (followUpAt IS NULL), CASE label WHEN 'STRONG' THEN 0 ELSE 1 END, attempts ASC, city, name, prospectId LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))} OFFSET ${Math.max(0, Math.min(99999, Math.floor(offset)))}`).bind(...binds).all<Record<string, unknown>>(),
-    db.prepare(`SELECT COUNT(*) AS n FROM (${LATEST}) WHERE ${where}`).bind(...binds).first<{ n: number }>(),
+    db.prepare(`SELECT * FROM (${STAGED}) WHERE ${where} ORDER BY (stage <> 'retry'), dueAt, CASE label WHEN 'STRONG' THEN 0 ELSE 1 END, attempts ASC, city, name, prospectId LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))} OFFSET ${Math.max(0, Math.min(99999, Math.floor(offset)))}`).bind(...binds).all<Record<string, unknown>>(),
+    db.prepare(`SELECT COUNT(*) AS n FROM (${STAGED}) WHERE ${where}`).bind(...binds).first<{ n: number }>(),
   ]);
   const parsed = rows.results.map(parseRow);
   return { row: parsed[0] ?? null, rows: parsed, remaining: Number(count?.n ?? 0) };
