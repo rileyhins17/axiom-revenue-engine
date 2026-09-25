@@ -1,0 +1,42 @@
+# Outside watchdog: if the live app goes down it cannot email anyone itself,
+# so GitHub checks it every 30 minutes and opens an issue (which emails the
+# repo owner and mentions Aidan). The issue closes itself when the site is back.
+name: Live site watchdog
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+permissions:
+  issues: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check operations.getaxiom.ca
+        id: probe
+        run: |
+          ok=false
+          for i in 1 2 3; do
+            if curl -fsS --max-time 20 https://operations.getaxiom.ca/api/health | grep -q '"ok":true'; then ok=true; break; fi
+            sleep 20
+          done
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+      - name: Open or close the site-down issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          open=$(gh issue list --label site-down --state open --json number --jq ".[0].number")
+          if [ "${{ steps.probe.outputs.ok }}" = "true" ]; then
+            if [ -n "$open" ]; then gh issue close "$open" --comment "✅ The site is back up. Nothing else to do."; fi
+          elif [ -z "$open" ]; then
+            gh label create site-down --color B60205 --force >/dev/null
+            gh issue create --label site-down --title "⚠️ operations.getaxiom.ca is down" --body "The live Revenue Engine did not respond to its health check 3 times in a row ($(date -u +%Y-%m-%dT%H:%MZ)).
+
+**What this means:** the app may not load and calls may not sync right now.
+
+**What to do:** usually Cloudflare recovers on its own within minutes. If this issue is still open in an hour, ask Claude to check the Cloudflare Worker and roll back the last release if needed.
+
+@Mageester @rileyhins17 (this closes itself when the site is back)."
+          fi
