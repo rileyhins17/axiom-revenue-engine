@@ -565,7 +565,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1 }).waitFor();
     await page.getByText("Results so far", { exact: true }).waitFor();
-    await page.getByText("Follow-ups due", { exact: true }).waitFor();
+    await page.getByText("Retries due today", { exact: true }).waitFor();
     await page.getByText("Start calling", { exact: false }).first().waitFor();
     await assertNav(page, "desktop Today");
     await assertWcag(page, "desktop Today");
@@ -619,15 +619,17 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await page.getByRole("button", { name: "Save" }).click();
     await page.getByText("Saved", { exact: true }).waitFor();
 
-    stage = "call log persists and moves to follow-ups";
+    stage = "a called business leaves To call and waits in Retries due";
     await page.reload({ waitUntil: "domcontentloaded" });
+    assert.equal(await page.locator("table").getByText("Sunrise Roofing Co", { exact: true }).count(), 0,
+      "Once a business is called it must leave the fresh To call list.");
+    await page.goto("/prospects?view=followups", { waitUntil: "domcontentloaded" });
     const reloadedSunriseRow = page.locator("tr").filter({ hasText: "Sunrise Roofing Co" }).first();
     await reloadedSunriseRow.getByText("Call back later", { exact: true }).waitFor();
     await reloadedSunriseRow.getByRole("button", { name: "Log" }).click();
     await page.getByText("No calls or visits yet.", { exact: true }).waitFor({ state: "detached" }).catch(() => undefined);
     assert.equal(await page.getByText(/Call back later/, { exact: false }).count() >= 1, true,
       "The saved activity must appear in the row's history after reload.");
-    await page.goto("/prospects?view=followups", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Call list" }).waitFor();
     await page.locator("table").getByText("Sunrise Roofing Co", { exact: true }).waitFor();
 
@@ -645,7 +647,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     const retriedBody = await retriedAttempt.json() as { status?: string };
     assert.equal(retriedBody.status, "ALREADY_SAVED", "A retried submission must report it was already saved.");
     await retriedAttempt.dispose();
-    await page.goto("/prospects", { waitUntil: "domcontentloaded" });
+    await page.goto("/prospects?view=all", { waitUntil: "domcontentloaded" });
     const boundaryRow = page.locator("tr").filter({ hasText: "Boundary HVAC Services" }).first();
     await boundaryRow.getByRole("button", { name: "Log" }).click();
     const historyEntries = page.locator("li").filter({ hasText: "No answer" });

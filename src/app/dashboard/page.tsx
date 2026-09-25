@@ -2,6 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { ArrowRight, Footprints, Headset, Mail, Phone, Target } from "lucide-react";
 
+import { WhatsNew } from "@/components/help/whats-new";
 import { CountUp } from "@/components/motion/count-up";
 import { getDatabase } from "@/lib/cloudflare";
 import { titleCase, torontoMidnight, torontoToday } from "@/lib/prospect-format";
@@ -93,11 +94,13 @@ export default async function TodayPage() {
       <h1>{greeting}, {firstName}.</h1>
     </header>
 
+    <WhatsNew />
+
     <div className="grid gap-4 lg:grid-cols-3">
       <Link href={"/call" as Route} className="group min-w-0 rounded-2xl owner-cta p-6  shadow-sm  lg:col-span-2">
         <p className="flex items-center gap-2 text-sm font-medium text-[#e9dfc8]"><Headset className="size-4" aria-hidden="true" />Call queue</p>
-        <p className="font-display owner-gold-text mt-2 text-6xl tabular-nums"><CountUp value={counts.call} /></p>
-        <p className="text-[#e9dfc8]">businesses ready to call{counts.followups ? `, including ${counts.followups} follow-up${counts.followups === 1 ? "" : "s"} due` : ""}</p>
+        <p className="font-display owner-gold-text mt-2 text-6xl tabular-nums"><CountUp value={counts.call + counts.followups} /></p>
+        <p className="text-[#e9dfc8]">calls to make right now: <b>{counts.call}</b> never called{counts.followups ? <>, <b>{counts.followups}</b> retr{counts.followups === 1 ? "y" : "ies"} due</> : null}</p>
         <p className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-[#f7e9c8] px-4 py-2 font-semibold text-[#0a0a0a] shadow-[0_8px_24px_-8px_rgba(227,192,122,0.6)] transition group-hover:bg-[#fbf1da]">Start calling <ArrowRight className="size-4 transition group-hover:translate-x-0.5" aria-hidden="true" /></p>
       </Link>
       <div className="grid gap-4">
@@ -145,11 +148,16 @@ export default async function TodayPage() {
       </div>
       <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="font-semibold">Follow-ups due</h2>
+          <h2 className="font-semibold">Retries due today</h2>
           <Link href={"/prospects?view=followups" as Route} className="text-xs font-medium text-[#7a5818] hover:underline">See all {counts.followups}</Link>
         </div>
+        <p className="mt-1 text-xs text-slate-600">People you already called who didn&apos;t answer (they come back after 2 days) or asked you to call back.</p>
         {followups.length ? <ul className="mt-2">{followups.map((row) => <LeadRow key={row.prospectId} row={row} />)}</ul>
-          : <p className="mt-3 text-sm text-slate-600">Nothing due. Pick &ldquo;Call back&rdquo; with a date and it shows up here.</p>}
+          : <p className="mt-3 text-sm text-slate-600">Nothing due today.{counts.scheduled ? ` ${counts.scheduled} more coming up later this week.` : ""}</p>}
+        {counts.review ? <Link href={"/prospects?view=review" as Route} className="mt-4 flex items-center justify-between rounded-xl border border-[#e6d6b3] bg-[#fbf3e2] px-3 py-2.5 text-sm hover:bg-[#f7ecd4]">
+          <span><b>{counts.review}</b> call{counts.review === 1 ? "" : "s"} need{counts.review === 1 ? "s" : ""} a decision: you talked to them but didn&apos;t pick a next step.</span>
+          <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+        </Link> : null}
       </div>
     </div>
   </section>;

@@ -11,12 +11,12 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Call list | Axiom Revenue Engine" };
 
 const TABS = [
-  { view: "call", label: "To call (new)" },
-  { view: "followups", label: "Retries due" },
-  { view: "review", label: "Needs a decision" },
-  { view: "visit", label: "Walk-ins" },
-  { view: "contacted", label: "Contacted" },
-  { view: "all", label: "Everything" },
+  { view: "call", label: "To call (new)", help: "Businesses nobody has called yet. Once you call one, it leaves this list." },
+  { view: "followups", label: "Retries due", help: "Already called. No answer or voicemail comes back here after 2 days; callbacks on the day you picked." },
+  { view: "review", label: "Needs a decision", help: "You talked to them but didn't pick what happens next. Open one and choose: call back, interested, not interested…" },
+  { view: "visit", label: "Walk-ins", help: "Businesses with a street address you can visit in person." },
+  { view: "contacted", label: "Contacted", help: "Everyone you've called, visited or emailed, newest first." },
+  { view: "all", label: "Everything", help: "Every business the engine has found, including closed ones." },
 ] as const;
 const CITIES = ["KITCHENER", "WATERLOO", "CAMBRIDGE"] as const;
 const TRADES = ["ROOFING", "HVAC", "LANDSCAPING"] as const;
@@ -81,6 +81,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
     <nav className="flex flex-wrap gap-2 border-b border-slate-200 pb-3" aria-label="Lists">
       {TABS.map((tab) => <Chip key={tab.view} active={tab.view === view} to={href(search, { view: tab.view })}>{tab.label} ({counts[tab.view]})</Chip>)}
     </nav>
+    <p className="-mt-2 text-sm text-slate-600">{TABS.find((tab) => tab.view === view)?.help}</p>
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="text-slate-600">City</span>
       <Chip active={!search.city} to={href(search, { city: undefined })}>All</Chip>
