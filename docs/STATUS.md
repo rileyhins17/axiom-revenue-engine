@@ -1,5 +1,9 @@
 # Current status — Axiom Revenue Engine
 
+## LOCAL ONLY 2026-09-25: connected Caller handoff
+
+On `codex/connected-calling`, commit `c030f7f` plus uncommitted Caller v2 work is being transferred to Aidan's local Windows environment. Production and automation settings are unchanged; no deployment, production migration, provider spend, or outreach occurred. The v2 result/receipt foundation, atomic storage, correction-aware history and stats have 36 passing focused tests; typecheck and safety pass; lint has 0 errors and 4 existing warnings. This is not a full release gate. Engine's earlier full-suite M2 lock failures remain unconfirmed; Cloudflare and owner-browser acceptance have not been completed for this change. Migration 0079 is unapplied. Claims, source preparation/tasks, linked coordination, and the usable Phone Link UI remain unfinished. Next: restore/review the handoff against latest upstream; implement Engine claim/eligibility and prepare routes; wire and test the actual local Phone Link flow. All approved plan tasks remain in scope.
+
 ## LIVE 2026-09-24 ~21:20 UTC: AI, private sign-in, caller bridge, v7 lead rules (`9f89654`)
 
 - Worker `acfb2cff-baf4-420c-b1b0-de9d2fda536c`; migrations through 0078 (81 receipts); stops `01111`.

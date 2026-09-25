@@ -1,0 +1,41 @@
+{
+  "protocol": "axiom-caller/2",
+  "eventId": "00000000-0000-4000-8000-000000000001",
+  "attemptId": "00000000-0000-4000-8000-000000000001",
+  "source": {
+    "system": "orbit",
+    "connectionId": "cx_a",
+    "workspaceId": "ws_a",
+    "entityType": "prospect",
+    "entityId": "p_a"
+  },
+  "purpose": "prospect_follow_up",
+  "contactId": "ct_a",
+  "sourceRevision": "r1",
+  "evidenceRevision": null,
+  "occurredAt": "2026-09-24T18:00:00.000Z",
+  "dialRequestedAt": "2026-09-24T18:00:00.000Z",
+  "connectedAt": "2026-09-24T18:00:10.000Z",
+  "endedAt": "2026-09-24T18:02:00.000Z",
+  "outcome": "callback",
+  "attempted": true,
+  "summary": "Contact requested a callback.",
+  "nextAction": {
+    "kind": "agreed_callback",
+    "description": "Call Friday at 13:15 Toronto time.",
+    "originalWords": "Friday, quarter after one",
+    "localDate": "2026-09-25",
+    "localTime": "13:15",
+    "timeZone": "America/Toronto",
+    "utcOffset": "-04:00",
+    "precision": "time",
+    "windowEndLocalTime": null,
+    "scheduledAt": "2026-09-25T17:15:00.000Z",
+    "timeStatus": "resolved",
+    "provenance": "operator"
+  },
+  "stopScope": "none",
+  "provenance": "operator",
+  "decisions": [],
+  "correctionOf": null
+}

@@ -26,19 +26,20 @@ export type ProspectRow = {
   prospectId: string; placeId: string | null; name: string; city: string; niche: string;
   websiteUrl: string | null; phone: string | null; address: string | null; label: "STRONG" | "WEAK" | "NO_WEBSITE";
   reasons: string[]; lastSeenAt: string;
-  lastOutcome: ProspectOutcome | null; lastActivityAt: string | null; lastActor: string | null; followUpAt: string | null; attempts: number;
+  lastOutcome: ProspectOutcome | null; lastCallerOutcome?: string | null; lastActivityAt: string | null; lastActor: string | null; followUpAt: string | null; attempts: number;
 };
 export type ProspectActivity = {
-  activityId: string; channel: string; outcome: ProspectOutcome; note: string; followUpAt: string | null; actor: string; createdAt: string;
+  activityId: string; channel: string; outcome: ProspectOutcome; callerOutcome?: string | null; note: string; followUpAt: string | null; actor: string; createdAt: string;
 };
 
 const LATEST = `
   SELECT p.*,
-    (SELECT a."outcome" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS lastOutcome,
-    (SELECT a."createdAt" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS lastActivityAt,
-    (SELECT a."actor" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS lastActor,
-    (SELECT a."followUpAt" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS followUpAt,
-    (SELECT COUNT(*) FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" AND a."channel" IN ('CALL','VISIT','EMAIL')) AS attempts,
+    (SELECT a."outcome" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastOutcome,
+    (SELECT a."callerOutcome" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastCallerOutcome,
+    (SELECT a.effectiveAt FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastActivityAt,
+    (SELECT a."actor" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastActor,
+    (SELECT a."followUpAt" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS followUpAt,
+    (SELECT COUNT(*) FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" AND a."channel" IN ('CALL','VISIT','EMAIL')) AS attempts,
     EXISTS (SELECT 1 FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" AND a."outcome"='DO_NOT_CONTACT') AS stopped
   FROM "EngineProspect" p`;
 
@@ -52,6 +53,7 @@ function parseRow(row: Record<string, unknown>): ProspectRow {
     websiteUrl: (row.websiteUrl as string | null) ?? null, phone: (row.phone as string | null) ?? null, address: (row.address as string | null) ?? null,
     label: row.label as ProspectRow["label"], reasons, lastSeenAt: String(row.lastSeenAt),
     lastOutcome: (row.lastOutcome as ProspectOutcome | null) ?? null, lastActivityAt: (row.lastActivityAt as string | null) ?? null,
+    lastCallerOutcome: (row.lastCallerOutcome as string | null) ?? null,
     lastActor: (row.lastActor as string | null) ?? null, followUpAt: (row.followUpAt as string | null) ?? null, attempts: Number(row.attempts ?? 0),
   };
 }
@@ -108,8 +110,8 @@ export async function listActivityFor(db: ProspectDb, prospectIds: readonly stri
   for (let i = 0; i < prospectIds.length; i += 90) {
     const chunk = prospectIds.slice(i, i + 90);
     if (!chunk.length) continue;
-    const { results } = await db.prepare(`SELECT "prospectId","activityId","channel","outcome","note","followUpAt","actor","createdAt" FROM "EngineProspectActivity"
-      WHERE "prospectId" IN (${chunk.map(() => "?").join(",")}) ORDER BY "createdAt" DESC, rowid DESC`).bind(...chunk).all<ProspectActivity & { prospectId: string }>();
+    const { results } = await db.prepare(`SELECT "prospectId","activityId","channel","outcome","callerOutcome","note","followUpAt","actor",effectiveAt AS "createdAt" FROM "EngineProspectActivityCurrent"
+      WHERE "prospectId" IN (${chunk.map(() => "?").join(",")}) ORDER BY effectiveAt DESC, activityRowId DESC`).bind(...chunk).all<ProspectActivity & { prospectId: string }>();
     for (const item of results) {
       const list = map.get(item.prospectId) ?? [];
       if (list.length < 20) list.push(item);
@@ -120,7 +122,7 @@ export async function listActivityFor(db: ProspectDb, prospectIds: readonly stri
 }
 
 export async function listProspectActivity(db: ProspectDb, prospectId: string): Promise<ProspectActivity[]> {
-  const result = await db.prepare(`SELECT "activityId","channel","outcome","note","followUpAt","actor","createdAt" FROM "EngineProspectActivity" WHERE "prospectId"=? ORDER BY "createdAt" DESC, rowid DESC LIMIT 50`)
+  const result = await db.prepare(`SELECT "activityId","channel","outcome","callerOutcome","note","followUpAt","actor",effectiveAt AS "createdAt" FROM "EngineProspectActivityCurrent" WHERE "prospectId"=? ORDER BY effectiveAt DESC, activityRowId DESC LIMIT 50`)
     .bind(prospectId).all<ProspectActivity>();
   return result.results;
 }
@@ -154,8 +156,8 @@ export type ProspectActivityStats = {
 
 /** Counts owner activity since a timestamp: calls, visits, real conversations and outcomes. */
 export async function prospectActivityStats(db: ProspectDb, since: string): Promise<ProspectActivityStats> {
-  const rows = (await db.prepare(`SELECT "actor","channel","outcome",COUNT(*) AS n FROM "EngineProspectActivity" WHERE "createdAt" >= ? GROUP BY "actor","channel","outcome"`)
-    .bind(since).all<{ actor: string; channel: string; outcome: string; n: number }>()).results;
+  const rows = (await db.prepare(`SELECT "actor","channel","outcome","callerConnected",COUNT(*) AS n FROM "EngineProspectActivityCurrent" WHERE effectiveAt >= ? GROUP BY "actor","channel","outcome","callerConnected"`)
+    .bind(since).all<{ actor: string; channel: string; outcome: string; callerConnected: number | null; n: number }>()).results;
   const stats: ProspectActivityStats = { byActor: {}, interested: 0, meetings: 0, won: 0, total: 0 };
   const talked = new Set(["GATEKEEPER", "CALL_BACK", "NOT_INTERESTED", "INTERESTED", "MEETING_BOOKED", "WON", "DO_NOT_CONTACT"]);
   for (const row of rows) {
@@ -163,7 +165,7 @@ export async function prospectActivityStats(db: ProspectDb, since: string): Prom
     const n = Number(row.n);
     if (row.channel === "CALL") actor.calls += n;
     if (row.channel === "VISIT") actor.visits += n;
-    if (talked.has(row.outcome)) actor.conversations += n;
+    if (row.callerConnected === 1 || (row.callerConnected === null && talked.has(row.outcome))) actor.conversations += n;
     if (row.outcome === "INTERESTED") stats.interested += n;
     if (row.outcome === "MEETING_BOOKED") stats.meetings += n;
     if (row.outcome === "WON") stats.won += n;

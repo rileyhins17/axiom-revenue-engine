@@ -221,7 +221,7 @@ describe("private KW M2 setup preflight", () => {
   it("applies 0069 transactionally, publishes the verified receipt last, and replays without writes", async () => {
     await prepareBackupFixture();
     try {
-      const firstRun = JSON.parse(execFileSync(process.execPath, ["node_modules/tsx/dist/cli.mjs", "scripts/private-kw-m2-setup.ts", backupFixtureEnvelopeRelative, "--apply"], { encoding: "utf8" }));
+      const firstRun = JSON.parse(execFileSync(process.execPath, ["--import", "tsx", "scripts/private-kw-m2-setup.ts", backupFixtureEnvelopeRelative, "--apply"], { encoding: "utf8" }));
       await rememberCreated(backupFixturePath);
       await rememberCreated(backupFixtureReceiptPath);
       const session = await preflightPrivateKwM2Setup(backupFixtureEnvelopeRelative);
