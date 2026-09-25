@@ -1,9 +1,10 @@
 "use client";
 
-import { MapPin, Phone } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { useState } from "react";
 
 import { LogActivityForm } from "./log-activity-form";
+import { CallerLaunch } from "./caller-launch";
 
 export type WalkInView = {
   prospectId: string; name: string; niche: string; label: "STRONG" | "WEAK" | "NO_WEBSITE"; address: string; phone: string | null;
@@ -21,7 +22,7 @@ export function WalkInCard({ stop, index }: { stop: WalkInView; index: number })
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1 text-xs">
         <a href={stop.mapsUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 font-medium text-[#7a5818] hover:underline"><MapPin className="size-3.5" aria-hidden="true" />Map</a>
-        {stop.phone ? <a href={`tel:${stop.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1 tabular-nums text-slate-700 hover:underline"><Phone className="size-3.5" aria-hidden="true" />{stop.phone}</a> : null}
+        {stop.phone ? <CallerLaunch prospectId={stop.prospectId} label={stop.phone} className="tabular-nums text-slate-700 hover:underline" /> : null}
       </div>
     </div>
     <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}

@@ -11,6 +11,7 @@ import { openSmtp, type SmtpStream } from "./smtp-client";
 function database() {
   const raw = new Database(":memory:");
   raw.exec(readFileSync("migrations/0075_engine_prospects_and_call_log.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0079_connected_caller.sql", "utf8"));
   raw.exec(readFileSync("migrations/0076_engine_email_outreach.sql", "utf8"));
   const insert = raw.prepare(`INSERT INTO "EngineProspect" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   const email = raw.prepare(`INSERT INTO "EngineProspectEmail" VALUES (?,?,?,'MAILTO_LINK','2026-09-24','run1')`);

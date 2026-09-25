@@ -19,6 +19,10 @@ export const OUTCOME_TEXT: Record<string, string> = {
   NO_ANSWER: "No answer", VOICEMAIL: "Left voicemail", GATEKEEPER: "Talked to staff", CALL_BACK: "Call back later", INTERESTED: "Interested",
   MEETING_BOOKED: "Meeting booked", NOT_INTERESTED: "Not interested", WON: "Won", WRONG_NUMBER: "Wrong number", DO_NOT_CONTACT: "Do not contact", NOTE: "Note",
 };
+export function prospectOutcomeText(outcome: string | null, callerOutcome?: string | null): string | null {
+  if (callerOutcome) { const text = callerOutcome.replaceAll('_', ' '); return text.charAt(0).toUpperCase() + text.slice(1); }
+  return outcome ? OUTCOME_TEXT[outcome] ?? outcome : null;
+}
 
 export const mapsUrl = (row: Pick<ProspectRow, "name" | "placeId" | "address" | "city">) => row.placeId
   ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.name)}&query_place_id=${encodeURIComponent(row.placeId)}`
@@ -27,7 +31,7 @@ export const mapsUrl = (row: Pick<ProspectRow, "name" | "placeId" | "address" | 
 export function historyView(items: ProspectActivity[]) {
   return items.map((item) => ({
     id: item.activityId, when: shortDay(item.createdAt) ?? "", who: item.actor === "AIDAN" ? "Aidan" : "Riley",
-    what: `${item.channel === "VISIT" ? "Visit" : item.channel === "CALL" ? "Call" : item.channel === "EMAIL" ? "Email" : "Note"}: ${OUTCOME_TEXT[item.outcome] ?? item.outcome}`,
+    what: `${item.channel === "VISIT" ? "Visit" : item.channel === "CALL" ? "Call" : item.channel === "EMAIL" ? "Email" : "Note"}: ${prospectOutcomeText(item.outcome, item.callerOutcome)}`,
     note: item.note, followUpAt: item.followUpAt,
   }));
 }

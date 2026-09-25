@@ -1,12 +1,13 @@
 "use client";
 
-import { Check, ChevronRight, Copy, ExternalLink, MapPin, Phone, SkipForward } from "lucide-react";
+import { ChevronRight, ExternalLink, MapPin, SkipForward } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { celebrate } from "@/components/motion/celebrate";
 
 import { AiBrief } from "./ai-brief";
+import { CallerLaunch, useCallerHandoff } from "./caller-launch";
 
 export type QueueBusiness = {
   prospectId: string; name: string; city: string; niche: string; label: "STRONG" | "WEAK" | "NO_WEBSITE";
@@ -41,14 +42,13 @@ function inDays(days: number) {
 
 /** A short, honest opener built only from what the engine observed on the site. */
 function opener(business: QueueBusiness, caller: string) {
-  const reason = business.reasons[0]?.toLowerCase();
-  if (business.label === "NO_WEBSITE") return `Hi, this is ${caller} from Axiom Web here in Kitchener-Waterloo. I noticed ${business.name} doesn't have a website listed on Google, so people searching for ${title(business.niche).toLowerCase()} can't find much about you. Is that something you've thought about?`;
-  return `Hi, this is ${caller} from Axiom Web here in Kitchener-Waterloo. I was looking at your website and noticed ${reason ?? "a few things that could be easier on a phone"}. Who looks after the website for you?`;
+  return `Hi, this is ${caller} from Axiom Web here in Kitchener-Waterloo. Who looks after the website for ${business.name}?`;
 }
 
 export type QueueBrief = { opener: string; talkingPoints: string[]; objections: { objection: string; reply: string }[]; nextStep: string };
 
 export function CallQueue({ business, remaining, caller, skipped, aiReady, brief }: { business: QueueBusiness; remaining: number; caller: string; skipped: string[]; aiReady: boolean; brief: QueueBrief | null }) {
+  const callerSelected=useCallerHandoff(business.prospectId);
   const router = useRouter();
   const [key, setKey] = useState(() => crypto.randomUUID());
   const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -56,7 +56,6 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
   const [followUpAt, setFollowUpAt] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -69,6 +68,7 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
   }, [business.prospectId, router, skipped]);
 
   const save = useCallback(async () => {
+    if(callerSelected)return;
     if (!outcome) { setError("Pick what happened (keys 1–0)."); return; }
     setSaving(true); setError(null);
     try {
@@ -82,10 +82,11 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
     } catch (caught) {
       setSaving(false); setError(caught instanceof Error ? caught.message : "Could not save.");
     }
-  }, [business.prospectId, followUpAt, key, note, outcome, router]);
+  }, [business.prospectId, followUpAt, key, note, outcome, router, callerSelected]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
+      if(callerSelected)return;
       const typing = event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement;
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save(); return; }
       if (typing || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -96,9 +97,8 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [followUpAt, save, skip]);
+  }, [followUpAt, save, skip, callerSelected]);
 
-  const dial = business.phone.replace(/[^\d+]/g, "");
   return <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
     <section key={business.prospectId} className="owner-slide-in min-w-0 space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -115,13 +115,7 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <a href={`tel:${dial}`} className="owner-cta inline-flex items-center gap-3 rounded-xl px-6 py-4 text-2xl font-semibold tabular-nums  shadow-sm ">
-            <Phone className="size-6" aria-hidden="true" />{business.phone}
-          </a>
-          <button type="button" onClick={() => { void navigator.clipboard?.writeText(business.phone); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50">
-            {copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}{copied ? "Copied" : "Copy number"}
-          </button>
+          <CallerLaunch prospectId={business.prospectId} label={`Call ${business.phone}`} className="owner-cta px-6 py-4 text-xl shadow-sm" />
           <a href={business.mapsUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50"><MapPin className="size-4" aria-hidden="true" />Google Maps</a>
           {business.websiteUrl ? <a href={business.websiteUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50"><ExternalLink className="size-4" aria-hidden="true" />Their website</a> : null}
         </div>
@@ -150,7 +144,7 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
       </div>
     </section>
 
-    <aside className="h-fit space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-20">
+    {callerSelected?<aside className="rounded-2xl border border-slate-200 bg-white p-5" role="status">This record is open in Caller. Review and save the result there.</aside>:<aside className="h-fit space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-20">
       <h3 className="font-semibold">What happened?</h3>
       <div className="grid grid-cols-2 gap-2" role="group" aria-label="Call outcome">
         {OUTCOMES.map((option) => {
@@ -186,6 +180,6 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
         <button type="button" onClick={skip} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-3 text-sm font-medium hover:bg-slate-50"><SkipForward className="size-4" aria-hidden="true" />Skip</button>
       </div>
       <p className="text-xs text-slate-600">Keys: 1–0 outcome · N notes · Ctrl+Enter save · S skip</p>
-    </aside>
+    </aside>}
   </div>;
 }

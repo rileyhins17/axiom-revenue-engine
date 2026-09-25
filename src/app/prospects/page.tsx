@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { ProspectRow, type ProspectRowView } from "@/components/prospects/prospect-row";
 import { getDatabase } from "@/lib/cloudflare";
-import { historyView } from "@/lib/prospect-format";
+import { historyView, prospectOutcomeText } from "@/lib/prospect-format";
 import { listActivityFor, listProspects, prospectCounts, ProspectViewSchema, type ProspectDb, type ProspectRow as Row } from "@/lib/revenue-engine/engine-prospects-d1";
 import { requireSession } from "@/lib/session";
 
@@ -17,10 +17,6 @@ const TABS = [
   { view: "contacted", label: "Contacted" },
   { view: "all", label: "Everything" },
 ] as const;
-const OUTCOME_TEXT: Record<string, string> = {
-  NO_ANSWER: "No answer", VOICEMAIL: "Left voicemail", GATEKEEPER: "Talked to staff", CALL_BACK: "Call back later", INTERESTED: "Interested",
-  MEETING_BOOKED: "Meeting booked", NOT_INTERESTED: "Not interested", WON: "Won", WRONG_NUMBER: "Wrong number", DO_NOT_CONTACT: "Do not contact", NOTE: "Note",
-};
 const CITIES = ["KITCHENER", "WATERLOO", "CAMBRIDGE"] as const;
 const TRADES = ["ROOFING", "HVAC", "LANDSCAPING"] as const;
 const title = (value: string) => value === "HVAC" ? value : value.charAt(0) + value.slice(1).toLowerCase();
@@ -64,7 +60,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
   const views: ProspectRowView[] = shown.map((row) => ({
     prospectId: row.prospectId, name: row.name, city: row.city, niche: row.niche, label: row.label, reasons: row.reasons,
     phone: row.phone, address: row.address, websiteUrl: row.websiteUrl, mapsUrl: mapsUrl(row),
-    lastOutcomeText: row.lastOutcome ? OUTCOME_TEXT[row.lastOutcome] ?? row.lastOutcome : null, lastActivity: day(row.lastActivityAt),
+    lastOutcomeText: prospectOutcomeText(row.lastOutcome, row.lastCallerOutcome), lastActivity: day(row.lastActivityAt),
     followUpAt: row.followUpAt, attempts: row.attempts,
     history: historyView(history.get(row.prospectId) ?? []),
   }));

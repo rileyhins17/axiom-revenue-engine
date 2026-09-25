@@ -221,7 +221,7 @@ describe("private KW M2 setup preflight", () => {
   it("applies 0069 transactionally, publishes the verified receipt last, and replays without writes", async () => {
     await prepareBackupFixture();
     try {
-      const firstRun = JSON.parse(execFileSync(process.execPath, ["node_modules/tsx/dist/cli.mjs", "scripts/private-kw-m2-setup.ts", backupFixtureEnvelopeRelative, "--apply"], { encoding: "utf8" }));
+      const firstRun = JSON.parse(execFileSync(process.execPath, ["--import", "tsx", "scripts/private-kw-m2-setup.ts", backupFixtureEnvelopeRelative, "--apply"], { encoding: "utf8" }));
       await rememberCreated(backupFixturePath);
       await rememberCreated(backupFixtureReceiptPath);
       const session = await preflightPrivateKwM2Setup(backupFixtureEnvelopeRelative);
@@ -384,9 +384,12 @@ describe("private KW M2 setup preflight", () => {
       try { await lstat(PRIVATE_KW_M2_SETUP_LOCK_PATH); return; } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
       await writeFile(PRIVATE_KW_M2_SETUP_LOCK_PATH, "other-process\n", { flag: "wx" });
       const ownedLock = await lstat(PRIVATE_KW_M2_SETUP_LOCK_PATH, { bigint: true });
-      await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /already locked/);
-      const currentLock = await lstat(PRIVATE_KW_M2_SETUP_LOCK_PATH, { bigint: true });
-      if (currentLock.dev === ownedLock.dev && currentLock.ino === ownedLock.ino) await unlink(PRIVATE_KW_M2_SETUP_LOCK_PATH);
+      try {
+        await assert.rejects(preflightPrivateKwM2Setup(envelopePath), /already locked/);
+      } finally {
+        const currentLock = await lstat(PRIVATE_KW_M2_SETUP_LOCK_PATH, { bigint: true });
+        if (currentLock.dev === ownedLock.dev && currentLock.ino === ownedLock.ino) await unlink(PRIVATE_KW_M2_SETUP_LOCK_PATH);
+      }
     } finally { await cleanupFixture(); }
   });
 

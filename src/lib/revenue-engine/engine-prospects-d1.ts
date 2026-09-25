@@ -26,21 +26,24 @@ export type ProspectRow = {
   prospectId: string; placeId: string | null; name: string; city: string; niche: string;
   websiteUrl: string | null; phone: string | null; address: string | null; label: "STRONG" | "WEAK" | "NO_WEBSITE";
   reasons: string[]; lastSeenAt: string;
-  lastOutcome: ProspectOutcome | null; lastActivityAt: string | null; lastActor: string | null; followUpAt: string | null; attempts: number;
+  lastOutcome: ProspectOutcome | null; lastCallerOutcome?: string | null; lastActivityAt: string | null; lastActor: string | null; followUpAt: string | null; attempts: number;
 };
 export type ProspectActivity = {
-  activityId: string; channel: string; outcome: ProspectOutcome; note: string; followUpAt: string | null; actor: string; createdAt: string;
+  activityId: string; channel: string; outcome: ProspectOutcome; callerOutcome?: string | null; note: string; followUpAt: string | null; actor: string; createdAt: string;
 };
 
-const LATEST = `
+export const PROSPECT_LATEST_SQL = `
   SELECT p.*,
-    (SELECT a."outcome" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS lastOutcome,
-    (SELECT a."createdAt" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS lastActivityAt,
-    (SELECT a."actor" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS lastActor,
-    (SELECT a."followUpAt" FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" ORDER BY a."createdAt" DESC, a.rowid DESC LIMIT 1) AS followUpAt,
-    (SELECT COUNT(*) FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" AND a."channel" IN ('CALL','VISIT','EMAIL')) AS attempts,
-    EXISTS (SELECT 1 FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" AND a."outcome"='DO_NOT_CONTACT') AS stopped
+    (SELECT a."outcome" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastOutcome,
+    (SELECT a."callerOutcome" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastCallerOutcome,
+    (SELECT a.effectiveAt FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" AND (a.callerAttempted IS NULL OR a.callerAttempted<>0) ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastActivityAt,
+    (SELECT a."actor" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS lastActor,
+    (SELECT a."followUpAt" FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" ORDER BY a.effectiveAt DESC, a.activityRowId DESC LIMIT 1) AS followUpAt,
+    (SELECT COUNT(*) FROM "EngineProspectActivityCurrent" a WHERE a."prospectId"=p."prospectId" AND a."channel" IN ('CALL','VISIT','EMAIL')) AS attempts,
+    (EXISTS (SELECT 1 FROM "EngineProspectActivity" a WHERE a."prospectId"=p."prospectId" AND a."outcome"='DO_NOT_CONTACT')
+      OR EXISTS (SELECT 1 FROM CallerContactControl c WHERE c.workspaceId='axiom' AND c.sourceEntityId=p.prospectId AND c.stopped=1)) AS stopped
   FROM "EngineProspect" p`;
+const LATEST = PROSPECT_LATEST_SQL;
 
 const CLOSED = `('NOT_INTERESTED','WON','WRONG_NUMBER','DO_NOT_CONTACT','MEETING_BOOKED')`;
 
@@ -52,16 +55,18 @@ function parseRow(row: Record<string, unknown>): ProspectRow {
     websiteUrl: (row.websiteUrl as string | null) ?? null, phone: (row.phone as string | null) ?? null, address: (row.address as string | null) ?? null,
     label: row.label as ProspectRow["label"], reasons, lastSeenAt: String(row.lastSeenAt),
     lastOutcome: (row.lastOutcome as ProspectOutcome | null) ?? null, lastActivityAt: (row.lastActivityAt as string | null) ?? null,
+    lastCallerOutcome: (row.lastCallerOutcome as string | null) ?? null,
     lastActor: (row.lastActor as string | null) ?? null, followUpAt: (row.followUpAt as string | null) ?? null, attempts: Number(row.attempts ?? 0),
   };
 }
 
 /** Owner views. Call/visit lists hide stopped and closed businesses; STRONG and no-website leads first. */
+const NO_CONVERSION = "NOT EXISTS(SELECT 1 FROM CallerConversionJob conversion WHERE conversion.workspaceId='axiom' AND conversion.sourceEntityId=prospectId)";
 export async function listProspects(db: ProspectDb, view: ProspectView, today: string, limit = 300): Promise<ProspectRow[]> {
   const where: Record<ProspectView, string> = {
-    call: `stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)`,
+    call: `stopped = 0 AND ${NO_CONVERSION} AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)`,
     visit: `stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND address IS NOT NULL AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})`,
-    followups: `stopped = 0 AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})`,
+    followups: `stopped = 0 AND ${NO_CONVERSION} AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})`,
     contacted: `attempts > 0`,
     all: `1 = 1`,
   };
@@ -74,9 +79,9 @@ export async function listProspects(db: ProspectDb, view: ProspectView, today: s
 /** All list counts in one pass. */
 export async function prospectCounts(db: ProspectDb, today: string) {
   const row = await db.prepare(`SELECT
-      SUM(stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)) AS call,
+      SUM(stopped = 0 AND ${NO_CONVERSION} AND label IN ('STRONG','NO_WEBSITE') AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)) AS call,
       SUM(stopped = 0 AND label IN ('STRONG','NO_WEBSITE') AND address IS NOT NULL AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})) AS visit,
-      SUM(stopped = 0 AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})) AS followups,
+      SUM(stopped = 0 AND ${NO_CONVERSION} AND followUpAt IS NOT NULL AND followUpAt <= ? AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED})) AS followups,
       SUM(attempts > 0) AS contacted,
       COUNT(*) AS total
     FROM (${LATEST})`).bind(today, today).first<Record<string, number | null>>();
@@ -88,14 +93,14 @@ export async function prospectCounts(db: ProspectDb, today: string) {
  * The next business for the calling queue: callable, has a phone, not touched
  * since `dayStart`, follow-ups due first, then weakest websites and fewest tries.
  */
-export async function nextInQueue(db: ProspectDb, today: string, dayStart: string, skip: readonly string[] = [], limit = 1): Promise<{ row: ProspectRow | null; rows: ProspectRow[]; remaining: number }> {
+export async function nextInQueue(db: ProspectDb, today: string, dayStart: string, skip: readonly string[] = [], limit = 1, offset = 0): Promise<{ row: ProspectRow | null; rows: ProspectRow[]; remaining: number }> {
   const skipList = skip.slice(0, 200);
-  const where = `stopped = 0 AND phone IS NOT NULL AND label IN ('STRONG','NO_WEBSITE')
+  const where = `stopped = 0 AND ${NO_CONVERSION} AND phone IS NOT NULL AND label IN ('STRONG','NO_WEBSITE')
     AND (lastOutcome IS NULL OR lastOutcome NOT IN ${CLOSED}) AND (followUpAt IS NULL OR followUpAt <= ?)
     AND (lastActivityAt IS NULL OR lastActivityAt < ?)${skipList.length ? ` AND prospectId NOT IN (${skipList.map(() => "?").join(",")})` : ""}`;
   const binds = [today, dayStart, ...skipList];
   const [rows, count] = await Promise.all([
-    db.prepare(`SELECT * FROM (${LATEST}) WHERE ${where} ORDER BY (followUpAt IS NULL), CASE label WHEN 'STRONG' THEN 0 ELSE 1 END, attempts ASC, city, name LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))}`).bind(...binds).all<Record<string, unknown>>(),
+    db.prepare(`SELECT * FROM (${LATEST}) WHERE ${where} ORDER BY (followUpAt IS NULL), CASE label WHEN 'STRONG' THEN 0 ELSE 1 END, attempts ASC, city, name, prospectId LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))} OFFSET ${Math.max(0, Math.min(99999, Math.floor(offset)))}`).bind(...binds).all<Record<string, unknown>>(),
     db.prepare(`SELECT COUNT(*) AS n FROM (${LATEST}) WHERE ${where}`).bind(...binds).first<{ n: number }>(),
   ]);
   const parsed = rows.results.map(parseRow);
@@ -108,8 +113,8 @@ export async function listActivityFor(db: ProspectDb, prospectIds: readonly stri
   for (let i = 0; i < prospectIds.length; i += 90) {
     const chunk = prospectIds.slice(i, i + 90);
     if (!chunk.length) continue;
-    const { results } = await db.prepare(`SELECT "prospectId","activityId","channel","outcome","note","followUpAt","actor","createdAt" FROM "EngineProspectActivity"
-      WHERE "prospectId" IN (${chunk.map(() => "?").join(",")}) ORDER BY "createdAt" DESC, rowid DESC`).bind(...chunk).all<ProspectActivity & { prospectId: string }>();
+    const { results } = await db.prepare(`SELECT "prospectId","activityId","channel","outcome","callerOutcome","note","followUpAt","actor",effectiveAt AS "createdAt" FROM "EngineProspectActivityCurrent"
+      WHERE "prospectId" IN (${chunk.map(() => "?").join(",")}) ORDER BY effectiveAt DESC, activityRowId DESC`).bind(...chunk).all<ProspectActivity & { prospectId: string }>();
     for (const item of results) {
       const list = map.get(item.prospectId) ?? [];
       if (list.length < 20) list.push(item);
@@ -120,13 +125,13 @@ export async function listActivityFor(db: ProspectDb, prospectIds: readonly stri
 }
 
 export async function listProspectActivity(db: ProspectDb, prospectId: string): Promise<ProspectActivity[]> {
-  const result = await db.prepare(`SELECT "activityId","channel","outcome","note","followUpAt","actor","createdAt" FROM "EngineProspectActivity" WHERE "prospectId"=? ORDER BY "createdAt" DESC, rowid DESC LIMIT 50`)
+  const result = await db.prepare(`SELECT "activityId","channel","outcome","callerOutcome","note","followUpAt","actor",effectiveAt AS "createdAt" FROM "EngineProspectActivityCurrent" WHERE "prospectId"=? ORDER BY effectiveAt DESC, activityRowId DESC LIMIT 50`)
     .bind(prospectId).all<ProspectActivity>();
   return result.results;
 }
 
 export class ProspectActivityError extends Error {
-  constructor(readonly code: "NOT_FOUND" | "STOPPED" | "CONFLICT") { super(code); }
+  constructor(readonly code: "NOT_FOUND" | "STOPPED" | "CONFLICT" | "CLAIM_REQUIRED") { super(code); }
 }
 
 /** Append one call/visit/note. Idempotent per key; a stopped business accepts notes only. */
@@ -142,8 +147,14 @@ export async function recordProspectActivity(db: ProspectDb, input: unknown, act
   const stopped = await db.prepare(`SELECT 1 AS s FROM "EngineProspectActivity" WHERE "prospectId"=? AND "outcome"='DO_NOT_CONTACT' LIMIT 1`).bind(command.prospectId).first();
   if (stopped && command.channel !== "NOTE") throw new ProspectActivityError("STOPPED");
   const activityId = `activity:${command.idempotencyKey}`;
-  await db.prepare(`INSERT INTO "EngineProspectActivity" ("activityId","idempotencyKey","prospectId","channel","outcome","note","followUpAt","actor","actorUserId") VALUES (?,?,?,?,?,?,?,?,?)`)
-    .bind(activityId, command.idempotencyKey, command.prospectId, command.channel, command.outcome, command.note.trim(), command.followUpAt, actor, actorUserId).run();
+  try {
+    await db.prepare(`INSERT INTO "EngineProspectActivity" ("activityId","idempotencyKey","prospectId","channel","outcome","note","followUpAt","actor","actorUserId") VALUES (?,?,?,?,?,?,?,?,?)`)
+      .bind(activityId, command.idempotencyKey, command.prospectId, command.channel, command.outcome, command.note.trim(), command.followUpAt, actor, actorUserId).run();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('CALLER_STOPPED')) throw new ProspectActivityError('STOPPED');
+    if (error instanceof Error && error.message.includes('CALLER_CLAIM_REQUIRED')) throw new ProspectActivityError('CLAIM_REQUIRED');
+    throw error;
+  }
   return { status: "SAVED" as const, activityId };
 }
 
@@ -154,8 +165,8 @@ export type ProspectActivityStats = {
 
 /** Counts owner activity since a timestamp: calls, visits, real conversations and outcomes. */
 export async function prospectActivityStats(db: ProspectDb, since: string): Promise<ProspectActivityStats> {
-  const rows = (await db.prepare(`SELECT "actor","channel","outcome",COUNT(*) AS n FROM "EngineProspectActivity" WHERE "createdAt" >= ? GROUP BY "actor","channel","outcome"`)
-    .bind(since).all<{ actor: string; channel: string; outcome: string; n: number }>()).results;
+  const rows = (await db.prepare(`SELECT "actor","channel","outcome","callerConnected",COUNT(*) AS n FROM "EngineProspectActivityCurrent" WHERE effectiveAt >= ? GROUP BY "actor","channel","outcome","callerConnected"`)
+    .bind(since).all<{ actor: string; channel: string; outcome: string; callerConnected: number | null; n: number }>()).results;
   const stats: ProspectActivityStats = { byActor: {}, interested: 0, meetings: 0, won: 0, total: 0 };
   const talked = new Set(["GATEKEEPER", "CALL_BACK", "NOT_INTERESTED", "INTERESTED", "MEETING_BOOKED", "WON", "DO_NOT_CONTACT"]);
   for (const row of rows) {
@@ -163,7 +174,7 @@ export async function prospectActivityStats(db: ProspectDb, since: string): Prom
     const n = Number(row.n);
     if (row.channel === "CALL") actor.calls += n;
     if (row.channel === "VISIT") actor.visits += n;
-    if (talked.has(row.outcome)) actor.conversations += n;
+    if (row.callerConnected === 1 || (row.callerConnected === null && talked.has(row.outcome))) actor.conversations += n;
     if (row.outcome === "INTERESTED") stats.interested += n;
     if (row.outcome === "MEETING_BOOKED") stats.meetings += n;
     if (row.outcome === "WON") stats.won += n;

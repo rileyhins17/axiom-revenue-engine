@@ -9,7 +9,7 @@ import { listProspects, type ProspectDb } from "./engine-prospects-d1";
 
 function database() {
   const raw = new Database(":memory:");
-  for (const file of ["0075_engine_prospects_and_call_log.sql", "0078_caller_tokens.sql"]) raw.exec(readFileSync(`migrations/${file}`, "utf8"));
+  for (const file of ["0075_engine_prospects_and_call_log.sql", "0078_caller_tokens.sql", "0079_connected_caller.sql"]) raw.exec(readFileSync(`migrations/${file}`, "utf8"));
   const insert = raw.prepare(`INSERT INTO "EngineProspect" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   insert.run("a.example", "p1", "Acme Roofing", "KITCHENER", "ROOFING", "https://a.example/", "(519) 555-0101", "12 King St", "STRONG", '["No phone layout"]', "run1", "2026-09-24", "2026-09-24");
   insert.run("place:p2", "p2", "Green Lawns", "WATERLOO", "LANDSCAPING", null, "(519) 555-0102", null, "NO_WEBSITE", "[]", "run1", "2026-09-24", "2026-09-24");

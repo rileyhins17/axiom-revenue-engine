@@ -11,7 +11,7 @@ import { AiError } from "./gemini";
 
 function database() {
   const raw = new Database(":memory:");
-  for (const file of ["0075_engine_prospects_and_call_log.sql", "0077_ai_call_briefs.sql"]) raw.exec(readFileSync(`migrations/${file}`, "utf8"));
+  for (const file of ["0075_engine_prospects_and_call_log.sql", "0077_ai_call_briefs.sql", "0079_connected_caller.sql"]) raw.exec(readFileSync(`migrations/${file}`, "utf8"));
   raw.prepare(`INSERT INTO "EngineProspect" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run("a.example", "p1", "Acme Roofing", "KITCHENER", "ROOFING", "https://a.example/", "519-555-0101", null, "STRONG", '["No phone layout"]', "run1", "2026-09-24", "2026-09-24");
   const db: ProspectDb = { prepare(sql) { const s = raw.prepare(sql); return { bind: (...v: unknown[]) => ({
     all: async <T,>() => ({ results: s.all(...v) as T[] }), first: async <T,>() => (s.get(...v) as T | undefined) ?? null, run: async () => s.run(...v),

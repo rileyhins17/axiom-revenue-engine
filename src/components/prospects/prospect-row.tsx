@@ -2,8 +2,11 @@
 
 import { ExternalLink, MapPin } from "lucide-react";
 import { useState } from "react";
+import Link from 'next/link';
+import type {Route} from 'next';
 
 import { LogActivityForm } from "./log-activity-form";
+import { CallerLaunch, useCallerHandoff } from "./caller-launch";
 
 export type ProspectRowView = {
   prospectId: string; name: string; city: string; niche: string; label: "STRONG" | "WEAK" | "NO_WEBSITE";
@@ -21,10 +24,11 @@ const BADGE: Record<ProspectRowView["label"], { text: string; className: string 
 
 /** One call-list row: the facts at a glance, with logging and history one click away. */
 export function ProspectRow({ row }: { row: ProspectRowView }) {
+  const callerSelected=useCallerHandoff(row.prospectId);
   const [open, setOpen] = useState(false);
   const badge = BADGE[row.label];
   return <>
-    <tr className="border-b border-slate-200 align-top hover:bg-slate-50">
+    <tr id={`prospect-${row.prospectId}`} className="border-b border-slate-200 align-top hover:bg-slate-50">
       <td className="px-3 py-3">
         <p className="font-medium">{row.name}</p>
         <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${badge.className}`}>{badge.text}</span>
@@ -32,7 +36,7 @@ export function ProspectRow({ row }: { row: ProspectRowView }) {
       <td className="px-3 py-3 text-sm">{title(row.city)}<br /><span className="text-slate-600">{title(row.niche)}</span></td>
       <td className="max-w-[340px] px-3 py-3 text-sm">{row.reasons.slice(0, 2).map((reason) => <p key={reason}>{reason}</p>)}</td>
       <td className="whitespace-nowrap px-3 py-3 text-sm">
-        {row.phone ? <a href={`tel:${row.phone.replace(/[^\d+]/g, "")}`} className="font-medium tabular-nums text-[#7a5818] hover:underline">{row.phone}</a> : <span className="text-slate-600">—</span>}
+        {row.phone ? <CallerLaunch prospectId={row.prospectId} label={row.phone} className="tabular-nums text-[#7a5818] hover:underline" /> : <span className="text-slate-600">—</span>}
         <div className="mt-1 flex gap-2 text-xs">
           <a href={row.mapsUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-slate-600 hover:text-slate-900"><MapPin className="size-3" aria-hidden="true" />Map</a>
           {row.websiteUrl ? <a href={row.websiteUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-slate-600 hover:text-slate-900"><ExternalLink className="size-3" aria-hidden="true" />Site</a> : null}
@@ -52,7 +56,8 @@ export function ProspectRow({ row }: { row: ProspectRowView }) {
         <div className="grid gap-4 lg:grid-cols-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Log a call or visit</p>
-            <LogActivityForm prospectId={row.prospectId} />
+            {callerSelected?<p role="status">This record is open in Caller. Review and save the result there.</p>:<LogActivityForm prospectId={row.prospectId} />}
+            <Link className="mt-3 inline-block text-sm underline" href={('/settings?conversionSource='+encodeURIComponent(row.prospectId)+'#orbit-handoff') as Route}>Create or link a confirmed client in Orbit</Link>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">History</p>

@@ -9,6 +9,7 @@ import { listProspectActivity, listProspects, ProspectActivityError, recordProsp
 function database(): ProspectDb & { raw: Database.Database } {
   const raw = new Database(":memory:");
   raw.exec(readFileSync("migrations/0075_engine_prospects_and_call_log.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0079_connected_caller.sql", "utf8"));
   const insert = raw.prepare(`INSERT INTO "EngineProspect" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   insert.run("a.example", "p1", "Strong Roofing", "KITCHENER", "ROOFING", "https://a.example/", "519-555-0101", "1 Main St", "STRONG", '["No tap-to-call"]', "run1", "2026-09-24", "2026-09-24");
   insert.run("place:p2", "p2", "No Site Lawns", "WATERLOO", "LANDSCAPING", null, null, null, "NO_WEBSITE", '["No website listed"]', "run1", "2026-09-24", "2026-09-24");

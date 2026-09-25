@@ -10,6 +10,7 @@ import { setCloudflareBindings } from "./src/lib/cloudflare";
 import { getCronTimeoutBudgets } from "./src/lib/cron-timeouts";
 import { clearServerEnvCache } from "./src/lib/env";
 import { runEngineEmailCron } from "./src/lib/revenue-engine/engine-email-worker";
+import { runCallerSyncTick } from "./src/lib/caller-v2/sync-tick";
 
 const worker = openNextWorkerModule;
 // Weekdays 10:00 Toronto (EDT); the sender itself refuses weekends and every closed gate.
@@ -137,6 +138,12 @@ const exportedWorker = {
   async scheduled(controller, env, ctx) {
     clearServerEnvCache();
     setCloudflareBindings(env);
+    if (controller?.cron === "* * * * *") {
+      ctx.waitUntil(runCallerSyncTick(env.DB, env)
+        .then((result) => console.log(JSON.stringify({ event: "caller_sync", ...result })))
+        .catch(() => { console.error("[caller-sync] failure"); throw new Error("CALLER_SYNC_FAILED"); }));
+      return;
+    }
     if (controller?.cron === ENGINE_EMAIL_CRON) {
       ctx.waitUntil(
         runEngineEmailCron(env)

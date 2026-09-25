@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { aiSpend } from "@/lib/ai/call-brief";
-import { historyView, OUTCOME_TEXT, torontoMidnight, torontoToday } from "@/lib/prospect-format";
+import { historyView, prospectOutcomeText, torontoMidnight, torontoToday } from "@/lib/prospect-format";
 import { emailOverview } from "@/lib/revenue-engine/engine-email";
 import { listActivityFor, listProspects, prospectActivityStats, prospectCounts, type ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
@@ -73,7 +73,7 @@ export const ENGINE_TOOLS: EngineTool[] = [
           && (!text || row.name.toLowerCase().includes(text) || (row.phone ?? "").includes(text) || (row.address ?? "").toLowerCase().includes(text)));
       return { total: rows.length, businesses: rows.slice(0, args.limit ?? 10).map((row) => ({
         id: row.prospectId, name: row.name, city: row.city, trade: row.niche, website: LABEL_TEXT[row.label], problems: row.reasons.slice(0, 3),
-        phone: row.phone, address: row.address, lastResult: row.lastOutcome ? OUTCOME_TEXT[row.lastOutcome] : "not contacted",
+        phone: row.phone, address: row.address, lastResult: prospectOutcomeText(row.lastOutcome, row.lastCallerOutcome) ?? "not contacted",
         lastBy: row.lastActor, followUp: row.followUpAt, attempts: row.attempts,
       })) };
     },
@@ -98,11 +98,11 @@ export const ENGINE_TOOLS: EngineTool[] = [
     async run(raw, { db, now = new Date() }) {
       const args = Activity.parse(raw);
       const since = new Date(now.getTime() - (args.days ?? 7) * 86_400_000).toISOString();
-      const { results } = await db.prepare(`SELECT a."createdAt", a."actor", a."channel", a."outcome", a."note", a."followUpAt", p."name"
-        FROM "EngineProspectActivity" a JOIN "EngineProspect" p ON p."prospectId" = a."prospectId"
-        WHERE a."createdAt" >= ?${args.who ? ` AND a."actor" = ?` : ""} ORDER BY a."createdAt" DESC LIMIT 60`)
+      const { results } = await db.prepare(`SELECT a.effectiveAt AS "createdAt", a."actor", a."channel", a."outcome", a."callerOutcome", a."note", a."followUpAt", p."name"
+        FROM "EngineProspectActivityCurrent" a JOIN "EngineProspect" p ON p."prospectId" = a."prospectId"
+        WHERE a.effectiveAt >= ?${args.who ? ` AND a."actor" = ?` : ""} ORDER BY a.effectiveAt DESC LIMIT 60`)
         .bind(...(args.who ? [since, args.who] : [since])).all<Record<string, string | null>>();
-      return { since, entries: results.map((r) => ({ when: r.createdAt, who: r.actor, business: r.name, channel: r.channel, result: OUTCOME_TEXT[r.outcome ?? ""] ?? r.outcome, note: clip(r.note, 200), followUp: r.followUpAt })) };
+      return { since, entries: results.map((r) => ({ when: r.createdAt, who: r.actor, business: r.name, channel: r.channel, result: prospectOutcomeText(r.outcome, r.callerOutcome), note: clip(r.note, 200), followUp: r.followUpAt })) };
     },
   },
   {

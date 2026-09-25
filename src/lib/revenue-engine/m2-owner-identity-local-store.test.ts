@@ -106,6 +106,7 @@ test("fails closed when the deterministic destination is replaced by a symlink",
     }
 
     await assert.rejects(savePrivateKwM2OwnerDecisions(valid, { rootDir }), M2OwnerIdentityLocalStoreError);
+    await assert.rejects(readFile(path.join(rootDir, "elsewhere.json")), { code: "ENOENT" });
   });
 });
 

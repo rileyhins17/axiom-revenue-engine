@@ -1,4 +1,66 @@
+## Production connected calling rollout — 2026-09-25
+
+The owner-authorized guarded release is active: Engine source `49b45523b7e9a9d444bc56cbfaa1b716977c12c5`, Worker `ecfba54e-ce3b-4529-844f-86c2849e3219`, additive migration 0079 applied. Fresh private backups passed restoration and original-row preservation checks. Intended-workspace calling is enabled; scheduled Caller sync, general autonomy and email remain off under the existing budget/stop controls. Authenticated connection/tasks and source preparation passed through the actual Caller browser without dialing or recording a synthetic production call. The previous Worker version and private rollback bookmark are retained. See [the release record](calling/release.md) for both source versions and recovery details.
+
+Caller 0.5.2 addresses two device-discovered browser/restore integration issues, preserves the owner's imported history across restarts, and connects to both production sources. Physical Phone Link pairing/audio and uncoached operator acceptance remain owner-device checks. Historical entries below describe earlier checkpoints and do not supersede this rollout record.
+
+## Rollout preparation 2026-09-25: CI runtime type refresh
+
+GitHub Actions on the connected-calling PR found the inert engine's generated runtime declarations still pinned to the prior Wrangler version. Regenerated src/engine/worker-env.d.ts with the locked Wrangler 4.140.0/workerd 1.20260923.1; its check and TypeScript pass. Runtime code and deployment controls are unchanged. The connected-calling production rollout is owner-authorized; fresh private database exports restore with unchanged original rows and zero foreign-key violations. Production remains unchanged while CI and live-source reconciliation complete. Existing budget and autonomy settings remain unchanged. Next: finish CI, reconcile the live Orbit source difference, then apply the guarded source release.
+
+## LOCAL ONLY 2026-09-25: connected calling verified; owner release gate open
+
+Verified implementation `9e7d6d58df80c035a5f93bc1c484a7827e500ee1`: safety975 tests/types/lint0errors8warnings/Cloudflarebuild/no-uploaddryrun/stock 8+extended 10ownerUI at1440 / 390PASS, zero external requests. Caller `e616e2b850c0e7b6896a759cb1440f5acdd760f0` passes263 tests and Chrome/Brave journey/recovery/latency checks. Orbit `ef4b97d078ddeb550700ecf0d7d575eb05c7c618` passes2,305 tests and real signed handoff browser. All five Important review findings are fixed; no deferred minors. See docs/calling/verification.md and implementation-decisions.md.
+
+Production/installed extension remain unchanged. Both deployed commits, Engine account mapping, fresh backup/restore proof, device/audio and uncoached owner acceptance remain open. Calling and scheduledsync defaultoff; C$50/month ceiling unchanged. Next: owner reviews the three prepared draft PRs; verifies source identity/backups and approves rollout; completes device/five-journey acceptance before routine calling. No publish/merge/deploy authority is inferred.
+
+## LOCAL ONLY 2026-09-25: final independent review fix candidate
+
+The independent whole-change review returned five Important findings and no Critical or Minor findings. The single fix pass covers delayed UI replies, unresolved callback timing, correction delivery ordering, missing callback zones, and strict workspace calling activation. Targeted regressions pass; the exact candidate's full safety/tests/types/lint/build/dry-run/browser gate is pending and will be recorded in the release manifest. Calling and scheduled sync default off. Source screens reflect the pause; ongoing call and delivery recovery remain available.
+
+No deployment, production migration, peer secrets, installed extension, real phone call or provider spend changed. Current Engine deployment identity and both deployed commits remain unverified; Orbit version72 is only partial identity evidence. Fresh production backup/restore proof, device/audio and uncoached owner acceptance remain release prerequisites. The C$50/month ceiling is unchanged; optional one-minute sync adds about43,200 invocations/app/month only after its separate gate.
+
+Next: complete the exact candidate gates; commit the verified trees and package hashes/reproducible evidence; present draft PRs and the owner device/release checklist for the final external approval step.
+
+## LOCAL ONLY 2026-09-25: final connected-calling verification candidate
+
+The local implementation now covers Engine/Orbit source calls, explicit shared links, durable stop/projection recovery, reviewed conversion, Caller history/corrections and optional Voice independent of phone facts. New race regressions cover stop/link commit order, ordinary and DNC corrections while linking, pre-link correction ancestors and stale selected history during conversion. Orbit now ranks canonical mirrored callbacks before uncalled prospects across source-page boundaries. Focused Engine26 and Orbit36 tests pass; complete release verification is recorded with exact revisions in the local release packet.
+
+Compatible published dependencies have been refreshed with lockfiles and retained/rebased Windows patches; see `docs/calling/dependency-compatibility.md`. The new migrations remain unapplied to production. Source deployments, installed extension and Phone Link were not changed; no contacts, outbound sends or paid providers were exercised. Sync scheduling remains off. Hardware/audio and uncoached Aidan/Riley acceptance remain release gates. Next: complete the required sequential Engine gate and cross-app browser checks; independent review and material fixes; prepare the exact-commit release/rollback packet for the owner's device and release gate.
+
+## Local reviewed handoff implementation — 2026-09-25
+
+Engine owner Settings now provides reviewed conversion requests, retained status and retries. Orbit has the owner confirmation page and a durable inbox. The shared conversion hold keeps acquisition closed; Orbit commits its business/contact/link/receipt atomically, then both sides activate the mapping. Eligible Orbit client/opportunity calls retain shared ownership and both source stops. No prospect calls, production changes, paid actions or installed-extension changes were used.
+
+Previous fully verified Engine checkpoint: `6dfaec7c7d6af402e86c91fe8ee60b3a2cb0276d`. Current focused Engine claims/conversion tests pass; the two actual-handler offline bridge tests pass. Orbit's corresponding local tree passes full verification: 232 test files, 2286 tests, typecheck and client/server builds. The Engine full gate is being run against an immutable clean candidate because the existing M2 release checks correctly reject uncommitted migration bytes.
+
+Next: finish source browser acceptance and the immutable Engine gate; finish Caller repair/latency and dependency refresh; complete independent review and the release/device packet. The existing C$50/month ceiling and disabled scheduled-sync trigger are unchanged.
+
 # Current status — Axiom Revenue Engine
+
+## LOCAL ONLY 2026-09-25: reviewed client handoff in progress
+
+Verified Engine checkpoint `6dfaec7` passed safety, 964 tests, typecheck, lint, Cloudflare build, Wrangler no-upload dry run and 8 owner UI pages at 1440/390 px with zero external requests. Caller checkpoint `afccb54` passed 256 tests and the offline IndexedDB browser journeys. Orbit checkpoint `e74139b` passed 2,270 tests, preflight, typecheck and build; it includes reviewed client conversion, immutable commercial corrections and currency-aware revenue. The offline cross-app signed-handler bridge passed again after that checkpoint.
+
+Uncommitted Task 14 work adds an Engine owner handoff preview, durable original-operator/grant request, exact retries, source/permission race guards and an Orbit pending inbox. Pending handoffs leave acquisition calling and never invent a missing domain or automatically create a business by matching it. Engine Settings and expanded prospect rows lead into the review. Orbit's final create/link review, conversion handshake and converted-client eligibility are still being implemented; this new tree has focused tests but has not passed the complete Engine gate.
+
+Production, installed extension data, peer secrets, automation switches and spending are unchanged. No merge, deployment, production migration or external call occurred. Next: finish Orbit's owner review and cross-platform retry/coordination; run browser/fault and latency acceptance; refresh compatible dependencies, independent review and the release/device packet. All approved tasks remain in scope.
+
+## LOCAL ONLY 2026-09-25: linked calling implementation in progress
+
+Verified foundation commit `4eebb0b` is the exact tree of candidate `d2ae6db92586c901747dc1ee324153adc3830d9f`: safety, 941 tests, typecheck, lint (0 errors/4 existing warnings), Cloudflare build and no-upload Wrangler dry run passed. The Windows Next trace exclusion fix retained the existing private-file guard; the completed build then passed 8 owner UI pages at 1440/390 px with zero external requests. Caller foundation is `dadfa82`; Orbit foundation is `44ac6fa`.
+
+Uncommitted Task 12 work now connects explicit owner-reviewed links, scoped signed peer requests, Engine shared claims, atomic result and standalone-stop outboxes, exact independent mirror receipts, retry/repair controls and sync-only watchdog code. Engine Settings can preview/confirm/resume a link without exposing peer secrets. Caller shows source and destination receipts separately. Mirrored calls feed history and totals at their original timestamps; callback eligibility respects reviewed time zones and precise times. Orbit private notes and commercial actions stay in Orbit. Focused suites and offline real-IndexedDB browser tests are passing as recorded in the development ledger; the final full gate for this new tree remains open.
+
+No production migration, peer grant, deployed config, installed extension, outreach or provider spending changed. Both scheduled sync flags remain false and the new minute trigger is not activated; its roughly 43,200 monthly invocations per app require release/budget review within the existing C$50/month Engine ceiling. See `docs/calling/linked-calling-development.md`. All 17 approved tasks remain in scope. Next: finish linked fault/browser checks; complete Caller reviewed decisions/history and explicit conversion/corrections; refresh compatible dependencies and run independent review plus the final release/device gates.
+
+## LOCAL ONLY 2026-09-25: Windows continuation in progress
+
+The exact handoff was restored in an isolated checkout and checkpointed at `3b3b89a`; maintained upstream was unchanged. Uncommitted continuation adds source-revision-bound claims, 120-second leases, explicit uncertain-call reconciliation, source-only launch controls, current source preparation and database guards for manual/legacy activity writers. Focused Caller v2 tests: 30 passing; development typecheck passes; lint has 0 errors and 4 existing warnings. The M2 orphan lock was traced to a synthetic contention test whose failed assertion skipped cleanup; a `finally` guard fixes it, and all 21 M2 recovery tests pass. A separate Windows dangling-symlink regression has 7 passing tests. Migration 0079 is still unapplied and has additive control/reconciliation fields. The full release gate, connected Caller UI, Orbit/linking, browser/device acceptance and dependency refresh are unfinished. No production state, outreach, spending or deployment changed. Complete the approved connected-calling plan before preparing a release.
+
+## LOCAL ONLY 2026-09-25: connected Caller handoff
+
+On `codex/connected-calling`, commit `c030f7f` plus uncommitted Caller v2 work is being transferred to Aidan's local Windows environment. Production and automation settings are unchanged; no deployment, production migration, provider spend, or outreach occurred. The v2 result/receipt foundation, atomic storage, correction-aware history and stats have 36 passing focused tests; typecheck and safety pass; lint has 0 errors and 4 existing warnings. This is not a full release gate. Engine's earlier full-suite M2 lock failures remain unconfirmed; Cloudflare and owner-browser acceptance have not been completed for this change. Migration 0079 is unapplied. Claims, source preparation/tasks, linked coordination, and the usable Phone Link UI remain unfinished. Next: restore/review the handoff against latest upstream; implement Engine claim/eligibility and prepare routes; wire and test the actual local Phone Link flow. All approved plan tasks remain in scope.
 
 ## LIVE 2026-09-24 ~21:20 UTC: AI, private sign-in, caller bridge, v7 lead rules (`9f89654`)
 
@@ -2757,3 +2819,4 @@ deployment, and spend facts remain unknown or off as stated above.
 3. If M2 is approved, implement and verify its bounded capability packet while
    keeping provider, contact, deployment, outreach, send, and spend actions
    separately gated.
+
