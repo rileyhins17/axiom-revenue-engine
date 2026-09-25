@@ -38,9 +38,10 @@ export function useCallerHandoff(prospectId:string):boolean {
 /** Only a source reference crosses into the extension; Caller fetches the number. */
 export function CallerLaunch({ prospectId, label = 'Open Caller', className = '' }: { prospectId: string; label?: string; className?: string }) {
   const enabled=useContext(CallerActivation);
-  // Paused is a status, not a button: muted, never styled like the call action.
-  if(!enabled)return <span className="inline-flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600" title="New calls are paused for this workspace. Saved results can still sync.">
-    <Phone className="size-4" aria-hidden="true" />New calls are paused right now
+  // Paused is a status, not a button: show the number quietly with a small tag.
+  if(!enabled)return <span className="inline-flex items-center gap-2 text-sm tabular-nums text-slate-700" title="New calls are paused for this workspace. Saved results can still sync.">
+    <Phone className="size-4 text-slate-500" aria-hidden="true" />{label.replace(/^Call /, "")}
+    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">calls paused</span>
   </span>;
   const source = { system: 'revenue-engine', connectionId: 'axiom-engine', workspaceId: 'axiom', entityType: 'prospect', entityId: prospectId };
   return <a href="/settings#caller" data-axiom-caller-source={JSON.stringify(source)}
