@@ -49,7 +49,7 @@
 :root {
   /* Claude Code desktop-style font stack: native system UI font + system mono.
      SF Pro on macOS, Segoe UI Variable on Windows 11, system-ui elsewhere. */
-  --font-app-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-app-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-app-mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -160,7 +160,7 @@
 }
 
 /* ============================================================
-   AXIOM PIPELINE ENGINE v3 — DESIGN SYSTEM
+   AXIOM REVENUE ENGINE — DESIGN SYSTEM
    ============================================================ */
 
 /* ========== AMBIENT AURORA BACKGROUND ========== */
@@ -968,6 +968,322 @@ body::after {
   .animate-radar,
   .animate-pulse-ring {
     animation: none !important;
+  }
+}
+
+/* Owner workspace chrome. The dark navigation anchors the decision-first
+   owner pages while the main canvas stays quiet and readable. */
+.owner-app-shell {
+  --owner-paper: #f7f8f5;
+  --owner-white: #ffffff;
+  --owner-ink: #172c25;
+  --owner-line: #dfe7df;
+  --owner-pine: #12573f;
+  --owner-pine-soft: #e7f2eb;
+  --owner-focus: #197255;
+  background: var(--owner-paper);
+  color: var(--owner-ink);
+}
+
+.owner-app-shell .owner-main {
+  background: var(--owner-paper);
+}
+
+.owner-app-shell .owner-topbar {
+  border-bottom: 1px solid var(--owner-line);
+  background: rgba(255, 255, 255, 0.97);
+  color: var(--owner-ink);
+}
+
+.owner-app-shell .owner-skip-link {
+  border-color: #9ab9a7;
+  background: var(--owner-white);
+  color: var(--owner-pine);
+}
+
+.owner-app-shell .owner-icon-button {
+  display: inline-flex;
+  min-width: 40px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--owner-line);
+  border-radius: 10px;
+  background: var(--owner-white);
+  color: #526158;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.owner-app-shell .owner-icon-button:hover {
+  border-color: #b9c9bd;
+  background: #f8faf7;
+  color: var(--owner-pine);
+}
+
+.owner-app-shell .owner-account-trigger {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--owner-ink);
+  outline: none;
+}
+
+.owner-app-shell .owner-account-trigger:hover {
+  background: #f4f6f2;
+}
+
+.owner-app-shell :is(.owner-icon-button, .owner-account-trigger, .owner-nav-item, .owner-mobile-nav-item):focus-visible,
+.owner-account-menu :is(button, [role="menuitem"]):focus-visible {
+  outline: 3px solid var(--owner-focus, #145943);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.owner-app-shell .owner-avatar {
+  border: 1px solid #c5d8ca;
+  background: #eaf2ec;
+  color: var(--owner-pine);
+}
+
+.owner-app-shell .owner-avatar > span {
+  color: var(--owner-pine);
+}
+
+.owner-app-shell .owner-search-trigger kbd {
+  display: none;
+}
+
+.owner-app-shell .owner-search-trigger button {
+  width: min(19rem, 30vw);
+  border-color: var(--owner-line);
+  background: #f8f9f6;
+  color: #52645a;
+}
+
+.owner-app-shell .owner-search-trigger button:hover {
+  border-color: #b9c9bd;
+  color: var(--owner-pine);
+}
+
+.owner-app-shell .owner-sidebar,
+.owner-app-shell .owner-sidebar [data-sidebar="sidebar"],
+[data-sidebar="sidebar"][data-mobile="true"] {
+  border-right: 1px solid #244b3d;
+  background: #142f27;
+  color: #eff7f0;
+}
+
+.owner-app-shell .owner-sidebar-brand {
+  min-height: 91px;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0 22px;
+}
+
+.owner-app-shell .owner-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: #f8fbf6;
+  text-decoration: none;
+}
+
+.owner-app-shell .owner-brand-name,
+.owner-app-shell .owner-brand-caption {
+  display: block;
+}
+
+.owner-app-shell .owner-brand-name {
+  font-family: var(--font-app-sans);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.105em;
+  line-height: 1.1;
+}
+
+.owner-app-shell .owner-brand-period {
+  color: #b4dfa8;
+}
+
+.owner-app-shell .owner-brand-caption {
+  margin-top: 4px;
+  color: #adcdb9;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.owner-app-shell .owner-sidebar-content {
+  padding: 28px 12px 16px;
+}
+
+.owner-app-shell .owner-sidebar-section-label {
+  margin: 0 10px 10px;
+  color: #9abfa9;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.owner-app-shell .owner-nav-item {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  padding: 7px 12px;
+  color: #d2e5d7;
+  text-decoration: none;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.owner-app-shell .owner-nav-item:hover {
+  background: #244739;
+  color: #fff;
+}
+
+.owner-app-shell .owner-nav-item.is-active,
+.owner-app-shell .owner-nav-item[data-active="true"] {
+  border-color: #c8e2cc;
+  background: #e8f4e9;
+  color: #173f2d;
+}
+
+.owner-app-shell .owner-nav-title,
+.owner-app-shell .owner-nav-description {
+  display: block;
+}
+
+.owner-app-shell .owner-nav-title {
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.owner-app-shell .owner-nav-description {
+  overflow: hidden;
+  margin-top: 2px;
+  color: #a8c4b0;
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.owner-app-shell .owner-nav-item.is-active .owner-nav-description,
+.owner-app-shell .owner-nav-item[data-active="true"] .owner-nav-description {
+  color: #446c53;
+}
+
+.owner-app-shell [data-collapsible="icon"] .owner-nav-item {
+  min-height: 40px;
+  justify-content: center;
+  padding: 6px;
+}
+
+.owner-app-shell [data-collapsible="icon"] .owner-nav-item > span {
+  display: none;
+}
+
+.owner-app-shell .owner-sidebar-footer {
+  min-height: 48px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 17px;
+  color: #b0ccba;
+  font-size: 11px;
+}
+
+.owner-app-shell .owner-sidebar-footer-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--owner-pine);
+}
+
+.owner-app-shell .owner-breadcrumb {
+  color: var(--owner-ink);
+}
+
+.owner-app-shell .owner-breadcrumb-icon {
+  border: 1px solid var(--owner-line);
+  background: #f7f8f5;
+  color: #62736a;
+}
+
+.owner-app-shell .owner-page-content {
+  padding-bottom: 30px;
+}
+
+.owner-app-shell .owner-mobile-nav {
+  border-top: 1px solid #dfe4de;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 -8px 26px rgba(35, 49, 40, 0.06);
+}
+
+.owner-app-shell .owner-mobile-nav-item {
+  color: #52645a;
+  text-decoration: none;
+}
+
+.owner-app-shell .owner-mobile-nav-item:hover {
+  background: #f4f7f3;
+  color: var(--owner-ink);
+}
+
+.owner-app-shell .owner-mobile-nav-item.is-active {
+  background: var(--owner-pine-soft);
+  color: var(--owner-pine);
+}
+
+.owner-account-menu {
+  border-color: #e1e5df;
+  background: #ffffff;
+  color: #202c26;
+  box-shadow: 0 14px 36px rgba(32, 44, 38, 0.14);
+}
+
+.owner-account-menu [data-slot="dropdown-menu-label"] {
+  color: var(--owner-ink);
+}
+
+.owner-account-menu [data-slot="dropdown-menu-item"] {
+  color: #4f5d54;
+}
+
+.owner-account-menu [data-slot="dropdown-menu-item"]:focus {
+  background: #f1f5f1;
+  color: var(--owner-pine);
+}
+
+.owner-account-menu [data-slot="dropdown-menu-separator"] {
+  background: var(--owner-line);
+}
+
+@media (max-width: 767px) {
+  .owner-app-shell .owner-topbar {
+    position: sticky;
+  }
+
+  .owner-app-shell .owner-page-content {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .owner-app-shell .owner-search-trigger {
+    display: none;
+  }
+
+  .owner-app-shell .owner-sidebar-brand {
+    min-height: 72px;
   }
 }
 
@@ -1918,7 +2234,7 @@ body::after {
 }
 
 /* ============================================================
-   AXIOM OPS 04 — QUIET CONTROL ROOM
+   AXIOM REVENUE ENGINE — QUIET CONTROL ROOM
    The v4 layer deliberately removes the ornamental motion and glass
    effects from earlier iterations. Dense operational data now sits on
    calm, predictable surfaces with one brand accent.
@@ -2151,7 +2467,7 @@ body::after {
   font-weight: 650;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #717784;
+  color: #9298a4;
 }
 
 .page-metric-value {
@@ -2164,7 +2480,7 @@ body::after {
 
 .page-metric-detail {
   overflow: hidden;
-  color: #686e79;
+  color: #8d949f;
   font-size: 10.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2414,3 +2730,197 @@ body::after {
     transform: rotate(360deg);
   }
 }
+
+/* Owner acceptance contrast floor. Small operational labels must remain legible
+   against the quiet-control-room surfaces at WCAG AA contrast. */
+.v2-sidebar .text-zinc-500,
+.v2-sidebar .text-zinc-600,
+.v2-sidebar .text-zinc-700,
+.v2-header .text-zinc-500,
+.v2-header .text-zinc-600,
+.v2-header .text-zinc-700,
+nav[aria-label="Primary"] .text-zinc-500,
+nav[aria-label="Primary"] .text-zinc-600,
+nav[aria-label="Primary"] .text-zinc-700,
+[data-owner-content] .text-zinc-500,
+[data-owner-content] .text-zinc-600,
+[data-owner-content] .text-zinc-700 {
+  color: #a1a1aa;
+}
+
+/* ==========================================================================
+   AXIOM OBSIDIAN & IVORY: owner theme (brand from getaxiom.ca)
+   Near-black #0a0a0a, warm ivory, champagne-gold accent, Fraunces + Inter.
+   ========================================================================== */
+.owner-app-shell {
+  --owner-paper: #f7f5ef;
+  --owner-white: #fffdf8;
+  --owner-ink: #0a0a0a;
+  --owner-line: #e6e1d6;
+  --owner-pine: #0a0a0a;
+  --owner-pine-soft: #efe9dc;
+  --owner-focus: #8a6420;
+  --owner-gold: #b8893b;
+  --owner-gold-deep: #8a6420;
+  --owner-gold-soft: #f4ead6;
+  background: var(--owner-paper) !important;
+  color: var(--owner-ink) !important;
+}
+.owner-app-shell .owner-main { background: radial-gradient(1200px 500px at 85% -10%, #efe7d6 0%, transparent 60%), var(--owner-paper); }
+.owner-app-shell .owner-topbar { background: rgba(247, 245, 239, 0.82); backdrop-filter: saturate(1.4) blur(14px); }
+.owner-app-shell h1, .owner-app-shell .font-display { font-family: var(--font-fraunces), Georgia, serif; font-weight: 560; letter-spacing: -0.015em; }
+.owner-app-shell h1 { font-size: clamp(1.7rem, 1.2rem + 1vw, 2.2rem); }
+
+/* Sidebar: obsidian with the brushed-metal logo */
+.owner-app-shell .owner-sidebar,
+.owner-app-shell .owner-sidebar [data-sidebar="sidebar"],
+[data-sidebar="sidebar"][data-mobile="true"] {
+  border-right: 1px solid #1c1c1c !important;
+  background: linear-gradient(180deg, #0f0f0f 0%, #0a0a0a 40%, #070707 100%) !important;
+  color: #f2f0ea !important;
+}
+.owner-app-shell .owner-brand-logo { display: block; width: 148px; height: auto; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.6)); transition: transform 400ms cubic-bezier(.2,.8,.2,1), filter 400ms ease; }
+.owner-app-shell .owner-brand:hover .owner-brand-logo { transform: translateY(-1px) scale(1.015); filter: drop-shadow(0 8px 22px rgba(184, 137, 59, 0.28)); }
+.owner-app-shell .owner-brand-caption { color: #a39f95 !important; letter-spacing: 0.18em !important; margin-top: 8px !important; }
+.owner-app-shell .owner-sidebar-brand { border-bottom-color: #1f1f1f !important; }
+.owner-app-shell .owner-sidebar-section-label { color: #8a867c !important; }
+.owner-app-shell .owner-nav-item { position: relative; color: #d6d2c8 !important; transition: background 220ms ease, color 220ms ease, transform 220ms cubic-bezier(.2,.8,.2,1) !important; }
+.owner-app-shell .owner-nav-item:hover { background: #161616 !important; color: #fff !important; transform: translateX(2px); }
+.owner-app-shell .owner-nav-item.is-active,
+.owner-app-shell .owner-nav-item[data-active="true"] {
+  border-color: #2a2418 !important;
+  background: linear-gradient(90deg, #1d1810 0%, #141414 100%) !important;
+  color: #f7ecd4 !important;
+  box-shadow: inset 0 0 0 1px rgba(184, 137, 59, 0.18), 0 8px 24px -12px rgba(184, 137, 59, 0.35);
+}
+.owner-app-shell .owner-nav-item.is-active::before,
+.owner-app-shell .owner-nav-item[data-active="true"]::before {
+  content: ""; position: absolute; left: -12px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px;
+  background: linear-gradient(180deg, #e3c07a, #b8893b); animation: owner-bar-in 380ms cubic-bezier(.2,.8,.2,1);
+}
+.owner-app-shell .owner-nav-description { color: #a09c92 !important; }
+.owner-app-shell .owner-nav-item.is-active .owner-nav-description,
+.owner-app-shell .owner-nav-item[data-active="true"] .owner-nav-description { color: #d4c29a !important; }
+.owner-app-shell .owner-sidebar-footer { border-top-color: #1f1f1f !important; color: #a09c92 !important; }
+.owner-app-shell .owner-sidebar-footer-dot { background: #b8893b !important; animation: owner-pulse 2.4s ease-out infinite; }
+
+/* Topbar controls */
+.owner-app-shell .owner-icon-button, .owner-app-shell .owner-search-trigger button { background: var(--owner-white) !important; border-color: var(--owner-line) !important; color: #3b3a36 !important; }
+.owner-app-shell .owner-icon-button:hover, .owner-app-shell .owner-search-trigger button:hover { color: var(--owner-ink) !important; border-color: #cfc6b3 !important; }
+.owner-app-shell .owner-avatar, .owner-app-shell .owner-avatar > span { background: #0a0a0a !important; color: #f2e3c2 !important; }
+.owner-app-shell .owner-breadcrumb-icon { background: var(--owner-white) !important; border-color: var(--owner-line) !important; color: #5c584f !important; }
+.owner-app-shell .owner-mobile-nav { background: rgba(10, 10, 10, 0.95) !important; border-top-color: #1f1f1f !important; backdrop-filter: blur(14px); }
+.owner-app-shell .owner-mobile-nav-item { color: #cfcac0 !important; }
+.owner-app-shell .owner-mobile-nav-item.is-active { background: #1d1810 !important; color: #f2e3c2 !important; }
+
+/* Cards: warm white, soft depth, lift on hover */
+.owner-app-shell [data-owner-content] :is(.rounded-xl, .rounded-2xl).border { border-color: var(--owner-line); }
+.owner-app-shell [data-owner-content] .bg-white { background-color: var(--owner-white); }
+.owner-card-lift { transition: transform 260ms cubic-bezier(.2,.8,.2,1), box-shadow 260ms ease, border-color 260ms ease; }
+.owner-card-lift:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -22px rgba(10, 10, 10, 0.35); border-color: #d6ccb6; }
+
+/* Primary actions: ink with a gold sheen that sweeps on hover */
+.owner-cta { position: relative; overflow: hidden; background: #0a0a0a; color: #fbf6ea; box-shadow: 0 10px 30px -12px rgba(10, 10, 10, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08); transition: transform 160ms ease, box-shadow 260ms ease, background 260ms ease; }
+.owner-cta:hover { background: #151515; box-shadow: 0 14px 34px -12px rgba(184, 137, 59, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+.owner-cta:active { transform: scale(0.975); }
+.owner-cta:disabled { opacity: 0.5; }
+.owner-cta::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, rgba(227, 192, 122, 0.35) 50%, transparent 70%); transform: translateX(-120%); transition: transform 700ms cubic-bezier(.2,.8,.2,1); pointer-events: none; }
+.owner-cta:hover::after { transform: translateX(120%); }
+.owner-hero { position: relative; overflow: hidden; background: radial-gradient(900px 300px at 110% -40%, rgba(227, 192, 122, 0.28), transparent 60%), linear-gradient(135deg, #111 0%, #0a0a0a 60%, #17130c 100%); color: #f7f1e3; }
+.owner-hero::before { content: ""; position: absolute; inset: -40%; background: conic-gradient(from 0deg, transparent 0 70%, rgba(227, 192, 122, 0.12) 80%, transparent 90%); animation: owner-spin 14s linear infinite; pointer-events: none; }
+.owner-hero > * { position: relative; }
+.owner-gold-text { background: linear-gradient(100deg, #e3c07a, #f7e4b5 45%, #d2a95c 70%, #e3c07a); -webkit-background-clip: text; background-clip: text; color: transparent; background-size: 200% auto; animation: owner-sheen 6s ease-in-out infinite; }
+
+/* Motion system */
+@keyframes owner-rise { from { opacity: 0; transform: translateY(10px) scale(0.995); } to { opacity: 1; transform: none; } }
+@keyframes owner-bar-in { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes owner-pulse { 0% { box-shadow: 0 0 0 0 rgba(184, 137, 59, 0.55); } 70% { box-shadow: 0 0 0 8px rgba(184, 137, 59, 0); } 100% { box-shadow: 0 0 0 0 rgba(184, 137, 59, 0); } }
+@keyframes owner-spin { to { transform: rotate(360deg); } }
+@keyframes owner-sheen { 0%, 100% { background-position: 0% center; } 50% { background-position: 100% center; } }
+@keyframes owner-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes owner-pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes owner-confetti { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
+@keyframes owner-slide-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+.owner-app-shell .owner-page-enter { animation: owner-rise 460ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes owner-lift { from { transform: translateY(14px); } to { transform: none; } }
+.owner-signin-enter { animation: owner-lift 600ms cubic-bezier(.2,.8,.2,1) both; }
+.owner-stagger > * { animation: owner-rise 520ms cubic-bezier(.2,.8,.2,1) both; }
+.owner-stagger > *:nth-child(1) { animation-delay: 30ms; }
+.owner-stagger > *:nth-child(2) { animation-delay: 80ms; }
+.owner-stagger > *:nth-child(3) { animation-delay: 130ms; }
+.owner-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.owner-stagger > *:nth-child(5) { animation-delay: 230ms; }
+.owner-stagger > *:nth-child(6) { animation-delay: 280ms; }
+.owner-stagger > *:nth-child(n+7) { animation-delay: 320ms; }
+.owner-grow { transform-origin: left; animation: owner-grow 900ms cubic-bezier(.2,.8,.2,1) both; animation-delay: 200ms; }
+.owner-pop { animation: owner-pop 420ms cubic-bezier(.2,.8,.2,1) both; }
+.owner-slide-in { animation: owner-slide-in 360ms cubic-bezier(.2,.8,.2,1) both; }
+.owner-press { transition: transform 120ms ease, background 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+.owner-press:active { transform: scale(0.96); }
+.owner-confetti { position: fixed; pointer-events: none; z-index: 90; width: 8px; height: 12px; border-radius: 2px; animation: owner-confetti 1100ms cubic-bezier(.15,.7,.3,1) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .owner-app-shell *, .owner-app-shell *::before, .owner-app-shell *::after, .owner-confetti { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}
+
+/* ==========================================================================
+   Polish round 2: micro-interactions (same Obsidian & Ivory palette)
+   ========================================================================== */
+@keyframes owner-shimmer { from { background-position: -600px 0; } to { background-position: 600px 0; } }
+@keyframes owner-slide-out { to { opacity: 0; transform: translateX(-28px) scale(0.985); } }
+@keyframes owner-check-draw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+@keyframes owner-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes owner-toast-in { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes owner-toast-bar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes owner-flicker { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.12) rotate(3deg); } }
+@keyframes owner-glow-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(184, 137, 59, 0); } 50% { box-shadow: 0 0 0 6px rgba(184, 137, 59, 0.12); } }
+@keyframes owner-row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.owner-skeleton { background: linear-gradient(90deg, #efe9dc 0%, #f8f2e4 40%, #efe9dc 80%); background-size: 1200px 100%; animation: owner-shimmer 1.4s linear infinite; border-radius: 12px; }
+.owner-slide-out { animation: owner-slide-out 220ms cubic-bezier(.4,0,1,1) forwards; }
+.owner-float { animation: owner-float 3.6s ease-in-out infinite; }
+.owner-flame { display: inline-block; animation: owner-flicker 900ms ease-in-out infinite; transform-origin: 50% 90%; }
+.owner-attention { animation: owner-glow-pulse 2.4s ease-in-out infinite; }
+.owner-check path { stroke-dasharray: 24; animation: owner-check-draw 380ms 80ms cubic-bezier(.2,.8,.2,1) both; }
+
+/* Toasts: ivory card, ink text, gold timer bar */
+.owner-toast { position: relative; overflow: hidden; animation: owner-toast-in 340ms cubic-bezier(.2,.8,.2,1) both; background: #fffdf8; color: #0a0a0a; border: 1px solid #e6d6b3; box-shadow: 0 18px 40px -18px rgba(10, 10, 10, 0.45); }
+.owner-toast-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; transform-origin: left; background: linear-gradient(90deg, #b8893b, #e3c07a); animation: owner-toast-bar linear forwards; }
+
+/* Lists: rows arrive one after another; the hovered row gets a gold edge */
+.owner-app-shell [data-owner-content] tbody > tr { animation: owner-row-in 360ms cubic-bezier(.2,.8,.2,1) both; }
+.owner-app-shell [data-owner-content] tbody > tr:hover { box-shadow: inset 3px 0 0 #b8893b; }
+.owner-app-shell [data-owner-content] tbody > tr { transition: background 160ms ease, box-shadow 160ms ease; }
+
+/* Chips and pills glide between states */
+.owner-app-shell [data-owner-content] a.rounded-full, .owner-app-shell [data-owner-content] button.rounded-full { transition: background 200ms ease, color 200ms ease, border-color 200ms ease, transform 160ms ease, box-shadow 200ms ease; }
+.owner-app-shell [data-owner-content] a.rounded-full:hover, .owner-app-shell [data-owner-content] button.rounded-full:hover { transform: translateY(-1px); }
+.owner-app-shell [data-owner-content] a.rounded-full[aria-current="page"] { box-shadow: 0 8px 20px -10px rgba(10, 10, 10, 0.55); }
+
+/* Pressed outcome buttons pop */
+.owner-app-shell [aria-pressed="true"] { animation: owner-pop 300ms cubic-bezier(.2,.8,.2,1); }
+
+/* Sidebar icons nudge on hover */
+.owner-app-shell .owner-nav-item svg { transition: transform 260ms cubic-bezier(.2,.8,.2,1); }
+.owner-app-shell .owner-nav-item:hover svg { transform: scale(1.12) rotate(-4deg); }
+
+/* Gold focus rings everywhere, and a quiet scrollbar */
+.owner-app-shell :is(a, button, input, textarea, select, [tabindex]):focus-visible { outline: 2px solid #b8893b !important; outline-offset: 2px; border-radius: 8px; }
+.owner-app-shell ::selection { background: #f4ead6; color: #0a0a0a; }
+.owner-app-shell * { scrollbar-width: thin; scrollbar-color: #d6ccb6 transparent; }
+.owner-app-shell ::-webkit-scrollbar { width: 10px; height: 10px; }
+.owner-app-shell ::-webkit-scrollbar-thumb { background: #d6ccb6; border-radius: 10px; border: 2px solid #f7f5ef; }
+
+/* Inputs lift into focus */
+.owner-app-shell [data-owner-content] :is(input, textarea, select) { transition: border-color 180ms ease, box-shadow 220ms ease; }
+.owner-app-shell [data-owner-content] :is(input, textarea, select):focus { border-color: #b8893b; box-shadow: 0 0 0 4px rgba(184, 137, 59, 0.14); outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .owner-skeleton, .owner-float, .owner-flame, .owner-attention, .owner-toast, .owner-toast-bar, .owner-slide-out { animation: none !important; }
+}
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(2) { animation-delay: 25ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(3) { animation-delay: 50ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(4) { animation-delay: 75ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(5) { animation-delay: 100ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(6) { animation-delay: 125ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(7) { animation-delay: 150ms; }
+.owner-app-shell [data-owner-content] tbody > tr:nth-child(n+8) { animation-delay: 175ms; }

@@ -64,8 +64,8 @@ export function AddClientDialog({ open, onOpenChange, onAdded }: AddClientDialog
     fetch(`/api/vault/leads?search=${encodeURIComponent(q)}&limit=20`, {
       signal: controller.signal,
     })
-      .then((r) => r.json())
-      .then((data: { leads: VaultLead[] }) => {
+      .then(async (r) => await r.json() as { leads: VaultLead[] })
+      .then((data) => {
         setResults(data.leads ?? []);
       })
       .catch(() => {})
@@ -92,7 +92,7 @@ export function AddClientDialog({ open, onOpenChange, onAdded }: AddClientDialog
         throw new Error((body as { error?: string }).error || "Failed to add client");
       }
 
-      const updated = await res.json();
+      const updated = await res.json() as Record<string, unknown>;
       onAdded(updated);
       reset();
       onOpenChange(false);

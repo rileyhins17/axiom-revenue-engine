@@ -1,0 +1,72 @@
+// Dedicated live config (ADR 0061): in-place upgrade of the legacy production Worker
+// and D1. Used only through scripts/release-production.mjs. Automation stays off.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "axiom-ops-omniscient",
+  "account_id": "fe468a56a5b8c7f8fc5d39e265c2f791",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-16",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env",
+    "global_fetch_strictly_public"
+  ],
+  "minify": true,
+  // Connected-calling settings (Caller v2 / Orbit link IDs) live only on the Worker.
+  // keep_vars stops a deploy from this file from silently removing them.
+  "keep_vars": true,
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [],
+  "send_email": [
+    { "name": "LOGIN_EMAIL", "allowed_destination_addresses": ["rileyhinsperger@gmail.com", "aidanmageebusiness@gmail.com"] }
+  ],
+  "triggers": {
+    "crons": ["0 14 * * 1-5", "*/15 * * * *"]
+  },
+  "vars": {
+    "APP_BASE_URL": "https://operations.getaxiom.ca/",
+    "ENGINE_EMAIL_ENABLED": "false",
+    "ENGINE_EMAIL_FROM": "riley@getaxiom.ca",
+    "ENGINE_EMAIL_FROM_NAME": "Riley Hinsperger",
+    "ENGINE_SMTP_HOST": "smtp.zoho.com",
+    "AI_MONTHLY_BUDGET_USD": "5",
+    "AUTH_PASSWORD_SIGNIN": "false",
+    "AUTH_ALLOWED_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
+    "AUTH_ADMIN_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
+    "AUTH_ALLOWED_ORIGINS": "https://operations.getaxiom.ca,https://axiom-ops-omniscient.aidan-magee2.workers.dev",
+    "CLOUD_SCRAPE_ENABLED": "false",
+    "CLOUD_SCRAPE_TIMEOUT_MS": "840000",
+    "CLOUD_SCRAPE_WORKER_NAME": "cloudflare-browser",
+    "CLOUD_SCRAPE_DETAIL_PAGES_ENABLED": "false",
+    "RATE_LIMIT_WINDOW_SECONDS": "60",
+    "RATE_LIMIT_MAX_AUTH": "50",
+    "RATE_LIMIT_MAX_SCRAPE": "20",
+    "RATE_LIMIT_MAX_EXPORT": "20",
+    "SCRAPE_CONCURRENCY_LIMIT": "1",
+    "SCRAPE_TIMEOUT_MS": "1800000",
+    "AUTONOMOUS_INTAKE_ENABLED": "false",
+    "AUTONOMOUS_QUEUE_ENABLED": "false",
+    "AUTONOMOUS_SEND_ENABLED": "false",
+    "AUTONOMOUS_DAILY_LEAD_INTAKE_CAP": "0",
+    "AUTONOMOUS_MAX_SENDS_PER_DAY": "0",
+    "AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY": "0",
+    "AUTONOMOUS_DOMAIN_COOLDOWN_DAYS": "14"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "axiom-ops-omniscient",
+      "database_id": "e42f3d48-5813-4d18-86c4-4471b55aa65e",
+      "migrations_dir": "./migrations"
+    }
+  ],
+  "browser": {
+    "binding": "BROWSER"
+  }
+}

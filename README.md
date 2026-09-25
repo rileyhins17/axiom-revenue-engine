@@ -1,142 +1,267 @@
-# Axiom Pipeline Engine
+# Axiom Revenue Engine
 
-Private Axiom operations app for lead intake, enrichment, autonomous first-touch outreach, reply tracking, and CRM movement.
+Axiom Web's internal system for finding worthwhile local website opportunities, preserving evidence, preparing legitimate outreach, managing replies and next actions, and learning which work becomes customers and collected revenue.
 
-The product direction, production baseline, target architecture, conversion strategy, safety gates, and staged root rebuild are documented in [`docs/AXIOM_REBUILD_BLUEPRINT.md`](docs/AXIOM_REBUILD_BLUEPRINT.md).
+## Current state
 
-The live app runs at `https://operations.getaxiom.ca`. The Cloudflare Worker and D1 resources still use the legacy resource name `axiom-ops-omniscient` so the production domain, bindings, and database stay stable. The npm package name is `axiom-pipeline-engine`.
+The owner Businesses view separates businesses that meet the existing qualification
+criteria from records that still need qualification. Only current
+`READY_FOR_REVIEW` records with confirmed business independence count as qualified
+for review. A recorded contact remains visible on other records, without being
+presented as the next manual outreach task. Scores and qualification thresholds are unchanged; even
+a qualified review record grants no outreach or send authority.
 
-## Current Production Shape
+The application is in a controlled rebuild. M1 verifies one synthetic business through the real local source, website, eligibility, assessment, owner-dossier, checkpoint and report writers, with exact durable replay. The retained checkpoint is `data/kw-evaluation/m1-checkpoint-2026-09-21-b42094a-fresh4-*`; earlier M1 artifact names are historical. Current implementation work is M2's bounded local HTML route, including the separately gated database setup and recovery runner. Synthetic proof does not establish a live acquisition loop.
 
-- Next.js 16 app deployed to Cloudflare Workers through OpenNext.
-- Cloudflare D1 is the production database. SQL migrations live in `migrations/`.
-- Cloudflare Browser Rendering powers cloud scraping. Local dev can fall back to Playwright.
-- Better Auth gates the app and API. Admin-only routes protect export, settings, and automation controls.
-- Gmail OAuth connections are used by the sending engine. Tests and local verification must not send mail or call inbox actions.
-- The autonomous pipeline is first-touch only right now. Follow-ups are intentionally paused in settings and capped at zero in `wrangler.jsonc`.
+The checkpoint is synthetic, offline, and disconnected from providers, network access, contacts, qualification execution, outreach, sending, and spend. Its report records `fixtureOnly=true`, `synthetic=true`, zero network/provider operations, all contact/consent/qualification/outreach/send authority false, `costAuthorizedUsd=0`, and `contactReview.state=NOT_RECORDED`. `localAssessmentMutationAuthorized=true` covers only the explicitly approved local shadow SQLite write. Riley has no OpenAI API keys. Existing adapter code is not a connected service. Jev is an optional later experiment, not a prerequisite for a useful deterministic/manual pilot. Public DNS observed on 2026-09-21 supports Cloudflare root Email Routing MX/SPF and a published Resend verification token, but does not prove active forwarding, a Resend account/key, sender verification, complete DKIM, or send readiness. The zero-paid-mailbox inbound target is Cloudflare forwarding to existing owner destinations. The current [Resend policy](https://resend.com/legal/acceptable-use) prohibits unsolicited cold outreach, so its separately gated adapter is not a route for cold first touches.
 
-## Main Surfaces
+Start with [STATUS](docs/STATUS.md) for the verified commit, current artifacts, test evidence and blockers. The local setup command, `npm run kw:prepare-m2-database -- <recorded-release-path>`, defaults to preflight. Applying 0069 requires explicit `--apply` and a current recorded setup release; recovery requires a separate recorded rollback release. Follow the [runbook](docs/RUNBOOK.md#m2-local-database-setup-and-recovery). The assessment command, `npm run kw:assess-m2-html -- <run.json> <business-id>`, prepares a separate owner decision from already captured HTML evidence. Its execution and durable verification modes are documented in the [HTML assessment runbook](docs/RUNBOOK.md#m2-local-html-assessment-and-restart). This path produces a private JSON owner dossier with HTML limitations and no contact authority. Production, staging, provider, contact, outreach and spend state remain unknown or off. M2's real one-then-ten evaluation and subsequent milestones are still incomplete.
 
-- `/dashboard` - operator command center: send capacity, queue load, next effective sends, recent sends, and lead supply.
-- `/automation` - sending console: mailbox readiness, first-touch queue, sent log, diagnostics, intake pause, and emergency stop.
-- `/vault` - source of truth for leads, filtering, CSV export, and manual lead entry.
-- `/clients` - reply and deal pipeline board.
-- `/settings` - authenticated operator profile and mailbox/runtime visibility.
+The local Quality Lab now takes a **blind dossier file** first and a separate
+**engine assessment file** only after the owner has judged and downloaded a
+first pass for all 50 businesses. The local `kw:split-owner-labeling` command
+derives both from the existing immutable checkpoint; the original is still used
+to record final review batches. This closes the browser-payload score leak in
+the synthetic owner workflow, but 50 real M3 dossiers and owner judgments have
+not been completed. See the [owner-labeling runbook](docs/RUNBOOK.md#resumable-kw-owner-labelling-checkpoint).
 
-## Pipeline Rules
+Preparing a current M2 capture packet requires `--review-policy` with explicit
+dates and the ten source-policy decisions. See the [preparation runbook](docs/RUNBOOK.md#m2-research-scope-and-current-authorization-preparation).
+Preparation cannot approve the packet or infer source rights from a public URL.
+The one-request capture command, `npm run kw:capture-m2-html -- <request.json>`,
+defaults to preflight. Explicit `--execute` requires the recorded capture
+approval; `--verify` reloads saved evidence without network access. Its input and
+operating limits are in the same preparation runbook.
+The [initial public-research scope](docs/reviews/2026-09-21-m2-public-research-scope.md)
+produced ten proposed evaluation businesses. Codex completed the delegated
+identity selection in an ignored private ledger and saved a ten-record shadow
+manifest. This selection does not assess website need or authorize capture or
+contact; see [current status](docs/STATUS.md) for the exact scope and blockers.
 
-Autonomous outreach should only send to qualified recipients:
+The private ten-business research packet now has a separate owner decision
+sheet and a no-network `npm run kw:prepare-m2-owner-decisions` preparer. It
+requires an explicit disposition for each proposed business and an exact
+reviewed source plan before it can write a plan-only shadow selection. The two
+documented access-blocked sites cannot enter that selection; they need reviewed
+replacements or a separately designed partial cohort. Nothing in this step
+authorizes capture or contact. See [the M2 decision runbook](docs/RUNBOOK.md#m2-research-scope-and-current-authorization-preparation).
 
-- owner email confidence must be at least `0.50`
-- staff email confidence must be at least `0.65`
-- generic, role, scraper-artifact, and malformed addresses are blocked
-- chain/non-customer entities and businesses with >800 reviews are hard-disqualified before autonomous send
-- follow-up sends remain disabled until deliberately re-enabled
+The older local **Businesses → Review 10 businesses** screen remains available
+for an owner who specifically wants to make a new owner-attributed decision.
+It is no longer promoted as a next step because the current ten identity
+choices were made and recorded by Codex under Riley's delegation. The server
+still verifies the packet and actual reviewer on that older path; the
+Codex-attributed private ledger is separate. Neither path authorizes capture,
+contact, or sending. The local screen is unavailable on Cloudflare.
 
-The dashboard and automation queue show projected effective send times based on mailbox cooldown and capacity. They should not show stale scheduled dates as if they were live next-send times.
+For sealed evidence that needs more research, the same assessment command saves
+a research report with missing pages and limitations, without an assessment
+approval or database write. Sealed policy blocks return their existing receipt
+and allow the ordered run to continue. Selected-page HTTP failures and transport
+errors now retain strict v2 partial receipts and research reports. Failed
+homepages, unsupported stream/redirect failures and storage conflicts remain
+unsealed and stop without a report.
 
-## Operator interface
+The admin-only `/leads/m2` Business Review independently verifies saved local
+evidence. Its searchable business list, plain-language status, selected website
+review, page clues and next step let an owner review one business at a time on
+desktop or mobile. On phones, opening a business goes directly to its review
+instead of repeating the queue overview. Derived-only page clues expand on
+demand; visual quality and qualification remain unknown. The page does not
+retain HTML, contact values or screenshots in that mode. It does not establish
+website fit or outreach readiness.
+It is disabled by default and unavailable on Cloudflare. A Node server with an
+existing approved local run can set `AXIOM_M2_LOCAL_REVIEW_ENABLED=1` and
+`AXIOM_M2_LOCAL_REVIEW_RUN=data/kw-evaluation/<run>.json`. The equivalent read-only
+CLI is `npm run kw:assess-m2-html -- data/kw-evaluation/<run>.json --inspect`.
+Neither view approves assessments or publishes missing reports. See the
+[console runbook](docs/RUNBOOK.md#m2-local-owner-research-console) for setup and limits.
 
-The Ops 04 interface is built for dense, repeated operational work: calm graphite surfaces, one mint status accent, shared page headers, compact metrics, keyboard search, responsive mobile navigation, and reduced-motion support. Authentication, Vault, Clients, Automation, and Settings use the same visual hierarchy and error language.
+When this local review is verified and the exact saved ten-business identity
+decisions are available, a collapsed **Optional observations** control appears
+after the business list. A named owner may record a concise, own-word,
+company-level fact from an exact public page URL, or explicitly mark the
+evidence insufficient. The note is stored only in ignored local evaluation
+data, can be reloaded, and stays `UNKNOWN / RESEARCH` with no contact or send
+authority. It is unavailable in the hosted app and does not count as a real M2
+website assessment. Riley is not required to perform this optional step.
+Codex can use the separate local `kw:record-codex-m2-observation` command only
+with an ignored, current, exact-page delegated source decision and a matching
+command file. Its saved note identifies Codex and retains the source-decision
+digest and a retention review date; that date does not delete the record.
+This command has no cloud or provider path and does not advance M2.
+See [ADR 0058](docs/adr/0058-keep-manual-m2-facts-separate-from-assessment.md)
+for the evidence and attribution boundary.
 
-The interface is deliberately restrained. Status colour communicates meaning; decorative animation does not compete with queue health, send safety, replies, or revenue signals.
+## Read the plan
 
-## Local Setup
+| Document | Purpose |
+|---|---|
+| [Master plan](docs/MASTER_PLAN.md) | Business outcome, architecture, complete revenue loop, alternatives and boundaries |
+| [Delivery plan](docs/DELIVERY_PLAN.md) | M0–M7 milestones, dependencies, code seams and observable exit gates |
+| [Operating model](docs/OPERATING_MODEL.md) | Owner capacity, contact/consent, approvals, reply handling, CRM and retention |
+| [Provider and budget plan](docs/PROVIDER_AND_BUDGET_PLAN.md) | Built/connected/authorized/verified inventory and realistic C$50 scenarios |
+| [Validation plan](docs/VALIDATION_PLAN.md) | Failure cases, evaluation, verification, release and rollback |
+| [Owner context](docs/OWNER_CONTEXT.md) | Private business facts, responsibilities and constraints |
+| [Runbook](docs/RUNBOOK.md) | Existing guarded operating and release procedures |
+| [Data dictionary](docs/DATA_DICTIONARY.md) | Implemented and proposed record vocabulary |
+| [ADRs](docs/adr/0039-deliver-owner-workflows-before-optional-ai-and-autonomy.md) | Recorded decisions and relationship to prior implementation contracts |
+| [Historical archive](docs/archive/2026-09-20/INDEX.md) | Previous master plan, accumulated status, README and blueprint |
 
-```bash
-npm install
-copy .env.example .env.development
-copy .dev.vars.example .dev.vars
-npm run db:migrate:local
-npm run dev
+The current sequence is one complete offline dossier, ten reviewed real-business dossiers, a fixed 50-business quality evaluation, contact/approval/reply readiness, a small separately approved outreach pilot, and a proven opportunity-to-customer loop. Selective automation follows evidence of quality and owner capacity.
+
+## Weekly engine run (local)
+
+The engine finds businesses, checks their websites and shortlists prospects
+without a person or AI choosing them ([ADR 0060](docs/adr/0060-automatic-discovery-and-website-check.md)).
+
+```powershell
+npx tsx scripts/engine-weekly-run.ts --places
 ```
 
-Open `http://localhost:3000/sign-in`.
+Discovery needs `AXIOM_PLACES_DISCOVERY_ENABLED=1` and a restricted
+`AXIOM_GOOGLE_PLACES_KEY` in the ignored local environment; it stops at 30
+requests per run and 200 per month. For an offline test of the loop, pass
+`--candidates <file.json>` instead. Results go to ignored
+`data/kw-evaluation/engine-runs/`. The admin-only Business Review page then
+shows **Prospects found by the engine**; Riley or Aidan marks each one **Worth
+a call** or **Not a fit**, and a worth-a-call prospect shows a factual call-notes
+draft. None of this contacts anyone. To regrade the checker against the
+50-business answer key, run `scripts/grade-engine-website-check.ts` and then
+`scripts/regrade-engine-lead-rules.ts`.
 
-Use `npm run preview` only when you need a Cloudflare-shaped local run with OpenNext bindings and local D1.
+## Owner experience
 
-## Environment
+The owner navigation is Today, Businesses, Follow-through, Clients and Settings.
+The decision-first workspace leads with plain-language actions and keeps
+operator diagnostics behind a disclosure. The private business decision flow
+and saved-research console are admin-only. Each page must distinguish
+available, blocked, stale, empty and unavailable states.
 
-Required app/runtime values:
+Today shows replies and follow-ups when they need attention or their status
+cannot be read; otherwise it shows a compact no-actions state. It no longer
+asks an owner to repeat the completed ten-name selection. Email readiness lives
+in Settings, while legacy operator metrics sit behind Operator details.
+The navigation does not use lead-score badges as if they counted approved
+business decisions. Today does not present Gmail OAuth as the path to the
+selected zero-paid-mailbox design. Missing critical status reads appear as
+unavailable; a dashboard warning is not a runtime stop or proof of provider
+readiness.
 
-- `APP_BASE_URL`
-- `BETTER_AUTH_SECRET`
-- `AUTH_ALLOWED_EMAILS`
-- `AUTH_ADMIN_EMAILS`
-- `MCP_API_TOKEN`
+Businesses groups saved assessments as ready for a decision, needing another
+look, or stopped. It does not present the ten-name identity selection as an
+owner task.
+Each row shows why it is there and opens its evidence. The old ranking
+and detailed scores sit in a closed advanced preview. The admin-only saved-research
+view shows the selected business and a short summary of captured pages; page
+sources sit under a disclosure. A business detail leads with one supported
+website finding, its source, open questions when recorded, and the next owner
+action. Owner stop and task controls follow. Contact-review status stays
+visible; recorded routes, history, and the full audit are available under
+**Research details** when needed.
+A score or suggested contact route is not a contact decision. Follow-through
+starts with client work and the automation stop, and labels the mail route
+unverified; it does not surface legacy Gmail connection or send controls.
+Clients distinguishes recorded
+recurring estimates from cash received. Settings reads emergency state without
+activating or synchronizing mailbox records, shows an unknown state when the
+read fails, and does not offer Gmail OAuth. Only an admin can change the stop;
+the unknown state permits an engage request but never a clear request. These
+owner screens do not authorize outbound work.
 
-Server-only secrets:
+A lead should answer: who is this, what is actually wrong, why is it worth attention, what is uncertain, how may we contact them, and who acts next? Reachability is separate from account quality. Email automation requires verified addresses, lawful consent, and a provider that permits the exact use. Cloudflare forwarding handles inbound mail only. Resend requires explicit opt-in under its current policy, and [Cloudflare Email Service](https://developers.cloudflare.com/email-service/reference/faq/) restricts outbound to transactional mail. No cold first-touch email route is selected or live. Calls, forms, and social DMs remain separately governed manual tasks.
 
-- `GEMINI_API_KEY`
-- Gmail OAuth client secrets used by the existing auth/Gmail flow
+The current v2 dossier source also includes a manual owner-task panel. On a
+current business, an authenticated owner can save an action with Riley or Aidan
+and a Toronto due time, then mark it complete or cancel it. Task records require
+migration 0071 in the app database; without it the panel reports unavailable
+while the evidence dossier remains readable. Saving a task does not approve a
+contact, send a message, schedule automation, or satisfy M4 mail/reply gates.
 
-Operational controls in `wrangler.jsonc`:
+## Local development
 
-- `AUTONOMOUS_INTAKE_ENABLED`
-- `AUTONOMOUS_QUEUE_ENABLED`
-- `AUTONOMOUS_SEND_ENABLED`
-- `AUTONOMOUS_MAX_SENDS_PER_DAY`
-- `AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY`
-- scrape/runtime rate limits
+Read `AGENTS.md` and the required documents before changes. Use Node.js 22+, npm and the pinned project dependencies. Install with `npm ci` only when needed. Create ignored local configuration from the value-free examples; local auth needs a suitable `BETTER_AUTH_SECRET`. Provider API keys are optional for fixture development and must not be supplied merely to run tests.
 
-## Cloudflare Operations
+`npm run dev` starts the console. `npm run cf:engine:dev` inspects the locked engine scaffold. Neither command is permission to contact a provider, run real acquisition, sync an inbox, send, migrate remotely or deploy. Existing guarded private-KW commands are documented in the runbook; their approval and trusted-input requirements remain.
 
-Production deploy and remote migration commands are intentionally blocked while
-the configured Worker and D1 still point at the legacy production resources.
-Use local migrations and dry-run checks for development; production release
-requires an isolated target and a separately verified release path.
+Public operator signup is disabled. The isolated owner-browser test alone can
+create a synthetic account on loopback with its process-only fixture flag;
+Cloudflare cannot use that path. A fresh live environment needs a separately
+verified private admin bootstrap. Legacy Gmail delivery and the deployed
+Browser Rendering crawler are also hard-disabled at their entry points. The
+manual Gmail reply route checks stops and suppressions as a second boundary.
+These release-containment decisions are recorded in [ADR 0054](docs/adr/0054-quarantine-legacy-public-signup-gmail-and-browser-crawler.md).
 
-Remote migrations are blocked until production has an isolated D1 target and a
-verified backup and rollback path. `npm run db:migrate:remote` currently exits
-before invoking Wrangler.
+On an authenticated v2 lead dossier, the **Do not contact** panel records one
+manual business-level owner stop with a reason and note. The saved stop blocks
+route presentation in both the dossier and ranked list. An unreadable stop
+state also blocks route presentation. This requires migration 0072 in the
+target environment; the committed migration is not a deployed schema. It does
+not replace contact-level suppression, legal/consent review, or legacy-history
+reconciliation, and it does not enable sending.
 
-Use `npm run db:migrate:local` for local development.
+The same dossier has a separate, closed **Email do-not-contact records** panel
+for an owner who personally observes an unsubscribe request, complaint, or
+bounce. It checks one saved email contact at a time and records a permanent
+local stop with reason, observed time, and short summary; it must not contain
+the message body. A later contact row with the same normalized address at that
+business inherits the stop. This requires migration 0073 and has not been
+migrated or deployed. It does not implement a provider webhook, legacy/global
+suppression reconciliation, or an outbound send gate. See
+[ADR 0049](docs/adr/0049-record-exact-email-suppression-before-mail-activation.md).
 
-Generate Cloudflare types:
+The dossier also has a compact **Observed email replies** panel for Riley or
+Aidan to record a response they personally see in an existing inbox. Select
+the exact saved email contact, enter a short factual summary and received time,
+then assign one owner, next action, and Toronto due time. Saving creates one
+linked Owner task atomically; Today shows open actions and the business detail
+retains completed or cancelled reply history. No message body, inbox sync, or
+send occurs. Do-not-contact requests belong in the email stop control, and a
+stopped business or suppressed contact cannot acquire a new reply task. This
+local workflow requires migration 0074 and has not been migrated or deployed;
+it does not prove an actual forwarding destination or reply route. See
+[ADR 0051](docs/adr/0051-link-manually-observed-replies-to-owner-actions.md).
 
-```bash
-npm run cf:typegen
+The M4 legacy-history report can compare old suppressions, contact attempts,
+bounces, and replies with v2 business identities from one private, standalone
+SQLite snapshot. It runs offline, proposes identity candidates for owner review,
+and leaves unresolved history blocked. No real snapshot has been processed or
+imported yet. See the [offline reconciliation runbook](docs/RUNBOOK.md#review-legacy-contact-history-offline-before-v2-outreach)
+for the exact local command and limits.
+
+### Local M1 offline dossier checkpoint
+
+The integrated M1 CLI accepts only the bounded direct-child paths and identities below. Prepare a new local SQLite with the canonical private-KW migrations, generate the canonical synthetic source/materialization/manifest/invocation inputs, and then run the same command twice without changing any path or ID:
+
+```powershell
+npm run kw:execute-m1-dossier -- --source-plan data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-source.json --materialization data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-materialization.json --manifest data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-manifest.json --invocation data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-invocation.json --website-checkpoint data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-website-checkpoint.json --assessment-checkpoint data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-assessment-checkpoint.json --report data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277-report.json --database data/kw-evaluation/m1-checkpoint-2026-09-21-96a0277.sqlite --business-id business:d4d99cc1cfb327216db2655e --evaluation-candidate-id evaluation-candidate:098c9b31dcbb8fd71e641ad1
 ```
 
-Build for Cloudflare:
+The first run must report fresh local commits/writes. The unchanged retry must report `EXACT_REPLAY` for source, eligibility, assessment, both checkpoint outputs, and the report, with zero assessment `insertedRows`. Preserve the three JSON inputs, invocation, website checkpoint, assessment checkpoint, report, SQLite file, both CLI stdout captures, and the machine-readable `m1-checkpoint-2026-09-21-96a0277-verification.json` receipt. This procedure is synthetic, local SQLite only, and performs no provider, network, contact, qualification, outreach, send, migration, deployment, or spend action.
 
-```bash
-npm run build:cloudflare
-```
-
-Production deployment is blocked until the Worker and D1 target are isolated
-and the release gate is verified. `npm run deploy` currently exits before
-invoking Wrangler.
-
-Use dry-run deploy checks for release validation.
-
-Check recent deployments:
-
-```bash
-npx wrangler deployments list --json
-```
-
-Do not run live cron, scheduler, Gmail send, or inbox-sync actions as a test. Use unit tests, typecheck, lint, build, and dry-run deploy checks for maintenance work.
+Secrets belong in ignored local files or approved provider secret stores. Cloudflare builds remove local environment fallback values and scan the bundle before upload. Never commit private seed files, screenshots, inbox contents, exports, databases, tokens or production backups.
 
 ## Verification
 
-Run these before merging operational changes:
-
-```bash
+```powershell
+npm run check:safety
 npm test
 npm run typecheck
 npm run lint
 npm run build:cloudflare
-npx wrangler deploy --dry-run --autoconfig false
-npm audit --omit=dev
+npx wrangler deploy --env="" --dry-run --autoconfig false
 ```
 
-`npm run typecheck` clears stale generated Next route types before TypeScript runs. This prevents deleted routes from poisoning source-only checks.
+Run `npm run test:owner-ui` only after all build/dry-run commands exit; they share `.next`. The test requires the completed production build and starts it with `next start` against synthetic databases; it does not start a development compiler. Use fake providers, isolated databases and mail sinks. Local results, exact-commit Linux CI, staging smoke and production evidence are separate gates. See STATUS for the current results; a successful build does not cancel failing tests.
 
-## Notes For Maintainers
+## Deployment and data safety
 
-- Keep production secrets out of Git. Use Cloudflare secrets or local `.dev.vars`.
-- Keep autonomous send policy and dashboard SQL predicates aligned.
-- If a feature is removed from the API, remove matching UI buttons, command-palette entries, cron budget fields, tests, and README references in the same change.
-- Prefer CSV export. XLSX export was removed to reduce dependency weight and the transitive `uuid` audit surface.
-- Cloudflare may print "preview database" for D1 because the configured preview and production D1 IDs are the same. Verify `served_by: v3-prod` in command metadata when checking production D1.
+Default automation stays off. No production send, inbox sync, prospect form submission, remote migration or deployment may be used as a test. Releases require an exact candidate, current backup, restore/rollback plan, passed gates and owner authorization for the actual environment. Existing staged release packets retain their own hashes and approval scope. `npm run deploy:production` and `npm run db:migrate:production` currently stop before Wrangler: the default console config points at the legacy production D1. See [ADR 0055](docs/adr/0055-block-default-production-release-against-legacy-d1.md) for the isolated-target requirements and the [staging schema runbook](docs/runbooks/STAGING_SCHEMA_0055_TO_0074.md) for the separate 0055-to-0074 preparation. The [pending migration-and-console packet](docs/releases/staging/2026-09-23-migration-console-pending.json) is checked locally with `npm run staging:verify-migration-console-release -- docs/releases/staging/2026-09-23-migration-console-pending.json`; it grants no live authority. Build from a clean release checkout: Next can copy ignored local evaluation files into a Worker bundle, and the build now fails if its final bundle contains them ([ADR 0056](docs/adr/0056-exclude-private-local-files-from-cloudflare-build.md)).
+
+Keep the legacy system read-only/rollback-capable until reconciliation and the post-cutover stability window are complete. Preserve suppression and contact history across identity changes and migration. Do not import old leads as freshly qualified prospects.
+
+## Connected calling local candidate
+
+See [owner acceptance](docs/calling/acceptance.md), [release/rollback gate](docs/calling/release.md), and [dependency compatibility](docs/calling/dependency-compatibility.md). The local implementation has not been deployed; production identity, backup, device/audio and uncoached owner acceptance remain separate gates.
+
+[Final local verification and remaining owner gates](docs/calling/verification.md).

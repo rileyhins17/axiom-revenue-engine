@@ -1,11 +1,8 @@
 "use client";
 
-import * as React from "react";
-import { Activity, CheckCircle2, Database, Radio, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { BrandMark } from "@/components/brand-mark";
 import {
   Sidebar,
   SidebarContent,
@@ -20,84 +17,28 @@ import {
 import { APP_NAV_ITEMS } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
-type LeadStats = {
-  total: number;
-  todayLeads: number;
-  readyForTouch?: number;
-  followUp?: number;
-  replied?: number;
-};
-
 export function AppSidebar() {
   const pathname = usePathname();
-  const [stats, setStats] = React.useState<LeadStats | null>(null);
-
-  React.useEffect(() => {
-    let requestInFlight = false;
-    let disposed = false;
-
-    const fetchStats = async () => {
-      if (requestInFlight) return;
-      requestInFlight = true;
-      try {
-        const response = await fetch("/api/leads/stats");
-        if (!response.ok) throw new Error("stats_request_failed");
-        const data = await response.json();
-        if (disposed) return;
-        setStats({
-          total: data.total ?? 0,
-          todayLeads: data.todayLeads ?? 0,
-          readyForTouch: data.readyForTouch,
-          followUp: data.followUp,
-          replied: data.replied,
-        });
-      } catch {
-        if (!disposed) setStats((current) => current ?? { total: 0, todayLeads: 0 });
-      } finally {
-        requestInFlight = false;
-      }
-    };
-
-    // Fetch immediately on mount. We deliberately do NOT depend on `pathname`
-    // — the stats are global, not per-route, so refetching on every tab click
-    // just adds load and slows navigation. The 30s poll keeps things fresh.
-    fetchStats();
-
-    const interval = setInterval(fetchStats, 30_000);
-
-    return () => {
-      disposed = true;
-      clearInterval(interval);
-    };
-  }, []);
 
   return (
-    <Sidebar className="v2-sidebar">
-      <SidebarHeader className="border-b border-white/[0.08] px-4 py-5">
-        <Link href="/dashboard" className="flex items-center justify-between gap-3">
-          <BrandMark
-            className="h-8 w-[130px] justify-start border-0 bg-transparent p-0"
-            imageClassName="h-7"
-            priority
-            showBorder={false}
-          />
-          <span className="rounded-md border border-white/[0.08] bg-white/[0.035] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-zinc-500">Ops</span>
+    <Sidebar className="owner-sidebar owner-app-shell">
+      <SidebarHeader className="owner-sidebar-brand">
+        <Link href="/dashboard" aria-label="Axiom Web home" className="owner-brand">
+          <span className="min-w-0">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset, no optimizer on Workers */}
+            <img src="/axiom-logo.webp" alt="Axiom" width={148} height={40} className="owner-brand-logo" />
+            <span className="owner-brand-caption">Revenue engine</span>
+          </span>
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="px-3 py-4">
+      <SidebarContent className="owner-sidebar-content">
         <SidebarGroup>
-          <div className="mb-2.5 flex items-center justify-between px-3">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-600">
-              Pipeline
-            </span>
-            <span className="text-[10px] font-mono text-zinc-600">⌘K</span>
-          </div>
+          <div className="owner-sidebar-section-label">Workspace</div>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
+            <SidebarMenu className="gap-1.5">
               {APP_NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.url || pathname?.startsWith(`${item.url}/`);
-                const badgeValue = item.badgeKey && stats ? stats[item.badgeKey] ?? 0 : 0;
                 const Icon = item.icon;
 
                 return (
@@ -108,36 +49,14 @@ export function AppSidebar() {
                         prefetch
                         data-active={isActive ? "true" : "false"}
                         aria-current={isActive ? "page" : undefined}
-                        title={`${item.title} — ${item.description} (${item.shortcut})`}
-                        className={cn(
-                          "v2-nav-item v2-focus-ring group flex min-h-14 items-center gap-3 px-3 py-2.5 text-sm",
-                          isActive ? "text-emerald-100" : "text-zinc-400 hover:text-white",
-                        )}
+                        title={`${item.title} — ${item.description}`}
+                        className={cn("owner-nav-item group", isActive && "is-active")}
                       >
-                        <Icon
-                          className={cn(
-                            "size-4 shrink-0 transition-colors",
-                            isActive ? "text-emerald-300" : "text-zinc-500 group-hover:text-zinc-200",
-                          )}
-                          aria-hidden="true"
-                        />
+                        <Icon className="size-[17px] shrink-0" aria-hidden="true" />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{item.title}</span>
-                          <span className="mt-0.5 block truncate text-[10.5px] font-normal text-zinc-600 group-hover:text-zinc-500">{item.description}</span>
+                          <span className="owner-nav-title">{item.title}</span>
+                          <span className="owner-nav-description">{item.description}</span>
                         </span>
-                        {badgeValue > 0 ? (
-                          <span
-                            aria-label={`${badgeValue} ${item.title} items`}
-                            className={cn(
-                              "rounded-md border px-1.5 py-0.5 font-mono text-[10px] tabular-nums",
-                              isActive
-                                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                                : "border-white/[0.09] bg-black/30 text-zinc-300",
-                            )}
-                          >
-                            {badgeValue > 99 ? "99+" : badgeValue}
-                          </span>
-                        ) : null}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -148,82 +67,10 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-white/[0.08] p-3">
-        <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-black/20">
-          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2.5">
-            <div className="flex items-center gap-2">
-              <div className="grid size-7 place-items-center rounded-md border border-emerald-400/25 bg-emerald-400/10">
-                <Workflow className="size-3.5 text-emerald-300" />
-              </div>
-              <div className="leading-tight">
-                <div className="text-[9.5px] uppercase tracking-[0.18em] text-zinc-600">Workspace</div>
-                <div className="text-xs font-semibold text-zinc-100">Revenue operations</div>
-              </div>
-            </div>
-            <span className="font-mono text-[10px] text-zinc-600">prod</span>
-          </div>
-          <div className="grid grid-cols-2 divide-x divide-white/[0.06]">
-            <SidebarStat
-              icon={<Database className="size-3.5" aria-hidden="true" />}
-              label="Records"
-              value={stats ? stats.total.toLocaleString() : "--"}
-              title="Total lead records in Vault"
-            />
-            <SidebarStat
-              icon={<Activity className="size-3.5" aria-hidden="true" />}
-              label="New today"
-              value={stats ? `+${stats.todayLeads}` : "--"}
-              accent
-              title="New leads captured today"
-            />
-          </div>
-          <div
-            className="flex items-center justify-between border-t border-white/[0.06] px-3 py-2 text-[11px]"
-            role="status"
-            aria-label="Workspace status"
-          >
-            <span className="flex items-center gap-1.5 text-emerald-300" title="System healthy">
-              <CheckCircle2 className="size-3.5" aria-hidden="true" />
-              Healthy
-            </span>
-            <span className="flex items-center gap-1.5 text-zinc-400" title="Receiving live updates every 30s">
-              <Radio className="size-3.5 animate-pulse text-emerald-400/70" aria-hidden="true" />
-              Live
-            </span>
-          </div>
-        </div>
+      <SidebarFooter className="owner-sidebar-footer">
+        <span>Private owner workspace</span>
+        <span className="ml-auto">KW</span>
       </SidebarFooter>
     </Sidebar>
-  );
-}
-
-function SidebarStat({
-  icon,
-  label,
-  value,
-  accent = false,
-  title,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  accent?: boolean;
-  title?: string;
-}) {
-  return (
-    <div className="px-3 py-2.5" title={title}>
-      <div className="flex items-center gap-1.5 text-[9.5px] uppercase tracking-[0.16em] text-zinc-400">
-        {icon}
-        {label}
-      </div>
-      <div
-        className={cn(
-          "mt-1 font-mono text-sm font-semibold tabular-nums",
-          accent ? "text-emerald-300" : "text-white",
-        )}
-      >
-        {value}
-      </div>
-    </div>
   );
 }

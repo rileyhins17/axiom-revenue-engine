@@ -1,0 +1,203 @@
+{
+  "version": "staging-migration-console-release/v1",
+  "preparedAt": "2026-09-23T18:37:38.000Z",
+  "candidate": {
+    "releaseSha": "cf2cb47e9690ecb3e9db986d7c69d99a5cf471be",
+    "parentShas": [
+      "29c56b8247d97256b9522c2fae88ef62e289b91d",
+      "e5da196da125285c7fe6bbedc8a1edab0a08702d"
+    ],
+    "treeSha": "f672d5648259c4ebe3b46abd15796bacff8463a6"
+  },
+  "migrations": [
+    {
+      "name": "0056_durable_evidence_receipts.sql",
+      "blobSha": "e814860ba41398047702a4a63370c362bac11d93"
+    },
+    {
+      "name": "0057_fenced_evidence_resume_records.sql",
+      "blobSha": "22d421fdd7f8f1d7820151889933f678ae7753db"
+    },
+    {
+      "name": "0058_artifact_reference_projections.sql",
+      "blobSha": "450eda35d19d25d8fe81145e31cda079a541d632"
+    },
+    {
+      "name": "0059_atomic_artifact_reference_snapshots.sql",
+      "blobSha": "2c25d72bf4b3e777dea9668558a8afceec7f27f2"
+    },
+    {
+      "name": "0060_artifact_reference_source_writer_guards.sql",
+      "blobSha": "41d388d2014de235985a66777d70c0704a43dd4f"
+    },
+    {
+      "name": "0061_shadow_lead_assessment_receipts.sql",
+      "blobSha": "788f437428af6b5612bf480144a753cd0992eeab"
+    },
+    {
+      "name": "0062_append_only_contact_verification_records.sql",
+      "blobSha": "f52d3d11a80645a2217a1829abfb7113c6cf2d3b"
+    },
+    {
+      "name": "0063_harden_contact_record_lineage.sql",
+      "blobSha": "158729646511a4462c33611f47d74dfb8939dfb4"
+    },
+    {
+      "name": "0064_local_source_workflow_materializations.sql",
+      "blobSha": "d5c44b0e199cbe346c723669ab46290ea7eeab04"
+    },
+    {
+      "name": "0065_local_contact_persistence_receipts.sql",
+      "blobSha": "14115d15a7fbf25024f7e3b71dfac74fe8bc0f18"
+    },
+    {
+      "name": "0066_harden_local_contact_persistence_receipts.sql",
+      "blobSha": "c1561da410f3d9245cbb6b31bdad74068c7d803c"
+    },
+    {
+      "name": "0067_local_contact_invocation_receipts.sql",
+      "blobSha": "3684f481d064b29c4c9045757a7138ae49ec8366"
+    },
+    {
+      "name": "0068_current_website_evidence_eligibility_receipts.sql",
+      "blobSha": "37fb7dceb27b18008d511233b9f2d59191369a66"
+    },
+    {
+      "name": "0069_private_kw_m2_html_assessment_lineage.sql",
+      "blobSha": "34666cbe15b8d3c2788797cc901e543ce60b2923"
+    },
+    {
+      "name": "0070_revenue_cost_reservations.sql",
+      "blobSha": "e6e9997a301dc52724919bbacff95865265c3f7a"
+    },
+    {
+      "name": "0071_revenue_owner_tasks.sql",
+      "blobSha": "3aa799e48dbd5ca28db683a8bee000731802cc7d"
+    },
+    {
+      "name": "0072_revenue_business_stop.sql",
+      "blobSha": "1c8b1a840acf3fb9f9c41a5b431222675e9fb4ae"
+    },
+    {
+      "name": "0073_revenue_contact_suppression.sql",
+      "blobSha": "ded748311b5452c15eb483aa8cadb77d724990e3"
+    },
+    {
+      "name": "0074_revenue_owner_observed_replies.sql",
+      "blobSha": "ff81684658ee66a715ba348d68895bff670c9c50"
+    }
+  ],
+  "target": {
+    "environment": "staging",
+    "configPath": "wrangler.jsonc",
+    "configBlobSha": "ead3b564f3e333cf3f9b825707ead9dcba8271bf",
+    "workerName": "axiom-revenue-engine-console-staging",
+    "baseUrl": "https://axiom-revenue-engine-console-staging.aidan-magee2.workers.dev/",
+    "database": {
+      "binding": "DB",
+      "name": "axiom-revenue-engine-staging",
+      "id": "322fcf89-312c-44f0-b238-c4a348f6d6ad"
+    },
+    "browserBinding": "BROWSER",
+    "assetsBinding": "ASSETS",
+    "cronTriggers": [],
+    "serviceBindings": [],
+    "autonomy": {
+      "intake": false,
+      "queue": false,
+      "send": false,
+      "dailyLeadCap": 0,
+      "dailySendCap": 0,
+      "dailyFollowUpCap": 0
+    }
+  },
+  "ci": {
+    "provider": "GitHub Actions",
+    "runNumber": 118,
+    "runId": "35901772615",
+    "candidateSha": "cf2cb47e9690ecb3e9db986d7c69d99a5cf471be",
+    "status": "PASS",
+    "scope": "CI safety, tests, owner UI, typecheck, lint, Cloudflare build, default and engine no-upload dry runs"
+  },
+  "rollback": {
+    "observationAt": "2026-09-23T17:11:00.000Z",
+    "workerVersionId": "941b37bc-38e8-4c6c-9111-d475e9871727",
+    "deploymentId": "c4bdd4af-85ec-4075-9a5a-7ded9f42add4",
+    "sourceSha": "7725098232829b7aca64a81d730db3b1729a5c7a",
+    "revalidation": "PENDING"
+  },
+  "gates": {
+    "liveLedger": {
+      "status": "PENDING",
+      "evidence": null
+    },
+    "liveStops": {
+      "status": "PENDING",
+      "evidence": null
+    },
+    "freshExport": {
+      "status": "PENDING",
+      "path": null,
+      "sha256": null,
+      "evidence": null
+    },
+    "offlineReplay": {
+      "status": "PENDING",
+      "evidence": null
+    },
+    "localWranglerRestore": {
+      "status": "PENDING",
+      "evidence": null
+    },
+    "exactStagingDryRun": {
+      "status": "PASS",
+      "command": "npx wrangler deploy --env staging --dry-run --autoconfig false",
+      "candidateSha": "cf2cb47e9690ecb3e9db986d7c69d99a5cf471be",
+      "databaseBinding": "axiom-revenue-engine-staging",
+      "autonomousIntake": false,
+      "autonomousQueue": false,
+      "autonomousSend": false,
+      "dailyLeadCap": 0,
+      "dailySendCap": 0,
+      "dailyFollowUpCap": 0,
+      "bundleFilesScanned": 1765,
+      "localSecretValuesRemoved": 0,
+      "uploadPerformed": false,
+      "evidence": "Fresh clean worktree; exact candidate; Wrangler exit 0; no upload."
+    },
+    "currentTimeTravelBookmark": {
+      "status": "PENDING",
+      "bookmark": null,
+      "evidence": null
+    },
+    "migrationApproval": {
+      "status": "PENDING",
+      "evidence": null
+    },
+    "deploymentApproval": {
+      "status": "PENDING",
+      "evidence": null
+    },
+    "remoteMigration": {
+      "status": "PENDING",
+      "evidence": null
+    },
+    "deployment": {
+      "status": "PENDING",
+      "evidence": null
+    },
+    "postDeploySmoke": {
+      "status": "PENDING",
+      "evidence": null
+    }
+  },
+  "authority": {
+    "databaseMigrationAuthorized": false,
+    "deploymentAuthorized": false,
+    "providerOperationsAuthorized": 0,
+    "mailboxOperationsAuthorized": 0,
+    "prospectContactsAuthorized": 0,
+    "externalWebsiteRequestsAuthorized": 0,
+    "costAuthorizedCad": 0
+  }
+}

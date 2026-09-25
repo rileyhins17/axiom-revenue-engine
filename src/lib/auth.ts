@@ -1,14 +1,16 @@
 import { APIError, betterAuth } from "better-auth";
 import { createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
-import { admin } from "better-auth/plugins";
+import { admin, emailOTP } from "better-auth/plugins";
 
 import { writeAuditEvent } from "@/lib/audit";
+import { assertOperatorSignupAllowed } from "@/lib/auth-signup-policy";
 import { getClientIp, getCloudflareBindings } from "@/lib/cloudflare";
 import { getAllowedEmails, getServerEnv, getTrustedOrigins, isAdminEmail } from "@/lib/env";
 import { ensureLocalDatabaseDirectory, getLocalDatabasePath } from "@/lib/local-sqlite";
 import { getPrisma } from "@/lib/prisma";
 import { assertRateLimit } from "@/lib/rate-limit";
+import { deliverLoginEmail, LOGIN_CODE_TTL_SECONDS, loginEmail, ownerForAccount } from "@/lib/owner-login";
 
 function isAllowedEmail(email: string) {
   const allowed = getAllowedEmails();
@@ -52,7 +54,8 @@ export function getAuth() {
     ...databaseConfig,
     trustedOrigins: getTrustedOrigins(),
     emailAndPassword: {
-      enabled: true,
+      // Live sign-in is by emailed code only. Passwords stay available for local test fixtures.
+      enabled: String(bindings?.AUTH_PASSWORD_SIGNIN ?? process.env.AUTH_PASSWORD_SIGNIN ?? "false") === "true",
       autoSignIn: true,
       requireEmailVerification: false,
     },
@@ -70,6 +73,19 @@ export function getAuth() {
       before: createAuthMiddleware(async (ctx) => {
         const ipAddress = ctx.request ? getClientIp(ctx.request) : "unknown";
 
+        if (ctx.path === "/email-otp/send-verification-otp" || ctx.path === "/sign-in/email-otp") {
+          await assertRateLimit({
+            identifier: `${ipAddress}:${ctx.path}`,
+            limit: Math.min(10, env.RATE_LIMIT_MAX_AUTH),
+            scope: "auth",
+            windowSeconds: 15 * 60,
+          });
+          const email = String(ctx.body?.email || "");
+          if (!ownerForAccount(email) || (ctx.path === "/email-otp/send-verification-otp" && ctx.body?.type !== "sign-in")) {
+            throw new APIError("FORBIDDEN", { message: "Pick Riley or Aidan." });
+          }
+        }
+
         if (ctx.path === "/sign-in/email" || ctx.path === "/sign-up/email") {
           await assertRateLimit({
             identifier: `${ipAddress}:${ctx.path}`,
@@ -80,6 +96,18 @@ export function getAuth() {
         }
 
         if (ctx.path === "/sign-up/email") {
+          try {
+            assertOperatorSignupAllowed({
+              appBaseUrl: env.APP_BASE_URL,
+              cloudflareDatabaseBound: Boolean(bindings?.DB),
+              localSyntheticSignupFlag: process.env.AXIOM_LOCAL_SYNTHETIC_SIGNUP,
+            });
+          } catch {
+            throw new APIError("FORBIDDEN", {
+              message: "Operator accounts are provisioned privately. Sign in with an existing account.",
+            });
+          }
+
           const email = String(ctx.body?.email || "").trim().toLowerCase();
           if (!email || !isAllowedEmail(email)) {
             throw new APIError("FORBIDDEN", {
@@ -92,12 +120,12 @@ export function getAuth() {
         const ipAddress = ctx.request ? getClientIp(ctx.request) : "unknown";
         const session = ctx.context.newSession;
 
-        if (ctx.path === "/sign-in/email" && session) {
+        if ((ctx.path === "/sign-in/email" || ctx.path === "/sign-in/email-otp") && session) {
           await writeAuditEvent({
             action: "auth.sign_in",
             actorUserId: session.user.id,
             ipAddress,
-            metadata: { email: session.user.email },
+            metadata: { email: session.user.email, method: ctx.path === "/sign-in/email-otp" ? "EMAIL_CODE" : "PASSWORD" },
           });
         }
 
@@ -135,6 +163,18 @@ export function getAuth() {
       admin({
         defaultRole: "user",
         adminRoles: ["admin"],
+      }),
+      emailOTP({
+        disableSignUp: true,
+        otpLength: 6,
+        expiresIn: LOGIN_CODE_TTL_SECONDS,
+        allowedAttempts: 5,
+        storeOTP: "hashed",
+        async sendVerificationOTP({ email, otp, type }) {
+          const owner = ownerForAccount(email);
+          if (type !== "sign-in" || !owner) return;
+          await deliverLoginEmail({ to: owner.inbox, ...loginEmail(owner.name, otp) });
+        },
       }),
       nextCookies(),
     ],

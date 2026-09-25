@@ -13,11 +13,14 @@ const eslintConfig = defineConfig([
     ".wrangler/**",
     ".playwright-mcp/**",
     ".claude/**",
-    "Axiom-Pipeline-Engine/**",
-    "axiom-pipeline-engine/**",
+    ".superpowers/**",
+    "backups/**",
+    "axiom-revenue-engine/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "cloudflare-env.d.ts",
+    "src/engine/worker-env.d.ts",
   ]),
 ]);
 

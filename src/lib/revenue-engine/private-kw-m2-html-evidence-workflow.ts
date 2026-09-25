@@ -1,0 +1,630 @@
+import { createHash } from "node:crypto";
+import { z } from "zod";
+
+import {
+  assertPrivateKwM2ApprovalChain,
+  PrivateKwM2ExecutionAuthorizationSchema,
+  PrivateKwM2OwnerApprovalEnvelopeSchema,
+  PrivateKwM2ResearchPacketSchema,
+  PrivateKwM2ResearchPolicySchema,
+  type PrivateKwM2ExecutionAuthorization,
+  type PrivateKwM2OwnerApprovalEnvelope,
+  type PrivateKwM2ResearchPacket,
+  type PrivateKwM2ResearchPolicy,
+} from "@/lib/revenue-engine/private-kw-m2-authorization";
+import { PrivateKwImportPlanSchema, type PrivateKwImportPlan } from "@/lib/revenue-engine/private-kw-import";
+import { PrivateKwShadowSliceManifestSchema, type PrivateKwShadowSliceManifest } from "@/lib/revenue-engine/private-kw-shadow-slice";
+import { createPrivateKwLocalHtmlEvidenceStore, type PrivateKwFacts, type PrivateKwHtmlEvidenceRef, type ReloadedEvidence } from "@/lib/revenue-engine/private-kw-local-html-evidence-store";
+import { createPrivateKwPublicHttpTransport, privateKwPublicHttpTransportReceiptDigest } from "@/lib/revenue-engine/private-kw-public-http-transport";
+import { evaluatePrivateKwRobotsPolicy, PrivateKwSourcePolicyDecisionSchema, type PrivateKwSourcePolicyDecision } from "@/lib/revenue-engine/private-kw-source-policy";
+import { PrivateKwPublicHttpTransportReceiptSchema } from "@/lib/revenue-engine/private-kw-public-http-transport";
+import { capturePublicWebsiteDocument, WebsiteCaptureResultSchema, type WebsiteCaptureResult } from "@/lib/revenue-engine/website-capture";
+import { extractHtmlPageFacts, type HtmlPageFacts } from "@/lib/revenue-engine/html-page-facts";
+import { projectPrivateKwHtmlStructure } from "@/lib/revenue-engine/private-kw-html-structure";
+import { defaultWebsitePageSelectionPolicy, planWebsitePages, WebsitePageSelectionPlanSchema, type WebsitePageSelectionPlan } from "@/lib/revenue-engine/website-page-selection";
+import { buildPrivateKwM2HtmlAuditReceipt, type PrivateKwM2HtmlAuditReceipt } from "@/lib/revenue-engine/private-kw-m2-html-audit";
+import { createPrivateKwM2HtmlEvidenceReceiptStore, privateKwM2ReceiptCanonicalDigest, type PrivateKwM2HtmlEvidenceReceiptStore } from "@/lib/revenue-engine/private-kw-m2-html-evidence-receipt";
+import {
+  BlockedEvidenceSchema, PageReceiptSchema, PageSelectionSchema, PrivateKwM2HtmlEvidenceRequestSchema,
+  PrivateKwM2WebsiteEvidenceReceiptSchema, PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION, PRIVATE_KW_M2_HTML_EVIDENCE_PARTIAL_WORKFLOW_VERSION, SourceIdentitySchema, StatusSchema,
+  type PrivateKwM2HtmlEvidenceRequest, type PrivateKwM2WebsiteEvidenceReceipt,
+} from "@/lib/revenue-engine/private-kw-m2-html-evidence-schema";
+export {
+  PrivateKwM2HtmlEvidenceRequestSchema, PrivateKwM2WebsiteEvidenceReceiptSchema, PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION,
+} from "@/lib/revenue-engine/private-kw-m2-html-evidence-schema";
+export type { PrivateKwM2HtmlEvidenceRequest, PrivateKwM2WebsiteEvidenceReceipt } from "@/lib/revenue-engine/private-kw-m2-html-evidence-schema";
+type Store = Pick<ReturnType<typeof createPrivateKwLocalHtmlEvidenceStore>, "writePrivateKwHtmlEvidence" | "writePrivateKwDerivedFacts" | "reloadPrivateKwHtmlEvidenceReadOnly">;
+export type PrivateKwM2HtmlEvidenceDependencies = {
+  transport?: ReturnType<typeof createPrivateKwPublicHttpTransport>;
+  store?: Store; receiptStore?: PrivateKwM2HtmlEvidenceReceiptStore; clock?: () => Date;
+  sleep?: (milliseconds: number) => Promise<void>;
+};
+export type PrivateKwM2HtmlEvidenceReadIdentity =
+  | { outcome: "RAW_HTML_ALLOWED"; contentRef: string; metadataRef: string }
+  | { outcome: "DERIVED_FACTS_ONLY"; contentRef: string; metadataRef: string; factsRef: string }
+  | { outcome: "BLOCKED"; receiptRef: string };
+export type PrivateKwM2HtmlEvidenceReadStore = {
+  reloadPrivateKwHtmlEvidenceReadOnly: (identity: PrivateKwM2HtmlEvidenceReadIdentity) => Promise<ReloadedEvidence>;
+};
+export type PrivateKwM2WebsiteEvidenceReceiptReloadInput = {
+  request: PrivateKwM2HtmlEvidenceRequest;
+  receiptStore?: Pick<PrivateKwM2HtmlEvidenceReceiptStore, "loadSealed">;
+  evidenceStore?: PrivateKwM2HtmlEvidenceReadStore;
+};
+type Identity = z.infer<typeof SourceIdentitySchema> & {
+  record: PrivateKwShadowSliceManifest["records"][number]; sourcePlan: PrivateKwImportPlan;
+  chain: { researchPacket: PrivateKwM2ResearchPacket; authorization: PrivateKwM2ExecutionAuthorization; ownerEnvelope: PrivateKwM2OwnerApprovalEnvelope; manifest: PrivateKwShadowSliceManifest; sourcePlan: PrivateKwImportPlan; researchPolicy?: PrivateKwM2ResearchPolicy };
+};
+function canonicalize(value: unknown): string {
+  if (value === undefined) return "null"; if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return "[" + value.map(canonicalize).join(",") + "]";
+  const object = value as Record<string, unknown>;
+  return "{" + Object.keys(object).filter((key) => object[key] !== undefined).sort().map((key) => JSON.stringify(key) + ":" + canonicalize(object[key])).join(",") + "}";
+}
+function digest(value: unknown) { return createHash("sha256").update(canonicalize(value), "utf8").digest("hex"); }
+function operationIdFor(request: PrivateKwM2HtmlEvidenceRequest, identity: Identity) {
+  const hex = digest({ requestId: request.requestId, requestedAt: request.requestedAt, businessId: identity.businessId, sourceIdentityDigest: identity.sourceIdentityDigest, authorizationDigest: identity.chain.authorization.authorizationDigest, workflowVersion: PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION }).slice(0, 32).split("");
+  hex[12] = "5";
+  hex[16] = ((parseInt(hex[16]!, 16) & 3) | 8).toString(16);
+  return `${hex.slice(0, 8).join("")}-${hex.slice(8, 12).join("")}-${hex.slice(12, 16).join("")}-${hex.slice(16, 20).join("")}-${hex.slice(20).join("")}`;
+}
+function host(value: string) { return new URL(value).hostname.toLocaleLowerCase("en-CA"); }
+function assertAuthority(auth: PrivateKwM2ExecutionAuthorization) {
+  const a = auth.authority;
+  if (Object.entries(a).some(([key, value]) => key === "providerOperationsAuthorized" ? value !== 0 : key === "costAuthorizedUsd" ? value !== 0 : value !== false)) throw new Error("M2 HTML workflow contains disallowed authority.");
+}
+function deriveIdentity(input: { businessId: string; researchPacket: PrivateKwM2ResearchPacket; authorization: PrivateKwM2ExecutionAuthorization; manifest: PrivateKwShadowSliceManifest; sourcePlan: PrivateKwImportPlan; ownerEnvelope: PrivateKwM2OwnerApprovalEnvelope; researchPolicy?: PrivateKwM2ResearchPolicy }): Identity {
+  const record = input.manifest.records.find((entry) => entry.businessId === input.businessId);
+  const source = input.sourcePlan.records.find((entry) => entry.business.id === input.businessId);
+  if (!record || !source || !record.websiteUrl || source.sourceRecord.id !== record.sourceRecordId || source.sourceRecord.businessId !== record.businessId || source.sourceRecord.websiteUrl !== record.websiteUrl || source.sourceRecord.sourceEvidenceUrl !== record.sourceEvidenceUrl || source.sourceRecord.capturedAt !== record.sourceCapturedAt || source.evaluationCandidateId !== record.evaluationCandidateId) throw new Error("M2 HTML workflow source identity mismatch.");
+  const run = input.sourcePlan.sourceRuns.find((entry) => entry.id === source.sourceRecord.sourceRunId);
+  if (!run || run.city !== record.city || run.niche !== record.niche) throw new Error("M2 HTML workflow source-run mismatch.");
+  if (input.manifest.sourcePlanDigest !== input.authorization.sourcePlanDigest) throw new Error("M2 HTML workflow source-plan digest mismatch.");
+  const decision = input.authorization.sourceDecisions.find((entry) => entry.businessId === input.businessId);
+  if (!decision || decision.websiteUrl !== record.websiteUrl) throw new Error("M2 HTML workflow authorization source mismatch.");
+  const tuple = { businessId: record.businessId, evaluationCandidateId: record.evaluationCandidateId, sourceRecordId: record.sourceRecordId, sourceRunId: source.sourceRecord.sourceRunId, sourcePlanDigest: input.manifest.sourcePlanDigest, manifestDigest: input.manifest.manifestDigest, sourceEvidenceUrl: record.sourceEvidenceUrl, approvedWebsiteUrl: record.websiteUrl, sourceCapturedAt: record.sourceCapturedAt };
+  return { ...tuple, sourceIdentityDigest: digest(tuple), record, sourcePlan: input.sourcePlan, chain: { researchPacket: input.researchPacket, authorization: input.authorization, ownerEnvelope: input.ownerEnvelope, manifest: input.manifest, sourcePlan: input.sourcePlan, researchPolicy: input.researchPolicy } };
+}
+function projectPlan(plan: WebsitePageSelectionPlan, identity: Identity) {
+  const parsed = WebsitePageSelectionPlanSchema.parse(plan);
+  if (parsed.plannerKind !== "DETERMINISTIC_FIXTURE" || parsed.businessId !== identity.businessId) throw new Error("M2 HTML workflow rejected its page plan.");
+  return PageSelectionSchema.parse({ selectionVersion: "kw-m2-html-page-selection-v1", selectionKind: "HTML_ONLY_DETERMINISTIC", businessId: identity.businessId, sourceIdentityDigest: identity.sourceIdentityDigest, status: parsed.status, selectedPages: parsed.selectedPages.map((page) => ({ pageKind: page.pageKind, url: page.url })), missingRequiredPageKinds: parsed.missingRequiredPageKinds });
+}
+function projectFacts(facts: HtmlPageFacts, expectedServices: string[], expectedLocations: string[]): PrivateKwFacts {
+  void expectedServices;
+  void expectedLocations;
+  return { canonicalUrl: facts.url, serviceObservations: [], locationObservations: [], claimIds: ["html:page-kind:" + facts.pageKind.toLocaleLowerCase("en-CA"), facts.complete ? "html:facts-complete" : "html:facts-incomplete"], limitations: ["HTML_ONLY", "VISUAL_UNKNOWN", "CONTACT_DATA_DISCARDED"], confidence: facts.complete ? "HIGH" : "UNKNOWN", structure: projectPrivateKwHtmlStructure(facts) };
+}
+function refs(value: PrivateKwHtmlEvidenceRef) {
+  return { contentRef: "contentRef" in value ? value.contentRef : null, metadataRef: "metadataRef" in value ? value.metadataRef : null, factsRef: "factsRef" in value ? value.factsRef : null, receiptRef: "receiptRef" in value ? value.receiptRef : null };
+}
+function makePage(pageKind: "HOME" | "SERVICE" | "ABOUT" | "CONTACT", capture: WebsiteCaptureResult, facts: HtmlPageFacts | null, storageOutcome: z.infer<typeof PageReceiptSchema>["storageOutcome"], storageRefs: z.infer<typeof PageReceiptSchema>["storageRefs"], failedPageTransportReceiptIds?: number[]) {
+  const failedWitness = failedPageTransportReceiptIds?.length ? { failedPageTransportReceiptIds } : {};
+  const derived = facts ? projectFacts(facts, [], []) : null;
+  return PageReceiptSchema.parse({ pageKind, requestedUrl: capture.requestedUrl ?? "https://invalid.invalid/", finalUrl: capture.finalUrl, capturedAt: capture.capturedAt, outcome: capture.outcome, statusCode: capture.statusCode, redirectCount: capture.redirectCount, bodyBytes: capture.bodyBytes, contentDigest: capture.outcome === "CAPTURED" ? capture.contentDigest : null, factsDigest: derived ? digest(derived) : null, ...(storageOutcome === "DERIVED_FACTS_ONLY" && derived ? { structure: derived.structure } : {}), storageOutcome, storageRefs, failureCode: capture.failure?.code ?? null, ...failedWitness });
+}
+function sourcePolicySummary(policy: PrivateKwSourcePolicyDecision | null) {
+  return policy ? PrivateKwSourcePolicyDecisionSchema.parse(policy) : null;
+}
+function sourcePolicyTransportReceipts(policy: PrivateKwSourcePolicyDecision, transport: ReturnType<typeof createPrivateKwPublicHttpTransport>) {
+  const ids = new Set(policy.transportReceiptIds);
+  return transport.takeReceipts().filter((receipt) => ids.has(receipt.requestId));
+}
+function blockedParentReceiptDigest(identity: Identity, reason: string, policy: PrivateKwSourcePolicyDecision, transport: ReturnType<typeof createPrivateKwPublicHttpTransport>) {
+  return digest({ sourceIdentityDigest: identity.sourceIdentityDigest, stopReason: reason, sourcePolicyDigest: digest(policy), transportReceiptDigests: transport.takeReceipts().map((receipt) => receipt.receiptDigest) });
+}
+function blockedEvidenceValue(ref: PrivateKwHtmlEvidenceRef | null, parentReceiptDigest: string | null) {
+  if (!ref || ref.outcome !== "BLOCKED" || !parentReceiptDigest) return null;
+  return { outcome: "BLOCKED" as const, receiptRef: ref.receiptRef, blockCode: ref.blockCode, executionPath: ref.executionPath, parentReceiptDigest };
+}
+function validateTransportLedger(receipts: readonly unknown[], attempts: number, cap: number, policy: PrivateKwSourcePolicyDecision | null) {
+  if (!Number.isSafeInteger(attempts) || attempts !== receipts.length || attempts > cap) throw new Error("TRANSPORT_LEDGER_COUNT_MISMATCH");
+  const parsed = receipts.map((value) => PrivateKwPublicHttpTransportReceiptSchema.parse(value));
+  const ids = parsed.map((receipt) => receipt.requestId);
+  if (new Set(ids).size !== ids.length || ids.some((id, index) => index > 0 && id <= ids[index - 1]!)) throw new Error("TRANSPORT_LEDGER_ORDER_MISMATCH");
+  parsed.forEach((receipt) => {
+    if (receipt.networkRequestCount !== 1 || privateKwPublicHttpTransportReceiptDigest(receipt) !== receipt.receiptDigest) throw new Error("TRANSPORT_LEDGER_DIGEST_MISMATCH");
+  });
+  if (policy) {
+    if (policy.networkRequestCount !== policy.transportReceiptIds.length || policy.networkRequestCount !== policy.transportReceiptDigests.length || policy.networkRequestCount > attempts) throw new Error("SOURCE_POLICY_LEDGER_COUNT_MISMATCH");
+    policy.transportReceiptIds.forEach((id, index) => {
+      const receipt = parsed[index];
+      if (!receipt || receipt.requestId !== id || receipt.receiptDigest !== policy.transportReceiptDigests[index]) throw new Error("SOURCE_POLICY_LEDGER_MISMATCH");
+    });
+  }
+  return parsed;
+}
+function failedPageTransportWitnessIds(page: z.infer<typeof PageReceiptSchema>, receipts: readonly z.infer<typeof PrivateKwPublicHttpTransportReceiptSchema>[], policy: PrivateKwSourcePolicyDecision | null) {
+  if (page.outcome === "CAPTURED" || !page.failureCode) return [];
+  const policyIds = new Set(policy?.transportReceiptIds ?? []);
+  const candidates = receipts.filter((receipt) => receipt.requestId > 0 && !policyIds.has(receipt.requestId) && receipt.normalizedUrl === page.requestedUrl);
+  if (page.failureCode === "HTTP_STATUS") return candidates.filter((receipt) => receipt.statusCode === page.statusCode && receipt.statusCode >= 400).map((receipt) => receipt.requestId);
+  if (page.failureCode === "FETCH_FAILED" || page.failureCode === "TIMEOUT") return candidates.filter((receipt) => receipt.errorCode !== undefined && receipt.statusCode === undefined).map((receipt) => receipt.requestId);
+  return [];
+}
+function buildReceipt(input: { request: PrivateKwM2HtmlEvidenceRequest; identity: Identity; authorization: PrivateKwM2ExecutionAuthorization; status: z.infer<typeof StatusSchema>; stopReason: string | null; policy: PrivateKwSourcePolicyDecision | null; plan: z.infer<typeof PageSelectionSchema> | null; pages: z.infer<typeof PageReceiptSchema>[]; audit: PrivateKwM2HtmlAuditReceipt | null; blockedEvidence?: z.infer<typeof BlockedEvidenceSchema> | null; transport: ReturnType<typeof createPrivateKwPublicHttpTransport> | undefined; attempts: number; operationId?: string }) {
+  const transportReceipts = input.transport?.takeReceipts() ?? [];
+  const parsedTransportReceipts = validateTransportLedger(transportReceipts, input.attempts, input.authorization.networkRequestCap, input.policy);
+  const transportIds = parsedTransportReceipts.map((receipt) => receipt.requestId);
+  const transportDigests = parsedTransportReceipts.map((receipt) => receipt.receiptDigest);
+  const core = { receiptVersion: input.status === "PARTIAL" ? PRIVATE_KW_M2_HTML_EVIDENCE_PARTIAL_WORKFLOW_VERSION : PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION, operationId: input.operationId ?? operationIdFor(input.request, input.identity), requestId: input.request.requestId, requestedAt: input.request.requestedAt, status: input.status, stopReason: input.stopReason, businessId: input.identity.businessId, sourceIdentity: { businessId: input.identity.businessId, evaluationCandidateId: input.identity.evaluationCandidateId, sourceRecordId: input.identity.sourceRecordId, sourceRunId: input.identity.sourceRunId, sourcePlanDigest: input.identity.sourcePlanDigest, manifestDigest: input.identity.manifestDigest, sourceEvidenceUrl: input.identity.sourceEvidenceUrl, approvedWebsiteUrl: input.identity.approvedWebsiteUrl, sourceCapturedAt: input.identity.sourceCapturedAt, sourceIdentityDigest: input.identity.sourceIdentityDigest }, authorizationDigest: input.authorization.authorizationDigest, authorizationExpiresAt: input.authorization.expiresAt, sourcePolicy: sourcePolicySummary(input.policy), pageSelection: input.plan, pages: input.pages, audit: input.audit, blockedEvidence: input.blockedEvidence ?? null, transportReceipts: parsedTransportReceipts, transportReceiptIds: transportIds, transportReceiptDigests: transportDigests, networkRequestCount: input.attempts, networkRequestCap: input.authorization.networkRequestCap, providerOperations: 0 as const, costAuthorizedUsd: 0 as const, authority: input.authorization.authority };
+  return PrivateKwM2WebsiteEvidenceReceiptSchema.parse({ ...core, operationDigest: digest(core) });
+}
+async function failReceipt(input: { request: PrivateKwM2HtmlEvidenceRequest; identity: Identity; authorization: PrivateKwM2ExecutionAuthorization; reason: string; policy: PrivateKwSourcePolicyDecision | null; transport?: ReturnType<typeof createPrivateKwPublicHttpTransport>; attempts: number; capture?: WebsiteCaptureResult | null; storage?: PrivateKwHtmlEvidenceRef | null; blockedEvidence?: z.infer<typeof BlockedEvidenceSchema> | null }) {
+  const pages = input.capture ? [makePage("HOME", input.capture, null, input.storage?.outcome ?? "NONE", input.storage ? refs(input.storage) : { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null })] : [];
+  return buildReceipt({ request: input.request, identity: input.identity, authorization: input.authorization, status: "FAILED", stopReason: input.reason, policy: input.policy, plan: null, pages, audit: null, blockedEvidence: input.blockedEvidence, transport: input.transport, attempts: input.attempts });
+}
+function safeCapture(value: unknown) { const parsed = WebsiteCaptureResultSchema.safeParse(value); return parsed.success ? parsed.data : null; }
+function isAuthorizationExpired(error: unknown, authorization: PrivateKwM2ExecutionAuthorization, clock: () => Date) {
+  return (error instanceof Error && (error.message.includes("AUTHORIZATION_EXPIRED") || /expired/i.test(error.message))) || Date.parse(authorization.expiresAt) <= clock().getTime();
+}
+function replayReadIdentity(page: z.infer<typeof PageReceiptSchema>): PrivateKwM2HtmlEvidenceReadIdentity {
+  const refs = page.storageRefs;
+  if (page.storageOutcome === "RAW_HTML_ALLOWED") {
+    if (!refs.contentRef || !refs.metadataRef) throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
+    return { outcome: "RAW_HTML_ALLOWED", contentRef: refs.contentRef, metadataRef: refs.metadataRef };
+  }
+  if (page.storageOutcome === "DERIVED_FACTS_ONLY") {
+    if (!refs.contentRef || !refs.metadataRef || !refs.factsRef) throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
+    return { outcome: "DERIVED_FACTS_ONLY", contentRef: refs.contentRef, metadataRef: refs.metadataRef, factsRef: refs.factsRef };
+  }
+  if (page.storageOutcome === "BLOCKED") {
+    if (!refs.receiptRef) throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
+    return { outcome: "BLOCKED", receiptRef: refs.receiptRef };
+  }
+  throw new Error("REPLAY_STORAGE_REFERENCE_MISSING");
+}
+function replayBlockedReadIdentity(value: z.infer<typeof BlockedEvidenceSchema>): PrivateKwM2HtmlEvidenceReadIdentity {
+  return { outcome: "BLOCKED", receiptRef: value.receiptRef };
+}
+function validateReplayShape(receipt: PrivateKwM2WebsiteEvidenceReceipt, authorization: PrivateKwM2ExecutionAuthorization, transport: ReturnType<typeof createPrivateKwPublicHttpTransport>) {
+  if (receipt.networkRequestCap !== authorization.networkRequestCap || receipt.networkRequestCount !== transport.takeReceipts().length || receipt.networkRequestCount !== receipt.transportReceipts.length || receipt.transportReceiptIds.length !== receipt.transportReceipts.length || receipt.transportReceiptDigests.length !== receipt.transportReceipts.length) throw new Error("REPLAY_COUNT_OR_CAP_MISMATCH");
+  const pages = receipt.pages;
+  const selection = receipt.pageSelection;
+  if (selection) {
+    if (selection.selectedPages.length !== pages.length || new Set(selection.selectedPages.map((page) => page.pageKind)).size !== selection.selectedPages.length) throw new Error("REPLAY_PAGE_SET_MISMATCH");
+    selection.selectedPages.forEach((selected, index) => {
+      const page = pages[index];
+      if (!page || page.pageKind !== selected.pageKind || page.requestedUrl !== selected.url) throw new Error("REPLAY_PAGE_ORDER_MISMATCH");
+    });
+  } else if (receipt.status !== "FAILED" && pages.length > 0) throw new Error("REPLAY_PAGE_SELECTION_MISSING");
+  pages.forEach((page) => {
+    const refs = page.storageRefs;
+    const refsEmpty = Object.values(refs).every((value) => value === null);
+    if (page.outcome === "CAPTURED") {
+      if (!page.contentDigest || page.bodyBytes <= 0 || page.failureCode !== null || page.finalUrl === null || page.storageOutcome === "NONE" || page.storageOutcome === "BLOCKED") throw new Error("REPLAY_CAPTURE_BRANCH_MISMATCH");
+      if (page.storageOutcome === "RAW_HTML_ALLOWED" && (!refs.contentRef || !refs.metadataRef || refs.factsRef !== null || refs.receiptRef !== null)) throw new Error("REPLAY_RAW_REFERENCE_MISMATCH");
+      if (page.storageOutcome === "DERIVED_FACTS_ONLY" && (!refs.contentRef || !refs.metadataRef || !refs.factsRef || refs.receiptRef !== null)) throw new Error("REPLAY_DERIVED_REFERENCE_MISMATCH");
+    } else if (page.storageOutcome !== "NONE" || page.contentDigest !== null || page.factsDigest !== null || page.failureCode === null || !refsEmpty) throw new Error("REPLAY_FAILED_BRANCH_MISMATCH");
+  });
+  const captured = pages.filter((page) => page.outcome === "CAPTURED");
+  const blockedReason = receipt.stopReason === "ROBOTS_OR_TERMS_BLOCKED" || receipt.stopReason === "RETENTION_BLOCKED";
+  if (blockedReason !== (receipt.blockedEvidence !== null) || (receipt.blockedEvidence && (receipt.status !== "FAILED" || receipt.pages.length !== 0 || receipt.pageSelection !== null || receipt.audit !== null))) throw new Error("REPLAY_BLOCKED_WITNESS_MISMATCH");
+  if (receipt.status === "FAILED" ? !receipt.stopReason : receipt.stopReason !== null) throw new Error("REPLAY_STATUS_REASON_MISMATCH");
+  if (receipt.status === "COMPLETE" && (!selection || selection.status !== "READY" || captured.length !== pages.length || !receipt.audit)) throw new Error("REPLAY_COMPLETE_STATUS_MISMATCH");
+  if (receipt.status === "RESEARCH_REQUIRED" && (!selection || selection.status !== "PARTIAL")) throw new Error("REPLAY_RESEARCH_STATUS_MISMATCH");
+  if (receipt.status === "PARTIAL" && (!selection || captured.length === pages.length || !receipt.audit || !captured.some((page) => page.pageKind === "HOME"))) throw new Error("REPLAY_PARTIAL_STATUS_MISMATCH");
+  if (selection?.status === "READY" && (receipt.status !== "COMPLETE" && receipt.status !== "PARTIAL" || receipt.status === "COMPLETE" && captured.length !== pages.length)) throw new Error("REPLAY_READY_SELECTION_MISMATCH");
+  if (selection?.status === "PARTIAL" && receipt.status !== "RESEARCH_REQUIRED" && receipt.status !== "PARTIAL") throw new Error("REPLAY_PARTIAL_SELECTION_MISMATCH");
+  if (receipt.status === "FAILED" && !receipt.stopReason) throw new Error("REPLAY_FAILURE_REASON_MISSING");
+  if (receipt.audit) {
+    if (receipt.audit.pages.length !== captured.length || receipt.audit.browserEvidencePresent || receipt.audit.assemblerKind !== "HTML_ONLY") throw new Error("REPLAY_AUDIT_PAGE_SET_MISMATCH");
+    receipt.audit.pages.forEach((auditPage, index) => {
+      const page = captured[index];
+      if (!page || auditPage.pageKind !== page.pageKind || auditPage.requestedUrl !== page.requestedUrl || auditPage.finalUrl !== page.finalUrl || auditPage.capturedAt !== page.capturedAt || auditPage.statusCode !== page.statusCode || auditPage.contentComplete) throw new Error("REPLAY_AUDIT_PAGE_MISMATCH");
+    });
+    const limitations = ["BROWSER_EVIDENCE_UNKNOWN", "MOBILE_EVIDENCE_UNKNOWN", "ABOVE_FOLD_EVIDENCE_UNKNOWN", "HTML_ONLY_STRUCTURAL_FACTS", "QUALIFICATION_NOT_PERFORMED", "CONTACT_DATA_DISCARDED"];
+    if (receipt.audit.state !== "HTML_ONLY_PARTIAL" || receipt.audit.unknownLimitations.join("|") !== limitations.join("|")) throw new Error("REPLAY_AUDIT_LIMITATIONS_MISMATCH");
+    const checks = receipt.audit.availability?.checks ?? [];
+    if (checks.length !== 3 || checks.map((check) => check.checkId).join("|") !== "website_availability|redirect_chain|https" || checks.some((check) => check.category !== "availability" || check.method !== "http_probe" || check.confidence !== 0 || check.conversionCritical !== false || check.artifactRef !== null)) throw new Error("REPLAY_AUDIT_CHECKS_MISMATCH");
+    const availability = receipt.audit.availability;
+    const home = captured.find((page) => page.pageKind === "HOME");
+    if (!availability || !home || availability.sourceIdentityDigest !== receipt.sourceIdentity.sourceIdentityDigest || availability.requestedUrl !== home.requestedUrl || availability.finalUrl !== home.finalUrl || availability.statusCode !== home.statusCode || availability.capturedAt !== home.capturedAt || availability.contentDigest !== home.contentDigest || availability.checks.some((check) => check.category !== "availability" || check.method !== "http_probe" || check.confidence !== 0 || check.conversionCritical !== false || check.artifactRef !== null)) throw new Error("REPLAY_AUDIT_AVAILABILITY_MISMATCH");
+  }
+}
+type ReplayContext = {
+  request: PrivateKwM2HtmlEvidenceRequest;
+  identity: Identity;
+  authorization: PrivateKwM2ExecutionAuthorization;
+  clock: () => Date;
+  reloadEvidence: (identity: PrivateKwM2HtmlEvidenceReadIdentity) => Promise<ReloadedEvidence>;
+  beforeArtifactRead?: () => void;
+};
+async function validateSealedReplay(receipt: PrivateKwM2WebsiteEvidenceReceipt, input: ReplayContext) {
+  const { operationDigest, ...core } = receipt;
+  if (digest(core) !== operationDigest) throw new Error("REPLAY_OPERATION_DIGEST_MISMATCH");
+  const operationId = operationIdFor(input.request, input.identity);
+  if (receipt.operationId !== operationId || receipt.requestId !== input.request.requestId || receipt.businessId !== input.identity.businessId || receipt.authorizationDigest !== input.authorization.authorizationDigest || receipt.authorizationExpiresAt !== input.authorization.expiresAt || receipt.sourceIdentity.sourceIdentityDigest !== input.identity.sourceIdentityDigest) throw new Error("REPLAY_IDENTITY_MISMATCH");
+  assertPrivateKwM2ApprovalChain({ ...input.identity.chain, phase: "GET", now: input.clock().toISOString() });
+  if (Date.parse(input.authorization.expiresAt) <= input.clock().getTime()) throw new Error("AUTHORIZATION_EXPIRED");
+  const decision = input.authorization.sourceDecisions.find((entry) => entry.businessId === input.identity.businessId)!;
+  const policy = receipt.sourcePolicy ? PrivateKwSourcePolicyDecisionSchema.parse(receipt.sourcePolicy) : null;
+  if (policy && (policy.robotsUrl !== new URL("/robots.txt", input.identity.approvedWebsiteUrl).toString() || policy.termsDecision !== decision.termsDecision || policy.providerOperationsAuthorized !== 0 || policy.costAuthorizedUsd !== 0)) throw new Error("REPLAY_SOURCE_POLICY_MISMATCH");
+  const transport = validateTransportLedger(receipt.transportReceipts, receipt.networkRequestCount, receipt.networkRequestCap, policy);
+  if (transport.map((entry) => entry.requestId).join(",") !== receipt.transportReceiptIds.join(",") || transport.map((entry) => entry.receiptDigest).join(",") !== receipt.transportReceiptDigests.join(",")) throw new Error("REPLAY_TRANSPORT_SET_MISMATCH");
+  const policyIds = new Set(policy?.transportReceiptIds ?? []);
+  const usedFailedIds = new Set<number>();
+  receipt.pages.filter((page) => page.outcome !== "CAPTURED").forEach((page) => {
+    const ids = page.failedPageTransportReceiptIds ?? [];
+    const canonicalIds = failedPageTransportWitnessIds(page, transport, policy);
+    if (canonicalIds.length === 0 || ids.length !== canonicalIds.length || ids.some((id, index) => id !== canonicalIds[index])) throw new Error("REPLAY_FAILED_PAGE_TRANSPORT_WITNESS_MISMATCH");
+    if (receipt.receiptVersion !== PRIVATE_KW_M2_HTML_EVIDENCE_PARTIAL_WORKFLOW_VERSION || ids.length === 0 || ids.some((id, index) => index > 0 && id <= ids[index - 1]! || policyIds.has(id) || usedFailedIds.has(id))) throw new Error("REPLAY_FAILED_PAGE_TRANSPORT_WITNESS_MISMATCH");
+    ids.forEach((id) => usedFailedIds.add(id));
+    const witnesses = ids.map((id) => transport.find((entry) => entry.requestId === id));
+    if (witnesses.some((entry) => !entry) || witnesses[0]!.normalizedUrl !== page.requestedUrl) throw new Error("REPLAY_FAILED_PAGE_TRANSPORT_URL_MISMATCH");
+    const terminal = witnesses.at(-1)!;
+    if (page.failureCode === "HTTP_STATUS" && (terminal.statusCode !== page.statusCode || terminal.statusCode < 400)) throw new Error("REPLAY_FAILED_PAGE_HTTP_WITNESS_MISMATCH");
+    if ((page.failureCode === "FETCH_FAILED" || page.failureCode === "TIMEOUT") && (!terminal.errorCode || terminal.statusCode !== undefined)) throw new Error("REPLAY_FAILED_PAGE_ERROR_WITNESS_MISMATCH");
+  });
+  if (receipt.pages.some((page) => page.outcome === "CAPTURED" && page.failedPageTransportReceiptIds !== undefined)) throw new Error("REPLAY_CAPTURED_PAGE_TRANSPORT_WITNESS_MISMATCH");
+  validateReplayShape(receipt, input.authorization, { takeReceipts: () => transport } as unknown as ReturnType<typeof createPrivateKwPublicHttpTransport>);
+  if (!policy || (receipt.pageSelection && receipt.pageSelection.sourceIdentityDigest !== input.identity.sourceIdentityDigest) || (receipt.audit?.availability && receipt.audit.availability.sourceIdentityDigest !== input.identity.sourceIdentityDigest)) throw new Error("REPLAY_CANONICAL_RECEIPT_MISMATCH");
+  if (receipt.blockedEvidence) {
+    const expectedParent = blockedParentReceiptDigest(input.identity, receipt.stopReason!, policy, { takeReceipts: () => transport } as unknown as ReturnType<typeof createPrivateKwPublicHttpTransport>);
+    if (receipt.blockedEvidence.parentReceiptDigest !== expectedParent) throw new Error("REPLAY_BLOCKED_PARENT_MISMATCH");
+    input.beforeArtifactRead?.();
+    const reloaded = await input.reloadEvidence(replayBlockedReadIdentity(receipt.blockedEvidence));
+    if (reloaded.outcome !== "BLOCKED" || reloaded.blockCode !== receipt.blockedEvidence.blockCode || reloaded.receipt.receiptRef !== receipt.blockedEvidence.receiptRef || reloaded.receipt.businessId !== receipt.businessId || reloaded.receipt.sourceId !== input.identity.sourceRecordId || reloaded.receipt.parentReceiptDigest !== expectedParent || reloaded.receipt.blockCode !== receipt.stopReason) throw new Error("REPLAY_BLOCKED_WITNESS_MISMATCH");
+  }
+  if (receipt.pages.length > 4) throw new Error("REPLAY_PAGE_COUNT_MISMATCH");
+  let homepageWitness: { statusCode: number; redirectCount: number; finalUrl: string; capturedAt: string; contentDigest: string } | null = null;
+  for (const page of receipt.pages) {
+    if (page.outcome === "CAPTURED") {
+      input.beforeArtifactRead?.();
+      const reloaded = await input.reloadEvidence(replayReadIdentity(page));
+      if (reloaded.outcome === "BLOCKED" || reloaded.outcome !== page.storageOutcome) throw new Error("REPLAY_DURABLE_METADATA_MISMATCH");
+      const metadata = reloaded.metadata;
+      if (metadata.businessId !== receipt.businessId || metadata.sourceId !== input.identity.sourceRecordId || metadata.requestedUrl !== page.requestedUrl || metadata.finalUrl !== page.finalUrl || metadata.sourcePageUrl !== input.identity.approvedWebsiteUrl || metadata.capturedAt !== page.capturedAt || metadata.statusCode !== page.statusCode || metadata.redirectCount !== page.redirectCount || metadata.authorizationDigest !== receipt.authorizationDigest || metadata.authorizationExpiresAt !== receipt.authorizationExpiresAt || metadata.sourcePolicyVersion !== policy.policyVersion || digest(metadata.sourcePolicyDecision) !== digest(policy) || digest(metadata.transportReceipts) !== digest(transport.slice(0, policy.networkRequestCount)) || metadata.retentionDecision !== page.storageOutcome || metadata.contentRef !== page.storageRefs.contentRef || metadata.metadataRef !== page.storageRefs.metadataRef || (page.storageOutcome === "DERIVED_FACTS_ONLY" && reloaded.outcome === "DERIVED_FACTS_ONLY" && reloaded.facts.factsRef !== page.storageRefs.factsRef)) throw new Error("REPLAY_DURABLE_METADATA_MISMATCH");
+      if (reloaded.outcome === "RAW_HTML_ALLOWED" && createHash("sha256").update(reloaded.bytes).digest("hex") !== page.contentDigest) throw new Error("REPLAY_CONTENT_DIGEST_MISMATCH");
+      if (reloaded.outcome === "DERIVED_FACTS_ONLY" && (digest(reloaded.facts.facts) !== page.factsDigest || digest(reloaded.facts.facts.structure) !== digest(page.structure))) throw new Error("REPLAY_FACTS_DIGEST_MISMATCH");
+      if (reloaded.metadata.parentReceiptDigest !== digest({ identity: receipt.sourceIdentity.sourceIdentityDigest, page: page.pageKind, contentDigest: page.contentDigest, pageSelectionDigest: digest(receipt.pageSelection) })) throw new Error("REPLAY_PARENT_DIGEST_MISMATCH");
+      if (page.pageKind === "HOME") homepageWitness = { statusCode: reloaded.metadata.statusCode ?? page.statusCode, redirectCount: reloaded.metadata.redirectCount ?? page.redirectCount, finalUrl: page.finalUrl!, capturedAt: page.capturedAt, contentDigest: page.contentDigest! };
+    } else if (page.storageOutcome !== "NONE") throw new Error("REPLAY_FAILED_PAGE_STORAGE");
+  }
+  if (receipt.audit?.availability && homepageWitness) {
+    const expectedOutcomes = [homepageWitness.statusCode >= 200 && homepageWitness.statusCode < 400 ? "PASS" : "FAIL", homepageWitness.redirectCount <= 3 ? "PASS" : "FAIL", homepageWitness.finalUrl.startsWith("https://") ? "PASS" : "FAIL"];
+    const checks = receipt.audit.availability.checks;
+    if (receipt.audit.availability.redirectCount !== homepageWitness.redirectCount || checks.some((check, index) => check.outcome !== expectedOutcomes[index] || check.sourceUrl !== homepageWitness!.finalUrl || check.capturedAt !== homepageWitness!.capturedAt)) throw new Error("REPLAY_AUDIT_CHECKS_MISMATCH");
+  }
+  return receipt;
+}
+
+export type PrivateKwM2WebsiteEvidenceReloadErrorCode =
+  | "M2_WEBSITE_RECEIPT_REPLAY_MISSING"
+  | "M2_WEBSITE_RECEIPT_SCHEMA_INVALID"
+  | "M2_WEBSITE_RECEIPT_CANONICAL_BYTES_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_OPERATION_DIGEST_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_UNSAFE_PATH"
+  | "M2_WEBSITE_RECEIPT_REPARSE_OR_SYMLINK"
+  | "M2_WEBSITE_RECEIPT_UNKNOWN_BRANCH"
+  | "M2_WEBSITE_RECEIPT_AUTHORIZATION_EXPIRED"
+  | "M2_WEBSITE_RECEIPT_AUTHORIZATION_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_SOURCE_IDENTITY_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_SOURCE_POLICY_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_TRANSPORT_LEDGER_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_PAGE_SELECTION_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_ARTIFACT_MISSING"
+  | "M2_WEBSITE_RECEIPT_ARTIFACT_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_AUDIT_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_STATUS_MISMATCH"
+  | "M2_WEBSITE_RECEIPT_UNSUPPORTED_UNSEALED_FAILURE";
+
+export class PrivateKwM2WebsiteEvidenceReloadError extends Error {
+  readonly code: PrivateKwM2WebsiteEvidenceReloadErrorCode;
+  constructor(code: PrivateKwM2WebsiteEvidenceReloadErrorCode) {
+    super(code);
+    this.name = "PrivateKwM2WebsiteEvidenceReloadError";
+    this.code = code;
+  }
+}
+
+function requestChainSnapshot(request: PrivateKwM2HtmlEvidenceRequest) {
+  return digest({ requestId: request.requestId, requestedAt: request.requestedAt, businessId: request.businessId, researchPacket: request.researchPacket, authorization: request.authorization, ownerEnvelope: request.ownerEnvelope, manifest: request.manifest, sourcePlan: request.sourcePlan, researchPolicy: request.researchPolicy });
+}
+function mapReloadError(error: unknown): PrivateKwM2WebsiteEvidenceReloadError {
+  if (error instanceof PrivateKwM2WebsiteEvidenceReloadError) return error;
+  const message = error instanceof Error ? error.message : "";
+  if (/AUTHORIZATION_EXPIRED|expired|approval window/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_AUTHORIZATION_EXPIRED");
+  if (/unknown discriminator|invalid discriminator|unknown outcome|unknown branch/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_UNKNOWN_BRANCH");
+  if (/schema|invalid|expected|required|ZodError/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SCHEMA_INVALID");
+  if (/canonical.?bytes|BYTES_MISMATCH|SEALED_RECEIPT_BYTES_MISMATCH/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_CANONICAL_BYTES_MISMATCH");
+  if (/operation.?digest|SEALED_RECEIPT_DIGEST_MISMATCH/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_OPERATION_DIGEST_MISMATCH");
+  if (/source identity|source-plan|source-run|source.*mismatch/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SOURCE_IDENTITY_MISMATCH");
+  if (/reparse|symlink|junction|UNKNOWN_REPARSE_CLASSIFICATION/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_REPARSE_OR_SYMLINK");
+  if (/UNSAFE_PATH|UNSAFE_SEALED|IDENTITY_UNAVAILABLE|outside approved|traversal/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_UNSAFE_PATH");
+  if (/ENOENT|missing|MISSING_/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_ARTIFACT_MISSING");
+  if (/SOURCE_POLICY|POLICY/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SOURCE_POLICY_MISMATCH");
+  if (/TRANSPORT/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_TRANSPORT_LEDGER_MISMATCH");
+  if (/PAGE_|SELECTION/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_PAGE_SELECTION_MISMATCH");
+  if (/AUDIT/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_AUDIT_MISMATCH");
+  if (/STATUS|BRANCH/i.test(message)) return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_STATUS_MISMATCH");
+  return new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_ARTIFACT_MISMATCH");
+}
+
+export async function reloadPrivateKwM2WebsiteEvidenceReceipt(input: PrivateKwM2WebsiteEvidenceReceiptReloadInput, options: { clock?: () => Date } = {}): Promise<PrivateKwM2WebsiteEvidenceReceipt> {
+  try {
+    const request = PrivateKwM2HtmlEvidenceRequestSchema.parse(input.request);
+    const packet = PrivateKwM2ResearchPacketSchema.parse(request.researchPacket);
+    const authorization = PrivateKwM2ExecutionAuthorizationSchema.parse(request.authorization);
+    const ownerEnvelope = PrivateKwM2OwnerApprovalEnvelopeSchema.parse(request.ownerEnvelope);
+    const manifest = PrivateKwShadowSliceManifestSchema.parse(request.manifest);
+    const sourcePlan = PrivateKwImportPlanSchema.parse(request.sourcePlan);
+    const researchPolicy = request.researchPolicy === undefined ? undefined : PrivateKwM2ResearchPolicySchema.parse(request.researchPolicy);
+    const chainSnapshot = requestChainSnapshot(request);
+    const identity = deriveIdentity({ businessId: request.businessId, researchPacket: packet, authorization, ownerEnvelope, manifest, sourcePlan, researchPolicy });
+    const clock = options.clock ?? (() => new Date());
+    const assertCurrent = () => {
+      const currentRequest = PrivateKwM2HtmlEvidenceRequestSchema.parse(input.request);
+      if (requestChainSnapshot(currentRequest) !== chainSnapshot) throw new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SOURCE_IDENTITY_MISMATCH");
+      const currentPacket = PrivateKwM2ResearchPacketSchema.parse(currentRequest.researchPacket);
+      const currentAuthorization = PrivateKwM2ExecutionAuthorizationSchema.parse(currentRequest.authorization);
+      const currentOwnerEnvelope = PrivateKwM2OwnerApprovalEnvelopeSchema.parse(currentRequest.ownerEnvelope);
+      const currentManifest = PrivateKwShadowSliceManifestSchema.parse(currentRequest.manifest);
+      const currentSourcePlan = PrivateKwImportPlanSchema.parse(currentRequest.sourcePlan);
+      const currentPolicy = currentRequest.researchPolicy === undefined ? undefined : PrivateKwM2ResearchPolicySchema.parse(currentRequest.researchPolicy);
+      const currentIdentity = deriveIdentity({ businessId: currentRequest.businessId, researchPacket: currentPacket, authorization: currentAuthorization, ownerEnvelope: currentOwnerEnvelope, manifest: currentManifest, sourcePlan: currentSourcePlan, researchPolicy: currentPolicy });
+      if (currentIdentity.sourceIdentityDigest !== identity.sourceIdentityDigest || currentAuthorization.authorizationDigest !== authorization.authorizationDigest) throw new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_SOURCE_IDENTITY_MISMATCH");
+      try {
+        assertPrivateKwM2ApprovalChain({ researchPacket: currentPacket, authorization: currentAuthorization, ownerEnvelope: currentOwnerEnvelope, manifest: currentManifest, sourcePlan: currentSourcePlan, phase: "GET", now: clock().toISOString(), researchPolicy: currentPolicy });
+      } catch (error) {
+        throw mapReloadError(error);
+      }
+    };
+    assertCurrent();
+    const receiptStore = input.receiptStore ?? createPrivateKwM2HtmlEvidenceReceiptStore();
+    const evidenceStore = input.evidenceStore ?? createPrivateKwLocalHtmlEvidenceStore();
+    const existing = await receiptStore.loadSealed(operationIdFor(request, identity));
+    if (!existing) throw new PrivateKwM2WebsiteEvidenceReloadError("M2_WEBSITE_RECEIPT_REPLAY_MISSING");
+    const receipt = PrivateKwM2WebsiteEvidenceReceiptSchema.parse(existing);
+    const reloadEvidence = (readIdentity: PrivateKwM2HtmlEvidenceReadIdentity) => evidenceStore.reloadPrivateKwHtmlEvidenceReadOnly(readIdentity);
+    return await validateSealedReplay(receipt, { request, identity, authorization, clock, reloadEvidence, beforeArtifactRead: assertCurrent });
+  } catch (error) {
+    throw mapReloadError(error);
+  }
+}
+
+export async function executePrivateKwM2HtmlEvidence(input: unknown, dependencies: PrivateKwM2HtmlEvidenceDependencies = {}): Promise<PrivateKwM2WebsiteEvidenceReceipt> {
+  const request = PrivateKwM2HtmlEvidenceRequestSchema.parse(input);
+  const clock = dependencies.clock ?? (() => new Date());
+  const packet = PrivateKwM2ResearchPacketSchema.parse(request.researchPacket);
+  const authorization = PrivateKwM2ExecutionAuthorizationSchema.parse(request.authorization);
+  const ownerEnvelope = PrivateKwM2OwnerApprovalEnvelopeSchema.parse(request.ownerEnvelope);
+  const manifest = PrivateKwShadowSliceManifestSchema.parse(request.manifest);
+  const sourcePlan = PrivateKwImportPlanSchema.parse(request.sourcePlan);
+  const policy = request.researchPolicy === undefined ? undefined : PrivateKwM2ResearchPolicySchema.parse(request.researchPolicy);
+  assertAuthority(authorization);
+  const identity = deriveIdentity({ businessId: request.businessId, researchPacket: packet, authorization, manifest, sourcePlan, ownerEnvelope, researchPolicy: policy });
+  const operationId = operationIdFor(request, identity);
+  try {
+    assertPrivateKwM2ApprovalChain({ researchPacket: packet, authorization, ownerEnvelope, manifest, sourcePlan, phase: "GET", now: clock().toISOString(), researchPolicy: policy });
+  } catch (error) {
+    if (request.replayMode === "EXACT_REPLAY") {
+      const reason = error instanceof Error && (error.message.includes("expired") || Date.parse(authorization.expiresAt) <= clock().getTime()) ? "AUTHORIZATION_EXPIRED" : "REPLAY_MISMATCH";
+      return buildReceipt({ request, identity, authorization, status: "FAILED", stopReason: reason, policy: null, plan: null, pages: [], audit: null, transport: undefined, attempts: 0, operationId });
+    }
+    throw error;
+  }
+  const receiptStore = dependencies.receiptStore ?? createPrivateKwM2HtmlEvidenceReceiptStore();
+  const replayStore = dependencies.store ?? createPrivateKwLocalHtmlEvidenceStore({ clock });
+  const existing = await receiptStore.loadSealed(operationId);
+  if (existing || request.replayMode === "EXACT_REPLAY") {
+    try {
+      return await reloadPrivateKwM2WebsiteEvidenceReceipt(
+        { request, receiptStore, evidenceStore: replayStore },
+        { clock },
+      );
+    }
+    catch (error) {
+      const reason = error instanceof Error && error.message.includes("AUTHORIZATION_EXPIRED")
+        ? "AUTHORIZATION_EXPIRED"
+        : error instanceof Error && error.message.includes("REPLAY_MISSING") ? "REPLAY_MISSING" : "REPLAY_MISMATCH";
+      return buildReceipt({ request, identity, authorization, status: "FAILED", stopReason: reason, policy: null, plan: null, pages: [], audit: null, transport: undefined, attempts: 0, operationId });
+    }
+  }
+  const base = dependencies.transport ?? createPrivateKwPublicHttpTransport({ now: clock });
+  let stage: "ROBOTS" | "GET" = "ROBOTS";
+  let attempts = 0;
+  const assertBefore = () => {
+    assertPrivateKwM2ApprovalChain({ researchPacket: packet, authorization, ownerEnvelope, manifest, sourcePlan, phase: stage, now: clock().toISOString(), researchPolicy: policy });
+    const current = deriveIdentity({ businessId: request.businessId, researchPacket: packet, authorization, manifest, sourcePlan, ownerEnvelope, researchPolicy: policy });
+    if (current.sourceIdentityDigest !== identity.sourceIdentityDigest) throw new Error("M2 HTML workflow source identity changed.");
+  };
+  const budget: ReturnType<typeof createPrivateKwPublicHttpTransport> = {
+    async request(value, init) {
+      assertBefore();
+      if (attempts >= authorization.networkRequestCap) throw new Error("NETWORK_REQUEST_CAP_EXCEEDED");
+      attempts += 1;
+      const before = base.takeReceipts().length;
+      const previousId = base.takeReceipts().at(-1)?.requestId ?? 0;
+      try { return await base.request(value, init); }
+      finally {
+        const receipts = base.takeReceipts();
+        if (receipts.length !== before + 1) throw new Error("TRANSPORT_RECEIPT_RECONCILIATION_FAILED");
+        const receipt = receipts.at(-1)!;
+        if (receipt.requestId <= previousId) throw new Error("TRANSPORT_RECEIPT_ORDER_RECONCILIATION_FAILED");
+        validateTransportLedger([receipt], 1, authorization.networkRequestCap, null);
+      }
+    },
+    takeReceipts: () => base.takeReceipts(),
+  };
+  let sourcePolicy: PrivateKwSourcePolicyDecision | null = null;
+  try {
+    sourcePolicy = await evaluatePrivateKwRobotsPolicy({
+      approvedSourceUrl: identity.approvedWebsiteUrl,
+      auditUserAgent: "AxiomRevenueEngineWebsiteAudit/0.1",
+      termsDecision: authorization.sourceDecisions.find((entry) => entry.businessId === identity.businessId)!.termsDecision,
+      transport: budget,
+      now: clock,
+      sleep: async (milliseconds) => {
+        if (Date.parse(authorization.expiresAt) <= clock().getTime() + milliseconds) throw new Error("AUTHORIZATION_EXPIRED");
+        await (dependencies.sleep ?? ((delay: number) => new Promise<void>((resolve) => setTimeout(resolve, delay))))(milliseconds);
+        assertBefore();
+      },
+      policyDeadlineAt: new Date(authorization.expiresAt),
+    });
+  } catch (error) {
+    const durableAttempts = budget.takeReceipts().length;
+    if (isAuthorizationExpired(error, authorization, clock)) return failReceipt({ request, identity, authorization, reason: "AUTHORIZATION_EXPIRED", policy: sourcePolicy, transport: budget, attempts: durableAttempts });
+    if (!sourcePolicy) return failReceipt({ request, identity, authorization, reason: "ROBOTS_POLICY_FAILED", policy: null, transport: budget, attempts: durableAttempts });
+    const reason = "ROBOTS_POLICY_FAILED";
+    const receipt = await failReceipt({ request, identity, authorization, reason, policy: sourcePolicy, transport: budget, attempts: durableAttempts });
+    await receiptStore.publishSealed(receipt);
+    return receipt;
+  }
+  if (!sourcePolicy.allowed) {
+    const durableAttempts = budget.takeReceipts().length;
+    let blockedRef: PrivateKwHtmlEvidenceRef | null = null;
+    const blockedParent = blockedParentReceiptDigest(identity, "ROBOTS_OR_TERMS_BLOCKED", sourcePolicy, budget);
+    const decision = authorization.sourceDecisions.find((entry) => entry.businessId === identity.businessId)!;
+    if (decision.evidenceRetention === "BLOCKED" && Date.parse(authorization.expiresAt) > clock().getTime()) {
+      const store = dependencies.store ?? createPrivateKwLocalHtmlEvidenceStore({ clock });
+      try {
+        blockedRef = await store.writePrivateKwHtmlEvidence({
+          outcome: "BLOCKED", blockCode: "ROBOTS_OR_TERMS_BLOCKED", businessId: identity.businessId, sourceId: identity.sourceRecordId,
+          requestedUrl: identity.approvedWebsiteUrl, finalUrl: identity.approvedWebsiteUrl, redirectChainDigest: digest([identity.approvedWebsiteUrl]),
+          captureVersion: "website-capture-v1", transportVersion: "kw-m2-public-transport-v1", sourcePolicyVersion: sourcePolicy.policyVersion,
+          capturedAt: clock().toISOString(), parentReceiptDigest: blockedParent,
+          authorizationDigest: authorization.authorizationDigest, authorizationExpiresAt: authorization.expiresAt, authorizationChain: identity.chain,
+          sourcePolicyDecision: sourcePolicy, transportReceipts: sourcePolicyTransportReceipts(sourcePolicy, budget), retentionDecision: "BLOCKED", legalHold: false,
+        });
+      } catch (error) {
+        if (isAuthorizationExpired(error, authorization, clock)) return failReceipt({ request, identity, authorization, reason: "AUTHORIZATION_EXPIRED", policy: sourcePolicy, transport: budget, attempts: durableAttempts });
+        blockedRef = null;
+      }
+    }
+    if (!blockedRef) return failReceipt({ request, identity, authorization, reason: "ROBOTS_OR_TERMS_BLOCKED", policy: sourcePolicy, transport: budget, attempts: durableAttempts });
+    const receipt = await failReceipt({ request, identity, authorization, reason: "ROBOTS_OR_TERMS_BLOCKED", policy: sourcePolicy, transport: budget, attempts: durableAttempts, blockedEvidence: blockedEvidenceValue(blockedRef, blockedParent) });
+    await receiptStore.publishSealed(receipt);
+    return receipt;
+  }
+  const decision = authorization.sourceDecisions.find((entry) => entry.businessId === identity.businessId)!;
+  const retention = decision.evidenceRetention;
+  const store = dependencies.store ?? createPrivateKwLocalHtmlEvidenceStore({ clock });
+  if (retention === "BLOCKED") {
+    let blockedRef: PrivateKwHtmlEvidenceRef | null = null;
+    const blockedParent = blockedParentReceiptDigest(identity, "RETENTION_BLOCKED", sourcePolicy, budget);
+    try {
+      blockedRef = await store.writePrivateKwHtmlEvidence({
+        outcome: "BLOCKED", blockCode: "RETENTION_BLOCKED", businessId: identity.businessId, sourceId: identity.sourceRecordId,
+        requestedUrl: identity.approvedWebsiteUrl, finalUrl: identity.approvedWebsiteUrl, redirectChainDigest: digest([identity.approvedWebsiteUrl]),
+        captureVersion: "website-capture-v1", transportVersion: "kw-m2-public-transport-v1", sourcePolicyVersion: sourcePolicy.policyVersion,
+        capturedAt: clock().toISOString(), parentReceiptDigest: blockedParent,
+        authorizationDigest: authorization.authorizationDigest, authorizationExpiresAt: authorization.expiresAt, authorizationChain: identity.chain,
+        sourcePolicyDecision: sourcePolicy, transportReceipts: sourcePolicyTransportReceipts(sourcePolicy, budget), retentionDecision: "BLOCKED", legalHold: false,
+      });
+    } catch (error) {
+      if (isAuthorizationExpired(error, authorization, clock)) return failReceipt({ request, identity, authorization, reason: "AUTHORIZATION_EXPIRED", policy: sourcePolicy, transport: budget, attempts });
+      blockedRef = null;
+    }
+    if (!blockedRef) return failReceipt({ request, identity, authorization, reason: "RETENTION_BLOCKED", policy: sourcePolicy, transport: budget, attempts });
+    const receipt = await failReceipt({ request, identity, authorization, reason: "RETENTION_BLOCKED", policy: sourcePolicy, transport: budget, attempts, blockedEvidence: blockedEvidenceValue(blockedRef, blockedParent) });
+    await receiptStore.publishSealed(receipt);
+    return receipt;
+  }
+  stage = "GET";
+  let homeCapture: WebsiteCaptureResult;
+  try {
+    homeCapture = await capturePublicWebsiteDocument(identity.approvedWebsiteUrl, { fetch: (value, init) => budget.request(value, init), now: clock });
+    if (Date.parse(authorization.expiresAt) <= clock().getTime()) throw new Error("AUTHORIZATION_EXPIRED");
+  } catch (error) {
+    const reason = error instanceof Error && (error.message.includes("AUTHORIZATION_EXPIRED") || Date.parse(authorization.expiresAt) <= clock().getTime()) ? "AUTHORIZATION_EXPIRED" : "HOMEPAGE_CAPTURE_FAILED";
+    return failReceipt({ request, identity, authorization, reason, policy: sourcePolicy, transport: budget, attempts, capture: safeCapture(error) });
+  }
+  if (homeCapture.outcome !== "CAPTURED" || !homeCapture.finalUrl || host(homeCapture.finalUrl) !== host(identity.approvedWebsiteUrl)) {
+    return failReceipt({ request, identity, authorization, reason: "HOMEPAGE_CAPTURE_FAILED", policy: sourcePolicy, transport: budget, attempts, capture: homeCapture });
+  }
+  const homeFacts = await extractHtmlPageFacts(homeCapture, "HOME");
+  const expectedServices = [identity.record.niche];
+  const expectedLocations = [identity.record.city];
+  const plan = projectPlan(planWebsitePages({
+    selectionVersion: "website-page-selection-v1", selectionId: request.requestId, businessId: identity.businessId,
+    businessName: identity.record.businessName, niche: identity.record.niche, expectedServices, plannedAt: clock().toISOString(),
+    mode: "SHADOW", plannerKind: "DETERMINISTIC_FIXTURE", maxCostUsd: 0, policy: defaultWebsitePageSelectionPolicy(), homepageFacts: homeFacts,
+  }), identity);
+  let homeRef: PrivateKwHtmlEvidenceRef | null = null;
+  const retentionReviewDate = identity.chain.researchPolicy?.decisions.find((entry) => entry.businessId === identity.businessId)?.retentionReviewDate ?? authorization.expiresAt;
+  const metadata = {
+    businessId: identity.businessId, sourceId: identity.sourceRecordId, requestedUrl: homeCapture.requestedUrl!, sourcePageUrl: identity.approvedWebsiteUrl, finalUrl: homeCapture.finalUrl!, statusCode: homeCapture.statusCode, redirectCount: homeCapture.redirectCount,
+    redirectChainDigest: digest(homeCapture.redirectChain), captureVersion: homeCapture.captureVersion, transportVersion: "kw-m2-public-transport-v1",
+    sourcePolicyVersion: sourcePolicy.policyVersion, capturedAt: homeCapture.capturedAt, parentReceiptDigest: digest({ identity: identity.sourceIdentityDigest, page: "HOME", contentDigest: homeCapture.contentDigest, pageSelectionDigest: digest(plan) }),
+    authorizationDigest: authorization.authorizationDigest, authorizationExpiresAt: authorization.expiresAt, authorizationChain: identity.chain,
+    sourcePolicyDecision: sourcePolicy, transportReceipts: sourcePolicyTransportReceipts(sourcePolicy, budget), retentionDecision: retention,
+    retainUntil: retention === "RAW_HTML_ALLOWED" ? retentionReviewDate : undefined,
+    reviewAt: retention === "DERIVED_FACTS_ONLY" ? retentionReviewDate : undefined,
+    legalHold: false,
+  };
+  let storageFailure = false;
+  try {
+    assertBefore();
+    if (retention === "RAW_HTML_ALLOWED") homeRef = await store.writePrivateKwHtmlEvidence({ ...metadata, outcome: "RAW_HTML_ALLOWED", contentType: "text/html", bytes: homeCapture.rawBytes });
+    else if (retention === "DERIVED_FACTS_ONLY") homeRef = await store.writePrivateKwDerivedFacts({ ...metadata, outcome: "DERIVED_FACTS_ONLY", captureBytes: homeCapture.rawBytes, facts: projectFacts(homeFacts, expectedServices, expectedLocations), rawArtifactRef: null });
+  } catch (error) {
+    if (isAuthorizationExpired(error, authorization, clock)) return failReceipt({ request, identity, authorization, reason: "AUTHORIZATION_EXPIRED", policy: sourcePolicy, transport: budget, attempts, capture: homeCapture });
+    return failReceipt({ request, identity, authorization, reason: "STORE_CONFLICT", policy: sourcePolicy, transport: budget, attempts, capture: homeCapture });
+  }
+  let pageResults: z.infer<typeof PageReceiptSchema>[] = [makePage("HOME", homeCapture, homeFacts, homeRef?.outcome ?? "NONE", homeRef ? refs(homeRef) : { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null })];
+  const capturedPages: Array<{ pageKind: "HOME" | "SERVICE" | "ABOUT" | "CONTACT"; capture: WebsiteCaptureResult; facts: HtmlPageFacts }> = [{ pageKind: "HOME", capture: homeCapture, facts: homeFacts }];
+  let unsealedFailure = false;
+  for (const selected of plan.selectedPages.filter((page) => page.pageKind !== "HOME")) {
+    let capture: WebsiteCaptureResult | null = null;
+    try {
+      capture = await capturePublicWebsiteDocument(selected.url, { fetch: (value, init) => budget.request(value, init), now: clock });
+      if (Date.parse(authorization.expiresAt) <= clock().getTime()) throw new Error("AUTHORIZATION_EXPIRED");
+    } catch (error) {
+      if (error instanceof Error && (error.message.includes("AUTHORIZATION_EXPIRED") || Date.parse(authorization.expiresAt) <= clock().getTime())) {
+        return failReceipt({ request, identity, authorization, reason: "AUTHORIZATION_EXPIRED", policy: sourcePolicy, transport: budget, attempts, capture });
+      }
+      unsealedFailure = true;
+      pageResults.push(PageReceiptSchema.parse({ pageKind: selected.pageKind, requestedUrl: selected.url, finalUrl: null, capturedAt: clock().toISOString(), outcome: "FAILED", statusCode: 0, redirectCount: 0, bodyBytes: 0, contentDigest: null, factsDigest: null, storageOutcome: "NONE", storageRefs: { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null }, failureCode: "SUBPAGE_CAPTURE_FAILED" }));
+      continue;
+    }
+    if (!capture) {
+      unsealedFailure = true;
+      pageResults.push(PageReceiptSchema.parse({ pageKind: selected.pageKind, requestedUrl: selected.url, finalUrl: null, capturedAt: clock().toISOString(), outcome: "FAILED", statusCode: 0, redirectCount: 0, bodyBytes: 0, contentDigest: null, factsDigest: null, storageOutcome: "NONE", storageRefs: { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null }, failureCode: "SUBPAGE_CAPTURE_FAILED" }));
+      continue;
+    }
+    if (capture.outcome !== "CAPTURED" || !capture.finalUrl || host(capture.finalUrl) !== host(identity.approvedWebsiteUrl)) {
+      unsealedFailure = true;
+      pageResults.push(makePage(selected.pageKind, capture, null, "NONE", { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null }));
+      continue;
+    }
+    const facts = await extractHtmlPageFacts(capture, selected.pageKind);
+    capturedPages.push({ pageKind: selected.pageKind, capture, facts });
+    let pageRef: PrivateKwHtmlEvidenceRef | null = null;
+    try {
+      assertBefore();
+      const pageMetadata = { ...metadata, requestedUrl: selected.url, sourcePageUrl: identity.approvedWebsiteUrl, finalUrl: capture.finalUrl!, statusCode: capture.statusCode, redirectCount: capture.redirectCount, parentReceiptDigest: digest({ identity: identity.sourceIdentityDigest, page: selected.pageKind, contentDigest: capture.contentDigest, pageSelectionDigest: digest(plan) }) };
+      if (retention === "RAW_HTML_ALLOWED") pageRef = await store.writePrivateKwHtmlEvidence({ ...pageMetadata, outcome: "RAW_HTML_ALLOWED", contentType: "text/html", bytes: capture.rawBytes });
+      else pageRef = await store.writePrivateKwDerivedFacts({ ...pageMetadata, outcome: "DERIVED_FACTS_ONLY", captureBytes: capture.rawBytes, facts: projectFacts(facts, expectedServices, expectedLocations), rawArtifactRef: null });
+    } catch (error) {
+      if (isAuthorizationExpired(error, authorization, clock)) return failReceipt({ request, identity, authorization, reason: "AUTHORIZATION_EXPIRED", policy: sourcePolicy, transport: budget, attempts, capture });
+      storageFailure = true;
+      unsealedFailure = true;
+    }
+    pageResults.push(makePage(selected.pageKind, capture, facts, pageRef?.outcome ?? "NONE", pageRef ? refs(pageRef) : { contentRef: null, metadataRef: null, factsRef: null, receiptRef: null }));
+  }
+  const transportLedger = validateTransportLedger(budget.takeReceipts(), attempts, authorization.networkRequestCap, sourcePolicy);
+  pageResults = pageResults.map((page) => {
+    const witnessIds = failedPageTransportWitnessIds(page, transportLedger, sourcePolicy);
+    return witnessIds.length ? PageReceiptSchema.parse({ ...page, failedPageTransportReceiptIds: witnessIds }) : page;
+  });
+  const audit = buildPrivateKwM2HtmlAuditReceipt({ sourceIdentityDigest: identity.sourceIdentityDigest, businessId: identity.businessId, businessName: identity.record.businessName, niche: identity.record.niche, expectedServices, expectedLocations, sourceEvidenceUrl: identity.record.sourceEvidenceUrl, pages: capturedPages });
+  const failedSubpage = pageResults.some((page) => page.pageKind !== "HOME" && page.outcome !== "CAPTURED");
+  const durablePartial = failedSubpage && pageResults.filter((page) => page.pageKind !== "HOME" && page.outcome !== "CAPTURED").every((page) => page.failedPageTransportReceiptIds?.length);
+  const status = storageFailure ? "FAILED" : failedSubpage && durablePartial ? "PARTIAL" : failedSubpage ? "FAILED" : plan.status === "PARTIAL" ? "RESEARCH_REQUIRED" : "COMPLETE";
+  if (status !== "PARTIAL") {
+    pageResults = pageResults.map((page) => {
+      const sanitized = { ...page };
+      delete sanitized.failedPageTransportReceiptIds;
+      return sanitized;
+    });
+  }
+  const receipt = buildReceipt({ request, identity, authorization, status, stopReason: storageFailure ? "STORE_CONFLICT" : status === "FAILED" && failedSubpage ? "SUBPAGE_CAPTURE_FAILED" : null, policy: sourcePolicy, plan, pages: pageResults, audit, transport: budget, attempts });
+  if ((unsealedFailure && !durablePartial) || status !== "PARTIAL" && failedSubpage) return receipt;
+  await receiptStore.publishSealed(receipt);
+  return receipt;
+}
+
+export function privateKwM2HtmlEvidenceReceiptDigest(value: PrivateKwM2WebsiteEvidenceReceipt) {
+  return privateKwM2ReceiptCanonicalDigest(value);
+}
