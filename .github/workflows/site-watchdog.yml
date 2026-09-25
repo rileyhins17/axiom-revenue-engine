@@ -1,6 +1,6 @@
 # Outside watchdog: if the live app goes down it cannot email anyone itself,
-# so GitHub checks it every 30 minutes and opens an issue (which emails the
-# repo owner and mentions Aidan). The issue closes itself when the site is back.
+# so GitHub checks it every 30 minutes and opens an issue (GitHub emails the repo
+# owner, and the issue mentions Aidan). The issue closes itself when the site is back.
 name: Live site watchdog
 on:
   schedule:
@@ -26,17 +26,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          SITE_OK: ${{ steps.probe.outputs.ok }}
         run: |
-          open=$(gh issue list --label site-down --state open --json number --jq ".[0].number")
-          if [ "${{ steps.probe.outputs.ok }}" = "true" ]; then
-            if [ -n "$open" ]; then gh issue close "$open" --comment "✅ The site is back up. Nothing else to do."; fi
-          elif [ -z "$open" ]; then
+          open=$(gh issue list --label site-down --state open --json number --jq '.[0].number')
+          if [ "$SITE_OK" = "true" ]; then
+            if [ -n "$open" ]; then gh issue close "$open" --comment "The site is back up. Nothing else to do."; fi
+            exit 0
+          fi
+          if [ -z "$open" ]; then
             gh label create site-down --color B60205 --force >/dev/null
-            gh issue create --label site-down --title "⚠️ operations.getaxiom.ca is down" --body "The live Revenue Engine did not respond to its health check 3 times in a row ($(date -u +%Y-%m-%dT%H:%MZ)).
-
-**What this means:** the app may not load and calls may not sync right now.
-
-**What to do:** usually Cloudflare recovers on its own within minutes. If this issue is still open in an hour, ask Claude to check the Cloudflare Worker and roll back the last release if needed.
-
-@Mageester @rileyhins17 (this closes itself when the site is back)."
+            printf '%s\n' \
+              "The live Revenue Engine did not answer its health check 3 times in a row ($(date -u +%Y-%m-%dT%H:%MZ))." \
+              "" \
+              "**What this means:** the app may not load and calls may not sync right now." \
+              "" \
+              "**What to do:** Cloudflare usually recovers on its own within minutes. If this is still open in an hour, ask Claude to check the Cloudflare Worker and roll back the last release." \
+              "" \
+              "@Mageester @rileyhins17 - this issue closes itself when the site is back." > body.md
+            gh issue create --label site-down --title "operations.getaxiom.ca is down" --body-file body.md
           fi
