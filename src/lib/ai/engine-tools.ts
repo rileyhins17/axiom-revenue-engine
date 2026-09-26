@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { aiSpend } from "@/lib/ai/call-brief";
 import { historyView, prospectOutcomeText, torontoMidnight, torontoToday } from "@/lib/prospect-format";
+import { DiscoveryCitySchema, DiscoveryNicheSchema } from "@/lib/revenue-engine/places-discovery";
 import { emailOverview } from "@/lib/revenue-engine/engine-email";
 import { listActivityFor, listProspects, prospectActivityStats, prospectCounts, type ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
@@ -21,8 +22,8 @@ const LABEL_TEXT = { STRONG: "weak website", WEAK: "website is fine", NO_WEBSITE
 const clip = (value: string | null | undefined, max = 300) => value ? value.slice(0, max) : value ?? null;
 
 const Search = z.object({
-  text: z.string().max(80).optional(), city: z.enum(["KITCHENER", "WATERLOO", "CAMBRIDGE"]).optional(),
-  trade: z.enum(["ROOFING", "HVAC", "LANDSCAPING"]).optional(),
+  text: z.string().max(80).optional(), city: DiscoveryCitySchema.optional(),
+  trade: DiscoveryNicheSchema.optional(),
   list: z.enum(["call", "visit", "followups", "contacted", "all"]).optional(), limit: z.number().int().min(1).max(25).optional(),
 }).strict();
 const Business = z.object({ id: z.string().max(300).optional(), name: z.string().max(120).optional() }).strict();
@@ -61,8 +62,8 @@ export const ENGINE_TOOLS: EngineTool[] = [
     name: "search_businesses",
     description: "Find businesses on the call list. Filter by words in the name or phone, city, trade, and list (call = ready to call, visit = has an address for walk-ins, followups = due now, contacted = anyone we've reached out to, all). Returns up to 25.",
     parameters: { type: "object", properties: {
-      text: { type: "string" }, city: { type: "string", enum: ["KITCHENER", "WATERLOO", "CAMBRIDGE"] },
-      trade: { type: "string", enum: ["ROOFING", "HVAC", "LANDSCAPING"] }, list: { type: "string", enum: ["call", "visit", "followups", "contacted", "all"] },
+      text: { type: "string" }, city: { type: "string", enum: [...DiscoveryCitySchema.options] },
+      trade: { type: "string", enum: [...DiscoveryNicheSchema.options] }, list: { type: "string", enum: ["call", "visit", "followups", "contacted", "all"] },
       limit: { type: "integer" },
     } },
     async run(raw, { db, now = new Date() }) {

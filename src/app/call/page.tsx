@@ -2,6 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 
 import { CallQueue } from "@/components/prospects/call-queue";
+import { FindLeadsButton } from "@/components/prospects/find-leads-button";
 import { cachedBrief } from "@/lib/ai/call-brief";
 import { getCloudflareBindings, getDatabase } from "@/lib/cloudflare";
 import { historyView, mapsUrl, torontoMidnight, torontoToday } from "@/lib/prospect-format";
@@ -44,6 +45,7 @@ export default async function CallQueuePage({ searchParams }: { searchParams: Pr
       <div className="owner-float mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl bg-[#0a0a0a] text-2xl shadow-[0_14px_30px_-12px_rgba(184,137,59,0.6)]" aria-hidden="true">🎉</div>
       <p className="font-display text-2xl">All caught up</p>
       <p className="mt-2 text-sm text-slate-600">Everyone with a phone number has been called today or is waiting on a follow-up date. Try walk-ins, or check back tomorrow.</p>
+      <div className="mt-5 flex justify-center"><FindLeadsButton /></div>
       <div className="mt-4 flex justify-center gap-3 text-sm font-medium">
         <Link href={"/walk-ins" as Route} className="rounded-lg border border-slate-300 px-3 py-2 hover:bg-slate-50">Walk-ins</Link>
         <Link href={"/prospects" as Route} className="rounded-lg border border-slate-300 px-3 py-2 hover:bg-slate-50">Full call list</Link>

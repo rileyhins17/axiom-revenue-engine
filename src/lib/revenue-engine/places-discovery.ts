@@ -3,10 +3,13 @@ import { z } from "zod";
 /**
  * Automatic discovery through Google Places API (New) Text Search.
  *
- * Places is a discovery hint only. The engine keeps the place ID and the
- * business's own website origin, then judges the business from its own site.
- * Other Places content (names, addresses, phones) is used transiently for
- * de-duplication and is not persisted as canonical data.
+ * The engine keeps the place ID and the business's own website origin, then judges
+ * the business from its own site.
+ *
+ * OWNER DECISION 2026-09-26 (Riley): Google's name, phone and address ARE stored on
+ * EngineProspect so the call list works without a lookup per call. Google Maps
+ * Platform terms only allow storing place IDs; the owner accepted the risk that the
+ * API key could be suspended. Revisit before scaling or if Google objects.
  *
  * Off unless explicitly enabled with a key. Every run is bounded by a request cap
  * and a monthly cap checked before each request.
@@ -20,18 +23,23 @@ export const PLACES_MAX_REQUESTS_PER_MONTH = 600;
 /** Worst case if no free tier applied: US$28 per 1,000 Enterprise events. */
 export const PLACES_WORST_CASE_USD_PER_REQUEST = 0.028;
 
-export const DiscoveryCitySchema = z.enum(["KITCHENER", "WATERLOO", "CAMBRIDGE"]);
-export const DiscoveryNicheSchema = z.enum(["ROOFING", "HVAC", "LANDSCAPING"]);
+export const DiscoveryCitySchema = z.enum(["KITCHENER", "WATERLOO", "CAMBRIDGE", "GUELPH", "BRANTFORD", "STRATFORD", "WOODSTOCK", "ELMIRA", "NEW_HAMBURG", "AYR", "BRESLAU"]);
+export const DiscoveryNicheSchema = z.enum(["ROOFING", "HVAC", "LANDSCAPING", "PLUMBING", "ELECTRICAL"]);
 export type DiscoveryCity = z.infer<typeof DiscoveryCitySchema>;
 export type DiscoveryNiche = z.infer<typeof DiscoveryNicheSchema>;
 
 /** Several phrasings per trade surface more businesses than one query's 60-result limit. */
 export const QUERIES: Record<DiscoveryNiche, readonly string[]> = {
-  ROOFING: ["roofing contractor", "roofer", "roof repair", "eavestrough and gutter company"],
-  HVAC: ["heating and air conditioning contractor", "furnace repair", "air conditioning installation", "HVAC company"],
-  LANDSCAPING: ["landscaping company", "lawn care service", "interlock and patio contractor", "snow removal company"],
+  ROOFING: ["roofing contractor", "roofer", "roof repair", "eavestrough and gutter company", "shingle roof replacement", "flat roof repair", "siding and soffit contractor"],
+  HVAC: ["heating and air conditioning contractor", "furnace repair", "air conditioning installation", "HVAC company", "heat pump installer", "duct cleaning service", "boiler repair"],
+  LANDSCAPING: ["landscaping company", "lawn care service", "interlock and patio contractor", "snow removal company", "tree service", "fence and deck builder", "sod and garden installation"],
+  PLUMBING: ["plumber", "plumbing company", "drain cleaning service", "water heater installation"],
+  ELECTRICAL: ["electrician", "electrical contractor", "residential electrician", "generator installation"],
 };
-const CITY_NAME: Record<DiscoveryCity, string> = { KITCHENER: "Kitchener", WATERLOO: "Waterloo", CAMBRIDGE: "Cambridge" };
+export const CITY_NAME: Record<DiscoveryCity, string> = {
+  KITCHENER: "Kitchener", WATERLOO: "Waterloo", CAMBRIDGE: "Cambridge", GUELPH: "Guelph", BRANTFORD: "Brantford", STRATFORD: "Stratford",
+  WOODSTOCK: "Woodstock", ELMIRA: "Elmira", NEW_HAMBURG: "New Hamburg", AYR: "Ayr", BRESLAU: "Breslau",
+};
 
 const PlaceSchema = z.object({
   id: z.string().min(1).max(300),

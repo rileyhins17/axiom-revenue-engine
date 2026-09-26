@@ -5,6 +5,7 @@ import { ProspectRow, type ProspectRowView } from "@/components/prospects/prospe
 import { getDatabase } from "@/lib/cloudflare";
 import { historyView, prospectOutcomeText } from "@/lib/prospect-format";
 import { listActivityFor, listProspects, prospectCounts, ProspectViewSchema, type ProspectDb, type ProspectRow as Row } from "@/lib/revenue-engine/engine-prospects-d1";
+import { ACTIVE_CITIES, ACTIVE_NICHES } from "@/lib/revenue-engine/cloud-discovery";
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +19,8 @@ const TABS = [
   { view: "contacted", label: "Contacted", help: "Everyone you've called, visited or emailed, newest first." },
   { view: "all", label: "Everything", help: "Every business the engine has found, including closed ones." },
 ] as const;
-const CITIES = ["KITCHENER", "WATERLOO", "CAMBRIDGE"] as const;
-const TRADES = ["ROOFING", "HVAC", "LANDSCAPING"] as const;
+const CITIES = ACTIVE_CITIES;
+const TRADES = ACTIVE_NICHES;
 const title = (value: string) => value === "HVAC" ? value : value.charAt(0) + value.slice(1).toLowerCase();
 const day = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("en-CA", { month: "short", day: "numeric", timeZone: "America/Toronto" }) : null;
 const mapsUrl = (row: Row) => row.placeId

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Footprints, Headset, Mail, Phone, Target } from "lucide-react";
 
 import { WhatsNew } from "@/components/help/whats-new";
+import { FindLeadsButton } from "@/components/prospects/find-leads-button";
 import { CountUp } from "@/components/motion/count-up";
 import { getDatabase } from "@/lib/cloudflare";
 import { displayPhone, titleCase, torontoMidnight, torontoToday } from "@/lib/prospect-format";
@@ -95,6 +96,14 @@ export default async function TodayPage() {
     </header>
 
     <WhatsNew />
+
+    {counts.call < 15 ? <div className="owner-attention flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e6d6b3] bg-[#fbf3e2] px-5 py-4">
+      <div>
+        <p className="font-semibold">{counts.call === 0 ? "You're out of new businesses to call." : `Only ${counts.call} new business${counts.call === 1 ? "" : "es"} left to call.`}</p>
+        <p className="text-sm text-slate-700">The engine also searches by itself every weekday at 7am. Press the button to get more right now.</p>
+      </div>
+      <FindLeadsButton />
+    </div> : null}
 
     <div className="grid gap-4 lg:grid-cols-3">
       <Link href={"/call" as Route} className="group min-w-0 rounded-2xl owner-cta p-6  shadow-sm  lg:col-span-2">

@@ -27,7 +27,7 @@
     { "name": "LOGIN_EMAIL", "allowed_destination_addresses": ["rileyhinsperger@gmail.com", "aidanmageebusiness@gmail.com"] }
   ],
   "triggers": {
-    "crons": ["0 14 * * 1-5", "*/15 * * * *"]
+    "crons": ["0 14 * * 1-5", "*/15 * * * *", "0 11 * * 1-5"]
   },
   "vars": {
     "APP_BASE_URL": "https://operations.getaxiom.ca/",

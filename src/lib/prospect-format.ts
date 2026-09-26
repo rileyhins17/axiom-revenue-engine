@@ -2,7 +2,7 @@ import type { ProspectActivity, ProspectRow } from "@/lib/revenue-engine/engine-
 
 const ZONE = "America/Toronto";
 
-export const titleCase = (value: string) => value === "HVAC" ? value : value.charAt(0) + value.slice(1).toLowerCase();
+export const titleCase = (value: string) => value === "HVAC" ? value : value.toLowerCase().split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 export const torontoToday = (now = new Date()) => now.toLocaleDateString("en-CA", { timeZone: ZONE });
 export const shortDay = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("en-CA", { month: "short", day: "numeric", timeZone: ZONE }) : null;
 

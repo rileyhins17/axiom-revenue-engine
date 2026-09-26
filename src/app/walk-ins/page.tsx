@@ -5,12 +5,13 @@ import { WalkInCard, type WalkInView } from "@/components/prospects/walk-in-card
 import { getDatabase } from "@/lib/cloudflare";
 import { mapsUrl, OUTCOME_TEXT, titleCase, torontoToday } from "@/lib/prospect-format";
 import { listProspects, type ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
+import { ACTIVE_CITIES } from "@/lib/revenue-engine/cloud-discovery";
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Walk-ins | Axiom Revenue Engine" };
 
-const CITIES = ["KITCHENER", "WATERLOO", "CAMBRIDGE"] as const;
+const CITIES = ACTIVE_CITIES;
 
 /** Google Maps directions through up to 10 stops (Maps' own limit for a shared link). */
 function routeUrl(stops: WalkInView[]) {
