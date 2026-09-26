@@ -1,3 +1,28 @@
+## Production 2026-09-26: server-side lead search live; Caller contact edits live
+
+Verified commit `4ab766ab` is live as Worker `ea38eea7-39b6-43a6-b874-dfd2cdb9ce1d`. Migrations run through 0082 (85 receipts), and the emergency stops read `01111`. The release script's smoke test passed. The rollback target is `629dc6c9`. Backups taken today: `backups/production/prod-export-20260926T231730Z.sql` and `-20260926T233826Z.sql`, plus time-travel bookmark `000030d0-00000000-000050f2-175e216389e92b4612e3921c91dfe275`. Gate passed: safety check, 988 tests (984 pass, 0 fail), types, lint (0 errors), Cloudflare build, and owner UI (8 WCAG pages).
+
+- **Lead discovery (0081):**
+  - Runs on the Worker every weekday at 07:00 Toronto (30 requests per run), plus the owner "Find new leads now" button (10 requests).
+  - Uses `ENGINE_PLACES_KEY`, falling back to the existing Worker secret `GOOGLE_PLACES_API_KEY`.
+  - First owner run: 10 requests, 126 found, 5 added to the call list, 14 held for a website check.
+  - Places usage for 2026-09 is 143 of the 600/month cap, inside Google's free tier. GCP allows about 40 requests a day.
+- **Caller contact edits (0082):**
+  - `POST /api/caller/v2/contact-edits` takes a Caller key and saves the edit append-only in `CallerContactEdit`, keeping the number it replaced.
+  - A phone fix updates `EngineProspect.phone` and returns the new `sourceRevision`.
+  - Notes never write to `EngineProspectActivity`, so queue stages are unchanged.
+  - The call list shows the latest note and a "Number updated (was …)" line.
+  - Edits are not sent to Orbit.
+- **Spend:** none. Places stays in the free tier; AI is unchanged under its US$5 cap.
+
+Owner decisions: store Google name, phone and address (2026-09-26); Riley builds the Engine side of contact edits.
+Open: whether Aidan may move 13 uncalled businesses (site mostly works, minor issues) onto his call list — waiting on Riley.
+
+Next three actions:
+1. Rehearse on a backup copy the EngineProspect rebuild together with its foreign-key child tables. This unlocks 8 more towns plus plumbing and electrical.
+2. Add a cloud website check (Browser Rendering) to promote `DiscoveryHeld` businesses.
+3. Aidan wires contact edits into Caller; after that, consider projecting edits to Orbit.
+
 ## Production connected calling rollout — 2026-09-25
 
 The owner-authorized guarded release is active: Engine source `49b45523b7e9a9d444bc56cbfaa1b716977c12c5`, Worker `ecfba54e-ce3b-4529-844f-86c2849e3219`, additive migration 0079 applied. Fresh private backups passed restoration and original-row preservation checks. Intended-workspace calling is enabled; scheduled Caller sync, general autonomy and email remain off under the existing budget/stop controls. Authenticated connection/tasks and source preparation passed through the actual Caller browser without dialing or recording a synthetic production call. The previous Worker version and private rollback bookmark are retained. See [the release record](calling/release.md) for both source versions and recovery details.
