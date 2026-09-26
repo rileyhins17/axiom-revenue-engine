@@ -11,6 +11,7 @@ import { claimContact, renewContactClaim, releaseContactClaim, reconcileClaim, s
 import { getEngineContactLink } from './links';
 import { claimEngineLinkedContact,renewEngineLinkedClaim } from './linked-claims';
 import { peerGrant,requestPeer,PeerError,type CallerBridge } from './peer-contract';
+import { contactEditSchema, recordContactEdit } from './contact-edits';
 
 const claimSchema = z.object({ attemptId: z.uuid(), ownerId: z.string().min(1).max(128), contactKey: z.string().max(2048), revision: z.number().int().nonnegative(), expiresAt: z.iso.datetime(), state: z.enum(['reserved','armed','active','uncertain','closed']) }).strict();
 const parseSource = (input: unknown) => { try { const source = sourceRefSchema.parse(input); assertEngineSource(source); return source; } catch (error) { if (error instanceof CallerError) throw error; throw new CallerError('INVALID_REQUEST', 400); } };
@@ -79,6 +80,12 @@ export async function handleEngineCallerRequest(db: CallerDb, request: Request, 
       if (!exists) throw new CallerError('NOT_FOUND', 404);
       await setContactStop(db, actor, await engineContactId(source.entityId), command.reason, Date.now(), source.entityId);
       flush();return json({ stopped: true });
+    }
+    if (route === 'contact-edits') {
+      if (request.method !== 'POST') throw new CallerError('METHOD_NOT_ALLOWED', 405);
+      const { source, ...edit } = contactEditSchema.parse(await readCallerJson(request));
+      const receipt = await recordContactEdit(db, actor, parseSource(source).entityId, edit);
+      return json(receipt, receipt.status === 'saved' ? 201 : 200);
     }
     if (route === 'results') {
       if (request.method !== 'POST') throw new CallerError('METHOD_NOT_ALLOWED', 405);

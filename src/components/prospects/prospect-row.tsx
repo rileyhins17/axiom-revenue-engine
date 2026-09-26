@@ -14,6 +14,9 @@ export type ProspectRowView = {
   reasons: string[]; phone: string | null; address: string | null; websiteUrl: string | null; mapsUrl: string;
   lastOutcomeText: string | null; lastActivity: string | null; followUpAt: string | null; attempts: number;
   history: { id: string; when: string; who: string; what: string; note: string; followUpAt: string | null }[];
+  /** Latest note and number fix sent from Axiom Caller (older ones stay in the database). */
+  callerNote?: { note: string; who: string; when: string } | null;
+  callerPhoneFix?: { previousPhone: string | null; who: string; when: string } | null;
 };
 
 const title = (value: string) => value === "HVAC" ? value : value.charAt(0) + value.slice(1).toLowerCase();
@@ -33,11 +36,13 @@ export function ProspectRow({ row }: { row: ProspectRowView }) {
       <td className="px-3 py-3">
         <p className="font-medium">{row.name}</p>
         <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${badge.className}`}>{badge.text}</span>
+        {row.callerNote ? <p className="mt-1 max-w-[260px] text-xs text-slate-700" title={`Note from Caller · ${row.callerNote.who} · ${row.callerNote.when}`}>📝 {row.callerNote.note}</p> : null}
       </td>
       <td className="px-3 py-3 text-sm">{title(row.city)}<br /><span className="text-slate-600">{title(row.niche)}</span></td>
       <td className="max-w-[340px] px-3 py-3 text-sm">{row.reasons.slice(0, 2).map((reason) => <p key={reason}>{reason}</p>)}</td>
       <td className="whitespace-nowrap px-3 py-3 text-sm">
         {row.phone ? <CallerLaunch prospectId={row.prospectId} label={displayPhone(row.phone)} className="tabular-nums text-[#7a5818] hover:underline" /> : <span className="text-slate-600">—</span>}
+        {row.callerPhoneFix ? <p className="text-[11px] text-slate-600" title={`Fixed in Caller by ${row.callerPhoneFix.who} · ${row.callerPhoneFix.when}`}>Number updated{row.callerPhoneFix.previousPhone ? ` (was ${displayPhone(row.callerPhoneFix.previousPhone)})` : ""}</p> : null}
         <div className="mt-1 flex gap-2 text-xs">
           <a href={row.mapsUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-slate-600 hover:text-slate-900"><MapPin className="size-3" aria-hidden="true" />Map</a>
           {row.websiteUrl ? <a href={row.websiteUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-slate-600 hover:text-slate-900"><ExternalLink className="size-3" aria-hidden="true" />Site</a> : null}

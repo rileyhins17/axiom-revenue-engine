@@ -6,6 +6,8 @@ import { getDatabase } from "@/lib/cloudflare";
 import { historyView, prospectOutcomeText } from "@/lib/prospect-format";
 import { listActivityFor, listProspects, prospectCounts, ProspectViewSchema, type ProspectDb, type ProspectRow as Row } from "@/lib/revenue-engine/engine-prospects-d1";
 import { ACTIVE_CITIES, ACTIVE_NICHES } from "@/lib/revenue-engine/cloud-discovery";
+import { listContactEditsFor } from "@/lib/caller-v2/contact-edits";
+import type { CallerDb } from "@/lib/caller-v2/database";
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -59,13 +61,22 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
     && (!q || row.name.toLowerCase().includes(q) || (row.phone ?? "").includes(q)));
   const shown = filtered.slice(0, 250);
   const history = await listActivityFor(db, shown.filter((row) => row.attempts > 0 || row.lastOutcome).map((row) => row.prospectId));
-  const views: ProspectRowView[] = shown.map((row) => ({
+  // Caller edits are extra context; the list still loads if they can't be read.
+  const edits = await listContactEditsFor(db as unknown as CallerDb, shown.map((row) => row.prospectId)).catch(() => new Map<string, never[]>());
+  const who = (actor: string) => actor === "AIDAN" ? "Aidan" : "Riley";
+  const views: ProspectRowView[] = shown.map((row) => {
+    const list = edits.get(row.prospectId) ?? [];
+    const note = list.find((item) => item.note), fix = list.find((item) => item.newPhone);
+    return {
     prospectId: row.prospectId, name: row.name, city: row.city, niche: row.niche, label: row.label, reasons: row.reasons,
     phone: row.phone, address: row.address, websiteUrl: row.websiteUrl, mapsUrl: mapsUrl(row),
     lastOutcomeText: prospectOutcomeText(row.lastOutcome, row.lastCallerOutcome), lastActivity: day(row.lastActivityAt),
     followUpAt: row.followUpAt, attempts: row.attempts,
     history: historyView(history.get(row.prospectId) ?? []),
-  }));
+    callerNote: note?.note ? { note: note.note, who: who(note.actor), when: day(note.createdAt) ?? "" } : null,
+    callerPhoneFix: fix ? { previousPhone: fix.previousPhone, who: who(fix.actor), when: day(fix.createdAt) ?? "" } : null,
+  };
+  });
 
   return <section className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-6">
     <header className="flex flex-wrap items-end justify-between gap-3">
