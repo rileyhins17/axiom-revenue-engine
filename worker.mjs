@@ -12,7 +12,7 @@ import { clearServerEnvCache } from "./src/lib/env";
 import { runEngineEmailCron } from "./src/lib/revenue-engine/engine-email-worker";
 import { runCallerSyncTick } from "./src/lib/caller-v2/sync-tick";
 import { alertEmail, OWNER_ALERT_INBOXES, recordAndSelectAlerts, runHealthChecks } from "./src/lib/ops/health";
-import { runDiscovery, SCHEDULED_REQUESTS_PER_RUN } from "./src/lib/revenue-engine/cloud-discovery";
+import { placesKeyFromEnv, runDiscovery, SCHEDULED_REQUESTS_PER_RUN } from "./src/lib/revenue-engine/cloud-discovery";
 
 // Weekdays 7am Toronto (EDT): find new businesses on the server, within the free Google cap.
 const DISCOVERY_CRON = "0 11 * * 1-5";
@@ -155,7 +155,7 @@ const exportedWorker = {
     clearServerEnvCache();
     setCloudflareBindings(env);
     if (controller?.cron === DISCOVERY_CRON) {
-      const apiKey = typeof env.ENGINE_PLACES_KEY === "string" ? env.ENGINE_PLACES_KEY.trim() || undefined : undefined;
+      const apiKey = placesKeyFromEnv(env);
       ctx.waitUntil(runDiscovery(env.DB, { apiKey, trigger: "SCHEDULE", maxRequests: SCHEDULED_REQUESTS_PER_RUN })
         .then((result) => console.log(JSON.stringify({ event: "discovery", ...result })))
         .catch((error) => console.error("[discovery] failure", error instanceof Error ? error.message : "unknown")));

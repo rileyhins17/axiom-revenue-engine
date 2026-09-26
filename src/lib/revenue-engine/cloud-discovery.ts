@@ -26,6 +26,15 @@ export const ACTIVE_NICHES: readonly DiscoveryNiche[] = ["ROOFING", "HVAC", "LAN
 export const DISCOVERY_CELLS: DiscoveryCell[] = ACTIVE_NICHES.flatMap((niche) =>
   QUERIES[niche].flatMap((query) => ACTIVE_CITIES.map((city) => ({ city, niche, query }))));
 
+/** The Places key on the Worker: ENGINE_PLACES_KEY, else the existing GOOGLE_PLACES_API_KEY secret. */
+export function placesKeyFromEnv(env: Record<string, unknown>): string | undefined {
+  for (const name of ["ENGINE_PLACES_KEY", "GOOGLE_PLACES_API_KEY"]) {
+    const value = env[name];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
 export type DiscoveryResult = { runId: string; requests: number; found: number; added: number; held: number; stopReason: string | null };
 type Fetcher = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{ status: number; json(): Promise<unknown> }>;
 type Place = { id?: string; displayName?: { text?: string }; websiteUri?: string; formattedAddress?: string; businessStatus?: string; nationalPhoneNumber?: string };
