@@ -203,6 +203,12 @@ requireMatch("scripts/sanitize-cloudflare-bundle.mjs", bundleSanitizer, /private
 requireMatch("package.json", packageJson, /"cf:engine:typegen:check"\s*:\s*"[^"]*--env-file wrangler\.typegen\.env/, "engine binding generation must ignore local env files");
 requireMatch("package.json", packageJson, /"cf:engine:dry-run"\s*:/, "CI must dry-run the inert engine bundle");
 requireMatch("package.json", packageJson, /scripts\/\*\*\/\*\.test\.ts/, "TypeScript script tests must run in the complete test gate");
+const siteCheckWrangler = await readFile(new URL("../wrangler.site-check.jsonc", import.meta.url), "utf8");
+requireMatch("wrangler.site-check.jsonc", siteCheckWrangler, /"name"\s*:\s*"axiom-site-check"/, "the website check runs as its own Worker, separate from the app");
+requireMatch("wrangler.site-check.jsonc", siteCheckWrangler, /"workers_dev"\s*:\s*false/, "the website check must not have a public workers.dev address");
+requireMatch("wrangler.site-check.jsonc", siteCheckWrangler, /"preview_urls"\s*:\s*false/, "the website check must not expose preview URLs");
+requireMatch("wrangler.site-check.jsonc", siteCheckWrangler, /"crons"\s*:\s*\[\s*"\*\/10 11-23 \* \* MON-FRI"\s*\]/, "the website check runs every 10 minutes on weekday daytimes only");
+forbidMatch("wrangler.site-check.jsonc", siteCheckWrangler, /send_email|"services"|kv_namespaces|r2_buckets|"queues"|"routes"|ENGINE_EMAIL|AUTONOMOUS_/, "the website check may only read businesses and grade websites");
 const productionWrangler = await readFile(new URL("../wrangler.production.jsonc", import.meta.url), "utf8");
 requireMatch("wrangler.production.jsonc", productionWrangler, /"ENGINE_EMAIL_ENABLED"\s*:\s*"false"/, "live email sending must be off in source; the owner enables it deliberately");
 requireMatch("wrangler.production.jsonc", productionWrangler, /"crons"\s*:\s*\[\s*(?:"0 14 \* \* MON-FRI"\s*,\s*"\*\/15 \* \* \* \*"\s*,\s*"0 11 \* \* MON-FRI"\s*)?\]/, "live may only schedule the gated email batch, the read-only health check and the capped lead search");

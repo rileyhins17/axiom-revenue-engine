@@ -13,7 +13,9 @@ import type { EngineSiteSignals } from "./engine-site-capture";
  *          sideways scrolling, a years-stale site, or a weak call/quote path.
  * WEAK   — everything else (the website broadly works).
  */
-export const ENGINE_LEAD_RULES_VERSION = "engine-lead-rules-v7" as const;
+// v8 (2026-09-28): same points and threshold as v7; the generic-domain check also knows the
+// wider market's towns (Guelph ... Breslau) and trades (plumbing, electrical).
+export const ENGINE_LEAD_RULES_VERSION = "engine-lead-rules-v8" as const;
 /** Points needed before a site is called weak, and at least one of them must be a visible, serious problem. */
 export const STRONG_THRESHOLD = 3;
 export type EngineLeadLabel = "STRONG" | "WEAK" | "WRONG";
@@ -21,8 +23,8 @@ export type EngineReasonCode = "LOCATION_PAGE" | "GENERIC_DOMAIN" | "NO_PHONE_LA
   | "NO_CALL_OR_QUOTE" | "NO_CALL_THIN" | "NO_QUOTE_THIN" | "WORKS";
 export type EngineLeadDecision = { label: EngineLeadLabel; reasons: string[]; codes: EngineReasonCode[]; score?: number };
 
-const CITY = /kitchener|waterloo|cambridge|guelph|tricity|kw/i;
-const TRADE = /roof|hvac|heating|cooling|air|furnace|landscap|lawn/i;
+const CITY = /kitchener|waterloo|cambridge|guelph|brantford|stratford|woodstock|elmira|newhamburg|ayr|breslau|tricity|kw/i;
+const TRADE = /roof|hvac|heating|cooling|air|furnace|landscap|lawn|plumb|drain|electric/i;
 
 export function wordpressMajor(generator: string | null): number | null {
   const match = generator?.match(/^WordPress\s+(\d+)/i);

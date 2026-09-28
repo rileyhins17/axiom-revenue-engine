@@ -74,3 +74,25 @@ test("the morning lead search is checked on weekdays after 8:30, and a key Googl
   raw.exec(`INSERT INTO "DiscoveryRun" ("runId","trigger","actor","startedAt","requests","stopReason") VALUES ('r3','OWNER','AIDAN','2026-09-25T16:00:00Z',1,'Google''s daily search limit was reached; it continues tomorrow.')`);
   assert.equal((await leadSearch(friday4pm)).ok, true, "the daily limit is expected, not a fault");
 });
+
+test("the website check is flagged only when businesses wait during weekday hours and it stopped or can't open sites", async () => {
+  const { raw, db } = database();
+  raw.exec(readFileSync("migrations/0081_cloud_discovery.sql", "utf8"));
+  raw.exec(`CREATE TABLE "EngineProspect" ("prospectId" TEXT)`);
+  raw.exec(readFileSync("migrations/0084_site_check.sql", "utf8"));
+  const siteCheck = async (now: Date) => (await runHealthChecks(db, ENV, now)).find((c) => c.key === "website-check")!;
+  const friday2pm = new Date("2026-09-25T18:00:00Z");
+  assert.equal((await siteCheck(friday2pm)).ok, true, "nothing waiting, nothing to judge");
+  raw.exec(`INSERT INTO "DiscoveryHeld" ("placeId","name","city","niche","websiteUrl","firstSeenAt") VALUES ('p1','Held','GUELPH','HVAC','https://held.example/','2026-09-25')`);
+  assert.equal((await siteCheck(friday2pm)).ok, false, "waiting and no run in the last hour");
+  assert.match((await siteCheck(friday2pm)).problem, /hasn't run/);
+  assert.equal((await siteCheck(new Date("2026-09-26T18:00:00Z"))).ok, true, "weekends are not judged");
+  assert.equal((await siteCheck(new Date("2026-09-25T23:30:00Z"))).ok, true, "evenings are not judged");
+  raw.exec(`INSERT INTO "SiteCheckRun" ("runId","startedAt","checked","failed") VALUES ('r1','2026-09-25T17:50:00Z',4,0)`);
+  assert.equal((await siteCheck(friday2pm)).ok, true);
+  raw.exec(`INSERT INTO "SiteCheckRun" ("runId","startedAt","checked","failed") VALUES ('r2','2026-09-25T15:40:00Z',0,6),('r3','2026-09-25T16:50:00Z',0,6)`);
+  raw.exec(`UPDATE "SiteCheckRun" SET "checked"=0,"failed"=6 WHERE "runId"='r1'`);
+  const failing = await siteCheck(friday2pm);
+  assert.equal(failing.ok, false);
+  assert.match(failing.problem, /can't open any websites/);
+});

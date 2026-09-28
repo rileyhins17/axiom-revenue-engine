@@ -58,6 +58,21 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
     leadSearch.rejected ? "Google turned down the last lead search, so no new businesses are being found." : "This morning's automatic lead search didn't run, so no new businesses were added today.",
     leadSearch.rejected ? "Ask Claude to check the Google Places key on the Worker (ENGINE_PLACES_KEY or GOOGLE_PLACES_API_KEY)." : "Press \"Find new leads now\" on Today, then ask Claude to check the Worker's 7am schedule.");
 
+  // The cloud website check (axiom-site-check Worker) runs every 10 minutes on weekdays.
+  // Only judged 8:00-19:00 while businesses are waiting, so a quiet queue is never a fault.
+  const businessHours = local.getDay() >= 1 && local.getDay() <= 5 && local.getHours() >= 8 && local.getHours() < 19;
+  const siteCheck = await safe(async () => {
+    if (!businessHours || await count(db, `SELECT COUNT(*) AS n FROM "DiscoveryHeld" WHERE "status" = 'WAITING'`) === 0) return { stalled: false, failing: false };
+    const recent = await db.prepare(`SELECT COUNT(*) AS runs, COALESCE(SUM("checked"),0) AS checked, COALESCE(SUM("failed"),0) AS failed FROM "SiteCheckRun" WHERE "startedAt" >= ?`)
+      .bind(hoursAgo(now, 1)).first<{ runs: number; checked: number; failed: number }>();
+    const lastThree = await db.prepare(`SELECT COALESCE(SUM("checked"),0) AS checked, COALESCE(SUM("failed"),0) AS failed FROM "SiteCheckRun" WHERE "startedAt" >= ?`)
+      .bind(hoursAgo(now, 3)).first<{ checked: number; failed: number }>();
+    return { stalled: Number(recent?.runs ?? 0) === 0, failing: Number(lastThree?.checked ?? 0) === 0 && Number(lastThree?.failed ?? 0) >= 6 };
+  }, { stalled: false, failing: false });
+  add("website-check", !siteCheck.stalled && !siteCheck.failing,
+    siteCheck.failing ? "The website check can't open any websites right now, so businesses with a site aren't being graded." : "The website check hasn't run in the last hour, so businesses with a site aren't reaching the call list.",
+    "Calling is not affected. Ask Claude to check the axiom-site-check Worker (Cloudflare Browser Run) and its SITE_CHECK_ENABLED setting.");
+
   const budget = Number(env.AI_MONTHLY_BUDGET_USD ?? 5) || 5;
   const spent = await safe(async () => Number((await db.prepare(`SELECT COALESCE(SUM("costMicroUsd"),0) AS n FROM "AiUsage" WHERE "month" = ?`).bind(now.toISOString().slice(0, 7)).first<{ n: number }>())?.n ?? 0) / 1_000_000, 0);
   add("ai-budget", spent < budget * 0.9, `AI has used US$${spent.toFixed(2)} of its US$${budget.toFixed(2)} monthly budget. AI briefs and Ask AI stop at the limit.`, "It resets on the 1st. Nothing to do unless you want a higher cap.");

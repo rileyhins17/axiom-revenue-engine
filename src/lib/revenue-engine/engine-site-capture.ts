@@ -152,7 +152,7 @@ export function copyrightYear(text: string): number | null {
   return years.length ? Math.max(...years) : null;
 }
 
-const ADDRESS = /\b\d{1,5}\s+[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)?\s+(?:St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Blvd|Boulevard|Cres|Crescent|Way|Ct|Court|Pl|Place|Line|Pkwy|Parkway|Hwy|Highway)\b\.?(?:[ ,]+(?:Unit|Suite|#)\s*\w+)?(?:[ ,]+(?:Kitchener|Waterloo|Cambridge|Guelph|Breslau|Elmira|Ayr|New Hamburg)\b)?/;
+const ADDRESS = /\b\d{1,5}\s+[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)?\s+(?:St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Blvd|Boulevard|Cres|Crescent|Way|Ct|Court|Pl|Place|Line|Pkwy|Parkway|Hwy|Highway)\b\.?(?:[ ,]+(?:Unit|Suite|#)\s*\w+)?(?:[ ,]+(?:Kitchener|Waterloo|Cambridge|Guelph|Brantford|Stratford|Woodstock|Breslau|Elmira|Ayr|New Hamburg)\b)?/;
 
 /** A North American number from the first tel: link, formatted for display. */
 export function sitePhone(hrefs: ReadonlyArray<string | null>): string | null {
