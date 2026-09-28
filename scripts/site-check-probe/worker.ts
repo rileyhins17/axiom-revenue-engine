@@ -14,7 +14,7 @@ import { captureAndAuditSite } from "../../src/lib/revenue-engine/engine-site-ca
  */
 type Env = { BROWSER: Parameters<typeof launch>[0] };
 
-export default {
+const siteCheckProbe = {
   async fetch(request: Request, env: Env) {
     const urls = new URL(request.url).searchParams.getAll("url").slice(0, 6);
     if (!urls.length) return Response.json({ error: "pass ?url=" }, { status: 400 });
@@ -40,3 +40,5 @@ export default {
     return Response.json({ results });
   },
 };
+
+export default siteCheckProbe;

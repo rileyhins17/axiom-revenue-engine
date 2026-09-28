@@ -16,7 +16,7 @@ import type { ProspectDb } from "../lib/revenue-engine/engine-prospects-d1";
 type Env = { DB: unknown; BROWSER: Parameters<typeof launch>[0]; SITE_CHECK_ENABLED?: string };
 type Context = { waitUntil(promise: Promise<unknown>): void };
 
-export default {
+const siteCheckWorker = {
   async scheduled(_controller: unknown, env: Env, ctx: Context) {
     if (env.SITE_CHECK_ENABLED !== "true") {
       console.log(JSON.stringify({ event: "site_check", skipped: "SITE_CHECK_ENABLED is not true" }));
@@ -38,3 +38,5 @@ export default {
     return new Response("Not found", { status: 404 });
   },
 };
+
+export default siteCheckWorker;
