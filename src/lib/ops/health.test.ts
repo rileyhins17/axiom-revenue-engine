@@ -55,3 +55,22 @@ test("missing sign-in email and a near-empty AI budget are reported", async () =
   const checks = await runHealthChecks(db, { CALLER_V2_ENABLED: "true" }, NOW);
   assert.deepEqual(checks.filter((c) => !c.ok).map((c) => c.key).sort(), ["ai-budget", "login-email"]);
 });
+
+test("the morning lead search is checked on weekdays after 8:30, and a key Google refuses is reported", async () => {
+  const { raw, db } = database();
+  raw.exec(readFileSync("migrations/0081_cloud_discovery.sql", "utf8"));
+  const leadSearch = async (now: Date) => (await runHealthChecks(db, ENV, now)).find((c) => c.key === "lead-search")!;
+  const friday4pm = new Date("2026-09-25T20:00:00Z");
+  assert.equal((await leadSearch(friday4pm)).ok, false, "no run this morning");
+  assert.match((await leadSearch(friday4pm)).problem, /didn't run/);
+  assert.equal((await leadSearch(new Date("2026-09-25T12:00:00Z"))).ok, true, "before 8:30 it is too early to tell");
+  assert.equal((await leadSearch(new Date("2026-09-26T20:00:00Z"))).ok, true, "weekends have no scheduled search");
+  raw.exec(`INSERT INTO "DiscoveryRun" ("runId","trigger","startedAt","requests","added") VALUES ('r1','SCHEDULE','2026-09-25T11:00:05Z',30,7)`);
+  assert.equal((await leadSearch(friday4pm)).ok, true);
+  raw.exec(`INSERT INTO "DiscoveryRun" ("runId","trigger","actor","startedAt","requests","stopReason") VALUES ('r2','OWNER','AIDAN','2026-09-25T15:00:00Z',1,'Google returned an error (403).')`);
+  const refused = await leadSearch(friday4pm);
+  assert.equal(refused.ok, false);
+  assert.match(refused.problem, /Google turned down/);
+  raw.exec(`INSERT INTO "DiscoveryRun" ("runId","trigger","actor","startedAt","requests","stopReason") VALUES ('r3','OWNER','AIDAN','2026-09-25T16:00:00Z',1,'Google''s daily search limit was reached; it continues tomorrow.')`);
+  assert.equal((await leadSearch(friday4pm)).ok, true, "the daily limit is expected, not a fault");
+});

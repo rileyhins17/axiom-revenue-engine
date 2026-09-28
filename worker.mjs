@@ -14,8 +14,12 @@ import { runCallerSyncTick } from "./src/lib/caller-v2/sync-tick";
 import { alertEmail, OWNER_ALERT_INBOXES, recordAndSelectAlerts, runHealthChecks } from "./src/lib/ops/health";
 import { placesKeyFromEnv, runDiscovery, SCHEDULED_REQUESTS_PER_RUN } from "./src/lib/revenue-engine/cloud-discovery";
 
+// Cloudflare numbers weekdays from 1 = Sunday, so "1-5" meant Sunday to Thursday.
+// Schedules use day names; each also matches its numeric form in case Cloudflare
+// reports it that way, so a schedule can never fall through to the wrong handler.
+const cronIs = (cron, names) => typeof cron === "string" && names.includes(cron.trim().toUpperCase());
 // Weekdays 7am Toronto (EDT): find new businesses on the server, within the free Google cap.
-const DISCOVERY_CRON = "0 11 * * 1-5";
+const DISCOVERY_CRON = ["0 11 * * MON-FRI", "0 11 * * 2-6"];
 
 const HEALTH_CRON = "*/15 * * * *";
 async function runHealthCron(env) {
@@ -30,7 +34,7 @@ async function runHealthCron(env) {
 
 const worker = openNextWorkerModule;
 // Weekdays 10:00 Toronto (EDT); the sender itself refuses weekends and every closed gate.
-const ENGINE_EMAIL_CRON = "0 14 * * 1-5";
+const ENGINE_EMAIL_CRON = ["0 14 * * MON-FRI", "0 14 * * 2-6"];
 
 export { BucketCachePurge, DOQueueHandler, DOShardedTagCache };
 
@@ -154,7 +158,7 @@ const exportedWorker = {
   async scheduled(controller, env, ctx) {
     clearServerEnvCache();
     setCloudflareBindings(env);
-    if (controller?.cron === DISCOVERY_CRON) {
+    if (cronIs(controller?.cron, DISCOVERY_CRON)) {
       const apiKey = placesKeyFromEnv(env);
       ctx.waitUntil(runDiscovery(env.DB, { apiKey, trigger: "SCHEDULE", maxRequests: SCHEDULED_REQUESTS_PER_RUN })
         .then((result) => console.log(JSON.stringify({ event: "discovery", ...result })))
@@ -174,7 +178,7 @@ const exportedWorker = {
         .catch(() => { console.error("[caller-sync] failure"); throw new Error("CALLER_SYNC_FAILED"); }));
       return;
     }
-    if (controller?.cron === ENGINE_EMAIL_CRON) {
+    if (cronIs(controller?.cron, ENGINE_EMAIL_CRON)) {
       ctx.waitUntil(
         runEngineEmailCron(env)
           .then((result) => console.log(JSON.stringify({ event: "engine_email", ...result })))

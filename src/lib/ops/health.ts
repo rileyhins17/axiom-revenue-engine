@@ -1,4 +1,5 @@
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
+import { torontoMidnight } from "@/lib/prospect-format";
 
 /**
  * Self-check that runs every 15 minutes on the live Worker. Read-only: it never
@@ -43,6 +44,19 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
 
   const failedEmails = await safe(() => count(db, `SELECT COUNT(*) AS n FROM EngineEmailSend WHERE status = 'FAILED' AND createdAt >= ?`, hoursAgo(now, 24)), 0);
   add("email-sending", failedEmails === 0, `${failedEmails} automatic email${failedEmails === 1 ? "" : "s"} failed to send in the last day.`, "Check the Zoho mailbox is still active, or turn automatic email off on the Email page and ask Claude.");
+
+  // The weekday 7am lead search and the Google key behind it. Checked from 8:30 on
+  // weekdays, so a schedule that stopped or a key Google rejects shows up that morning.
+  const local = new Date(now.toLocaleString("en-US", { timeZone: "America/Toronto" }));
+  const afterMorningRun = local.getDay() >= 1 && local.getDay() <= 5 && local.getHours() * 60 + local.getMinutes() >= 8 * 60 + 30;
+  const leadSearch = await safe(async () => ({
+    ranToday: !afterMorningRun || await count(db, `SELECT COUNT(*) AS n FROM "DiscoveryRun" WHERE "trigger" = 'SCHEDULE' AND "startedAt" >= ?`, torontoMidnight(now)) > 0,
+    rejected: await count(db, `SELECT COUNT(*) AS n FROM (SELECT "stopReason" FROM "DiscoveryRun" WHERE "startedAt" >= ? ORDER BY "startedAt" DESC LIMIT 1)
+      WHERE "stopReason" LIKE '%key isn''t set up%' OR "stopReason" LIKE 'Google returned an error (4%'`, hoursAgo(now, 24)) > 0,
+  }), { ranToday: true, rejected: false });
+  add("lead-search", leadSearch.ranToday && !leadSearch.rejected,
+    leadSearch.rejected ? "Google turned down the last lead search, so no new businesses are being found." : "This morning's automatic lead search didn't run, so no new businesses were added today.",
+    leadSearch.rejected ? "Ask Claude to check the Google Places key on the Worker (ENGINE_PLACES_KEY or GOOGLE_PLACES_API_KEY)." : "Press \"Find new leads now\" on Today, then ask Claude to check the Worker's 7am schedule.");
 
   const budget = Number(env.AI_MONTHLY_BUDGET_USD ?? 5) || 5;
   const spent = await safe(async () => Number((await db.prepare(`SELECT COALESCE(SUM("costMicroUsd"),0) AS n FROM "AiUsage" WHERE "month" = ?`).bind(now.toISOString().slice(0, 7)).first<{ n: number }>())?.n ?? 0) / 1_000_000, 0);

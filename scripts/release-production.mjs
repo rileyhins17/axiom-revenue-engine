@@ -27,8 +27,9 @@ if (createHash("sha256").update(readFileSync(backup)).digest("hex") !== expected
 const config = JSON.parse(readFileSync(path.join(repo, "wrangler.production.jsonc"), "utf8").replace(/^\s*\/\/.*$/gm, ""));
 if (config.name !== WORKER || config.account_id !== ACCOUNT || config.d1_databases?.[0]?.database_id !== DATABASE_ID) stop("config target mismatch");
 if (config.vars?.AUTONOMOUS_SEND_ENABLED !== "false" || config.vars?.AUTONOMOUS_QUEUE_ENABLED !== "false" || config.vars?.AUTONOMOUS_INTAKE_ENABLED !== "false" || config.vars?.ENGINE_EMAIL_ENABLED !== "false") stop("automation must stay off");
-// The only schedule allowed is the gated weekday email batch, which sends nothing while ENGINE_EMAIL_ENABLED is "false".
-if (!["", "0 14 * * 1-5", "0 14 * * 1-5|*/15 * * * *", "0 14 * * 1-5|*/15 * * * *|0 11 * * 1-5"].includes((config.triggers?.crons ?? []).join("|"))) stop("unexpected cron schedule");
+// Allowed schedules: the gated weekday email batch (sends nothing while ENGINE_EMAIL_ENABLED is "false"),
+// the read-only health check and the capped weekday lead search. Weekdays are named: Cloudflare's 1 is Sunday.
+if (!["", "0 14 * * MON-FRI|*/15 * * * *|0 11 * * MON-FRI"].includes((config.triggers?.crons ?? []).join("|"))) stop("unexpected cron schedule");
 
 const wrangler = (args, cwd = repo, input) => spawnSync(process.execPath, [path.join(cwd, "node_modules", "wrangler", "bin", "wrangler.js"), ...args, "--config", path.join(repo, "wrangler.production.jsonc")], { cwd, encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024, env: process.env });
 // Live settings guard: keep_vars preserves Worker-only settings (such as the Orbit
@@ -60,7 +61,7 @@ if (before.stops !== "01111") stop("stops are not engaged");
 const pending = (wrangler(["d1", "migrations", "list", DATABASE, "--remote"]).stdout.match(/\b\d{4}_[a-z0-9_]+\.sql\b/g) ?? []);
 const unique = [...new Set(pending)];
 // Live is past 0074. Allowed: nothing pending, or only the next known migrations in order.
-const KNOWN = ["0075_engine_prospects_and_call_log.sql", "0076_engine_email_outreach.sql", "0077_ai_call_briefs.sql", "0078_caller_tokens.sql", "0079_connected_caller.sql", "0080_health_alerts.sql", "0081_cloud_discovery.sql", "0082_caller_contact_edits.sql"];
+const KNOWN = ["0075_engine_prospects_and_call_log.sql", "0076_engine_email_outreach.sql", "0077_ai_call_briefs.sql", "0078_caller_tokens.sql", "0079_connected_caller.sql", "0080_health_alerts.sql", "0081_cloud_discovery.sql", "0082_caller_contact_edits.sql", "0083_wider_market.sql"];
 const TARGET = KNOWN.at(-1);
 const position = KNOWN.indexOf(before.last);
 if (before.last !== "0074_revenue_owner_observed_replies.sql" && position < 0) stop("live is in an unexpected state; investigate before retrying");
