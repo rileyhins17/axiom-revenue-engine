@@ -5,6 +5,53 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## DATA-014 — A table with ON DELETE RESTRICT children cannot be rebuilt alone on D1
+
+- **Symptom:** a migration that copied `EngineProspect` into a new table with a
+  wider CHECK and dropped the old one failed with `FOREIGN KEY constraint failed`
+  (and `SQLITE_CONSTRAINT_TRIGGER` from the no-delete trigger when deleting rows).
+  `PRAGMA defer_foreign_keys` and a `legacy_alter_table` rename did not help.
+- **Root cause:** D1 always enforces foreign keys, and SQLite applies RESTRICT
+  actions immediately, even when foreign keys are deferred. A rename rewrites the
+  children's REFERENCES when foreign keys are on, whatever `legacy_alter_table` says.
+- **Proven fix:** migration 0083 copies the parent and all five RESTRICT children
+  aside (`CREATE TABLE _m0083_x AS SELECT rowid AS _rowid, *`), drops the view and
+  children before the parent, recreates the parent then the children with identical
+  definitions, restores every row with its rowid, and only then recreates triggers
+  (so history cannot trip insert guards) and the view.
+- **Prevention/test:** `wider-market-migration.test.ts` proves rows, rowids,
+  definitions and every trigger survive; rehearse any future rebuild on a full live
+  export and through `wrangler d1 migrations apply --local` before release.
+- **Affected area:** schema changes to `EngineProspect` or any RESTRICT parent.
+- **Verifying commit:** `87573fe`.
+
+## OPS-015 — Cloudflare weekday 1 is Sunday
+
+- **Symptom:** the "weekday" lead search (`0 11 * * 1-5`) ran on Sunday
+  2026-09-27 at 07:01 Toronto time.
+- **Root cause:** Cloudflare cron numbers weekdays 1 = Sunday to 7 = Saturday, so
+  `1-5` is Sunday to Thursday (standard cron's 1 is Monday).
+- **Proven fix:** schedules use day names (`MON-FRI`); `worker.mjs` matches each by
+  name or by its numeric form (`2-6`), so none falls through to the legacy tick.
+- **Prevention/test:** `src/lib/ops/schedules.test.ts` rejects numeric weekday
+  ranges and requires every configured schedule to have a Worker handler; the
+  `lead-search` health check alerts if the morning search did not run.
+- **Affected area:** every Cloudflare cron with a weekday field.
+- **Verifying commit:** `9b2c234`.
+
+## OPS-016 — M2 tests fail while any migration file is uncommitted
+
+- **Symptom:** `npm test` reports 19–23 failures in the private KW M2 setup and
+  assessment suites (`The setup release requires a clean migration working tree.`,
+  `Assessment requires unchanged approved migration files.`).
+- **Root cause:** those suites verify the approved migration bytes from Git and
+  refuse any new or changed file under `migrations/`.
+- **Proven fix:** commit the new migration, then rerun; the same suites pass.
+- **Prevention/test:** commit migrations before the full gate; do not create a
+  migration file while `npm test` is running.
+- **Affected area:** full test gate whenever a migration is added.
+- **Verifying commit:** `4ab766a`.
+
 ## OPS-014 — Owner UI acceptance failed under a long Windows path
 
 - **Symptom:** `npm run test:owner-ui` in a clean clone under the session temp
@@ -16,7 +63,9 @@ Retire entries when the architecture makes them impossible.
 - **Proven fix:** the same commit passed after moving the clean clone to a
   short root (`C:\Users\riley\.codex\worktrees\rv`).
 - **Prevention/test:** run clean-checkout verification from a short root on
-  Windows; if the error appears, check path length before suspecting code.
+  Windows; if the error appears, check path length before suspecting code. The
+  same limit makes `wrangler d1 ... --local --persist-to <long path>` fail with a
+  bare `internal error`; use a short folder such as `%TEMP%\d1r`.
 - **Affected area:** Windows clean-checkout verification of owner acceptance.
 - **Verifying commit:** `254b1b6`.
 
