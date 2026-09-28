@@ -1,3 +1,36 @@
+## Production 2026-09-28 (midday): market-area search, website check v2, rules v9
+
+Verified commit `1934f09`.
+
+**Live state**
+- **App:** Worker `83a5c3b2-4d7f-42c6-b450-8e085ca21438`, a code-only release. Rollback target `3ac3523b-7baf-4409-a9cf-f33c6e34f828`.
+- **Website check:** `axiom-site-check` `f9d0d9df-f860-4845-9655-2cd5ed8134d6` (previous `1b16a23c`).
+- **Backup:** `prod-export-20260928T173017Z.sql` (sha256 `03736d4f…`).
+
+**Gate:** safety check; `npm test` 1,013 tests (1,009 pass, 0 fail, 4 skipped); typecheck; lint 0 errors / 11 baseline warnings; build; dry runs of both Workers; owner UI (8 WCAG pages).
+
+**Why:** Aidan asked whether "0 weak websites out of 59" meant the cloud check was missing issues.
+- **The rate is normal.** By the end of the day it was 2 of 99 (erbelectric.ca, halcoroofing.com). The local runs found 5 of 200 (2.5%), and the minor findings occur at the same rates as the local runs.
+- **Two real gaps were found:**
+  1. Places returned same-named towns abroad (GOTCHAS GEO-002). Four UK or US businesses were added as WEAK and 11 were held; none were callable.
+  2. Unloadable sites were never graded: 9 https connection resets, 9 HeadlessChrome 403s, one 500, one timeout, and one Wix root 404. Some of these are the most broken sites. On the cloud browser, one forwarded to Facebook and one showed a host's "account suspended" page.
+
+**Change**
+- **Discovery:** every search sends a `locationRestriction` rectangle around the eleven towns, drops non-Ontario results, and keeps Wix page paths.
+- **Website check v2:** sets aside businesses outside Ontario, and retries over plain http when the https connection fails.
+- **Capture v2:** presents a normal desktop Chrome user agent. 2 of 6 sites that returned 403 now load.
+- **Rules v9:** decide "no working website" first. That covers a parked page, a host's "account suspended" page (new), and a web address that forwards to Facebook or a directory (new). Points and threshold are unchanged.
+- **Cloud check:** the suspended and Facebook-forwarding sites are now weak websites. The 9-site answer key and 6 of today's sites are unchanged.
+
+**Live now:** 359 businesses; Aidan's queue has 43 ready (33 new, 10 retries due). All 10 health checks are OK. Website checks: 120 today (the daily cap); 224 waiting.
+
+**Proposal (not built, needs owner approval):** treat a site that does not load at all on three checks across the day (a server error, or no connection over https or http) as a weak-website lead ("your website is down"). Exclude 403s, which usually mean the site blocks automated browsers.
+
+Next three actions:
+1. Watch the 7:00 search: the rectangle should keep every result in Ontario, and the health check alerts if Google refuses the new field.
+2. Decide on the daily website-check cap. At 120 a day the queue grows by about 150 a day with the wider market. 300 a day would cost about US$0.40 a month beyond the included Browser Run hours.
+3. The Zoho setup continues when the owner reaches domain verification.
+
 ## Production 2026-09-28: wider market, cloud website check, weekday schedules
 
 Verified commit `a354aeb` (release copy `01c0a84` for the app plus the site-check release fix) is live.
