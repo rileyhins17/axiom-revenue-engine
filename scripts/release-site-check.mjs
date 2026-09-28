@@ -38,8 +38,12 @@ const live = JSON.parse(schema.stdout || "[]")[0]?.results?.[0];
 if (!live || live.applied !== 1 || live.runs !== 1) stop("live database does not have migration 0084 yet; release the main app first");
 console.log("live schema: 0084 applied");
 
-const before = JSON.parse(wrangler(["deployments", "list", "--json"]).stdout || "[]");
-const previous = [...before].sort((a, b) => String(a.created_on).localeCompare(String(b.created_on))).at(-1)?.versions?.[0]?.version_id ?? null;
+// On the first deploy the Worker does not exist yet, so there is no previous version.
+let previous = null;
+try {
+  const before = JSON.parse(wrangler(["deployments", "list", "--json"]).stdout.trim() || "[]");
+  previous = [...before].sort((a, b) => String(a.created_on).localeCompare(String(b.created_on))).at(-1)?.versions?.[0]?.version_id ?? null;
+} catch { previous = null; }
 const deploy = wrangler(["deploy"]);
 const version = (deploy.stdout.match(/Current Version ID: ([0-9a-f-]+)/) ?? [])[1];
 if (!version) { console.error(deploy.stdout.slice(-2000), deploy.stderr.slice(-2000)); stop("deploy did not report a version"); }
