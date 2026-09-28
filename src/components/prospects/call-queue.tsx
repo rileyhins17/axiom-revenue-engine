@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronRight, ExternalLink, MapPin, SkipForward } from "lucide-react";
-import { displayPhone } from "@/lib/prospect-format";
+import { displayPhone, titleCase } from "@/lib/prospect-format";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -33,7 +33,7 @@ const OUTCOMES = [
 type Outcome = (typeof OUTCOMES)[number]["value"];
 const NEEDS_DATE = new Set<Outcome>(["CALL_BACK", "INTERESTED"]);
 
-const title = (value: string) => value === "HVAC" ? value : value.charAt(0) + value.slice(1).toLowerCase();
+const title = titleCase;
 function inDays(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);

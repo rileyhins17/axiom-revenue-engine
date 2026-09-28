@@ -3,11 +3,13 @@ import { readFileSync } from 'node:fs';
 import type { CallerDb, CallerStatement } from './database';
 import { ENGINE_CONNECTION, ENGINE_WORKSPACE, engineContactId } from './identity';
 import { parseResultEvent, type ResultEvent } from './protocol';
+import { applyEngineSchema } from '../revenue-engine/test-support/engine-schema';
 
 export const AIDAN = { actor: 'AIDAN' as const, actorUserId: 'user-aidan' };
 export function openCallerTestDb() {
   const raw = new Database(':memory:'); raw.pragma('foreign_keys = ON');
-  for (const name of ['0001_cloudflare_auth_security.sql', '0075_engine_prospects_and_call_log.sql', '0078_caller_tokens.sql', '0079_connected_caller.sql', '0082_caller_contact_edits.sql']) raw.exec(readFileSync(new URL('../../../migrations/' + name, import.meta.url), 'utf8'));
+  raw.exec(readFileSync(new URL('../../../migrations/0001_cloudflare_auth_security.sql', import.meta.url), 'utf8'));
+  applyEngineSchema(raw);
   raw.prepare('INSERT INTO User(id,name,email,emailVerified,updatedAt) VALUES(?,?,?,1,?)').run(AIDAN.actorUserId, 'Fixture owner', 'aidan@getaxiom.ca', '2026-09-25T00:00:00.000Z');
   raw.prepare(`INSERT INTO EngineProspect VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run('fixture.example', 'fixture-place', 'Synthetic roofing fixture', 'KITCHENER', 'ROOFING', 'https://fixture.example', '+15195550101', null, 'STRONG', '["Stored fixture observation"]', 'fixture-run', '2026-09-24', '2026-09-24');
   const pending = new WeakMap<CallerStatement, { sql: string; values: unknown[] }>();

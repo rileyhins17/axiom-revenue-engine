@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { ProspectRow, type ProspectRowView } from "@/components/prospects/prospect-row";
 import { getDatabase } from "@/lib/cloudflare";
-import { historyView, prospectOutcomeText } from "@/lib/prospect-format";
+import { historyView, prospectOutcomeText, titleCase } from "@/lib/prospect-format";
 import { listActivityFor, listProspects, prospectCounts, ProspectViewSchema, type ProspectDb, type ProspectRow as Row } from "@/lib/revenue-engine/engine-prospects-d1";
 import { ACTIVE_CITIES, ACTIVE_NICHES } from "@/lib/revenue-engine/cloud-discovery";
 import { listContactEditsFor } from "@/lib/caller-v2/contact-edits";
@@ -23,7 +23,7 @@ const TABS = [
 ] as const;
 const CITIES = ACTIVE_CITIES;
 const TRADES = ACTIVE_NICHES;
-const title = (value: string) => value === "HVAC" ? value : value.charAt(0) + value.slice(1).toLowerCase();
+const title = titleCase;
 const day = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("en-CA", { month: "short", day: "numeric", timeZone: "America/Toronto" }) : null;
 const mapsUrl = (row: Row) => row.placeId
   ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.name)}&query_place_id=${encodeURIComponent(row.placeId)}`
@@ -82,7 +82,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div>
         <h1 className="text-2xl font-semibold">Call list</h1>
-        <p className="text-sm text-slate-600">Local roofing, HVAC and landscaping businesses with a weak website or none. Call, log what happened, and it&apos;s shared between Riley and Aidan.</p>
+        <p className="text-sm text-slate-600">Local roofing, HVAC, landscaping, plumbing and electrical businesses across Waterloo Region and nearby towns with a weak website or none. Call, log what happened, and it&apos;s shared between Riley and Aidan.</p>
       </div>
       <form action="/prospects" className="flex gap-2">
         {Object.entries({ view, city: search.city, trade: search.trade, kind: search.kind }).filter(([, value]) => value).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}

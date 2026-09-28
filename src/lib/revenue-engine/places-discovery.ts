@@ -33,8 +33,8 @@ export const QUERIES: Record<DiscoveryNiche, readonly string[]> = {
   ROOFING: ["roofing contractor", "roofer", "roof repair", "eavestrough and gutter company", "shingle roof replacement", "flat roof repair", "siding and soffit contractor"],
   HVAC: ["heating and air conditioning contractor", "furnace repair", "air conditioning installation", "HVAC company", "heat pump installer", "duct cleaning service", "boiler repair"],
   LANDSCAPING: ["landscaping company", "lawn care service", "interlock and patio contractor", "snow removal company", "tree service", "fence and deck builder", "sod and garden installation"],
-  PLUMBING: ["plumber", "plumbing company", "drain cleaning service", "water heater installation"],
-  ELECTRICAL: ["electrician", "electrical contractor", "residential electrician", "generator installation"],
+  PLUMBING: ["plumber", "plumbing company", "drain cleaning service", "water heater installation", "sump pump installation", "emergency plumber", "bathroom plumbing contractor"],
+  ELECTRICAL: ["electrician", "electrical contractor", "residential electrician", "generator installation", "EV charger installation", "electrical panel upgrade", "lighting installation contractor"],
 };
 export const CITY_NAME: Record<DiscoveryCity, string> = {
   KITCHENER: "Kitchener", WATERLOO: "Waterloo", CAMBRIDGE: "Cambridge", GUELPH: "Guelph", BRANTFORD: "Brantford", STRATFORD: "Stratford",

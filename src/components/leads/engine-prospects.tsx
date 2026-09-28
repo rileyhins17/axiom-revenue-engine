@@ -1,10 +1,11 @@
 import { ExternalLink } from "lucide-react";
 
 import type { EngineProspect, EngineRunReview } from "@/lib/revenue-engine/engine-run-review";
+import { titleCase } from "@/lib/prospect-format";
 
 import { ProspectDecisionButtons } from "./prospect-decision-buttons";
 
-const title = (value: string) => value === "HVAC" ? value : value.charAt(0) + value.slice(1).toLowerCase();
+const title = titleCase;
 const REASON_TEXT: Record<string, string> = {
   WEBSITE_ALREADY_FINE: "website is fine", NOT_LOCAL_OR_CHAIN: "not local or a chain", WRONG_TRADE: "wrong trade",
   ALREADY_A_CUSTOMER_OR_CONTACTED: "already known", OTHER: "other",

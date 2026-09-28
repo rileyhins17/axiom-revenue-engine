@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink, MapPin } from "lucide-react";
-import { displayPhone } from "@/lib/prospect-format";
+import { displayPhone, titleCase } from "@/lib/prospect-format";
 import { useState } from "react";
 import Link from 'next/link';
 import type {Route} from 'next';
@@ -19,7 +19,7 @@ export type ProspectRowView = {
   callerPhoneFix?: { previousPhone: string | null; who: string; when: string } | null;
 };
 
-const title = (value: string) => value === "HVAC" ? value : value.charAt(0) + value.slice(1).toLowerCase();
+const title = titleCase;
 const BADGE: Record<ProspectRowView["label"], { text: string; className: string }> = {
   STRONG: { text: "Weak website", className: "bg-rose-50 text-rose-800 ring-rose-200" },
   NO_WEBSITE: { text: "No website", className: "bg-amber-50 text-amber-900 ring-amber-200" },

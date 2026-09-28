@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { nextInQueue, recordProspectActivity, type ProspectDb, type ProspectOutcome, type ProspectRow } from "./engine-prospects-d1";
+import { titleCase } from "../prospect-format";
 
 /**
  * Bridge to the Axiom Caller browser extension (github.com/Mageester/axiom-caller).
@@ -41,7 +42,7 @@ export async function authenticateCaller(db: ProspectDb, authorization: string |
   return row;
 }
 
-const title = (value: string) => value === "HVAC" ? value : value.charAt(0) + value.slice(1).toLowerCase();
+const title = titleCase;
 
 /** One business in the extension's LeadInput shape, plus the engine id it must send back. */
 export function toCallerLead(row: ProspectRow) {

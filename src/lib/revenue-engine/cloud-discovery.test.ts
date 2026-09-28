@@ -4,18 +4,25 @@ import test from "node:test";
 
 import Database from "better-sqlite3";
 
-import { DISCOVERY_CELLS, runDiscovery } from "./cloud-discovery";
+import { DISCOVERY_CELLS, discoveryCells, runDiscovery, townFromAddress } from "./cloud-discovery";
+import { QUERIES } from "./places-discovery";
+import { applyEngineSchema } from "./test-support/engine-schema";
 import type { ProspectDb } from "./engine-prospects-d1";
 
 function database(withLegacyRow = true) {
   const raw = new Database(":memory:");
   raw.pragma("foreign_keys = ON");
-  for (const file of ["0075_engine_prospects_and_call_log.sql", "0076_engine_email_outreach.sql", "0077_ai_call_briefs.sql"]) raw.exec(readFileSync(`migrations/${file}`, "utf8"));
+  applyEngineSchema(raw, "0077_ai_call_briefs.sql");
   if (withLegacyRow) {
     raw.prepare(`INSERT INTO "EngineProspect" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run("a.example", "pA", "Acme Roofing", "KITCHENER", "ROOFING", "https://a.example/", "519-555-0101", null, "STRONG", "[]", "run1", "2026-09-20", "2026-09-20");
     raw.prepare(`INSERT INTO "EngineProspectActivity" ("activityId","idempotencyKey","prospectId","channel","outcome","note","actor","actorUserId") VALUES ('x','k','a.example','CALL','NO_ANSWER','','AIDAN','u')`).run();
   }
+  raw.exec(readFileSync("migrations/0078_caller_tokens.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0079_connected_caller.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0080_health_alerts.sql", "utf8"));
   raw.exec(readFileSync("migrations/0081_cloud_discovery.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0082_caller_contact_edits.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0083_wider_market.sql", "utf8"));
   const db: ProspectDb = { prepare(sql) { const s = raw.prepare(sql); return { bind: (...v: unknown[]) => ({
     all: async <T,>() => ({ results: s.all(...v) as T[] }), first: async <T,>() => (s.get(...v) as T | undefined) ?? null, run: async () => s.run(...v),
   }) }; } };
@@ -52,8 +59,8 @@ test("no-website businesses with a phone join the call list; website ones wait f
   ] }]);
   const result = await runDiscovery(db, { apiKey: "k", trigger: "OWNER", actor: "AIDAN", maxRequests: 1, fetcher, now: new Date("2026-09-26T18:00:00Z") });
   assert.deepEqual({ requests: result.requests, added: result.added, held: result.held }, { requests: 1, added: 1, held: 1 });
-  assert.deepEqual(raw.prepare(`SELECT "prospectId","label","phone","address" FROM "EngineProspect" WHERE "prospectId"='place:n1'`).get(),
-    { prospectId: "place:n1", label: "NO_WEBSITE", phone: "(519) 555-0111", address: "1 King St, Guelph, ON" });
+  assert.deepEqual(raw.prepare(`SELECT "prospectId","label","phone","address","city" FROM "EngineProspect" WHERE "prospectId"='place:n1'`).get(),
+    { prospectId: "place:n1", label: "NO_WEBSITE", phone: "(519) 555-0111", address: "1 King St, Guelph, ON", city: "GUELPH" }, "the town comes from Google's address");
   assert.equal((raw.prepare(`SELECT "websiteUrl" FROM "DiscoveryHeld" WHERE "placeId"='w1'`).get() as { websiteUrl: string }).websiteUrl, "https://www.hassite.example/");
   const run = raw.prepare(`SELECT "trigger","actor","added","stopReason" FROM "DiscoveryRun"`).get();
   assert.deepEqual(run, { trigger: "OWNER", actor: "AIDAN", added: 1, stopReason: null });
@@ -65,7 +72,7 @@ test("the search rotates through towns/trades, follows pages, and stops at the m
   await runDiscovery(db, { apiKey: "k", trigger: "SCHEDULE", maxRequests: 3, fetcher, now: new Date("2026-09-26T11:00:00Z") });
   assert.equal(calls[1]!.body.pageToken, "p2", "the second request follows the first page");
   assert.notEqual(calls[2]!.body.textQuery, calls[0]!.body.textQuery, "then it moves to the next town or trade");
-  assert.equal(DISCOVERY_CELLS.length, 3 * 3 * 7);
+  assert.equal(DISCOVERY_CELLS.length, 11 * Object.values(QUERIES).reduce((sum, list) => sum + list.length, 0));
   raw.prepare(`UPDATE "PlacesUsage" SET "requests" = 599 WHERE "month" = '2026-09'`).run();
   const capped = await runDiscovery(db, { apiKey: "k", trigger: "SCHEDULE", maxRequests: 30, fetcher, now: new Date("2026-09-26T11:00:00Z") });
   assert.equal(capped.requests, 1);
@@ -73,4 +80,29 @@ test("the search rotates through towns/trades, follows pages, and stops at the m
   const noKey = await runDiscovery(db, { apiKey: undefined, trigger: "SCHEDULE", maxRequests: 30, fetcher });
   assert.equal(noKey.requests, 0);
   assert.match(noKey.stopReason!, /key isn't set up/);
+});
+
+test("the rotation covers all 11 towns and 5 trades, new ground first, spread across towns each pass", () => {
+  const key = (cell: { city: string; niche: string; query: string }) => `${cell.city}|${cell.niche}|${cell.query}`;
+  assert.equal(new Set(DISCOVERY_CELLS.map(key)).size, DISCOVERY_CELLS.length, "no duplicate searches");
+  assert.equal(new Set(DISCOVERY_CELLS.map((cell) => cell.city)).size, 11);
+  assert.equal(new Set(DISCOVERY_CELLS.map((cell) => cell.niche)).size, 5);
+  const original = (cell: { city: string; niche: string }) => ["KITCHENER", "WATERLOO", "CAMBRIDGE"].includes(cell.city) && ["ROOFING", "HVAC", "LANDSCAPING"].includes(cell.niche);
+  const firstOriginal = DISCOVERY_CELLS.findIndex(original);
+  assert.equal(firstOriginal, DISCOVERY_CELLS.length - 3 * 3 * 7, "the 63 searches already done come last");
+  assert.ok(DISCOVERY_CELLS.slice(firstOriginal).every(original));
+  // The first day's 30 searches reach several towns and trades, not seven phrasings of one.
+  const firstDay = DISCOVERY_CELLS.slice(0, 30);
+  assert.ok(new Set(firstDay.map((cell) => cell.city)).size >= 5 && new Set(firstDay.map((cell) => cell.niche)).size === 5);
+  assert.ok(firstDay.every((cell) => cell.query === QUERIES[cell.niche][0]), "every town and trade gets its main phrasing before any second phrasing");
+  assert.deepEqual(discoveryCells(["GUELPH"], ["PLUMBING"]).map((cell) => cell.query), [...QUERIES.PLUMBING]);
+});
+
+test("a business's town comes from its Google address when it names one of our towns", () => {
+  assert.equal(townFromAddress("45 Victoria St S, Kitchener, ON N2G 2B2", "BRESLAU"), "KITCHENER");
+  assert.equal(townFromAddress("100 Peel St, New Hamburg, ON N3A 1E5", "KITCHENER"), "NEW_HAMBURG");
+  assert.equal(townFromAddress("RR 1, Ayr, ON N0B 1E0", "CAMBRIDGE"), "AYR");
+  assert.equal(townFromAddress("12 Main St, Fergus, ON", "GUELPH"), "GUELPH", "a town outside the market keeps the searched town");
+  assert.equal(townFromAddress("Waterloo Region, ON", "ELMIRA"), "ELMIRA", "a region name is not a town");
+  assert.equal(townFromAddress(null, "STRATFORD"), "STRATFORD");
 });

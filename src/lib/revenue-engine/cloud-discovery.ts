@@ -1,6 +1,6 @@
 import type { ProspectDb } from "./engine-prospects-d1";
 import {
-  buildTextSearchRequest, CITY_NAME, PLACES_MAX_REQUESTS_PER_MONTH, QUERIES, websiteOrigin,
+  buildTextSearchRequest, CITY_NAME, DiscoveryCitySchema, DiscoveryNicheSchema, PLACES_MAX_REQUESTS_PER_MONTH, QUERIES, websiteOrigin,
   type DiscoveryCity, type DiscoveryNiche,
 } from "./places-discovery";
 
@@ -17,14 +17,49 @@ export const OWNER_REQUESTS_PER_RUN = 10;
 
 export type DiscoveryCell = { city: DiscoveryCity; niche: DiscoveryNiche; query: string };
 /**
- * Towns and trades the EngineProspect table accepts today. The wider market
- * (Guelph, Brantford, Stratford, Woodstock, Elmira, New Hamburg, Ayr, Breslau;
- * plumbing and electrical) switches on after the table rebuild migration.
+ * The market (owner decision 2026-09-26, migration 0083): Kitchener, Waterloo and
+ * Cambridge plus Guelph, Brantford, Stratford, Woodstock, Elmira, New Hamburg, Ayr
+ * and Breslau; roofing, HVAC and landscaping plus plumbing and electrical.
  */
-export const ACTIVE_CITIES: readonly DiscoveryCity[] = ["KITCHENER", "WATERLOO", "CAMBRIDGE"];
-export const ACTIVE_NICHES: readonly DiscoveryNiche[] = ["ROOFING", "HVAC", "LANDSCAPING"];
-export const DISCOVERY_CELLS: DiscoveryCell[] = ACTIVE_NICHES.flatMap((niche) =>
-  QUERIES[niche].flatMap((query) => ACTIVE_CITIES.map((city) => ({ city, niche, query }))));
+export const ACTIVE_CITIES: readonly DiscoveryCity[] = DiscoveryCitySchema.options;
+export const ACTIVE_NICHES: readonly DiscoveryNiche[] = DiscoveryNicheSchema.options;
+/** Searched before the wider market existed, so most of what they return is already known. */
+const ORIGINAL_MARKET = new Set(["KITCHENER", "WATERLOO", "CAMBRIDGE"].flatMap((city) => ["ROOFING", "HVAC", "LANDSCAPING"].map((niche) => `${city}|${niche}`)));
+
+/**
+ * The search rotation. Each pass uses every town and trade once with the same
+ * phrasing before moving to the next phrasing, so a day's searches spread across
+ * towns and trades. Towns and trades never searched before come first.
+ */
+export function discoveryCells(cities: readonly DiscoveryCity[] = ACTIVE_CITIES, niches: readonly DiscoveryNiche[] = ACTIVE_NICHES): DiscoveryCell[] {
+  const passes = Math.max(...niches.map((niche) => QUERIES[niche].length));
+  const all: DiscoveryCell[] = [];
+  for (let pass = 0; pass < passes; pass += 1) {
+    for (const city of cities) for (const niche of niches) {
+      const query = QUERIES[niche][pass];
+      if (query) all.push({ city, niche, query });
+    }
+  }
+  const searched = (cell: DiscoveryCell) => ORIGINAL_MARKET.has(`${cell.city}|${cell.niche}`);
+  return [...all.filter((cell) => !searched(cell)), ...all.filter(searched)];
+}
+export const DISCOVERY_CELLS: DiscoveryCell[] = discoveryCells();
+
+/**
+ * The town a business is actually in, from Google's address when it names one of our
+ * towns ("12 King St, Guelph, ON"); otherwise the town that was searched. A search for
+ * "plumber in Breslau" often returns Kitchener businesses, and walk-ins group by town.
+ */
+export function townFromAddress(address: string | null | undefined, searched: DiscoveryCity): DiscoveryCity {
+  if (!address) return searched;
+  const parts = address.split(",").map((part) => part.trim().toLowerCase());
+  // The town is the part before the province ("…, Guelph, ON N1H 1A1").
+  for (let index = parts.length - 1; index >= 0; index -= 1) {
+    const match = ACTIVE_CITIES.find((city) => parts[index] === CITY_NAME[city].toLowerCase());
+    if (match) return match;
+  }
+  return searched;
+}
 
 /** The Places key on the Worker: ENGINE_PLACES_KEY, else the existing GOOGLE_PLACES_API_KEY secret. */
 export function placesKeyFromEnv(env: Record<string, unknown>): string | undefined {
@@ -90,15 +125,16 @@ export async function runDiscovery(db: ProspectDb, options: {
       const known = await db.prepare(`SELECT 1 AS n FROM "EngineProspect" WHERE "placeId" = ? OR "prospectId" = ? OR "prospectId" = ? LIMIT 1`)
         .bind(place.id, `place:${place.id}`, origin ? hostKey(origin) : "").first();
       if (known) continue;
+      const town = townFromAddress(address, cell.city);
       if (!origin) {
         if (!phone) continue; // Nothing to call.
         const inserted = await db.prepare(`INSERT INTO "EngineProspect" ("prospectId","placeId","name","city","niche","websiteUrl","phone","address","label","reasons","runId","firstSeenAt","lastSeenAt")
           VALUES (?,?,?,?,?,NULL,?,?,'NO_WEBSITE',?,?,?,?) ON CONFLICT("prospectId") DO NOTHING`)
-          .bind(`place:${place.id}`, place.id, name, cell.city, cell.niche, phone, address, JSON.stringify(["No website listed on Google."]), runId, now.toISOString(), now.toISOString()).run() as { changes?: number; meta?: { changes?: number } };
+          .bind(`place:${place.id}`, place.id, name, town, cell.niche, phone, address, JSON.stringify(["No website listed on Google."]), runId, now.toISOString(), now.toISOString()).run() as { changes?: number; meta?: { changes?: number } };
         if ((inserted.meta?.changes ?? inserted.changes ?? 0) === 1) result.added += 1;
       } else {
         const held = await db.prepare(`INSERT INTO "DiscoveryHeld" ("placeId","name","city","niche","websiteUrl","phone","address","firstSeenAt") VALUES (?,?,?,?,?,?,?,?) ON CONFLICT("placeId") DO NOTHING`)
-          .bind(place.id, name, cell.city, cell.niche, origin, phone, address, now.toISOString()).run() as { changes?: number; meta?: { changes?: number } };
+          .bind(place.id, name, town, cell.niche, origin, phone, address, now.toISOString()).run() as { changes?: number; meta?: { changes?: number } };
         if ((held.meta?.changes ?? held.changes ?? 0) === 1) result.held += 1;
       }
     }
