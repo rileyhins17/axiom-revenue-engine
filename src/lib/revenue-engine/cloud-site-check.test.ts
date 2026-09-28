@@ -4,7 +4,7 @@ import test from "node:test";
 
 import Database from "better-sqlite3";
 
-import { runSiteChecks, SITE_CHECK_VERSION, type SiteCapture } from "./cloud-site-check";
+import { outsideMarket, runSiteChecks, SITE_CHECK_VERSION, type SiteCapture } from "./cloud-site-check";
 import type { EngineSiteCapture, EngineSiteSignals } from "./engine-site-capture";
 import type { ProspectDb } from "./engine-prospects-d1";
 import { applyEngineSchema } from "./test-support/engine-schema";
@@ -145,4 +145,49 @@ test("if Cloudflare's browser cannot start, the run records it as failed checks 
   assert.match(result.stopReason!, /^Couldn't start Cloudflare's browser: Browser Run: too many requests$/);
   assert.deepEqual(raw.prepare(`SELECT "status","attempts" FROM "DiscoveryHeld" ORDER BY "placeId"`).all(), [{ status: "WAITING", attempts: 0 }, { status: "WAITING", attempts: 0 }], "the businesses are not blamed");
   assert.deepEqual(raw.prepare(`SELECT "checked","failed","finishedAt" IS NOT NULL AS done FROM "SiteCheckRun"`).get(), { checked: 0, failed: 2, done: 1 });
+});
+
+test("only Ontario addresses are our market (Google also returns Cambridge in England and Maryland)", () => {
+  for (const address of ["130 Marlborough Ave, Kitchener, ON N2M 1H8", "3, 5551 Hwy 6 N, Guelph, ON N1H 6J2", "145 Alma St, Guelph/Eramosa, ON N0B 2K0", "RR 1, Ayr, ON", "1808 Sawmill Rd, Conestogo, ON N0B 1N0"]) {
+    assert.equal(outsideMarket(address), false, address);
+  }
+  for (const address of ["23 King St, Cambridge CB1 1AH, UK", "100 Lake St, Cambridge, MD 21613, USA", "21 W Main St, Marlton, NJ 08053, USA", "1B Pembroke Ave, Waterbeach, Cambridge CB25 9QP, UK"]) {
+    assert.equal(outsideMarket(address), true, address);
+  }
+  assert.equal(outsideMarket(null), false, "no address: the website check decides");
+});
+
+test("businesses abroad are set aside without opening a browser", async () => {
+  const { raw, db, hold } = database();
+  hold.run("uk1", "Browns Roofing", "CAMBRIDGE", "ROOFING", "https://browns-roofing.example/", "01223 852140", "7 Cobble Yard, Napier St, Cambridge CB1 1HP, UK", "2026-09-28T11:00:00Z");
+  hold.run("us1", "Tiger Roofing", "CAMBRIDGE", "ROOFING", "https://tiger.example/", null, "100 Lake St, Cambridge, MD 21613, USA", "2026-09-28T11:00:01Z");
+  const fake = fakeCapture({});
+  const result = await runSiteChecks(db, { openCapture: fake.openCapture, now: NOW });
+  assert.equal(result.wrong, 2);
+  assert.deepEqual(fake.counts(), { opened: 0, closed: 0 }, "no browser for businesses outside the market");
+  assert.deepEqual(raw.prepare(`SELECT "placeId","status","label","reasons" FROM "DiscoveryHeld" ORDER BY "placeId"`).all(), [
+    { placeId: "uk1", status: "CHECKED", label: "WRONG", reasons: JSON.stringify(["Outside our market: 7 Cobble Yard, Napier St, Cambridge CB1 1HP, UK"]) },
+    { placeId: "us1", status: "CHECKED", label: "WRONG", reasons: JSON.stringify(["Outside our market: 100 Lake St, Cambridge, MD 21613, USA"]) },
+  ]);
+  assert.equal(raw.prepare(`SELECT COUNT(*) FROM "EngineProspect"`).pluck().get(), 0);
+});
+
+test("a site whose secure connection fails is graded over plain http, where 'not secure' counts; a 403 is not retried that way", async () => {
+  const { raw, db, hold } = database();
+  hold.run("h1", "Three Sons Roofing", "WATERLOO", "ROOFING", "https://threesons.example/", "(519) 555-0161", "1808 Sawmill Rd, Conestogo, ON N0B 1N0", "2026-09-28T11:00:00Z");
+  hold.run("h2", "Guarded Plumbing", "KITCHENER", "PLUMBING", "https://guarded.example/", null, "809 Victoria St N, Kitchener, ON N2B 3C3", "2026-09-28T11:00:01Z");
+  const unreachable = (reason: string): EngineSiteCapture => ({ status: "UNREACHABLE", reason, audit: {} as EngineSiteCapture["audit"] });
+  const fake = fakeCapture({
+    "https://threesons.example/": unreachable("page.goto: net::ERR_CONNECTION_RESET at https://threesons.example/"),
+    "http://threesons.example/": captured({ finalUrl: "http://threesons.example/", phoneTapToCall: false, wordCount: 180 }),
+    "https://guarded.example/": unreachable("HTTP 403"),
+  });
+  const result = await runSiteChecks(db, { openCapture: fake.openCapture, now: NOW });
+  assert.deepEqual({ strong: result.strong, failed: result.failed }, { strong: 1, failed: 1 });
+  const strong = raw.prepare(`SELECT "label","websiteUrl","reasons" FROM "EngineProspect" WHERE "prospectId" = 'threesons.example'`).get() as Record<string, string>;
+  assert.equal(strong.label, "STRONG");
+  assert.equal(strong.websiteUrl, "http://threesons.example/");
+  assert.match(strong.reasons, /Not secure/);
+  assert.deepEqual(fake.seen, ["https://threesons.example/", "http://threesons.example/", "https://guarded.example/"], "no http retry after the server answered 403");
+  assert.deepEqual(raw.prepare(`SELECT "status","attempts","lastError" FROM "DiscoveryHeld" WHERE "placeId" = 'h2'`).get(), { status: "WAITING", attempts: 1, lastError: "HTTP 403" });
 });

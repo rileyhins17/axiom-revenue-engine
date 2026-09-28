@@ -68,12 +68,38 @@ export type DiscoveredBusiness = {
   address?: string | null;
 };
 
+/**
+ * The market area: Waterloo Region, Guelph, Brantford, Stratford and Woodstock (all eleven
+ * towns, with a margin) but not Toronto, Hamilton or London. Without it Google also returns
+ * same-named towns abroad: "roofer in Cambridge, Ontario" found Cambridge in England and
+ * Maryland on 2026-09-28.
+ */
+export const MARKET_RECTANGLE = { low: { latitude: 42.95, longitude: -81.1 }, high: { latitude: 43.8, longitude: -79.95 } } as const;
+
 export function buildTextSearchRequest(city: DiscoveryCity, niche: DiscoveryNiche, apiKey: string, pageToken?: string, query = QUERIES[niche][0]!) {
   return {
     url: PLACES_TEXT_SEARCH_URL,
     headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": PLACES_FIELD_MASK },
-    body: JSON.stringify({ textQuery: `${query} in ${CITY_NAME[city]}, Ontario`, regionCode: "CA", languageCode: "en", pageSize: 20, ...(pageToken ? { pageToken } : {}) }),
+    body: JSON.stringify({ textQuery: `${query} in ${CITY_NAME[city]}, Ontario`, regionCode: "CA", languageCode: "en", pageSize: 20, locationRestriction: { rectangle: MARKET_RECTANGLE }, ...(pageToken ? { pageToken } : {}) }),
   };
+}
+
+/**
+ * An Ontario address, as Google formats it ("12 King St, Guelph, ON N1H 1A1, Canada") or as the
+ * engine stores it (", Canada" removed). A missing address counts as in the market.
+ */
+export function inOntario(address: string | null | undefined): boolean {
+  if (!address) return true;
+  return /,\s*ON(?:\s+[A-Z]\d[A-Z](?:\s*\d[A-Z]\d)?)?\s*(?:,\s*Canada)?\s*$/.test(address.trim());
+}
+
+/** Wix's free sites live at a path (name.wixsite.com/site); every other site is judged from its homepage. */
+export function siteAddress(websiteUri: string | undefined, origin: string): string {
+  try {
+    const url = new URL(websiteUri ?? "");
+    if (/\.wixsite\.com$/i.test(url.hostname) && url.pathname.length > 1) return `https://${url.hostname.toLowerCase()}${url.pathname}`.slice(0, 300);
+  } catch { /* fall through to the homepage */ }
+  return origin;
 }
 
 export function websiteOrigin(value: string | undefined): string | null {

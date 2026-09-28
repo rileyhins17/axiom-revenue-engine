@@ -25,6 +25,23 @@ Retire entries when the architecture makes them impossible.
 - **Affected area:** schema changes to `EngineProspect` or any RESTRICT parent.
 - **Verifying commit:** `87573fe`.
 
+## GEO-002 — Google returned same-named towns abroad
+
+- **Symptom:** the first day of the wider market held 11 businesses in Cambridge,
+  England, Cambridge, Maryland and New Jersey; four were added as working-website
+  (WEAK) rows with UK or US phone numbers. None reached the call queue.
+- **Root cause:** Places Text Search was only given "… in Cambridge, Ontario" and
+  `regionCode: "CA"`, which bias but do not restrict results.
+- **Proven fix:** every search sends `locationRestriction` (a rectangle around the
+  eleven towns that excludes Toronto, Hamilton and London); discovery drops any result
+  whose address is not in Ontario; the website check sets aside held businesses
+  outside Ontario without opening a browser (`cloud-site-check-v2`).
+- **Prevention/test:** `cloud-discovery.test.ts` checks the rectangle, the town
+  coordinates inside it and that UK/US results are dropped; `cloud-site-check.test.ts`
+  checks held foreign businesses are set aside.
+- **Affected area:** Places discovery and the website check.
+- **Verifying commit:** the commit that adds this entry.
+
 ## DATA-015 — D1's remote runner rejects a CASE expression inside a trigger body
 
 - **Symptom:** `wrangler d1 migrations apply --remote` failed with

@@ -1,6 +1,7 @@
 import type { ProspectDb } from "./engine-prospects-d1";
 import { classifyEngineLead, ENGINE_LEAD_RULES_VERSION, type EngineLeadDecision } from "./engine-lead-rules";
 import { ENGINE_SITE_CAPTURE_VERSION, type EngineSiteCapture } from "./engine-site-capture";
+import { inOntario } from "./places-discovery";
 import { torontoMidnight } from "../prospect-format";
 
 /**
@@ -14,7 +15,9 @@ import { torontoMidnight } from "../prospect-format";
  * that will not load is retried on later runs, then marked FAILED. Page text stays in
  * memory; only the label, reasons, final URL and versions are stored.
  */
-export const SITE_CHECK_VERSION = `cloud-site-check-v1+${ENGINE_SITE_CAPTURE_VERSION}+${ENGINE_LEAD_RULES_VERSION}`;
+// v2 (2026-09-28): skips businesses outside Ontario (Google also returns Cambridge UK/MD,
+// Waterloo and others abroad), and retries over plain http when the https connection fails.
+export const SITE_CHECK_VERSION = `cloud-site-check-v2+${ENGINE_SITE_CAPTURE_VERSION}+${ENGINE_LEAD_RULES_VERSION}`;
 /** Per run (every 10 minutes during the day) and per day: about 25 browser-minutes a day, inside the included hours. */
 export const SITE_CHECKS_PER_RUN = 6;
 export const SITE_CHECKS_PER_DAY = 120;
@@ -35,6 +38,16 @@ const siteOrigin = (url: string) => {
   catch { return null; }
 };
 const EMAIL = /^[^\s@']+@[^\s@']+\.[a-z]{2,24}$/;
+/** Failures below HTTP: the secure connection never completed (so plain http may still work). */
+const CONNECTION_FAILURE = /net::ERR_(?:CONNECTION_(?:RESET|REFUSED|CLOSED)|SSL_|CERT_|BAD_SSL|EMPTY_RESPONSE)/;
+
+/**
+ * Only Ontario addresses are our market. Google's text search also returned same-named towns
+ * abroad (Cambridge CB1 in England, Cambridge MD, New Jersey) before discovery was limited to
+ * the market area; held businesses found then are set aside here. Same test as discovery; no
+ * address means unknown, so the website check decides.
+ */
+export const outsideMarket = (address: string | null | undefined): boolean => !inOntario(address);
 
 export async function runSiteChecks(db: ProspectDb, options: {
   /** Opened only when there is work, so an idle run never starts a browser. */
@@ -59,28 +72,50 @@ export async function runSiteChecks(db: ProspectDb, options: {
     WHERE "status" = 'WAITING' ORDER BY "attempts" ASC, "firstSeenAt" ASC, "placeId" ASC LIMIT ?`).bind(room).all<Held>();
   if (!due.length) return finish(null);
 
+  // Businesses that need no browser: outside Ontario, or already on the list.
+  const toOpen: Held[] = [];
+  for (const held of due) {
+    if (outsideMarket(held.address)) {
+      await db.prepare(`UPDATE "DiscoveryHeld" SET "status"='CHECKED',"checkedAt"=?,"label"='WRONG',"reasons"=?,"checkVersion"=?,"lastError"=NULL WHERE "placeId"=?`)
+        .bind(now.toISOString(), JSON.stringify([`Outside our market: ${held.address}`.slice(0, 300)]), SITE_CHECK_VERSION, held.placeId).run();
+      result.wrong += 1;
+      continue;
+    }
+    const known = await db.prepare(`SELECT "prospectId" FROM "EngineProspect" WHERE "prospectId" = ? OR "placeId" = ? LIMIT 1`).bind(hostKey(held.websiteUrl), held.placeId).first<{ prospectId: string }>();
+    if (known) {
+      // Added some other way in the meantime; nothing to check.
+      await db.prepare(`UPDATE "DiscoveryHeld" SET "status"='CHECKED',"checkedAt"=?,"prospectId"=?,"checkVersion"=?,"lastError"='Already on the list.' WHERE "placeId"=?`)
+        .bind(now.toISOString(), known.prospectId, SITE_CHECK_VERSION, held.placeId).run();
+      continue;
+    }
+    toOpen.push(held);
+  }
+  if (!toOpen.length) return finish(null);
+
   let session: Awaited<ReturnType<typeof options.openCapture>>;
   try { session = await options.openCapture(); }
   catch (caught) {
     // Browser Run itself is unavailable (outage or usage limit): count the waiting sites as
     // failed for this run, so the health check's "can't open any websites" alert fires.
-    result.failed = due.length;
+    result.failed = toOpen.length;
     return finish(`Couldn't start Cloudflare's browser: ${(caught instanceof Error ? caught.message : "unknown").split("\n")[0]!.slice(0, 150)}`);
   }
+  const open = async (held: Held, websiteUrl: string) => {
+    try { return { capture: await session.capture({ businessId: held.placeId, businessName: held.name, niche: held.niche, websiteUrl }), error: "" }; }
+    catch (caught) { return { capture: null, error: caught instanceof Error ? caught.message.split("\n")[0]!.slice(0, 200) : "capture failed" }; }
+  };
   try {
-    for (const held of due) {
+    for (const held of toOpen) {
       const id = hostKey(held.websiteUrl);
-      const known = await db.prepare(`SELECT "prospectId" FROM "EngineProspect" WHERE "prospectId" = ? OR "placeId" = ? LIMIT 1`).bind(id, held.placeId).first<{ prospectId: string }>();
-      if (known) {
-        // Added some other way in the meantime; nothing to check.
-        await db.prepare(`UPDATE "DiscoveryHeld" SET "status"='CHECKED',"checkedAt"=?,"prospectId"=?,"checkVersion"=?,"lastError"='Already on the list.' WHERE "placeId"=?`)
-          .bind(now.toISOString(), known.prospectId, SITE_CHECK_VERSION, held.placeId).run();
-        continue;
+      let { capture, error } = await open(held, held.websiteUrl);
+      // A site whose secure (https) connection fails may only work over plain http: grade that
+      // (the rules then report "not secure"). Only for connection-level failures, never when
+      // the server answered (403, 404, 500).
+      if (capture?.status === "UNREACHABLE" && CONNECTION_FAILURE.test(capture.reason) && held.websiteUrl.startsWith("https://")) {
+        const plain = await open(held, `http://${held.websiteUrl.slice("https://".length)}`);
+        if (plain.capture?.status === "CAPTURED") ({ capture, error } = plain);
+        else capture = { ...capture, reason: `${capture.reason} (also failed over http)` };
       }
-      let capture: EngineSiteCapture | null = null;
-      let error = "";
-      try { capture = await session.capture({ businessId: held.placeId, businessName: held.name, niche: held.niche, websiteUrl: held.websiteUrl }); }
-      catch (caught) { error = caught instanceof Error ? caught.message.split("\n")[0]!.slice(0, 200) : "capture failed"; }
       if (!capture || capture.status !== "CAPTURED") {
         const attempts = held.attempts + 1;
         const giveUp = attempts >= SITE_CHECK_MAX_ATTEMPTS;

@@ -5,7 +5,7 @@ import test from "node:test";
 import Database from "better-sqlite3";
 
 import { DISCOVERY_CELLS, discoveryCells, runDiscovery, townFromAddress } from "./cloud-discovery";
-import { QUERIES } from "./places-discovery";
+import { buildTextSearchRequest, inOntario, MARKET_RECTANGLE, QUERIES } from "./places-discovery";
 import { applyEngineSchema } from "./test-support/engine-schema";
 import type { ProspectDb } from "./engine-prospects-d1";
 
@@ -105,4 +105,30 @@ test("a business's town comes from its Google address when it names one of our t
   assert.equal(townFromAddress("12 Main St, Fergus, ON", "GUELPH"), "GUELPH", "a town outside the market keeps the searched town");
   assert.equal(townFromAddress("Waterloo Region, ON", "ELMIRA"), "ELMIRA", "a region name is not a town");
   assert.equal(townFromAddress(null, "STRATFORD"), "STRATFORD");
+});
+
+test("searches are limited to the market area, and results abroad are dropped", async () => {
+  const request = JSON.parse(buildTextSearchRequest("CAMBRIDGE", "ROOFING", "k").body);
+  assert.deepEqual(request.locationRestriction, { rectangle: MARKET_RECTANGLE });
+  for (const [name, lat, lng] of [["Woodstock", 43.13, -80.757], ["Stratford", 43.37, -80.982], ["Brantford", 43.139, -80.264], ["Guelph", 43.546, -80.248], ["Elmira", 43.599, -80.557], ["Cambridge", 43.36, -80.312]] as const) {
+    assert.ok(lat > MARKET_RECTANGLE.low.latitude && lat < MARKET_RECTANGLE.high.latitude && lng > MARKET_RECTANGLE.low.longitude && lng < MARKET_RECTANGLE.high.longitude, `${name} is inside the market area`);
+  }
+  for (const [name, lng] of [["Toronto", -79.38], ["Mississauga", -79.64], ["Hamilton", -79.87], ["London", -81.25]] as const) {
+    assert.ok(lng > MARKET_RECTANGLE.high.longitude || lng < MARKET_RECTANGLE.low.longitude, `${name} is outside the market area`);
+  }
+
+  const { raw, db } = database(false);
+  const { fetcher } = google([{ places: [
+    { id: "uk", displayName: { text: "Browns Roofing" }, nationalPhoneNumber: "01223 852140", formattedAddress: "7 Cobble Yard, Napier St, Cambridge CB1 1HP, UK", businessStatus: "OPERATIONAL" },
+    { id: "us", displayName: { text: "Tiger Roofing" }, websiteUri: "https://tiger.example/", formattedAddress: "100 Lake St, Cambridge, MD 21613, USA", businessStatus: "OPERATIONAL" },
+    { id: "on", displayName: { text: "Galt Roofing" }, nationalPhoneNumber: "(519) 555-0171", formattedAddress: "5 Main St, Cambridge, ON N1R 1V4, Canada", businessStatus: "OPERATIONAL" },
+    { id: "wix", displayName: { text: "Preston Eaves" }, websiteUri: "https://prestoneaves.wixsite.com/home?lang=en", formattedAddress: "9 King St E, Cambridge, ON N3H 3M3, Canada", businessStatus: "OPERATIONAL" },
+  ] }]);
+  const result = await runDiscovery(db, { apiKey: "k", trigger: "OWNER", actor: "RILEY", maxRequests: 1, fetcher, now: new Date("2026-09-28T18:00:00Z") });
+  assert.deepEqual({ found: result.found, added: result.added, held: result.held }, { found: 2, added: 1, held: 1 });
+  assert.deepEqual(raw.prepare(`SELECT "prospectId" FROM "EngineProspect"`).pluck().all(), ["place:on"]);
+  assert.equal(raw.prepare(`SELECT "websiteUrl" FROM "DiscoveryHeld" WHERE "placeId" = 'wix'`).pluck().get(), "https://prestoneaves.wixsite.com/home", "a free Wix site keeps its page path");
+  assert.equal(inOntario("5 Main St, Cambridge, ON N1R 1V4, Canada"), true);
+  assert.equal(inOntario("5 Main St, Cambridge, ON N1R 1V4"), true);
+  assert.equal(inOntario("100 Lake St, Cambridge, MD 21613, USA"), false);
 });

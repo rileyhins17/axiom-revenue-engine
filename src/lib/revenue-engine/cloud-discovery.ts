@@ -1,6 +1,6 @@
 import type { ProspectDb } from "./engine-prospects-d1";
 import {
-  buildTextSearchRequest, CITY_NAME, DiscoveryCitySchema, DiscoveryNicheSchema, PLACES_MAX_REQUESTS_PER_MONTH, QUERIES, websiteOrigin,
+  buildTextSearchRequest, CITY_NAME, DiscoveryCitySchema, DiscoveryNicheSchema, inOntario, PLACES_MAX_REQUESTS_PER_MONTH, QUERIES, siteAddress, websiteOrigin,
   type DiscoveryCity, type DiscoveryNiche,
 } from "./places-discovery";
 
@@ -116,6 +116,8 @@ export async function runDiscovery(db: ProspectDb, options: {
 
     for (const place of body.places ?? []) {
       if (!place.id || (place.businessStatus && place.businessStatus !== "OPERATIONAL")) continue;
+      // Only Ontario: a same-named town abroad (Cambridge in England) is never a lead.
+      if (!inOntario(place.formattedAddress)) continue;
       result.found += 1;
       const name = place.displayName?.text?.trim().slice(0, 200);
       if (!name) continue;
@@ -134,7 +136,7 @@ export async function runDiscovery(db: ProspectDb, options: {
         if ((inserted.meta?.changes ?? inserted.changes ?? 0) === 1) result.added += 1;
       } else {
         const held = await db.prepare(`INSERT INTO "DiscoveryHeld" ("placeId","name","city","niche","websiteUrl","phone","address","firstSeenAt") VALUES (?,?,?,?,?,?,?,?) ON CONFLICT("placeId") DO NOTHING`)
-          .bind(place.id, name, town, cell.niche, origin, phone, address, now.toISOString()).run() as { changes?: number; meta?: { changes?: number } };
+          .bind(place.id, name, town, cell.niche, siteAddress(place.websiteUri, origin), phone, address, now.toISOString()).run() as { changes?: number; meta?: { changes?: number } };
         if ((held.meta?.changes ?? held.changes ?? 0) === 1) result.held += 1;
       }
     }

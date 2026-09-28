@@ -104,3 +104,39 @@ test("phone and street address come from the business's own page", async () => {
   assert.equal(streetAddress("Visit us at 291 Mill St, Unit 1, Kitchener today"), "291 Mill St, Unit 1, Kitchener");
   assert.equal(streetAddress("Serving the region"), null);
 });
+
+test("v9: a web address that just forwards to Facebook or a directory has no website of its own", () => {
+  const facebook = classifyEngineLead("https://gasguymechanical.example/", signals({ finalUrl: "https://www.facebook.com/people/Gas-Guy-Mechanical-Inc/61590894142195/", hasStreetAddress: false }), 2026);
+  assert.deepEqual({ label: facebook.label, codes: facebook.codes }, { label: "STRONG", codes: ["FORWARDS_TO_SOCIAL"] });
+  assert.match(facebook.reasons[0]!, /forwards to a Facebook page; there is no website of its own/);
+  for (const finalUrl of ["https://www.instagram.com/some.roofer/", "https://linktr.ee/someroofer", "https://some-roofer.business.site/"]) {
+    assert.deepEqual(classifyEngineLead("https://some-roofer.example/", signals({ finalUrl }), 2026).codes, ["FORWARDS_TO_SOCIAL"], finalUrl);
+  }
+  // A site that merely links to Facebook is judged normally.
+  assert.equal(classifyEngineLead("https://synthetic-roofing.example/", signals(), 2026).label, "WEAK");
+});
+
+test("v9: a host's 'account suspended' page is a weak website, even on a city-and-trade domain with no address", () => {
+  const cpanel = classifyEngineLead("http://www.cambridgeflatroofing.example/", signals({ finalUrl: "http://www.cambridgeflatroofing.example/cgi-sys/suspendedpage.cgi", hasStreetAddress: false, wordCount: 12 }), 2026);
+  assert.deepEqual({ label: cpanel.label, codes: cpanel.codes }, { label: "STRONG", codes: ["HOSTING_SUSPENDED"] });
+  const notice = classifyEngineLead("https://synthetic-roofing.example/", signals({ hostingSuspended: true, wordCount: 25 }), 2026);
+  assert.deepEqual(notice.codes, ["HOSTING_SUSPENDED"]);
+  // A long page that happens to mention a suspended account is not a suspension notice.
+  assert.equal(classifyEngineLead("https://synthetic-roofing.example/", signals({ hostingSuspended: true, wordCount: 900 }), 2026).label, "WEAK");
+  // The generic-domain rule still applies to ordinary pages.
+  assert.equal(classifyEngineLead("https://kitchenerroofing.example/", signals({ finalUrl: "https://kitchenerroofing.example/", hasStreetAddress: false }), 2026).label, "WRONG");
+});
+
+test("v9: a parked page is a weak website even on a city-and-trade domain (v8 called it WRONG)", () => {
+  const parked = classifyEngineLead("https://guelphroofing.example/", signals({ finalUrl: "http://ww1.guelphroofing.example/?tkn=abc", hasStreetAddress: false }), 2026);
+  assert.deepEqual({ label: parked.label, codes: parked.codes }, { label: "STRONG", codes: ["PARKED_DOMAIN"] });
+});
+
+test("v9: the suspended-page reader and the call notes for the new reasons", async () => {
+  const { saysHostingSuspended } = await import("./engine-site-capture");
+  for (const text of ["Account Suspended. This Account has been suspended.", "This website is suspended", "Site suspended - contact your hosting provider"]) assert.equal(saysHostingSuspended(text), true, text);
+  for (const text of ["We install sump pumps and water heaters.", "Suspended ceilings and drywall repair"]) assert.equal(saysHostingSuspended(text), false, text);
+  const { callNotes } = await import("./engine-lead-rules");
+  assert.match(callNotes(["HOSTING_SUSPENDED"])[0]!, /account suspended/);
+  assert.match(callNotes(["FORWARDS_TO_SOCIAL"])[0]!, /forwards to your social media page/);
+});

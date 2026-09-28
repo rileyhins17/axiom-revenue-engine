@@ -13,11 +13,14 @@ import {
  * downloads. Page text lives only in memory for the audit; callers persist only
  * the audit result and the derived signals below.
  */
-export const ENGINE_SITE_CAPTURE_VERSION = "engine-site-capture-v1" as const;
+// v2 (2026-09-28): the desktop view presents a normal desktop Chrome user agent. Many trade
+// sites' firewalls refuse "HeadlessChrome" (HTTP 403), so v1 could not grade them at all.
+export const ENGINE_SITE_CAPTURE_VERSION = "engine-site-capture-v2" as const;
 const DESKTOP = { width: 1440, height: 900 };
 const PHONE = { width: 390, height: 844 };
 // Builders such as Wix choose their phone layout from the user agent, so the phone view must look like a phone.
 const PHONE_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36";
+const DESKTOP_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 const NAVIGATION_TIMEOUT_MS = 20_000;
 const SETTLE_MS = 1_500;
 
@@ -41,6 +44,8 @@ export type EngineSiteSignals = {
   phoneLayoutWidth: number;
   /** The homepage itself says the site is under construction or being rebuilt. */
   underConstruction?: boolean;
+  /** The page is a web host's "account suspended" notice (capture v2). */
+  hostingSuspended?: boolean;
   /** The page declares a phone layout (viewport width=device-width). Null on runs before capture v-next. */
   phoneViewportMeta?: boolean | null;
   phoneScrollWidth: number;
@@ -185,6 +190,11 @@ export function saysUnderConstruction(text: string): boolean {
   return /\bunder (?:a )?(?:re)?construction\b|\bwebsite (?:is )?coming soon\b|\bpardon our dust\b|\bexcuse our (?:web ?)?site\b|\bsite (?:is )?being (?:re)?built\b/i.test(text);
 }
 
+/** A web host's notice that the account behind the site is suspended (the rules also require a short page). */
+export function saysHostingSuspended(text: string): boolean {
+  return /\b(?:this )?account (?:has been |is )?suspended\b|\b(?:web)?site (?:has been |is )?suspended\b/i.test(text);
+}
+
 export function streetAddress(text: string): string | null {
   return text.match(ADDRESS)?.[0]?.replace(/\s+/g, " ").trim().slice(0, 200) ?? null;
 }
@@ -208,7 +218,7 @@ export async function captureAndAuditSite(
   clock: () => Date = () => new Date(),
 ): Promise<EngineSiteCapture> {
   const capturedAt = clock().toISOString();
-  const desktop = await browser.newContext({ viewport: DESKTOP, javaScriptEnabled: true, serviceWorkers: "block", acceptDownloads: false });
+  const desktop = await browser.newContext({ viewport: DESKTOP, userAgent: DESKTOP_USER_AGENT, javaScriptEnabled: true, serviceWorkers: "block", acceptDownloads: false });
   const phone = await browser.newContext({ viewport: PHONE, userAgent: PHONE_USER_AGENT, isMobile: true, hasTouch: true, deviceScaleFactor: 2, serviceWorkers: "block", acceptDownloads: false });
   // tsx/esbuild wraps named functions with a __name helper that does not exist in the page.
   for (const context of [desktop, phone]) await context.addInitScript({ content: "globalThis.__name = (fn) => fn;" });
@@ -263,7 +273,7 @@ export async function captureAndAuditSite(
         phone: sitePhone(facts.actions.map((action) => action.href)),
         email: siteEmail(facts.mailtos, text)?.email ?? null, emailMethod: siteEmail(facts.mailtos, text)?.method ?? null,
         streetAddress: streetAddress(text), statusCode, copyrightYear: copyrightYear(text), generator: facts.generator,
-        hasStreetAddress: hasStreetAddress(text), underConstruction: saysUnderConstruction(text), phoneLayoutWidth: phoneFacts.layoutWidth, phoneViewportMeta: phoneFacts.viewportMeta, phoneScrollWidth: phoneFacts.scrollWidth,
+        hasStreetAddress: hasStreetAddress(text), underConstruction: saysUnderConstruction(text), hostingSuspended: saysHostingSuspended(text), phoneLayoutWidth: phoneFacts.layoutWidth, phoneViewportMeta: phoneFacts.viewportMeta, phoneScrollWidth: phoneFacts.scrollWidth,
         phoneTapToCall: phoneFacts.tapToCall, desktopTapToCall: facts.actions.some((action) => action.href?.startsWith("tel:") && action.visible),
         quoteAction: facts.actions.some((action) => (action.kind === "QUOTE" || action.kind === "BOOK") && action.visible),
         wordCount: text.split(/\s+/).filter(Boolean).length,
