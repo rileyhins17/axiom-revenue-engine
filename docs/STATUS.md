@@ -1,3 +1,42 @@
+## Production 2026-09-28: wider market, cloud website check, weekday schedules
+
+Verified commit `a354aeb` (release copy `01c0a84` for the app plus the site-check release fix) is live.
+
+**Live state**
+- **App:** Worker `3ac3523b-7baf-4409-a9cf-f33c6e34f828`. Rollback target `ea38eea7-39b6-43a6-b874-dfd2cdb9ce1d`, which is compatible with the new schema.
+- **Database:** migrations run through 0084 (87 receipts). Stops `01111`.
+- **Backup:** `backups/production/prod-export-20260928T040717Z.sql` (sha256 `30dcc2e5…`), plus Time Travel bookmark `0000314d-00000000-000050f4-edc89ae423a342f2c7abde459dfdf58b`.
+- **Schedules** (checked on the Worker): `0 11 * * MON-FRI` lead search, `0 14 * * MON-FRI` gated email, `*/15 * * * *` health.
+- **Website check:** Worker `axiom-site-check` `16f976fd-27f1-40fa-bab4-1ee72a135b48`. Browser Run and DB bindings only, no workers.dev address or previews, `*/10 11-23 * * MON-FRI`, `SITE_CHECK_ENABLED=true`. 55 businesses are waiting to be checked.
+- **Post-release check:** live EngineProspect (231) and call history (24) are byte-identical to the pre-release export. No foreign-key problems. Aidan's queue is unchanged (13 new, 11 retries due, 24 Caller tasks). Discovery cursor is reset to the new towns and trades.
+
+**Gate:** safety check; `npm test` 1,004 tests (1,000 pass, 0 fail, 4 skipped); typecheck; lint 0 errors / 11 baseline warnings; clean build; dry runs of both Workers; owner UI (8 WCAG pages).
+
+**Rehearsals of 0083**
+- Full live export in SQLite: all 150 tables, 231 Caller revisions, lists, queue and tasks identical.
+- 0083 and 0084 through `wrangler d1 migrations apply` on the local D1 engine.
+- 0083 and 0084 on a temporary remote D1 copy of the live tables, with every rule verified on the remote engine. That database was deleted afterwards.
+- Cloud grading matched the local answer key on 9 of 9 sites.
+
+**First release attempt (stopped safely):** D1's remote runner rejected 0083's `CASE` guard triggers ("incomplete input", GOTCHAS DATA-015). Live was untouched and the release stopped at its ledger check. The guards were rewritten in an equivalent form, and the release script now reads Wrangler's coloured errors.
+
+**Also this cycle**
+- **Watchdog (main `9fd3bf7`):** it now checks the app on workers.dev, because Bot Fight Mode challenges GitHub's runners on the domain (seen in Security events). The false site-down issue #12 closes on the next run.
+- **Caller:** checked GitHub main (0.6.4): 290 tests, typecheck, build and package checks all pass.
+
+**Spend:** Places stays inside the free tier (600/month cap, 40/day Google quota). Browser Run stays inside the Workers Paid included hours (120 checks a day). No new paid services.
+
+**Owner decisions:** wider market (2026-09-26); keep Google details (2026-09-26); build and deploy only when fully tested (2026-09-27).
+
+**Open:**
+- Zoho Mail Lite signup and DNS (TXT verification, SPF include, DKIM; no MX change until sign-in and alert email move off Email Routing).
+- Raising the Google daily quota (optional, free within the cap).
+
+Next three actions:
+1. Watch the 7:00 lead search and the first website-check runs. Health checks email both owners if either fails.
+2. Finish Zoho: verification and DKIM records, the aidan@ mailbox, then the SMTP host `smtp.zohocloud.ca` for the Canada data centre when email is approved.
+3. Add website-check counts to Today, and propose the MX move plan (sign-in codes via Cloudflare Email Sending).
+
 ## Production 2026-09-26: server-side lead search live; Caller contact edits live
 
 Verified commit `4ab766ab` is live as Worker `ea38eea7-39b6-43a6-b874-dfd2cdb9ce1d`. Migrations run through 0082 (85 receipts), and the emergency stops read `01111`. The release script's smoke test passed. The rollback target is `629dc6c9`. Backups taken today: `backups/production/prod-export-20260926T231730Z.sql` and `-20260926T233826Z.sql`, plus time-travel bookmark `000030d0-00000000-000050f2-175e216389e92b4612e3921c91dfe275`. Gate passed: safety check, 988 tests (984 pass, 0 fail), types, lint (0 errors), Cloudflare build, and owner UI (8 WCAG pages).
