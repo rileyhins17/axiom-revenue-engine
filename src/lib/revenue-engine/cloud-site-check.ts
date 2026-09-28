@@ -59,7 +59,14 @@ export async function runSiteChecks(db: ProspectDb, options: {
     WHERE "status" = 'WAITING' ORDER BY "attempts" ASC, "firstSeenAt" ASC, "placeId" ASC LIMIT ?`).bind(room).all<Held>();
   if (!due.length) return finish(null);
 
-  const session = await options.openCapture();
+  let session: Awaited<ReturnType<typeof options.openCapture>>;
+  try { session = await options.openCapture(); }
+  catch (caught) {
+    // Browser Run itself is unavailable (outage or usage limit): count the waiting sites as
+    // failed for this run, so the health check's "can't open any websites" alert fires.
+    result.failed = due.length;
+    return finish(`Couldn't start Cloudflare's browser: ${(caught instanceof Error ? caught.message : "unknown").split("\n")[0]!.slice(0, 150)}`);
+  }
   try {
     for (const held of due) {
       const id = hostKey(held.websiteUrl);

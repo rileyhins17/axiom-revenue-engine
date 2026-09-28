@@ -135,3 +135,14 @@ test("0084 is additive: waiting businesses keep their details and gain an empty 
   raw.prepare(`INSERT INTO "SiteCheckRun" ("runId","startedAt") VALUES ('r1','2026-09-28')`).run();
   assert.throws(() => raw.prepare(`DELETE FROM "SiteCheckRun"`).run(), /SITE_CHECK_RUN_NO_DELETE/);
 });
+
+test("if Cloudflare's browser cannot start, the run records it as failed checks so the health alert fires, and nothing changes", async () => {
+  const { raw, db, hold } = database();
+  hold.run("p1", "Waiting HVAC", "STRATFORD", "HVAC", "https://waiting.example/", null, null, "2026-09-28T11:00:00Z");
+  hold.run("p2", "Waiting Roofing", "STRATFORD", "ROOFING", "https://waiting2.example/", null, null, "2026-09-28T11:00:01Z");
+  const result = await runSiteChecks(db, { openCapture: async () => { throw new Error("Browser Run: too many requests\n  at launch"); }, now: NOW });
+  assert.equal(result.failed, 2);
+  assert.match(result.stopReason!, /^Couldn't start Cloudflare's browser: Browser Run: too many requests$/);
+  assert.deepEqual(raw.prepare(`SELECT "status","attempts" FROM "DiscoveryHeld" ORDER BY "placeId"`).all(), [{ status: "WAITING", attempts: 0 }, { status: "WAITING", attempts: 0 }], "the businesses are not blamed");
+  assert.deepEqual(raw.prepare(`SELECT "checked","failed","finishedAt" IS NOT NULL AS done FROM "SiteCheckRun"`).get(), { checked: 0, failed: 2, done: 1 });
+});
