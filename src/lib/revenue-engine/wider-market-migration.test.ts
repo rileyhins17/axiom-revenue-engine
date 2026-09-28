@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import Database from "better-sqlite3";
@@ -55,7 +55,10 @@ test("0083 keeps every business, call, email, brief and contact edit exactly, ro
   assert.deepEqual(raw.prepare(`SELECT "cellIndex", "pageToken" FROM "DiscoveryCursor"`).get(), { cellIndex: 0, pageToken: null });
 });
 
-test("0083 recreates every index, trigger and the history view with identical definitions", () => {
+/** The two call-history guards are rewritten (same checks, D1-safe form); everything else is identical. */
+const REWRITTEN_GUARDS = ["trigger:EngineProspectActivity_caller_guard", "trigger:EngineProspectActivity_conversion_guard"];
+
+test("0083 recreates every index, trigger and the history view; only the widened lists and the two guards' wording change", () => {
   const raw = seeded();
   const before = schema(raw);
   migrate(raw);
@@ -63,12 +66,58 @@ test("0083 recreates every index, trigger and the history view with identical de
   for (const object of before) {
     const key = `${object.type}:${object.name}`;
     assert.ok(after.has(key), `${key} is missing`);
-    if (key === "table:EngineProspect") continue;
+    if (key === "table:EngineProspect" || REWRITTEN_GUARDS.includes(key)) continue;
     assert.equal(after.get(key), object.sql, `${key} definition changed`);
   }
   assert.equal(after.size, before.length, "no extra objects");
   assert.match(after.get("table:EngineProspect")!, /'GUELPH', 'BRANTFORD', 'STRATFORD', 'WOODSTOCK', 'ELMIRA', 'NEW_HAMBURG', 'AYR', 'BRESLAU'/);
   assert.match(after.get("table:EngineProspect")!, /'PLUMBING', 'ELECTRICAL'/);
+  for (const key of REWRITTEN_GUARDS) assert.doesNotMatch(after.get(key)!, /\bCASE\b/, `${key} must not use CASE (D1's remote runner rejects it in a trigger)`);
+});
+
+test("the rewritten call-history guards give exactly the old guards' result for every kind of entry", () => {
+  // Same database state before (0079 guards) and after (0083 guards): a normal business, one
+  // Caller holds, one linked to Orbit, one being converted and one marked do-not-contact.
+  const prepare = (raw: Database.Database) => {
+    for (const id of ["held", "linked", "converting", "free"]) raw.prepare(`INSERT INTO "EngineProspect" VALUES (?,?,?,'KITCHENER','ROOFING',NULL,'1',NULL,'NO_WEBSITE','[]','r','2026-09-28','2026-09-28')`).run(`place:${id}`, `p-${id}`, id);
+    raw.prepare(`INSERT INTO CallerContactControl (workspaceId,contactKey,sourceEntityId,phase) VALUES ('axiom','ec-held','place:held','armed')`).run();
+    raw.prepare(`INSERT INTO CallerSourceLink (workspaceId,linkId,grantId,sourceEntityId,engineContactKey,orbitWorkspaceId,orbitContactId,identityJson,state,revision,confirmedBy,createdAt) VALUES ('axiom','l1','g','place:linked','ec-linked','ow','oc1','{}','active',1,'u','2026-09-28')`).run();
+    raw.prepare(`INSERT INTO CallerConversionJob (workspaceId,conversionId,sourceEntityId,contactKey,grantId,actorId,requestHash,payloadHash,payloadJson,sourceSnapshot,status,createdAt) VALUES ('axiom','c1','place:converting','ec-converting','g','u','h','h','{}','{}','pending','2026-09-28')`).run();
+  };
+  const outcomes = (raw: Database.Database) => {
+    const results: string[] = [];
+    let n = 0;
+    for (const prospect of ["place:held", "place:linked", "place:converting", "place:nrg", "place:free"]) {
+      for (const channel of ["CALL", "VISIT", "EMAIL", "NOTE"]) {
+        for (const event of [null, "caller-event"]) {
+          n += 1;
+          try {
+            raw.prepare(`INSERT INTO "EngineProspectActivity" ("activityId","idempotencyKey","prospectId","channel","outcome","note","actor","actorUserId","callerEventId") VALUES (?,?,?,?,?,'','AIDAN','u',?)`)
+              .run(`t${n}`, `t${n}`, prospect, channel, channel === "NOTE" ? "NOTE" : "NO_ANSWER", event ? `${event}-${n}` : null);
+            results.push(`${prospect} ${channel} ${event ?? "manual"}: saved`);
+          } catch (error) { results.push(`${prospect} ${channel} ${event ?? "manual"}: ${(error as Error).message}`); }
+        }
+      }
+    }
+    return results;
+  };
+  const old = seeded(); prepare(old);
+  const rebuilt = seeded(); migrate(rebuilt); prepare(rebuilt);
+  const expected = outcomes(old);
+  assert.deepEqual(outcomes(rebuilt), expected);
+  // And the old guards really do refuse these cases, so the comparison is meaningful.
+  for (const code of ["CALLER_CLAIM_REQUIRED", "CALLER_LINK_REQUIRED", "CALLER_STOPPED"]) assert.ok(expected.some((line) => line.endsWith(code)), `${code} never fired`);
+  assert.ok(expected.some((line) => line.endsWith("saved")));
+});
+
+test("no migration from 0083 on puts a CASE expression inside a trigger (D1's remote runner rejects it)", () => {
+  for (const name of readdirSync("migrations").filter((file) => file >= "0083")) {
+    const sql = readFileSync(`migrations/${name}`, "utf8").replace(/--.*$/gm, "");
+    for (const trigger of sql.match(/CREATE TRIGGER[\s\S]*?\bEND\s*;/gi) ?? []) {
+      const body = trigger.slice(trigger.search(/\bBEGIN\b/i));
+      assert.doesNotMatch(body.slice(5, -4), /\bCASE\b/i, `${name}: ${trigger.slice(0, 80)}`);
+    }
+  }
 });
 
 test("after 0083 the new towns and trades are accepted and every old rule still holds", () => {

@@ -25,6 +25,28 @@ Retire entries when the architecture makes them impossible.
 - **Affected area:** schema changes to `EngineProspect` or any RESTRICT parent.
 - **Verifying commit:** `87573fe`.
 
+## DATA-015 — D1's remote runner rejects a CASE expression inside a trigger body
+
+- **Symptom:** `wrangler d1 migrations apply --remote` failed with
+  `incomplete input: SQLITE_ERROR [code: 7500]` on 0083, although the same file
+  passed SQLite, the full-copy rehearsal and the local D1 engine. The release's
+  "migrations: applied" line was wrong (see prevention) and only the post-migration
+  ledger check stopped it; live was untouched because D1 ran the file as one batch.
+  The Sep 25 release of 0079 hit the same error and used the file-import path.
+- **Root cause:** the remote `/query` endpoint splits statements itself and treats
+  the `END` of a `CASE ... END` inside `BEGIN ... END` as the trigger's end.
+  Reproduced on a temporary remote database with a two-line trigger.
+- **Proven fix:** write trigger guards as `SELECT RAISE(ABORT, '...') WHERE <condition>;`
+  (same checks, order and codes). 0083 then applied cleanly on a temporary remote
+  copy of the live tables, with every rule verified on the remote engine.
+- **Prevention/test:** `wider-market-migration.test.ts` fails if any migration from
+  0083 on puts `CASE` inside a trigger, and proves the rewritten guards match the old
+  ones across 40 kinds of entries. The release script now strips Wrangler's colour
+  codes and checks the exit status before saying a migration applied. Rehearse
+  trigger-bearing migrations on a temporary remote D1 database, not only locally.
+- **Affected area:** any D1 migration applied with `wrangler d1 migrations apply --remote`.
+- **Verifying commit:** the commit that adds this entry.
+
 ## OPS-015 — Cloudflare weekday 1 is Sunday
 
 - **Symptom:** the "weekday" lead search (`0 11 * * 1-5`) ran on Sunday

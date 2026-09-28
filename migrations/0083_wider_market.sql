@@ -129,7 +129,11 @@ INSERT INTO "CallerContactEdit" (rowid, "editId", "workspaceId", "prospectId", "
   SELECT "_rowid", "editId", "workspaceId", "prospectId", "actor", "actorUserId", "previousPhone", "newPhone", "note", "payloadHash", "occurredAt", "createdAt" FROM "_m0083_CallerContactEdit" ORDER BY "_rowid";
 CREATE INDEX "CallerContactEdit_prospect" ON "CallerContactEdit" ("prospectId", "createdAt");
 
--- 5. The protective triggers, identical to before, now that history is back in place.
+-- 5. The protective triggers, now that history is back in place. The two call-history
+-- guards make the same checks in the same order with the same codes as 0079, written
+-- as SELECT RAISE(...) WHERE instead of a conditional expression: D1's remote runner
+-- splits statements itself and misreads that expression inside a trigger body as the
+-- trigger's own ending ("incomplete input"), see GOTCHAS DATA-015.
 CREATE TRIGGER "EngineProspect_no_delete" BEFORE DELETE ON "EngineProspect"
 BEGIN SELECT RAISE(ABORT, 'ENGINE_PROSPECT_NO_DELETE'); END;
 CREATE TRIGGER "EngineProspectActivity_immutable_update" BEFORE UPDATE ON "EngineProspectActivity"
@@ -139,15 +143,15 @@ BEGIN SELECT RAISE(ABORT, 'ENGINE_PROSPECT_ACTIVITY_APPEND_ONLY'); END;
 CREATE TRIGGER EngineProspectActivity_caller_guard BEFORE INSERT ON EngineProspectActivity
 WHEN NEW.callerEventId IS NULL AND NEW.channel <> 'NOTE'
 BEGIN
-  SELECT CASE WHEN NEW.channel='CALL' AND EXISTS(SELECT 1 FROM CallerSourceLink l WHERE l.workspaceId='axiom'
-    AND l.sourceEntityId=NEW.prospectId) THEN RAISE(ABORT,'CALLER_LINK_REQUIRED') END;
-  SELECT CASE WHEN EXISTS(SELECT 1 FROM CallerContactControl c WHERE c.workspaceId='axiom'
-    AND c.sourceEntityId=NEW.prospectId AND c.stopped=1) THEN RAISE(ABORT,'CALLER_STOPPED') END;
-  SELECT CASE WHEN NEW.channel='CALL' AND EXISTS(SELECT 1 FROM CallerContactControl c WHERE c.workspaceId='axiom'
-    AND c.sourceEntityId=NEW.prospectId AND c.phase<>'closed') THEN RAISE(ABORT,'CALLER_CLAIM_REQUIRED') END;
+  SELECT RAISE(ABORT,'CALLER_LINK_REQUIRED') WHERE NEW.channel='CALL' AND EXISTS(SELECT 1 FROM CallerSourceLink l WHERE l.workspaceId='axiom'
+    AND l.sourceEntityId=NEW.prospectId);
+  SELECT RAISE(ABORT,'CALLER_STOPPED') WHERE EXISTS(SELECT 1 FROM CallerContactControl c WHERE c.workspaceId='axiom'
+    AND c.sourceEntityId=NEW.prospectId AND c.stopped=1);
+  SELECT RAISE(ABORT,'CALLER_CLAIM_REQUIRED') WHERE NEW.channel='CALL' AND EXISTS(SELECT 1 FROM CallerContactControl c WHERE c.workspaceId='axiom'
+    AND c.sourceEntityId=NEW.prospectId AND c.phase<>'closed');
 END;
 CREATE TRIGGER EngineProspectActivity_conversion_guard BEFORE INSERT ON EngineProspectActivity WHEN NEW.channel='CALL' AND NEW.callerEventId IS NULL
- BEGIN SELECT CASE WHEN EXISTS(SELECT 1 FROM CallerConversionJob WHERE workspaceId='axiom' AND sourceEntityId=NEW.prospectId) THEN RAISE(ABORT,'CALLER_LINK_REQUIRED') END; END;
+ BEGIN SELECT RAISE(ABORT,'CALLER_LINK_REQUIRED') WHERE EXISTS(SELECT 1 FROM CallerConversionJob WHERE workspaceId='axiom' AND sourceEntityId=NEW.prospectId); END;
 CREATE TRIGGER "EngineEmailSend_forward_only" BEFORE UPDATE ON "EngineEmailSend"
 WHEN OLD."status" <> 'CLAIMED' OR NEW."prospectId" <> OLD."prospectId" OR NEW."email" <> OLD."email" OR NEW."unsubscribeToken" <> OLD."unsubscribeToken"
 BEGIN SELECT RAISE(ABORT, 'ENGINE_EMAIL_SEND_FORWARD_ONLY'); END;

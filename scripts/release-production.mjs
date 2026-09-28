@@ -73,8 +73,11 @@ if (unique.length) {
   if (!bookmark) stop("could not record a Time Travel bookmark");
   console.log("time-travel bookmark:", bookmark);
   const apply = wrangler(["d1", "migrations", "apply", DATABASE, "--remote"], repo, "y\n");
-  const failed = /❌|\[ERROR\]/.test(apply.stdout + apply.stderr);
+  // Wrangler colours its errors, which splits "[ERROR]" with escape codes; check the exit status too.
+  const output = (apply.stdout + apply.stderr).replace(/\x1b\[[0-9;]*m/g, "");
+  const failed = apply.status !== 0 || /❌|\[ERROR\]/.test(output);
   console.log("migrations:", failed ? "FAILED" : "applied");
+  if (failed) console.error(output.split("\n").filter((line) => /ERROR|error|SQLITE|failed/.test(line)).slice(0, 8).join("\n"));
   if (failed) stop(`migration failed; live DB partially upgraded. Inspect, then restore with bookmark ${bookmark} if needed`);
 }
 const after = state();
