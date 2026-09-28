@@ -7,7 +7,7 @@ Verified commit `a354aeb` (release copy `01c0a84` for the app plus the site-chec
 - **Database:** migrations run through 0084 (87 receipts). Stops `01111`.
 - **Backup:** `backups/production/prod-export-20260928T040717Z.sql` (sha256 `30dcc2e5…`), plus Time Travel bookmark `0000314d-00000000-000050f4-edc89ae423a342f2c7abde459dfdf58b`.
 - **Schedules** (checked on the Worker): `0 11 * * MON-FRI` lead search, `0 14 * * MON-FRI` gated email, `*/15 * * * *` health.
-- **Website check:** Worker `axiom-site-check` `16f976fd-27f1-40fa-bab4-1ee72a135b48`. Browser Run and DB bindings only, no workers.dev address or previews, `*/10 11-23 * * MON-FRI`, `SITE_CHECK_ENABLED=true`. 55 businesses are waiting to be checked.
+- **Website check:** Worker `axiom-site-check` `1b16a23c-c44d-4492-b41d-21bbd7e82d91` (commit `4661af3`: a browser that cannot start counts as failed checks, so the alert fires; previous `16f976fd`). Browser Run and DB bindings only, no workers.dev address or previews, `*/10 11-23 * * MON-FRI`, `SITE_CHECK_ENABLED=true`. 55 businesses are waiting to be checked.
 - **Post-release check:** live EngineProspect (231) and call history (24) are byte-identical to the pre-release export. No foreign-key problems. Aidan's queue is unchanged (13 new, 11 retries due, 24 Caller tasks). Discovery cursor is reset to the new towns and trades.
 
 **Gate:** safety check; `npm test` 1,004 tests (1,000 pass, 0 fail, 4 skipped); typecheck; lint 0 errors / 11 baseline warnings; clean build; dry runs of both Workers; owner UI (8 WCAG pages).
