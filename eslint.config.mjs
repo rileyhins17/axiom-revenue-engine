@@ -11,6 +11,8 @@ const eslintConfig = defineConfig([
     ".next/**",
     ".open-next/**",
     ".wrangler/**",
+    // Wrangler dev bundles next to a nested config (scripts/site-check-probe).
+    "**/.wrangler/**",
     ".playwright-mcp/**",
     ".claude/**",
     ".superpowers/**",
