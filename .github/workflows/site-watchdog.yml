@@ -1,6 +1,12 @@
 # Outside watchdog: if the live app goes down it cannot email anyone itself,
 # so GitHub checks it every 30 minutes and opens an issue (GitHub emails the repo
 # owner, and the issue mentions Aidan). The issue closes itself when the site is back.
+#
+# Cloudflare's Bot Fight Mode challenges GitHub's servers on operations.getaxiom.ca
+# (HTTP 403 with "cf-mitigated: challenge"), so the app itself is checked on its
+# workers.dev address, which Bot Fight Mode does not cover. The custom domain counts
+# as up when Cloudflare answers it, including with that challenge; it is down only on
+# a timeout, a connection error or a server error.
 name: Live site watchdog
 on:
   schedule:
@@ -13,14 +19,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check operations.getaxiom.ca
+      - name: Check the Revenue Engine and its domain
         id: probe
         run: |
-          ok=false
+          app_ok=false
+          domain_ok=false
           for i in 1 2 3; do
-            if curl -fsS --max-time 20 https://operations.getaxiom.ca/api/health | grep -q '"ok":true'; then ok=true; break; fi
+            app=$(curl -sS --max-time 20 -o app.json -w '%{http_code}' https://axiom-ops-omniscient.aidan-magee2.workers.dev/api/health) || true
+            if [ "$app" = "200" ] && grep -q '"ok":true' app.json; then app_ok=true; fi
+            domain=$(curl -sS --max-time 20 -o /dev/null -D domain.headers -w '%{http_code}' https://operations.getaxiom.ca/api/health) || true
+            if [ "$domain" = "200" ]; then domain_ok=true; fi
+            if [ "$domain" = "403" ] && grep -qi '^cf-mitigated: *challenge' domain.headers; then domain_ok=true; fi
+            echo "attempt $i: app health HTTP $app, domain HTTP $domain" | tee -a "$GITHUB_STEP_SUMMARY"
+            if [ "$app_ok" = "true" ] && [ "$domain_ok" = "true" ]; then break; fi
             sleep 20
           done
+          if [ "$app_ok" = "true" ] && [ "$domain_ok" = "true" ]; then ok=true; else ok=false; fi
+          echo "app_ok=$app_ok domain_ok=$domain_ok" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "ok=$ok" >> "$GITHUB_OUTPUT"
       - name: Open or close the site-down issue
         env:
