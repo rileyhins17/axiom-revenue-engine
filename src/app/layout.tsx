@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Axiom Revenue",
+    title: "Axiom",
     statusBarStyle: "black-translucent",
   },
   icons: {

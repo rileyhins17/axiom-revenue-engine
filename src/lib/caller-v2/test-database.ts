@@ -11,7 +11,7 @@ export function openCallerTestDb() {
   raw.exec(readFileSync(new URL('../../../migrations/0001_cloudflare_auth_security.sql', import.meta.url), 'utf8'));
   applyEngineSchema(raw);
   raw.prepare('INSERT INTO User(id,name,email,emailVerified,updatedAt) VALUES(?,?,?,1,?)').run(AIDAN.actorUserId, 'Fixture owner', 'aidan@getaxiom.ca', '2026-09-25T00:00:00.000Z');
-  raw.prepare(`INSERT INTO EngineProspect VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run('fixture.example', 'fixture-place', 'Synthetic roofing fixture', 'KITCHENER', 'ROOFING', 'https://fixture.example', '+15195550101', null, 'STRONG', '["Stored fixture observation"]', 'fixture-run', '2026-09-24', '2026-09-24');
+  raw.prepare(`INSERT INTO EngineProspect (prospectId,placeId,name,city,niche,websiteUrl,phone,address,label,reasons,runId,firstSeenAt,lastSeenAt) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run('fixture.example', 'fixture-place', 'Synthetic roofing fixture', 'KITCHENER', 'ROOFING', 'https://fixture.example', '+15195550101', null, 'STRONG', '["Stored fixture observation"]', 'fixture-run', '2026-09-24', '2026-09-24');
   const pending = new WeakMap<CallerStatement, { sql: string; values: unknown[] }>();
   const db: CallerDb = {
     prepare(sql) {

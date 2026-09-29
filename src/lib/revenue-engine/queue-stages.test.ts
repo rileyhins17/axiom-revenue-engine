@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import Database from "better-sqlite3";
 
 import { listProspects, nextInQueue, prospectCounts, type ProspectDb } from "./engine-prospects-d1";
+import { applyEngineSchema } from "@/lib/revenue-engine/test-support/engine-schema";
 
 /**
  * Aidan's queue rules (Slack, 2026-09-25): "To call" means never attempted; any call
@@ -14,9 +14,8 @@ import { listProspects, nextInQueue, prospectCounts, type ProspectDb } from "./e
  */
 function database() {
   const raw = new Database(":memory:");
-  raw.exec(readFileSync("migrations/0075_engine_prospects_and_call_log.sql", "utf8"));
-  raw.exec(readFileSync("migrations/0079_connected_caller.sql", "utf8"));
-  const insert = raw.prepare(`INSERT INTO "EngineProspect" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  applyEngineSchema(raw);
+  const insert = raw.prepare(`INSERT INTO "EngineProspect" ("prospectId","placeId","name","city","niche","websiteUrl","phone","address","label","reasons","runId","firstSeenAt","lastSeenAt") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   for (const [id, name] of [["fresh", "Fresh Roofing"], ["vm", "Voicemail HVAC"], ["cb", "Callback Lawns"], ["connected", "Connected Roofing"], ["no", "Not Interested HVAC"], ["na", "No Answer Roofing"]]) {
     insert.run(id, `p-${id}`, name, "KITCHENER", "ROOFING", null, "519-555-0100", "1 King St", "NO_WEBSITE", "[]", "run1", "2026-09-20", "2026-09-20");
   }

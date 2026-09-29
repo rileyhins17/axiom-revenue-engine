@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import Database from "better-sqlite3";
@@ -8,11 +7,12 @@ import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
 import { getCallBrief, type BriefInput } from "./call-brief";
 import { AiError } from "./gemini";
+import { applyEngineSchema } from "@/lib/revenue-engine/test-support/engine-schema";
 
 function database() {
   const raw = new Database(":memory:");
-  for (const file of ["0075_engine_prospects_and_call_log.sql", "0077_ai_call_briefs.sql", "0079_connected_caller.sql"]) raw.exec(readFileSync(`migrations/${file}`, "utf8"));
-  raw.prepare(`INSERT INTO "EngineProspect" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run("a.example", "p1", "Acme Roofing", "KITCHENER", "ROOFING", "https://a.example/", "519-555-0101", null, "STRONG", '["No phone layout"]', "run1", "2026-09-24", "2026-09-24");
+  applyEngineSchema(raw);
+  raw.prepare(`INSERT INTO "EngineProspect" ("prospectId","placeId","name","city","niche","websiteUrl","phone","address","label","reasons","runId","firstSeenAt","lastSeenAt") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run("a.example", "p1", "Acme Roofing", "KITCHENER", "ROOFING", "https://a.example/", "519-555-0101", null, "STRONG", '["No phone layout"]', "run1", "2026-09-24", "2026-09-24");
   const db: ProspectDb = { prepare(sql) { const s = raw.prepare(sql); return { bind: (...v: unknown[]) => ({
     all: async <T,>() => ({ results: s.all(...v) as T[] }), first: async <T,>() => (s.get(...v) as T | undefined) ?? null, run: async () => s.run(...v),
   }) }; } };

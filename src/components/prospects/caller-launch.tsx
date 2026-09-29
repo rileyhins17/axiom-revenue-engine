@@ -2,6 +2,7 @@
 import { Phone } from 'lucide-react';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { sourceRefSchema } from '@/lib/caller-v2/protocol';
+import { displayPhone, telHref } from '@/lib/prospect-format';
 
 
 const CallerActivation=createContext(false);
@@ -35,17 +36,21 @@ export function useCallerHandoff(prospectId:string):boolean {
   return selectedId===prospectId;
 }
 
-/** Only a source reference crosses into the extension; Caller fetches the number. */
-export function CallerLaunch({ prospectId, label = 'Open Caller', className = '' }: { prospectId: string; label?: string; className?: string }) {
+/**
+ * The Call button is a real tap-to-dial link, so it dials from an iPhone (home screen app
+ * or Safari) and from any computer. When connected calling is on it also carries the source
+ * reference: on a computer with Axiom Caller installed, the extension takes the click over
+ * (it cancels the dial and opens Caller). Only that reference crosses into the extension;
+ * Caller fetches the number itself.
+ */
+export function CallerLaunch({ prospectId, phone, label, className = '' }: { prospectId: string; phone: string; label?: string; className?: string }) {
   const enabled=useContext(CallerActivation);
-  // Paused is a status, not a button: show the number quietly with a small tag.
-  if(!enabled)return <span className="inline-flex items-center gap-2 text-sm tabular-nums text-slate-700" title="New calls are paused for this workspace. Saved results can still sync.">
-    <Phone className="size-4 text-slate-500" aria-hidden="true" />{label.replace(/^Call /, "")}
-    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">calls paused</span>
-  </span>;
   const source = { system: 'revenue-engine', connectionId: 'axiom-engine', workspaceId: 'axiom', entityType: 'prospect', entityId: prospectId };
-  return <a href="/settings#caller" data-axiom-caller-source={JSON.stringify(source)}
-    className={`inline-flex items-center gap-2 rounded-lg font-medium ${className}`} title="Open Axiom Caller. Connect the extension in Settings if it is unavailable.">
-    <Phone className="size-4" aria-hidden="true" />{label}
+  return <a href={telHref(phone)} {...(enabled ? { 'data-axiom-caller-source': JSON.stringify(source) } : {})}
+    className={`inline-flex items-center gap-2 rounded-lg font-medium ${className}`}
+    title={enabled ? 'Call. With Axiom Caller installed on this computer, this opens Caller instead.' : 'Call this number'}>
+    <Phone className="size-4 shrink-0" aria-hidden="true" /><span className="tabular-nums">{label ?? displayPhone(phone)}</span>
+    {/* Connected calling paused: a quiet desktop-only note; tapping still dials. */}
+    {enabled ? null : <span className="hidden rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 md:inline">Caller paused</span>}
   </a>;
 }

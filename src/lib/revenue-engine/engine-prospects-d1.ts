@@ -29,6 +29,10 @@ export type ProspectRow = {
   lastOutcome: ProspectOutcome | null; lastCallerOutcome?: string | null; lastActivityAt: string | null; lastActor: string | null; followUpAt: string | null; attempts: number;
   /** fresh = never called; retry = called, next attempt due on dueAt; review = called, needs a decision; closed = finished. */
   stage?: ProspectStage; dueAt?: string | null; callAttempts?: number;
+  /** The other number when the business's website and Google disagree (migration 0085). */
+  altPhone?: string | null;
+  /** Google review count and stars from discovery (null when not collected). */
+  googleRatingCount?: number | null; googleRating?: number | null;
 };
 export type ProspectActivity = {
   activityId: string; channel: string; outcome: ProspectOutcome; callerOutcome?: string | null; note: string; followUpAt: string | null; actor: string; createdAt: string;
@@ -72,6 +76,16 @@ const STAGED = `SELECT staged.*, CASE
 
 const CLOSED = `('NOT_INTERESTED','WON','WRONG_NUMBER','DO_NOT_CONTACT','MEETING_BOOKED')`;
 
+/**
+ * Who to call first among businesses nobody has called (2026-09-28: 7 of 19 calls reached dead
+ * numbers on review-less "no website" listings). Toll-free numbers rarely reach the owner, so they
+ * go last; weak websites (evidence to talk about) come first; then the more Google reviews, the
+ * more established the business and the likelier its number works. Unrated rows (collected before
+ * reviews were stored) sit between reviewed listings and ones with no reviews at all.
+ */
+const TOLL_FREE = `CASE WHEN substr(ltrim(replace(replace(replace(replace(replace(replace(COALESCE(phone,''),'(',''),')',''),'-',''),' ',''),'+',''),'.',''),'1'),1,3) IN ('800','833','844','855','866','877','888') THEN 1 ELSE 0 END`;
+const FRESH_ORDER = `${TOLL_FREE}, CASE label WHEN 'STRONG' THEN 0 ELSE 1 END, COALESCE(googleRatingCount, 1) DESC`;
+
 function parseRow(row: Record<string, unknown>): ProspectRow {
   let reasons: string[] = [];
   try { reasons = JSON.parse(String(row.reasons)) as string[]; } catch { reasons = []; }
@@ -84,6 +98,9 @@ function parseRow(row: Record<string, unknown>): ProspectRow {
     lastActor: (row.lastActor as string | null) ?? null, followUpAt: (row.followUpAt as string | null) ?? null, attempts: Number(row.attempts ?? 0),
     stage: (row.stage as ProspectStage | undefined) ?? undefined, dueAt: (row.dueAt as string | null | undefined) ?? null,
     callAttempts: row.callAttempts == null ? undefined : Number(row.callAttempts),
+    altPhone: (row.altPhone as string | null | undefined) ?? null,
+    googleRatingCount: row.googleRatingCount == null ? null : Number(row.googleRatingCount),
+    googleRating: row.googleRating == null ? null : Number(row.googleRating),
   };
 }
 
@@ -98,7 +115,7 @@ export async function listProspects(db: ProspectDb, view: ProspectView, today: s
     contacted: `attempts > 0`,
     all: `1 = 1`,
   };
-  const order = view === "contacted" || view === "review" ? `lastActivityAt DESC` : view === "followups" ? `dueAt, name` : `CASE label WHEN 'STRONG' THEN 0 WHEN 'NO_WEBSITE' THEN 1 ELSE 2 END, attempts ASC, city, name`;
+  const order = view === "contacted" || view === "review" ? `lastActivityAt DESC` : view === "followups" ? `dueAt, name` : `CASE label WHEN 'WEAK' THEN 1 ELSE 0 END, ${FRESH_ORDER}, attempts ASC, city, name`;
   const result = await db.prepare(`SELECT * FROM (${STAGED}) WHERE ${where[view]} ORDER BY ${order} LIMIT ${Math.max(1, Math.min(limit, 1000))}`)
     .bind(...Array.from({ length: (where[view].match(/\?/g) ?? []).length }, () => today)).all<Record<string, unknown>>();
   return result.results.map(parseRow);
@@ -130,7 +147,7 @@ export async function nextInQueue(db: ProspectDb, today: string, dayStart: strin
     AND (lastActivityAt IS NULL OR lastActivityAt < ?)${skipList.length ? ` AND prospectId NOT IN (${skipList.map(() => "?").join(",")})` : ""}`;
   const binds = [today, dayStart, ...skipList];
   const [rows, count] = await Promise.all([
-    db.prepare(`SELECT * FROM (${STAGED}) WHERE ${where} ORDER BY (stage <> 'retry'), dueAt, CASE label WHEN 'STRONG' THEN 0 ELSE 1 END, attempts ASC, city, name, prospectId LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))} OFFSET ${Math.max(0, Math.min(99999, Math.floor(offset)))}`).bind(...binds).all<Record<string, unknown>>(),
+    db.prepare(`SELECT * FROM (${STAGED}) WHERE ${where} ORDER BY (stage <> 'retry'), dueAt, ${FRESH_ORDER}, attempts ASC, city, name, prospectId LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))} OFFSET ${Math.max(0, Math.min(99999, Math.floor(offset)))}`).bind(...binds).all<Record<string, unknown>>(),
     db.prepare(`SELECT COUNT(*) AS n FROM (${STAGED}) WHERE ${where}`).bind(...binds).first<{ n: number }>(),
   ]);
   const parsed = rows.results.map(parseRow);

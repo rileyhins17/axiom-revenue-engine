@@ -23,6 +23,8 @@ function database(withLegacyRow = true) {
   raw.exec(readFileSync("migrations/0081_cloud_discovery.sql", "utf8"));
   raw.exec(readFileSync("migrations/0082_caller_contact_edits.sql", "utf8"));
   raw.exec(readFileSync("migrations/0083_wider_market.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0084_site_check.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0085_phone_quality.sql", "utf8"));
   const db: ProspectDb = { prepare(sql) { const s = raw.prepare(sql); return { bind: (...v: unknown[]) => ({
     all: async <T,>() => ({ results: s.all(...v) as T[] }), first: async <T,>() => (s.get(...v) as T | undefined) ?? null, run: async () => s.run(...v),
   }) }; } };

@@ -103,7 +103,7 @@ test("a site that will not load is retried on later runs, then marked failed; no
 
 test("runs are capped per run and per day, and a business already on the list is not checked again", async () => {
   const { raw, db, hold } = database();
-  raw.prepare(`INSERT INTO "EngineProspect" VALUES ('known.example','pk','Known Roofing','KITCHENER','ROOFING','https://known.example/',NULL,NULL,'WEAK','[]','run1','2026-09-20','2026-09-20')`).run();
+  raw.prepare(`INSERT INTO "EngineProspect" ("prospectId","placeId","name","city","niche","websiteUrl","phone","address","label","reasons","runId","firstSeenAt","lastSeenAt") VALUES ('known.example','pk','Known Roofing','KITCHENER','ROOFING','https://known.example/',NULL,NULL,'WEAK','[]','run1','2026-09-20','2026-09-20')`).run();
   hold.run("pk", "Known Roofing", "KITCHENER", "ROOFING", "https://known.example/", null, null, "2026-09-28T10:00:00Z");
   const urls: Record<string, EngineSiteCapture> = {};
   for (let index = 0; index < 5; index += 1) {

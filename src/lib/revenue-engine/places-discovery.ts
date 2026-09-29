@@ -17,7 +17,8 @@ import { z } from "zod";
 export const PLACES_DISCOVERY_VERSION = "places-text-search-discovery-v1" as const;
 export const PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 /** websiteUri makes each request a Text Search Enterprise event (1,000 free per month as of 2026-09). */
-export const PLACES_FIELD_MASK = "places.id,places.displayName,places.websiteUri,places.formattedAddress,places.types,places.businessStatus,places.nationalPhoneNumber,nextPageToken";
+/** rating and userRatingCount are Enterprise fields too, so they do not change what a request costs. */
+export const PLACES_FIELD_MASK = "places.id,places.displayName,places.websiteUri,places.formattedAddress,places.types,places.businessStatus,places.nationalPhoneNumber,places.rating,places.userRatingCount,nextPageToken";
 export const PLACES_MAX_REQUESTS_PER_RUN = 150;
 export const PLACES_MAX_REQUESTS_PER_MONTH = 600;
 /** Worst case if no free tier applied: US$28 per 1,000 Enterprise events. */

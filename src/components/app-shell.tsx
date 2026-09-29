@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { CircleUserRound, LogOutIcon, UserIcon } from "lucide-react";
+import { CircleUserRound, LogOutIcon, MoreHorizontal, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -16,6 +16,7 @@ import { isPublicPath } from "@/lib/public-paths";
 import { cn } from "@/lib/utils";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar } from "@/components/ui/avatar";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,10 +81,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <AppSidebar />
       <main id="main-content" tabIndex={-1} className="owner-main flex min-h-screen min-w-0 w-full flex-1 flex-col outline-none">
         <header className="owner-topbar sticky top-0 z-40">
-          <div className="flex h-[64px] items-center gap-3 px-4 sm:px-6 lg:px-9">
-            <SidebarTrigger aria-label="Toggle navigation" className="owner-icon-button" />
+          <div className="owner-topbar-inner flex h-[52px] items-center gap-3 px-4 sm:px-6 md:h-[64px] lg:px-9">
+            <SidebarTrigger aria-label="Toggle navigation" className="owner-icon-button hidden md:inline-flex" />
+            {/* Phones: the brand on the left; each page carries its own large title. */}
+            <Link href="/dashboard" aria-label="Axiom Revenue Engine home" className="owner-mobile-brand md:hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/axiomtransparentlogo.png" alt="" width={88} height={18} className="h-[18px] w-auto" />
+            </Link>
             <div className="min-w-0 flex-1">
-              <LayoutBreadcrumb />
+              <div className="hidden md:block"><LayoutBreadcrumb /></div>
             </div>
             <div className="owner-search-trigger"><SearchTrigger /></div>
             <DropdownMenu>
@@ -148,43 +154,77 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div data-owner-content className="owner-page-content min-w-0 flex-1 px-4 py-6 pb-28 sm:px-6 sm:py-8 md:px-9 md:py-9">{children}</div>
         </HotkeyProvider>
 
-        <MobileTabBar pathname={pathname} />
+        <MobileTabBar pathname={pathname} email={sessionEmail} onSignOut={async () => { await authClient.signOut(); router.push("/sign-in"); }} />
       </main>
     </SidebarProvider>
     </CallerActivationProvider>
   );
 }
 
-function MobileTabBar({ pathname }: { pathname: string | null }) {
-  return (
-    <nav
-      aria-label="Primary"
-      className="owner-mobile-nav fixed inset-x-0 bottom-0 z-50 px-2 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] pt-2 md:hidden"
-    >
-      <div className="grid grid-cols-7 gap-0.5">
-        {APP_NAV_ITEMS.map((item) => {
-          const active = pathname === item.url || pathname?.startsWith(`${item.url}/`);
-          const Icon = item.icon;
+const isActive = (pathname: string | null, url: string) => pathname === url || Boolean(pathname?.startsWith(`${url}/`));
+/** The four places used all day; everything else lives under More. */
+const PRIMARY_URLS = ["/dashboard", "/call", "/prospects", "/walk-ins"];
 
+/**
+ * Phone navigation (the home-screen app on iPhone): four thumb-sized tabs and a More sheet,
+ * clear of the home indicator.
+ */
+function MobileTabBar({ pathname, email, onSignOut }: { pathname: string | null; email: string; onSignOut: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const primary = APP_NAV_ITEMS.filter((item) => PRIMARY_URLS.includes(item.url));
+  const more = APP_NAV_ITEMS.filter((item) => !PRIMARY_URLS.includes(item.url));
+  const moreActive = more.some((item) => isActive(pathname, item.url));
+
+  return (
+    <nav aria-label="Primary" className="owner-mobile-nav fixed inset-x-0 bottom-0 z-50 md:hidden">
+      <div className="grid grid-cols-5">
+        {primary.map((item) => {
+          const active = isActive(pathname, item.url);
+          const Icon = item.icon;
           return (
-            <Link
-              key={item.url}
-              href={item.url}
-              prefetch
-              aria-current={active ? "page" : undefined}
-              aria-label={item.title}
-              className={cn(
-                "owner-mobile-nav-item flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium transition-colors",
-                active
-                  ? "is-active"
-                  : "",
-              )}
-            >
-              <Icon className="size-[17px]" aria-hidden="true" />
-              <span className="max-w-full truncate">{item.label}</span>
+            <Link key={item.url} href={item.url} prefetch aria-current={active ? "page" : undefined}
+              className={cn("owner-mobile-nav-item", active ? "is-active" : "")}>
+              <Icon className="size-[22px]" aria-hidden="true" />
+              <span>{item.label}</span>
             </Link>
           );
         })}
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <button type="button" className={cn("owner-mobile-nav-item", moreActive ? "is-active" : "")}>
+              <MoreHorizontal className="size-[22px]" aria-hidden="true" />
+              <span>More</span>
+            </button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="owner-more-sheet">
+            <SheetHeader>
+              <SheetTitle>More</SheetTitle>
+              <SheetDescription>{email || "Axiom Revenue Engine"}</SheetDescription>
+            </SheetHeader>
+            <ul className="grid gap-1 px-3 pb-3">
+              {more.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <li key={item.url}>
+                    <Link href={item.url} onClick={() => setOpen(false)} aria-current={isActive(pathname, item.url) ? "page" : undefined} className="owner-more-item">
+                      <Icon className="size-5" aria-hidden="true" />
+                      <span className="min-w-0">
+                        <span className="block font-semibold">{item.title}</span>
+                        <span className="block text-xs opacity-70">{item.description}</span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+              <li>
+                <button type="button" onClick={() => { setOpen(false); void onSignOut(); }} className="owner-more-item w-full text-left">
+                  <LogOutIcon className="size-5" aria-hidden="true" />
+                  <span className="font-semibold">Sign out</span>
+                </button>
+              </li>
+            </ul>
+          </SheetContent>
+        </Sheet>
       </div>
     </nav>
   );

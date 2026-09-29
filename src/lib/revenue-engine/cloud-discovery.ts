@@ -72,7 +72,12 @@ export function placesKeyFromEnv(env: Record<string, unknown>): string | undefin
 
 export type DiscoveryResult = { runId: string; requests: number; found: number; added: number; held: number; stopReason: string | null };
 type Fetcher = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{ status: number; json(): Promise<unknown> }>;
-type Place = { id?: string; displayName?: { text?: string }; websiteUri?: string; formattedAddress?: string; businessStatus?: string; nationalPhoneNumber?: string };
+type Place = { id?: string; displayName?: { text?: string }; websiteUri?: string; formattedAddress?: string; businessStatus?: string; nationalPhoneNumber?: string; rating?: number; userRatingCount?: number };
+/** Google's review count and stars, kept only when they are sane numbers. */
+const reviews = (place: Place) => ({
+  count: Number.isInteger(place.userRatingCount) && place.userRatingCount! >= 0 ? place.userRatingCount! : null,
+  stars: typeof place.rating === "number" && place.rating >= 0 && place.rating <= 5 ? Math.round(place.rating * 10) / 10 : null,
+});
 
 const hostKey = (origin: string) => new URL(origin).hostname.toLowerCase().replace(/^www\./, "");
 
@@ -130,13 +135,13 @@ export async function runDiscovery(db: ProspectDb, options: {
       const town = townFromAddress(address, cell.city);
       if (!origin) {
         if (!phone) continue; // Nothing to call.
-        const inserted = await db.prepare(`INSERT INTO "EngineProspect" ("prospectId","placeId","name","city","niche","websiteUrl","phone","address","label","reasons","runId","firstSeenAt","lastSeenAt")
-          VALUES (?,?,?,?,?,NULL,?,?,'NO_WEBSITE',?,?,?,?) ON CONFLICT("prospectId") DO NOTHING`)
-          .bind(`place:${place.id}`, place.id, name, town, cell.niche, phone, address, JSON.stringify(["No website listed on Google."]), runId, now.toISOString(), now.toISOString()).run() as { changes?: number; meta?: { changes?: number } };
+        const inserted = await db.prepare(`INSERT INTO "EngineProspect" ("prospectId","placeId","name","city","niche","websiteUrl","phone","address","label","reasons","runId","firstSeenAt","lastSeenAt","googleRatingCount","googleRating")
+          VALUES (?,?,?,?,?,NULL,?,?,'NO_WEBSITE',?,?,?,?,?,?) ON CONFLICT("prospectId") DO NOTHING`)
+          .bind(`place:${place.id}`, place.id, name, town, cell.niche, phone, address, JSON.stringify(["No website listed on Google."]), runId, now.toISOString(), now.toISOString(), reviews(place).count, reviews(place).stars).run() as { changes?: number; meta?: { changes?: number } };
         if ((inserted.meta?.changes ?? inserted.changes ?? 0) === 1) result.added += 1;
       } else {
-        const held = await db.prepare(`INSERT INTO "DiscoveryHeld" ("placeId","name","city","niche","websiteUrl","phone","address","firstSeenAt") VALUES (?,?,?,?,?,?,?,?) ON CONFLICT("placeId") DO NOTHING`)
-          .bind(place.id, name, town, cell.niche, siteAddress(place.websiteUri, origin), phone, address, now.toISOString()).run() as { changes?: number; meta?: { changes?: number } };
+        const held = await db.prepare(`INSERT INTO "DiscoveryHeld" ("placeId","name","city","niche","websiteUrl","phone","address","firstSeenAt","googleRatingCount","googleRating") VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT("placeId") DO NOTHING`)
+          .bind(place.id, name, town, cell.niche, siteAddress(place.websiteUri, origin), phone, address, now.toISOString(), reviews(place).count, reviews(place).stars).run() as { changes?: number; meta?: { changes?: number } };
         if ((held.meta?.changes ?? held.changes ?? 0) === 1) result.held += 1;
       }
     }

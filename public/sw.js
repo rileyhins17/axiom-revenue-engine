@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "axiom-revenue-engine";
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2"; // v2 (2026-09-28): new app icons.
 const STATIC_CACHE = `${CACHE_PREFIX}-${CACHE_VERSION}-static`;
 const OFFLINE_URL = "/offline";
 

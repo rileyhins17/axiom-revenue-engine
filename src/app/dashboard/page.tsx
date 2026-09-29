@@ -95,15 +95,6 @@ export default async function TodayPage() {
       <h1>{greeting}, {firstName}.</h1>
     </header>
 
-    <WhatsNew />
-
-    {counts.call < 15 ? <div className="owner-attention flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e6d6b3] bg-[#fbf3e2] px-5 py-4">
-      <div>
-        <p className="font-semibold">{counts.call === 0 ? "You're out of new businesses to call." : `Only ${counts.call} new business${counts.call === 1 ? "" : "es"} left to call.`}</p>
-        <p className="text-sm text-slate-700">The engine also searches by itself every weekday at 7am. Press the button to get more right now.</p>
-      </div>
-      <FindLeadsButton />
-    </div> : null}
 
     <div className="grid gap-4 lg:grid-cols-3">
       <Link href={"/call" as Route} className="group min-w-0 rounded-2xl owner-cta p-6  shadow-sm  lg:col-span-2">
@@ -126,6 +117,15 @@ export default async function TodayPage() {
       </div>
     </div>
 
+
+    {counts.call < 15 ? <div className="owner-attention flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e6d6b3] bg-[#fbf3e2] px-5 py-4">
+      <div>
+        <p className="font-semibold">{counts.call === 0 ? "You're out of new businesses to call." : `Only ${counts.call} new business${counts.call === 1 ? "" : "es"} left to call.`}</p>
+        <p className="text-sm text-slate-700">The engine also searches by itself every weekday at 7am. Press the button to get more right now.</p>
+      </div>
+      <FindLeadsButton />
+    </div> : null}
+
     {upNext.length ? <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-semibold">Up next in the queue</h2>
@@ -141,9 +141,10 @@ export default async function TodayPage() {
       </li>)}</ol>
     </div> : null}
 
+    <WhatsNew />
+
     <div className="grid gap-4 md:grid-cols-2">
-      <Scoreboard label="Aidan" today={todayStats} week={weekStats} />
-      <Scoreboard label="Riley" today={todayStats} week={weekStats} />
+      {(firstName === "Aidan" ? ["Aidan", "Riley"] : ["Riley", "Aidan"]).map((label) => <Scoreboard key={label} label={label} today={todayStats} week={weekStats} />)}
     </div>
 
     <div className="grid gap-4 lg:grid-cols-2">

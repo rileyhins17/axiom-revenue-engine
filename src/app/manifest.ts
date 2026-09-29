@@ -3,14 +3,14 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "Axiom Web Owner Workspace",
-    short_name: "Axiom Web",
-    description: "Business research, owner actions, and client follow-through for Axiom Web.",
+    name: "Axiom Revenue Engine",
+    short_name: "Axiom",
+    description: "Find, call and win local businesses that need a better website.",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",
-    background_color: "#f5f4ef",
-    theme_color: "#f5f4ef",
+    background_color: "#0a0a0a",
+    theme_color: "#0a0a0a",
     categories: ["business", "productivity"],
     icons: [
       {
@@ -43,6 +43,12 @@ export default function manifest(): MetadataRoute.Manifest {
         name: "Call queue",
         short_name: "Queue",
         url: "/call",
+        icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
+      },
+      {
+        name: "Walk-ins",
+        short_name: "Walk-ins",
+        url: "/walk-ins",
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
       {

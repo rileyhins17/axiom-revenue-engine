@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import Database from "better-sqlite3";
@@ -9,11 +8,12 @@ import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { askAssistant } from "./assistant";
 import { ENGINE_TOOLS, runTool, UPDATE_FIX_TOOL } from "./engine-tools";
 import { AiError } from "./gemini";
+import { applyEngineSchema } from "@/lib/revenue-engine/test-support/engine-schema";
 
 function database() {
   const raw = new Database(":memory:");
-  for (const file of ["0075_engine_prospects_and_call_log.sql", "0076_engine_email_outreach.sql", "0077_ai_call_briefs.sql", "0079_connected_caller.sql"]) raw.exec(readFileSync(`migrations/${file}`, "utf8"));
-  const insert = raw.prepare(`INSERT INTO "EngineProspect" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  applyEngineSchema(raw);
+  const insert = raw.prepare(`INSERT INTO "EngineProspect" ("prospectId","placeId","name","city","niche","websiteUrl","phone","address","label","reasons","runId","firstSeenAt","lastSeenAt") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   insert.run("a.example", "p1", "Acme Roofing", "KITCHENER", "ROOFING", "https://a.example/", "519-555-0101", "12 King St", "STRONG", '["No phone layout"]', "run1", "2026-09-24", "2026-09-24");
   insert.run("place:p2", "p2", "Green Lawns", "WATERLOO", "LANDSCAPING", null, "519-555-0102", null, "NO_WEBSITE", '["No website listed"]', "run1", "2026-09-24", "2026-09-24");
   raw.prepare(`INSERT INTO "EngineProspectActivity" ("activityId","idempotencyKey","prospectId","channel","outcome","note","followUpAt","actor","actorUserId") VALUES ('a1','k1','a.example','CALL','CALL_BACK','Owner Dave back Friday','2026-09-25','AIDAN','u')`).run();

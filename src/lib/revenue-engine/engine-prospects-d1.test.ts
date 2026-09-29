@@ -1,16 +1,15 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import Database from "better-sqlite3";
 
 import { listProspectActivity, listProspects, ProspectActivityError, recordProspectActivity, type ProspectDb } from "./engine-prospects-d1";
+import { applyEngineSchema } from "@/lib/revenue-engine/test-support/engine-schema";
 
 function database(): ProspectDb & { raw: Database.Database } {
   const raw = new Database(":memory:");
-  raw.exec(readFileSync("migrations/0075_engine_prospects_and_call_log.sql", "utf8"));
-  raw.exec(readFileSync("migrations/0079_connected_caller.sql", "utf8"));
-  const insert = raw.prepare(`INSERT INTO "EngineProspect" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  applyEngineSchema(raw);
+  const insert = raw.prepare(`INSERT INTO "EngineProspect" ("prospectId","placeId","name","city","niche","websiteUrl","phone","address","label","reasons","runId","firstSeenAt","lastSeenAt") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   insert.run("a.example", "p1", "Strong Roofing", "KITCHENER", "ROOFING", "https://a.example/", "519-555-0101", "1 Main St", "STRONG", '["No tap-to-call"]', "run1", "2026-09-24", "2026-09-24");
   insert.run("place:p2", "p2", "No Site Lawns", "WATERLOO", "LANDSCAPING", null, null, null, "NO_WEBSITE", '["No website listed"]', "run1", "2026-09-24", "2026-09-24");
   insert.run("c.example", "p3", "Fine HVAC", "CAMBRIDGE", "HVAC", "https://c.example/", null, null, "WEAK", '[]', "run1", "2026-09-24", "2026-09-24");

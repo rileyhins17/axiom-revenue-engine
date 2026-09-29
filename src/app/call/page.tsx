@@ -6,7 +6,7 @@ import { FindLeadsButton } from "@/components/prospects/find-leads-button";
 import { cachedBrief } from "@/lib/ai/call-brief";
 import { getCloudflareBindings, getDatabase } from "@/lib/cloudflare";
 import { historyView, mapsUrl, torontoMidnight, torontoToday } from "@/lib/prospect-format";
-import { listActivityFor, nextInQueue, type ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
+import { listActivityFor, nextInQueue, prospectActivityStats, type ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { requireSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -18,9 +18,16 @@ export default async function CallQueuePage({ searchParams }: { searchParams: Pr
   const skipped = (skip ?? "").split(",").map((id) => id.trim()).filter(Boolean).slice(-100);
   const db = getDatabase() as unknown as ProspectDb;
   const caller = session.user.email?.startsWith("aidan") ? "Aidan" : "Riley";
+  const DAILY_DIAL_GOAL = 40;
   let queue: Awaited<ReturnType<typeof nextInQueue>>;
+  let callsToday = 0;
   try {
-    queue = await nextInQueue(db, torontoToday(), torontoMidnight(), skipped);
+    const [next, stats] = await Promise.all([
+      nextInQueue(db, torontoToday(), torontoMidnight(), skipped),
+      prospectActivityStats(db, torontoMidnight()).catch(() => null),
+    ]);
+    queue = next;
+    callsToday = stats?.byActor[caller.toUpperCase()]?.calls ?? 0;
   } catch {
     return <section className="mx-auto max-w-6xl px-6 py-8"><h1 className="text-2xl font-semibold">Call queue</h1><p className="mt-2 text-sm">The queue could not be loaded. Refresh in a minute.</p></section>;
   }
@@ -31,15 +38,22 @@ export default async function CallQueuePage({ searchParams }: { searchParams: Pr
   const brief = row ? await cachedBrief(db, { prospectId: row.prospectId, name: row.name, city: row.city, niche: row.niche, label: row.label, websiteUrl: row.websiteUrl, reasons: row.reasons, history }, caller).catch(() => null) : null;
   return <section className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-6">
     <header className="flex flex-wrap items-end justify-between gap-3">
-      <div>
+      <div className="min-w-0">
         <h1 className="text-2xl font-semibold">Call queue</h1>
-        <p className="text-sm text-slate-600">One business at a time. Log what happened and the next one loads. Anyone called today is held until tomorrow.</p>
+        <p className="hidden text-sm text-slate-600 sm:block">One business at a time. Log what happened and the next one loads. Anyone called today is held until tomorrow.</p>
       </div>
-      {skipped.length ? <Link href={"/call" as Route} className="text-sm font-medium text-[#7a5818] hover:underline">Bring back {skipped.length} skipped</Link> : null}
+      <div className="flex items-center gap-3">
+        {skipped.length ? <Link href={"/call" as Route} className="text-sm font-medium text-[#7a5818] hover:underline">Bring back {skipped.length} skipped</Link> : null}
+        <p className="owner-goal-chip" aria-label={`${callsToday} of ${DAILY_DIAL_GOAL} calls today`}>
+          <span className="font-semibold tabular-nums">{callsToday}</span><span className="opacity-70">/ {DAILY_DIAL_GOAL} today</span>
+          <span className="owner-goal-track" aria-hidden="true"><span style={{ width: `${Math.min(100, Math.round((callsToday / DAILY_DIAL_GOAL) * 100))}%` }} /></span>
+        </p>
+      </div>
     </header>
     {row && row.phone ? <CallQueue caller={caller} remaining={queue.remaining} skipped={skipped} aiReady={aiReady} brief={brief} business={{
       prospectId: row.prospectId, name: row.name, city: row.city, niche: row.niche, label: row.label, reasons: row.reasons,
       phone: row.phone, address: row.address, websiteUrl: row.websiteUrl, mapsUrl: mapsUrl(row), attempts: row.attempts, followUpAt: row.followUpAt,
+      altPhone: row.altPhone ?? null, googleRatingCount: row.googleRatingCount ?? null, googleRating: row.googleRating ?? null,
       history,
     }} /> : <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
       <div className="owner-float mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl bg-[#0a0a0a] text-2xl shadow-[0_14px_30px_-12px_rgba(184,137,59,0.6)]" aria-hidden="true">🎉</div>

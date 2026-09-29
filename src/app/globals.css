@@ -2924,3 +2924,87 @@ nav[aria-label="Primary"] .text-zinc-700,
 .owner-app-shell [data-owner-content] tbody > tr:nth-child(6) { animation-delay: 125ms; }
 .owner-app-shell [data-owner-content] tbody > tr:nth-child(7) { animation-delay: 150ms; }
 .owner-app-shell [data-owner-content] tbody > tr:nth-child(n+8) { animation-delay: 175ms; }
+
+/* ==========================================================================
+   Phone app (iPhone home screen), 2026-09-28
+   A dark, notch-safe top bar; a thumb-sized tab bar with a More sheet; the
+   call queue's Save & next pinned above the tabs; and cards instead of wide
+   tables. Computers keep the layout above.
+   ========================================================================== */
+:root { --owner-tabbar-h: 0px; }
+@media (max-width: 767px) { :root { --owner-tabbar-h: calc(62px + env(safe-area-inset-bottom)); } }
+
+/* Touch: no grey flash on tap and no double-tap zoom delay. */
+.owner-app-shell { -webkit-tap-highlight-color: transparent; }
+.owner-app-shell :is(a, button, summary, label, [role="button"]) { touch-action: manipulation; }
+
+@media (max-width: 767px) {
+  /* The status bar is black-translucent in the home-screen app: an obsidian bar under it keeps the clock readable. */
+  .owner-app-shell .owner-topbar { background: #0a0a0a !important; -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom: 1px solid #1c1c1c; padding-top: env(safe-area-inset-top); }
+  .owner-app-shell .owner-topbar :is(.owner-account-trigger, .owner-account-trigger svg) { color: #f2e3c2 !important; }
+  .owner-app-shell .owner-account-trigger { min-height: 40px; min-width: 40px; justify-content: center; }
+  .owner-mobile-brand { display: inline-flex; align-items: center; min-height: 40px; }
+  .owner-mobile-brand img { filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6)); }
+  /* Content clears the tab bar and the home indicator. */
+  .owner-app-shell .owner-page-content { padding-top: 18px !important; padding-bottom: calc(var(--owner-tabbar-h) + 28px) !important; }
+  /* Inputs at 16px so iOS never zooms the page when a field is tapped. */
+  .owner-app-shell [data-owner-content] :is(input, textarea, select) { font-size: 16px !important; }
+}
+
+/* Tab bar */
+.owner-app-shell .owner-mobile-nav { padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
+.owner-app-shell .owner-mobile-nav-item { display: flex; min-height: 50px; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border-radius: 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.01em; transition: background 200ms ease, color 200ms ease, transform 160ms ease; }
+.owner-app-shell .owner-mobile-nav-item:active { transform: scale(0.94); }
+.owner-app-shell .owner-mobile-nav-item.is-active { color: #f2e3c2 !important; background: linear-gradient(180deg, #221b10, #151209) !important; box-shadow: inset 0 0 0 1px rgba(184, 137, 59, 0.25); }
+.owner-app-shell .owner-mobile-nav-item.is-active svg { color: #e3c07a; }
+
+/* More sheet */
+.owner-more-sheet { background: #0e0e0e !important; color: #f2f0ea !important; border-top: 1px solid #262015 !important; border-radius: 22px 22px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+.owner-more-sheet [data-slot="sheet-title"] { color: #f7ecd4; font-family: var(--font-fraunces), Georgia, serif; font-size: 1.35rem; }
+.owner-more-sheet [data-slot="sheet-description"] { color: #a39f95; }
+.owner-more-sheet [data-slot="sheet-close"] { color: #cfcac0; }
+.owner-more-item { display: flex; min-height: 58px; align-items: center; gap: 14px; border-radius: 14px; padding: 10px 14px; color: #ece6da; transition: background 180ms ease; }
+.owner-more-item:hover, .owner-more-item:active { background: #1a1712; }
+.owner-more-item[aria-current="page"] { background: #1d1810; color: #f2e3c2; box-shadow: inset 0 0 0 1px rgba(184, 137, 59, 0.22); }
+.owner-more-item svg { color: #e3c07a; flex: none; }
+
+/* Chip rows scroll sideways on phones instead of wrapping into a wall. */
+@media (max-width: 767px) {
+  .owner-scroll-row { overflow-x: auto; scrollbar-width: none; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; }
+  .owner-scroll-row::-webkit-scrollbar { display: none; }
+  .owner-scroll-row > * { flex: none; }
+}
+.owner-filters > summary { list-style: none; }
+.owner-filters > summary::-webkit-details-marker { display: none; }
+
+/* Call list: each business is a card on a phone. */
+@media (max-width: 767px) {
+  .owner-card-table, .owner-card-table > tbody { display: block; }
+  .owner-card-table > thead { display: none; }
+  .owner-card-table > tbody > tr:not(:has(> td[colspan])) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px; padding: 14px 16px; }
+  .owner-card-table > tbody > tr > td { display: block; padding: 0 !important; max-width: none !important; white-space: normal !important; text-align: left; }
+  .owner-card-table td[data-col="business"] { grid-column: 1; }
+  .owner-card-table td[data-col="action"] { grid-column: 2; grid-row: 1; }
+  .owner-card-table td:is([data-col="where"], [data-col="why"], [data-col="phone"], [data-col="result"]) { grid-column: 1 / -1; }
+  .owner-card-table td[data-col="where"] br { display: none; }
+  .owner-card-table td[data-col="where"] > span::before { content: " · "; }
+  .owner-card-table td[data-col="phone"] a[href^="tel:"] { font-size: 1rem; min-height: 32px; }
+  .owner-card-table > tbody > tr:has(> td[colspan]) { display: block; }
+  .owner-card-table > tbody > tr > td[colspan] { padding: 12px 16px !important; }
+}
+
+/* Call queue */
+.owner-soft-button { display: inline-flex; min-height: 40px; align-items: center; gap: 6px; border-radius: 12px; border: 1px solid #d9d2c3; background: #fff; padding: 0 12px; font-size: 0.875rem; font-weight: 500; color: #202c26; transition: background 160ms ease, border-color 160ms ease; }
+.owner-soft-button:hover { background: #faf7f0; border-color: #cfc6b3; }
+.owner-call-button { box-shadow: 0 16px 36px -14px rgba(10, 10, 10, 0.6), inset 0 0 0 1px rgba(184, 137, 59, 0.22); }
+.owner-goal-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; background: #0a0a0a; color: #f2e3c2; padding: 6px 12px; font-size: 0.8125rem; }
+.owner-goal-track { display: inline-block; width: 48px; height: 5px; overflow: hidden; border-radius: 999px; background: #2a2418; }
+.owner-goal-track > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #b8893b, #e3c07a); }
+/* Keyboard hints only where there is a keyboard. */
+@media (pointer: coarse) { .owner-kbd { display: none !important; } }
+@media (max-width: 1023px) {
+  .owner-queue { padding-bottom: 84px; }
+  .owner-decision .owner-action-bar { position: fixed; left: 0; right: 0; bottom: var(--owner-tabbar-h); z-index: 45; padding: 10px 16px; background: rgba(247, 245, 239, 0.94); -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px); border-top: 1px solid #e6dfd0; box-shadow: 0 -12px 30px -20px rgba(10, 10, 10, 0.4); }
+}
+@media (min-width: 768px) and (max-width: 1023px) { .owner-decision .owner-action-bar { padding-bottom: calc(10px + env(safe-area-inset-bottom)); } }
+@media (prefers-reduced-motion: reduce) { .owner-app-shell .owner-mobile-nav-item:active { transform: none; } }

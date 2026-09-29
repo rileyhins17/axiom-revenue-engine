@@ -225,8 +225,8 @@ async function applyMigrations(database: SqliteDatabase) {
   const migrations = (await readdir(migrationsDirectory))
     .filter((name) => /^\d{4}_.+\.sql$/.test(name))
     .sort((left, right) => left.localeCompare(right));
-  assert(migrations.at(-1)?.startsWith("0084_"),
-    "The owner fixture must apply every migration through 0084_site_check.");
+  assert(migrations.at(-1)?.startsWith("0085_"),
+    "The owner fixture must apply every migration through 0085_phone_quality.");
   database.pragma("foreign_keys = ON");
   for (const migration of migrations) {
     database.exec(await readFile(join(migrationsDirectory, migration), "utf8"));
@@ -447,12 +447,23 @@ async function assertResponsive(page: Page, label: string) {
 async function assertNav(page: Page, label: string) {
   // The shadcn Sidebar (desktop, full titles like "Call list") only mounts
   // its menu markup above the mobile breakpoint; the fixed bottom tab bar
-  // (nav[aria-label='Primary'], short labels like "Calls") is mobile-only.
+  // (nav[aria-label='Primary'], short labels like "Queue") is mobile-only:
+  // four tabs used all day plus a More sheet with the other pages.
   const isMobile = (page.viewportSize()?.width ?? DESKTOP_VIEWPORT.width) < 768;
   if (isMobile) {
-    const mobileItems = await page.locator("nav[aria-label='Primary'] a[href]").evaluateAll((elements) =>
+    const tabBar = page.locator("nav[aria-label='Primary']");
+    const mobileItems = await tabBar.locator("a[href]").evaluateAll((elements) =>
       elements.map((element) => element.textContent?.trim() ?? ""));
-    assert.deepEqual(mobileItems, ["Today", "Queue", "List", "Walk-ins", "Email", "Ask AI", "Settings"], `${label} mobile tab bar must list the six owner pages.`);
+    assert.deepEqual(mobileItems, ["Today", "Queue", "List", "Walk-ins"], `${label} mobile tab bar must list the four daily pages.`);
+    await tabBar.getByRole("button", { name: "More", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "More" });
+    await sheet.waitFor();
+    const moreItems = await sheet.locator("a[href] .font-semibold").evaluateAll((elements) =>
+      elements.map((element) => element.textContent?.trim() ?? ""));
+    assert.deepEqual(moreItems, ["Email", "Ask AI", "Settings"], `${label} More sheet must list the other owner pages.`);
+    await sheet.getByRole("button", { name: "Sign out" }).waitFor();
+    await page.keyboard.press("Escape");
+    await sheet.waitFor({ state: "detached" });
   } else {
     const sidebarItems = await page.locator(".owner-nav-title").evaluateAll((elements) =>
       elements.map((element) => element.textContent?.trim() ?? ""));
@@ -738,6 +749,19 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await assertResponsive(page, "mobile Call list");
     await page.screenshot({ path: join(outputDirectory, "prospects-mobile.png"), fullPage: true });
 
+    stage = "mobile call queue";
+    await page.goto("/call", { waitUntil: "load" });
+    await page.getByRole("heading", { level: 1, name: "Call queue" }).waitFor();
+    // On a phone the big button must dial even without the Caller extension.
+    const callButton = page.getByRole("region", { name: "Business to call" }).locator("a[href^='tel:']").first();
+    await callButton.waitFor();
+    assert.match(await callButton.getAttribute("href") ?? "", /^tel:\+1\d{10}$/, "The mobile Call button must be a dialable tel: link.");
+    await page.getByRole("button", { name: /Pick what happened|Save & next/ }).waitFor();
+    await assertWcag(page, "mobile Call queue");
+    pagesScanned += 1;
+    await assertResponsive(page, "mobile Call queue");
+    await page.screenshot({ path: join(outputDirectory, "call-queue-mobile.png"), fullPage: false });
+
     await context.close();
     return { pagesScanned, externalRequests: externalRequests.length, desktopWidth, mobileWidth } satisfies AcceptanceResult;
   } catch (error) {
@@ -780,7 +804,7 @@ async function run() {
     server = startNextServer(baseUrl, databasePath, serverLogs);
     await waitForServer(baseUrl, server);
     result = await runBrowserAcceptance(baseUrl, outputDirectory);
-    for (const name of ["today-desktop.png", "today-mobile.png", "prospects-desktop.png", "prospects-mobile.png"]) {
+    for (const name of ["today-desktop.png", "today-mobile.png", "prospects-desktop.png", "prospects-mobile.png", "call-queue-mobile.png"]) {
       await copyIfExists(join(outputDirectory, name), join(OUTPUT_ROOT, name));
     }
     success = true;

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 /** The Revenue Engine call-list schema, in release order (live is at the last one). */
 export const ENGINE_MIGRATIONS = [
   "0075_engine_prospects_and_call_log.sql", "0076_engine_email_outreach.sql", "0077_ai_call_briefs.sql", "0078_caller_tokens.sql",
-  "0079_connected_caller.sql", "0080_health_alerts.sql", "0081_cloud_discovery.sql", "0082_caller_contact_edits.sql", "0083_wider_market.sql", "0084_site_check.sql",
+  "0079_connected_caller.sql", "0080_health_alerts.sql", "0081_cloud_discovery.sql", "0082_caller_contact_edits.sql", "0083_wider_market.sql", "0084_site_check.sql", "0085_phone_quality.sql",
 ] as const;
 
 type Exec = { exec(sql: string): unknown };

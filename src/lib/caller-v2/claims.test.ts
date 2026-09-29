@@ -85,7 +85,7 @@ test('stale renewal cannot overwrite a newer claim and potentially dialed releas
 test('shared phone numbers do not share ownership and a missing or ineligible source never gets a permit', async () => {
   const t = openCallerTestDb();
   try {
-    t.raw.exec("INSERT INTO EngineProspect SELECT 'other.example',placeId,'Other fixture',city,niche,websiteUrl,phone,address,label,reasons,runId,firstSeenAt,lastSeenAt FROM EngineProspect");
+    t.raw.exec("INSERT INTO EngineProspect (prospectId,placeId,name,city,niche,websiteUrl,phone,address,label,reasons,runId,firstSeenAt,lastSeenAt) SELECT 'other.example',placeId,'Other fixture',city,niche,websiteUrl,phone,address,label,reasons,runId,firstSeenAt,lastSeenAt FROM EngineProspect");
     const one = await command(t), two = await command(t, 'other.example');
     assert.notEqual(one.contactKey, two.contactKey);
     await claimContact(t.db, AIDAN, one, NOW);

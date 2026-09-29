@@ -2,7 +2,7 @@ import type { ProspectDb } from "./engine-prospects-d1";
 import { classifyEngineLead, ENGINE_LEAD_RULES_VERSION, type EngineLeadDecision } from "./engine-lead-rules";
 import { ENGINE_SITE_CAPTURE_VERSION, type EngineSiteCapture } from "./engine-site-capture";
 import { inOntario } from "./places-discovery";
-import { torontoMidnight } from "../prospect-format";
+import { samePhone, torontoMidnight } from "../prospect-format";
 
 /**
  * Cloud website check for businesses that list a website (DiscoveryHeld).
@@ -28,7 +28,7 @@ export type SiteCapture = (business: SiteCheckBusiness) => Promise<EngineSiteCap
 /** checked = sites graded; failed = attempts that did not load (each counts toward the daily cap); gaveUp = sites now marked FAILED. */
 export type SiteCheckResult = { runId: string; checked: number; strong: number; weak: number; wrong: number; failed: number; gaveUp: number; stopReason: string | null };
 
-type Held = { placeId: string; name: string; city: string; niche: string; websiteUrl: string; phone: string | null; address: string | null; attempts: number };
+type Held = { placeId: string; name: string; city: string; niche: string; websiteUrl: string; phone: string | null; address: string | null; attempts: number; googleRatingCount: number | null; googleRating: number | null };
 type Changes = { changes?: number; meta?: { changes?: number } };
 const changed = (result: unknown) => ((result as Changes).meta?.changes ?? (result as Changes).changes ?? 0) === 1;
 const hostKey = (url: string) => new URL(url).hostname.toLowerCase().replace(/^www\./, "");
@@ -68,7 +68,7 @@ export async function runSiteChecks(db: ProspectDb, options: {
   const today = await db.prepare(`SELECT COALESCE(SUM("checked" + "failed"), 0) AS n FROM "SiteCheckRun" WHERE "startedAt" >= ?`).bind(torontoMidnight(now)).first<{ n: number }>();
   const room = Math.max(0, Math.min(options.perRun ?? SITE_CHECKS_PER_RUN, (options.perDay ?? SITE_CHECKS_PER_DAY) - Number(today?.n ?? 0)));
   if (room === 0) return finish("Today's website checks are done; more tomorrow.");
-  const { results: due } = await db.prepare(`SELECT "placeId","name","city","niche","websiteUrl","phone","address","attempts" FROM "DiscoveryHeld"
+  const { results: due } = await db.prepare(`SELECT "placeId","name","city","niche","websiteUrl","phone","address","attempts","googleRatingCount","googleRating" FROM "DiscoveryHeld"
     WHERE "status" = 'WAITING' ORDER BY "attempts" ASC, "firstSeenAt" ASC, "placeId" ASC LIMIT ?`).bind(room).all<Held>();
   if (!due.length) return finish(null);
 
@@ -132,11 +132,17 @@ export async function runSiteChecks(db: ProspectDb, options: {
       const finalUrl = (siteOrigin(capture.signals.finalUrl) ?? held.websiteUrl).slice(0, 300);
       let prospectId: string | null = null;
       if (decision.label === "STRONG" || decision.label === "WEAK") {
-        const inserted = await db.prepare(`INSERT INTO "EngineProspect" ("prospectId","placeId","name","city","niche","websiteUrl","phone","address","label","reasons","runId","firstSeenAt","lastSeenAt")
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT("prospectId") DO NOTHING`)
+        // The business's own website number comes first: Google's listing is often out of
+        // date (Aidan, 2026-09-28). When they differ, Google's is kept as the other number.
+        const sitePhone = capture.signals.phone ?? null;
+        const differ = Boolean(held.phone && sitePhone && !samePhone(held.phone, sitePhone));
+        const phone = (differ ? sitePhone : held.phone ?? sitePhone)?.slice(0, 40) ?? null;
+        const altPhone = differ ? held.phone!.slice(0, 40) : null;
+        const inserted = await db.prepare(`INSERT INTO "EngineProspect" ("prospectId","placeId","name","city","niche","websiteUrl","phone","address","label","reasons","runId","firstSeenAt","lastSeenAt","altPhone","googleRatingCount","googleRating")
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT("prospectId") DO NOTHING`)
           .bind(id, held.placeId, held.name.slice(0, 200), held.city, held.niche, finalUrl,
-            (held.phone ?? capture.signals.phone ?? null)?.slice(0, 40) ?? null, (held.address ?? capture.signals.streetAddress ?? null)?.slice(0, 200) ?? null,
-            decision.label, reasons, runId, now.toISOString(), now.toISOString()).run();
+            phone, (held.address ?? capture.signals.streetAddress ?? null)?.slice(0, 200) ?? null,
+            decision.label, reasons, runId, now.toISOString(), now.toISOString(), altPhone, held.googleRatingCount, held.googleRating).run();
         prospectId = id;
         const email = capture.signals.email?.trim().toLowerCase();
         if (changed(inserted) && email && EMAIL.test(email) && email.length <= 254 && (capture.signals.emailMethod === "MAILTO_LINK" || capture.signals.emailMethod === "PAGE_TEXT")) {

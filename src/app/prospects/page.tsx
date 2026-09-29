@@ -70,6 +70,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
     return {
     prospectId: row.prospectId, name: row.name, city: row.city, niche: row.niche, label: row.label, reasons: row.reasons,
     phone: row.phone, address: row.address, websiteUrl: row.websiteUrl, mapsUrl: mapsUrl(row),
+    altPhone: row.altPhone ?? null, googleRatingCount: row.googleRatingCount ?? null, googleRating: row.googleRating ?? null,
     lastOutcomeText: prospectOutcomeText(row.lastOutcome, row.lastCallerOutcome), lastActivity: day(row.lastActivityAt),
     followUpAt: row.followUpAt, attempts: row.attempts,
     history: historyView(history.get(row.prospectId) ?? []),
@@ -78,39 +79,49 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
   };
   });
 
+  const activeFilters = [search.city, search.trade, search.kind].filter(Boolean).length;
+  const filterChips = <>
+    <span className="text-slate-600">City</span>
+    <Chip active={!search.city} to={href(search, { city: undefined })}>All</Chip>
+    {CITIES.map((city) => <Chip key={city} active={search.city === city} to={href(search, { city })}>{title(city)}</Chip>)}
+    <span className="ml-3 text-slate-600">Trade</span>
+    <Chip active={!search.trade} to={href(search, { trade: undefined })}>All</Chip>
+    {TRADES.map((trade) => <Chip key={trade} active={search.trade === trade} to={href(search, { trade })}>{title(trade)}</Chip>)}
+    <span className="ml-3 text-slate-600">Website</span>
+    <Chip active={!search.kind} to={href(search, { kind: undefined })}>Any</Chip>
+    <Chip active={search.kind === "bad"} to={href(search, { kind: "bad" })}>Weak</Chip>
+    <Chip active={search.kind === "none"} to={href(search, { kind: "none" })}>None</Chip>
+  </>;
+
   return <section className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-6">
     <header className="flex flex-wrap items-end justify-between gap-3">
-      <div>
+      <div className="min-w-0">
         <h1 className="text-2xl font-semibold">Call list</h1>
-        <p className="text-sm text-slate-600">Local roofing, HVAC, landscaping, plumbing and electrical businesses across Waterloo Region and nearby towns with a weak website or none. Call, log what happened, and it&apos;s shared between Riley and Aidan.</p>
+        <p className="hidden text-sm text-slate-600 sm:block">Local roofing, HVAC, landscaping, plumbing and electrical businesses across Waterloo Region and nearby towns with a weak website or none. Call, log what happened, and it&apos;s shared between Riley and Aidan.</p>
       </div>
-      <form action="/prospects" className="flex gap-2">
+      <form action="/prospects" className="flex w-full gap-2 sm:w-auto">
         {Object.entries({ view, city: search.city, trade: search.trade, kind: search.kind }).filter(([, value]) => value).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
-        <input name="q" defaultValue={search.q ?? ""} placeholder="Search name or phone" aria-label="Search" className="w-64 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+        <input name="q" defaultValue={search.q ?? ""} placeholder="Search name or phone" aria-label="Search" type="search" enterKeyHint="search" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm sm:w-64" />
       </form>
     </header>
 
-    <nav className="flex flex-wrap gap-2 border-b border-slate-200 pb-3" aria-label="Lists">
+    <nav className="owner-scroll-row flex gap-2 border-b border-slate-200 pb-3 md:flex-wrap" aria-label="Lists">
       {TABS.map((tab) => <Chip key={tab.view} active={tab.view === view} to={href(search, { view: tab.view })}>{tab.label} ({counts[tab.view]})</Chip>)}
     </nav>
     <p className="-mt-2 text-sm text-slate-600">{TABS.find((tab) => tab.view === view)?.help}</p>
-    <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-slate-600">City</span>
-      <Chip active={!search.city} to={href(search, { city: undefined })}>All</Chip>
-      {CITIES.map((city) => <Chip key={city} active={search.city === city} to={href(search, { city })}>{title(city)}</Chip>)}
-      <span className="ml-3 text-slate-600">Trade</span>
-      <Chip active={!search.trade} to={href(search, { trade: undefined })}>All</Chip>
-      {TRADES.map((trade) => <Chip key={trade} active={search.trade === trade} to={href(search, { trade })}>{title(trade)}</Chip>)}
-      <span className="ml-3 text-slate-600">Website</span>
-      <Chip active={!search.kind} to={href(search, { kind: undefined })}>Any</Chip>
-      <Chip active={search.kind === "bad"} to={href(search, { kind: "bad" })}>Weak</Chip>
-      <Chip active={search.kind === "none"} to={href(search, { kind: "none" })}>None</Chip>
-    </div>
+    {/* Phones: the town/trade/website filters fold away; a computer shows them inline. */}
+    <details className="owner-filters rounded-xl border border-slate-200 bg-white md:hidden">
+      <summary className="flex min-h-11 cursor-pointer items-center justify-between px-4 text-sm font-semibold">
+        Filters{activeFilters ? <span className="rounded-full bg-[#0a0a0a] px-2 py-0.5 text-xs text-[#f2e3c2]">{activeFilters} on</span> : <span className="text-xs font-normal text-slate-600">town, trade, website</span>}
+      </summary>
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 p-3 text-sm">{filterChips}</div>
+    </details>
+    <div className="hidden flex-wrap items-center gap-2 text-sm md:flex">{filterChips}</div>
 
     <p className="text-sm text-slate-600">{filtered.length} businesses{filtered.length > shown.length ? ` (showing first ${shown.length})` : ""}</p>
     {shown.length === 0 ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm">Nothing matches. Try another list or clear the filters.</p> :
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[960px] text-left">
+      <div className="rounded-xl border border-slate-200 bg-white md:overflow-x-auto">
+        <table className="owner-card-table w-full text-left md:min-w-[960px]">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
             <tr><th className="px-3 py-2 font-semibold">Business</th><th className="px-3 py-2 font-semibold">Where</th><th className="px-3 py-2 font-semibold">Why call</th><th className="px-3 py-2 font-semibold">Phone</th><th className="px-3 py-2 font-semibold">Last result</th><th className="px-3 py-2" /></tr>
           </thead>

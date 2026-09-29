@@ -36,9 +36,33 @@ export function historyView(items: ProspectActivity[]) {
   }));
 }
 
+/** The ten digits of a North American number, or null (extensions and other formats return null). */
+export function phoneDigits(phone: string | null | undefined): string | null {
+  const digits = (phone ?? "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+  return digits.length === 10 ? digits : null;
+}
+
 /** North American numbers as (519) 555-0155, whatever format they were stored in. */
 export function displayPhone(phone: string | null | undefined) {
   if (!phone) return "";
-  const digits = phone.replace(/D/g, "").replace(/^1(?=d{10}$)/, "");
-  return digits.length === 10 ? `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}` : phone.trim();
+  const digits = phoneDigits(phone);
+  return digits ? `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}` : phone.trim();
+}
+
+/** A tap-to-dial link for any phone (tel:+15195550155 for North American numbers). */
+export function telHref(phone: string): string {
+  const digits = phoneDigits(phone);
+  return digits ? `tel:+1${digits}` : `tel:${phone.replace(/[^\d+]/g, "")}`;
+}
+
+/** Toll-free numbers usually reach a call centre or a lead-generation service, not the owner. */
+export function isTollFree(phone: string | null | undefined): boolean {
+  const digits = phoneDigits(phone);
+  return Boolean(digits && ["800", "833", "844", "855", "866", "877", "888"].includes(digits.slice(0, 3)));
+}
+
+/** Whether two stored numbers are the same line, whatever their formatting. */
+export function samePhone(left: string | null | undefined, right: string | null | undefined): boolean {
+  const a = phoneDigits(left), b = phoneDigits(right);
+  return a !== null && a === b;
 }

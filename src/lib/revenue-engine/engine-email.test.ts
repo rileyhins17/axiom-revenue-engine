@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import Database from "better-sqlite3";
@@ -7,13 +6,12 @@ import Database from "better-sqlite3";
 import { composeFirstEmail, EMAIL_TEMPLATE_VERSION, PermanentEmailError, runDailyEmail, unsubscribe, type EmailRunConfig, type OutgoingEmail } from "./engine-email";
 import type { ProspectDb } from "./engine-prospects-d1";
 import { openSmtp, type SmtpStream } from "./smtp-client";
+import { applyEngineSchema } from "@/lib/revenue-engine/test-support/engine-schema";
 
 function database() {
   const raw = new Database(":memory:");
-  raw.exec(readFileSync("migrations/0075_engine_prospects_and_call_log.sql", "utf8"));
-  raw.exec(readFileSync("migrations/0079_connected_caller.sql", "utf8"));
-  raw.exec(readFileSync("migrations/0076_engine_email_outreach.sql", "utf8"));
-  const insert = raw.prepare(`INSERT INTO "EngineProspect" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  applyEngineSchema(raw);
+  const insert = raw.prepare(`INSERT INTO "EngineProspect" ("prospectId","placeId","name","city","niche","websiteUrl","phone","address","label","reasons","runId","firstSeenAt","lastSeenAt") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   const email = raw.prepare(`INSERT INTO "EngineProspectEmail" VALUES (?,?,?,'MAILTO_LINK','2026-09-24','run1')`);
   for (let i = 1; i <= 14; i += 1) {
     insert.run(`s${i}.example`, `p${i}`, `Roofer ${i}`, "KITCHENER", "ROOFING", `https://s${i}.example/`, null, null, "STRONG", '["No tap-to-call button","Page is hard to read on a phone"]', "run1", `2026-09-${String(i).padStart(2, "0")}`, "2026-09-24");
