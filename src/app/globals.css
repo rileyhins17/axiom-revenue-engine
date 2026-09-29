@@ -2943,6 +2943,8 @@ nav[aria-label="Primary"] .text-zinc-700,
   .owner-app-shell .owner-topbar { background: #0a0a0a !important; -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom: 1px solid #1c1c1c; padding-top: env(safe-area-inset-top); }
   .owner-app-shell .owner-topbar :is(.owner-account-trigger, .owner-account-trigger svg) { color: #f2e3c2 !important; }
   .owner-app-shell .owner-account-trigger { min-height: 40px; min-width: 40px; justify-content: center; }
+  /* Tabs replace the sidebar on phones. Unlayered .owner-icon-button outranks Tailwind's `hidden`, so hide it here. */
+  .owner-app-shell .owner-topbar [data-sidebar="trigger"] { display: none !important; }
   .owner-mobile-brand { display: inline-flex; align-items: center; min-height: 40px; }
   .owner-mobile-brand img { filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6)); }
   /* Content clears the tab bar and the home indicator. */
@@ -2955,6 +2957,8 @@ nav[aria-label="Primary"] .text-zinc-700,
 .owner-app-shell .owner-mobile-nav { padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
 .owner-app-shell .owner-mobile-nav-item { display: flex; min-height: 50px; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border-radius: 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.01em; transition: background 200ms ease, color 200ms ease, transform 160ms ease; }
 .owner-app-shell .owner-mobile-nav-item:active { transform: scale(0.94); }
+/* Replaces the light-theme hover: iOS keeps :hover on the last tapped tab, which left light text on a light pill. */
+.owner-app-shell .owner-mobile-nav-item:hover { background: rgba(255, 255, 255, 0.07); color: #f2f0ea !important; }
 .owner-app-shell .owner-mobile-nav-item.is-active { color: #f2e3c2 !important; background: linear-gradient(180deg, #221b10, #151209) !important; box-shadow: inset 0 0 0 1px rgba(184, 137, 59, 0.25); }
 .owner-app-shell .owner-mobile-nav-item.is-active svg { color: #e3c07a; }
 
