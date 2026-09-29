@@ -611,8 +611,9 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await page.goto("/prospects", { waitUntil: "domcontentloaded" });
 
     stage = "call list search filter";
-    await page.getByRole("textbox", { name: "Search" }).fill("Boundary");
-    await page.getByRole("textbox", { name: "Search" }).press("Enter");
+    // type="search" (the phone keyboard shows a Search key), so its role is searchbox.
+    await page.getByRole("searchbox", { name: "Search" }).fill("Boundary");
+    await page.getByRole("searchbox", { name: "Search" }).press("Enter");
     await page.waitForURL(/q=Boundary/);
     await page.waitForLoadState("networkidle");
     await table.getByText("Boundary HVAC Services", { exact: true }).waitFor();
