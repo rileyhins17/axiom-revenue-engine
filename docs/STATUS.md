@@ -1,3 +1,71 @@
+## Production 2026-09-28 (night): phone app, fewer wrong numbers (0085)
+
+Verified commit `7eb97a1` is live (the docs and gate commits follow it).
+
+**Live state**
+- **App:** Worker `7b0b764f-c321-4183-aef0-a6291999f4be`. Rollback target `83a5c3b2-4d7f-42c6-b450-8e085ca21438`, which works on the new schema (rehearsed).
+- **Database:** migrations run through 0085 (88 receipts). Stops `01111`.
+- **Website check:** `axiom-site-check` `969bdef9-4594-4ace-8256-857ff242242c` (previous `f9d0d9df`). Its release now requires 0084 and 0085 on live.
+- **Backup:** `backups/production/prod-export-20260929T032211Z.sql` (sha256 `9bdf9984…`), plus Time Travel bookmark `000031f0-00000000-000050f5-702e69f1c61504b6692f409544f3ca7f`.
+- **Post-release check:** live `EngineProspect` (359), call history (43), `CallerContactControl` (22) and `DiscoveryHeld` (330) are identical to the pre-release export. The new columns are empty until the next search. Health, the manifest, the new icons and service worker v2 are served.
+
+**Gate:**
+- Safety check.
+- `npm test`: 1,018 tests (1,013 pass, 4 skipped). One stale manifest-shortcut expectation failed; it was fixed in `144f4fc` and re-run.
+- Typecheck; lint 0 errors / 11 baseline warnings.
+- Clean build; dry runs of both Workers.
+- Owner UI: 10 WCAG pages, now including the phone queue, the More sheet and a check that the Save bar clears the last card.
+
+**Rehearsal of 0085:** full live export in SQLite.
+- All 151 tables and 359 Caller revisions were identical before and after.
+- The live code (the rollback target) returns the same counts, queue and lists on the new schema.
+- The new code sees the same 43 businesses, with the one toll-free number last. Caller's task list pages to the end (43 tasks).
+- No remote rehearsal: 0085 has no triggers, and 0084 applied the same `ADD COLUMN … CHECK` form to a populated table on the live engine.
+
+**Why**
+- **Wrong numbers:** 7 of Aidan's 19 calls on 2026-09-28 reached wrong numbers. All were businesses Google lists without a website, in Guelph and Cambridge.
+- **Phone use:** Riley installed the app on an iPhone home screen. On the phone:
+  - the Call button went to Settings instead of dialing;
+  - seven tabs were squeezed into the bar;
+  - the top bar was light under a dark status bar;
+  - the call list was a cut-off table below a wall of filters.
+
+**Change**
+- **Migration 0085 (additive):**
+  - `EngineProspect` gains `altPhone`, `googleRatingCount` and `googleRating`.
+  - `DiscoveryHeld` gains the two rating columns.
+  - All are nullable with CHECKs.
+- **Discovery:** asks for `places.rating` and `places.userRatingCount` in the same Text Search request. They are in the Enterprise SKU already used (checked against Google's field list), so this costs nothing extra.
+- **Website check:** when the business's own site lists a different number from Google's, the site's number becomes the main one, and Google's is kept as `altPhone` ("No luck? Try …").
+- **Queue, call list and Caller order:**
+  1. Due retries.
+  2. Toll-free numbers last.
+  3. STRONG first.
+  4. More Google reviews first. A listing with no reviews comes after unrated ones.
+
+  Existing businesses have no review data yet.
+- **Phone app:**
+  - Tabs: four (Today, Queue, List, Walk-ins) plus a More sheet (Email, Ask AI, Settings, Sign out).
+  - Top bar: dark and notch-safe.
+  - Call button: a `tel:` link that still hands off to Caller when the extension is present.
+  - Save & next: pinned above the tabs.
+  - Call list: cards instead of the table; filters fold away.
+  - Queue: a daily call goal of 40.
+  - Icons and manifest: new app icons (service worker cache v2), manifest name "Axiom", and a Walk-ins shortcut.
+- **Phone bugs the gate caught, fixed before release** (GOTCHAS UI-003, UI-004):
+  1. A light-theme hover on the dark tabs (contrast 1.51).
+  2. The sidebar toggle showing on phones.
+  3. The Save bar trapped by the page wrapper's leftover animation transform.
+
+**Spend:** none new. Places used 213 of the 600 monthly cap in September.
+
+**Owner decisions:** Aidan may buy the business phone number; business expenses are split at month end; Aidan may make reasonable purchases for Axiom International (Riley, 2026-09-28, relayed on Slack).
+
+Next three actions:
+1. Watch the 7:00 search. New leads should carry review counts; the health check alerts if Google refuses the fields.
+2. Decide the website-check cap (120 → 300 a day, about US$0.40 a month) and the "site down on three checks" lead proposal.
+3. Zoho: TXT verification, SPF include and DKIM once the owner reaches domain verification. No MX change.
+
 ## Production 2026-09-28 (midday): market-area search, website check v2, rules v9
 
 Verified commit `1934f09`.

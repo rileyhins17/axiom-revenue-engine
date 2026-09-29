@@ -5,6 +5,57 @@ Include symptom, root cause, proven fix, prevention/test, affected area, and the
 verifying commit. Promote a repeated gotcha into an automated test or `AGENTS.md`.
 Retire entries when the architecture makes them impossible.
 
+## UI-003 — An entrance animation trapped the phone's pinned Save bar
+
+- **Symptom:** on a phone the queue's fixed "Save & next" bar sat about 100px above
+  the tab bar and covered the last card. The owner UI gate measured the clearance at
+  -39px.
+- **Root cause:** `template.tsx` wraps every page in `.owner-page-enter`. Its
+  `owner-rise` animation filled `both`, so it ended at an identity transform
+  (`matrix(1, 0, 0, 1, 0, 0)`), not `none`, and a transformed ancestor is the
+  containing block for `position: fixed`. The bar was pinned to the page wrapper.
+  An inherited `space-y` margin added another 16px.
+- **Proven fix:** entrance animations (`owner-page-enter`, `owner-stagger`,
+  `owner-slide-in`) fill `backwards` only. The fixed bar sets `margin: 0`.
+- **Prevention/test:** the owner UI gate scrolls the phone queue to the end and
+  requires the last card to clear the Save bar. Portal or verify any new fixed
+  element inside page content.
+- **Affected area:** fixed or sticky phone UI inside animated page content.
+- **Verifying commit:** `7eb97a1`.
+
+## UI-004 — Unlayered CSS outranks Tailwind's `hidden`
+
+- **Symptom:** the sidebar toggle, marked `hidden md:inline-flex`, still showed as
+  a white square in the dark phone top bar.
+- **Root cause:** Tailwind v4 utilities live in `@layer utilities`. The unlayered
+  `.owner-app-shell .owner-icon-button { display: inline-flex }` wins regardless of
+  specificity.
+- **Proven fix:** hide it with an explicit phone rule in `globals.css`
+  (`.owner-topbar [data-sidebar="trigger"] { display: none !important; }`). Check
+  for unlayered `display` rules before relying on `hidden`.
+- **Prevention/test:** the owner UI gate asserts the toggle is not visible at phone
+  width.
+- **Affected area:** any element with an `owner-*` class that sets `display`.
+- **Verifying commit:** `a085d19`.
+
+## TOOL-001 — Shell-quoted edits silently dropped regex backslashes
+
+- **Symptom:** after edits made through a Bash heredoc or a `node -e` string,
+  `displayPhone` stripped the letter "D" instead of every non-digit (`/D/g`), so
+  numbers were not formatted. Separately, a regular expression in
+  `check-safety-config.mjs` stopped matching. Type checks and lint passed.
+- **Root cause:** shell and JavaScript string quoting consumed `\D`, `\s` and `\b`
+  before the text reached the file.
+- **Proven fix:** make regex-bearing edits with a file-editing tool, or with a
+  script written to a file, never through inline shell or `node -e` strings.
+  Re-read the changed line afterwards.
+- **Prevention/test:** `phone-quality.test.ts` pins `displayPhone`, `telHref`,
+  `isTollFree` and `samePhone` on E.164, dashed and extension inputs. The safety
+  check runs in every gate.
+- **Affected area:** any agent edit containing regular expressions or other
+  backslash escapes.
+- **Verifying commit:** `2b0ca1b`.
+
 ## DATA-014 — A table with ON DELETE RESTRICT children cannot be rebuilt alone on D1
 
 - **Symptom:** a migration that copied `EngineProspect` into a new table with a

@@ -455,6 +455,8 @@ async function assertNav(page: Page, label: string) {
     const mobileItems = await tabBar.locator("a[href]").evaluateAll((elements) =>
       elements.map((element) => element.textContent?.trim() ?? ""));
     assert.deepEqual(mobileItems, ["Today", "Queue", "List", "Walk-ins"], `${label} mobile tab bar must list the four daily pages.`);
+    // Unlayered .owner-icon-button CSS once outranked Tailwind's `hidden` (GOTCHAS UI-004).
+    assert.equal(await page.locator("header [data-sidebar='trigger']").isVisible(), false, `${label} must not show the sidebar toggle on a phone.`);
     await tabBar.getByRole("button", { name: "More", exact: true }).click();
     const sheet = page.getByRole("dialog", { name: "More" });
     await sheet.waitFor();

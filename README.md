@@ -132,7 +132,16 @@ draft. None of this contacts anyone. To regrade the checker against the
 
 ## Owner experience
 
-The owner navigation is Today, Businesses, Follow-through, Clients and Settings.
+The owner navigation is Today, Call queue, Call list, Walk-ins, Email, Ask AI and
+Settings. On a phone four tabs sit at the bottom (Today, Queue, List, Walk-ins)
+and the rest are under More. This includes the iPhone home-screen app: Safari →
+Share → Add to Home Screen; remove and re-add it to pick up a new icon. The
+queue's Call button dials the number (`tel:`) and still hands off to the Caller
+extension when it is installed. Save & next stays pinned above the tabs.
+
+The paragraphs below describe the earlier decision workspace. Its routes
+(`/leads`, `/automation`, `/clients`, `/vault`) now redirect to the call list.
+
 The decision-first workspace leads with plain-language actions and keeps
 operator diagnostics behind a disclosure. The private business decision flow
 and saved-research console are admin-only. Each page must distinguish
