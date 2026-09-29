@@ -33,10 +33,11 @@ for (const key of ["send_email", "services", "kv_namespaces", "r2_buckets", "que
 if (JSON.stringify(config.triggers?.crons ?? []) !== JSON.stringify(CRONS)) stop("unexpected schedule");
 
 const wrangler = (args) => spawnSync(process.execPath, [path.join(repo, "node_modules", "wrangler", "bin", "wrangler.js"), ...args, "--config", configPath], { cwd: repo, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: process.env });
-const schema = wrangler(["d1", "execute", DATABASE, "--remote", "--json", "--command", "SELECT (SELECT COUNT(*) FROM d1_migrations WHERE name = '0084_site_check.sql') AS applied, (SELECT COUNT(*) FROM sqlite_master WHERE name = 'SiteCheckRun') AS runs"]);
+// The checker writes the 0085 phone-quality columns, so both migrations must be live first.
+const schema = wrangler(["d1", "execute", DATABASE, "--remote", "--json", "--command", "SELECT (SELECT COUNT(*) FROM d1_migrations WHERE name IN ('0084_site_check.sql', '0085_phone_quality.sql')) AS applied, (SELECT COUNT(*) FROM sqlite_master WHERE name = 'SiteCheckRun') AS runs"]);
 const live = JSON.parse(schema.stdout || "[]")[0]?.results?.[0];
-if (!live || live.applied !== 1 || live.runs !== 1) stop("live database does not have migration 0084 yet; release the main app first");
-console.log("live schema: 0084 applied");
+if (!live || live.applied !== 2 || live.runs !== 1) stop("live database does not have migrations 0084 and 0085 yet; release the main app first");
+console.log("live schema: 0084 and 0085 applied");
 
 // On the first deploy the Worker does not exist yet, so there is no previous version.
 let previous = null;

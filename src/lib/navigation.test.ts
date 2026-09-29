@@ -11,6 +11,7 @@ test("owner navigation covers calling, walk-ins, email and settings only", () =>
   assert.equal(APP_NAV_ITEMS.some((item) => ["/leads", "/automation", "/clients", "/vault"].includes(item.url)), false);
 });
 
-test("installed app shortcuts open Today and the call list", () => {
-  assert.deepEqual(manifest().shortcuts?.map((shortcut) => shortcut.url), ["/dashboard", "/call", "/prospects"]);
+test("installed app shortcuts open Today, the queue, walk-ins and the call list", () => {
+  assert.deepEqual(manifest().shortcuts?.map((shortcut) => shortcut.url), ["/dashboard", "/call", "/walk-ins", "/prospects"]);
+  assert.equal(manifest().short_name, "Axiom", "the home-screen label must fit under an iPhone icon");
 });

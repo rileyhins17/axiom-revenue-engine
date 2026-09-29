@@ -761,6 +761,16 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     pagesScanned += 1;
     await assertResponsive(page, "mobile Call queue");
     await page.screenshot({ path: join(outputDirectory, "call-queue-mobile.png"), fullPage: false });
+    // Scrolled to the end, the last card must clear the pinned Save bar (which sits above the tab bar).
+    const clearance = await page.evaluate(async () => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const last = document.querySelector("[aria-label='What to say']")?.getBoundingClientRect();
+      const bar = document.querySelector(".owner-action-bar")?.getBoundingClientRect();
+      return last && bar ? Math.round(bar.top - last.bottom) : null;
+    });
+    assert(clearance !== null && clearance >= 0, `The last mobile queue card must clear the pinned Save bar (clearance ${clearance}px).`);
+    await page.screenshot({ path: join(outputDirectory, "call-queue-mobile-end.png"), fullPage: false });
 
     await context.close();
     return { pagesScanned, externalRequests: externalRequests.length, desktopWidth, mobileWidth } satisfies AcceptanceResult;
@@ -804,7 +814,7 @@ async function run() {
     server = startNextServer(baseUrl, databasePath, serverLogs);
     await waitForServer(baseUrl, server);
     result = await runBrowserAcceptance(baseUrl, outputDirectory);
-    for (const name of ["today-desktop.png", "today-mobile.png", "prospects-desktop.png", "prospects-mobile.png", "call-queue-mobile.png"]) {
+    for (const name of ["today-desktop.png", "today-mobile.png", "prospects-desktop.png", "prospects-mobile.png", "call-queue-mobile.png", "call-queue-mobile-end.png"]) {
       await copyIfExists(join(outputDirectory, name), join(OUTPUT_ROOT, name));
     }
     success = true;
