@@ -677,6 +677,32 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     assert.equal(await page.locator("table").getByText("Cambridge Landscape Pros", { exact: true }).count(), 0,
       "A DO_NOT_CONTACT outcome must remove the business from the To call list.");
 
+    // While a business is still waiting (the desktop step below logs the last one).
+    stage = "mobile call queue";
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await page.goto("/call", { waitUntil: "load" });
+    await page.getByRole("heading", { level: 1, name: "Call queue" }).waitFor();
+    // On a phone the big button must dial even without the Caller extension.
+    const callButton = page.getByRole("region", { name: "Business to call" }).locator("a[href^='tel:']").first();
+    await callButton.waitFor();
+    assert.match(await callButton.getAttribute("href") ?? "", /^tel:\+1\d{10}$/, "The mobile Call button must be a dialable tel: link.");
+    await page.getByRole("button", { name: /Pick what happened|Save & next/ }).waitFor();
+    await assertWcag(page, "mobile Call queue");
+    pagesScanned += 1;
+    await assertResponsive(page, "mobile Call queue");
+    await page.screenshot({ path: join(outputDirectory, "call-queue-mobile.png"), fullPage: false });
+    // Scrolled to the end, the last card must clear the pinned Save bar (which sits above the tab bar).
+    const clearance = await page.evaluate(async () => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const last = document.querySelector("[aria-label='What to say']")?.getBoundingClientRect();
+      const bar = document.querySelector(".owner-action-bar")?.getBoundingClientRect();
+      return last && bar ? Math.round(bar.top - last.bottom) : null;
+    });
+    assert(clearance !== null && clearance >= 0, `The last mobile queue card must clear the pinned Save bar (clearance ${clearance}px).`);
+    await page.screenshot({ path: join(outputDirectory, "call-queue-mobile-end.png"), fullPage: false });
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+
     stage = "call queue logs with the keyboard and moves on";
     await page.goto("/call", { waitUntil: "load" });
     await page.getByRole("heading", { level: 1, name: "Call queue" }).waitFor();
@@ -750,28 +776,13 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await assertResponsive(page, "mobile Call list");
     await page.screenshot({ path: join(outputDirectory, "prospects-mobile.png"), fullPage: true });
 
-    stage = "mobile call queue";
+    stage = "mobile call queue, all caught up";
     await page.goto("/call", { waitUntil: "load" });
     await page.getByRole("heading", { level: 1, name: "Call queue" }).waitFor();
-    // On a phone the big button must dial even without the Caller extension.
-    const callButton = page.getByRole("region", { name: "Business to call" }).locator("a[href^='tel:']").first();
-    await callButton.waitFor();
-    assert.match(await callButton.getAttribute("href") ?? "", /^tel:\+1\d{10}$/, "The mobile Call button must be a dialable tel: link.");
-    await page.getByRole("button", { name: /Pick what happened|Save & next/ }).waitFor();
-    await assertWcag(page, "mobile Call queue");
+    await page.getByText("All caught up", { exact: true }).waitFor();
+    await assertWcag(page, "mobile Call queue (caught up)");
     pagesScanned += 1;
-    await assertResponsive(page, "mobile Call queue");
-    await page.screenshot({ path: join(outputDirectory, "call-queue-mobile.png"), fullPage: false });
-    // Scrolled to the end, the last card must clear the pinned Save bar (which sits above the tab bar).
-    const clearance = await page.evaluate(async () => {
-      window.scrollTo(0, document.documentElement.scrollHeight);
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const last = document.querySelector("[aria-label='What to say']")?.getBoundingClientRect();
-      const bar = document.querySelector(".owner-action-bar")?.getBoundingClientRect();
-      return last && bar ? Math.round(bar.top - last.bottom) : null;
-    });
-    assert(clearance !== null && clearance >= 0, `The last mobile queue card must clear the pinned Save bar (clearance ${clearance}px).`);
-    await page.screenshot({ path: join(outputDirectory, "call-queue-mobile-end.png"), fullPage: false });
+    await assertResponsive(page, "mobile Call queue (caught up)");
 
     await context.close();
     return { pagesScanned, externalRequests: externalRequests.length, desktopWidth, mobileWidth } satisfies AcceptanceResult;
