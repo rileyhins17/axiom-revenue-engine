@@ -11,14 +11,14 @@ import { isLeadOutreachEligible } from "@/lib/lead-qualification";
  * higher than the old 20/day default — the operator is paying for the
  * pipeline and expects leads to move.
  */
-export const MAILBOX_DAILY_SEND_TARGET = 50;
+export const MAILBOX_DAILY_SEND_TARGET = 5;
 /** Hourly cap is aligned to the daily target instead of allowing bursts that
  *  drain the hour and make automation look stopped. */
-export const MAILBOX_HOURLY_SEND_TARGET = 3;
+export const MAILBOX_HOURLY_SEND_TARGET = 1;
 /** 50/day/mailbox requires one send about every 29 minutes. This keeps the
  *  engine moving 24/7 at a steady reputation-safe rate instead of bursting. */
-export const MAILBOX_MIN_DELAY_SECONDS = 1728;
-export const MAILBOX_MAX_DELAY_SECONDS = 30 * 60;
+export const MAILBOX_MIN_DELAY_SECONDS = 60 * 60;
+export const MAILBOX_MAX_DELAY_SECONDS = 2 * 60 * 60;
 
 /** Adequate-lead threshold. Intake, queueing, and send-time checks must stay
  *  aligned so every adequate lead can actually receive an email. */
@@ -35,10 +35,9 @@ export const AUTONOMOUS_QUALIFICATION_SCAN_SIZE = 250;
  *  mailboxes at 50/day each (= 100 sends/day), this keeps a healthy
  *  intake-to-send ratio without manual gating. */
 export const AUTONOMOUS_DAILY_LEAD_INTAKE_CAP = 50;
-/** Follow-ups are useful, but first-touch volume is the primary growth lever.
- *  Cap follow-ups at 25% of the 80/day global send budget so aged sequences
- *  cannot take over daily mailbox capacity. */
-export const AUTONOMOUS_FOLLOW_UP_DAILY_SEND_CAP = 20;
+/** Follow-ups remain fully disabled until a separate evidence threshold and
+ * owner approval demonstrate that they add value without harming reputation. */
+export const AUTONOMOUS_FOLLOW_UP_DAILY_SEND_CAP = 0;
 export const FOLLOW_UP_3_DELAY_DAYS = 4;
 
 export function isAdequateAutonomousLead(lead: {
@@ -92,23 +91,23 @@ export function isAdequateAutonomousLead(lead: {
 }
 
 export const AUTOMATION_SETTINGS_DEFAULTS = {
-  enabled: true,
-  globalPaused: false,
-  emergencyPaused: false,
+  enabled: false,
+  globalPaused: true,
+  emergencyPaused: true,
   emergencyPausedAt: null,
   emergencyPausedBy: null,
   emergencyPauseReason: null,
-  intakePaused: false,
+  intakePaused: true,
   intakePausedAt: null,
   intakePausedBy: null,
   followUpsPaused: true,
   followUpsPausedAt: null,
   followUpsPausedBy: null,
-  sendWindowStartHour: 0,
+  sendWindowStartHour: 9,
   sendWindowStartMinute: 0,
-  sendWindowEndHour: 23,
-  sendWindowEndMinute: 59,
-  weekdaysOnly: false,
+  sendWindowEndHour: 16,
+  sendWindowEndMinute: 30,
+  weekdaysOnly: true,
   /** Initial touch fires within 1-5 min of being queued (was 3-12). */
   initialDelayMinMinutes: 1,
   initialDelayMaxMinutes: 5,
@@ -117,7 +116,7 @@ export const AUTOMATION_SETTINGS_DEFAULTS = {
   /** Steps claimed per scheduler tick. Raised to 60 so a single tick can
    *  drain a larger backlog once the enrichment funnel catches up. Per-mailbox
    *  caps still throttle any one account; this only lifts the per-tick ceiling. */
-  schedulerClaimBatch: 60,
+  schedulerClaimBatch: 2,
   replySyncStaleMinutes: 15,
 } satisfies Omit<OutreachAutomationSettingRecord, "id" | "createdAt" | "updatedAt">;
 

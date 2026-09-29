@@ -1,5 +1,5 @@
 import { writeAuditEvent } from "@/lib/audit";
-import { getCloudflareBindings } from "@/lib/cloudflare";
+import { evaluateAutomationSafety } from "@/lib/automation-safety";
 import { generateDedupeKey } from "@/lib/dedupe";
 import { getServerEnv } from "@/lib/env";
 import { getAutomationSettings, updateAutomationSettings } from "@/lib/outreach-automation";
@@ -41,14 +41,6 @@ type ExistingLeadDedupeCandidate = {
   websiteDomain?: string | null;
   websiteUrl?: string | null;
 };
-
-function isEnabled(value: string | undefined, fallback = true) {
-  if (value === undefined || value === null || value === "") {
-    return fallback;
-  }
-
-  return !/^(0|false|no|off)$/i.test(value.trim());
-}
 
 export function shouldUseExistingLeadForScrapeDedupe(lead: ExistingLeadDedupeCandidate) {
   const hasContactOrWebsite = Boolean(
@@ -166,7 +158,7 @@ async function claimCloudJob(workerName: string) {
 }
 
 export function shouldSkipCloudMapsDetailPages(env: Pick<ReturnType<typeof getServerEnv>, "CLOUD_SCRAPE_DETAIL_PAGES_ENABLED">) {
-  return isEnabled(env.CLOUD_SCRAPE_DETAIL_PAGES_ENABLED, false) === false;
+  return !env.CLOUD_SCRAPE_DETAIL_PAGES_ENABLED;
 }
 
 export function isTransientCloudBrowserError(message: string) {
@@ -203,7 +195,9 @@ async function runClaimedJob(job: ScrapeJobRecord, existingDedupeKeys: string[])
       }
 
       try {
-        if (await getAutomationSettings().then((settings) => settings.emergencyPaused).catch(() => false)) {
+        const settings = await getAutomationSettings();
+        const safety = evaluateAutomationSafety({ env, phase: "intake", settings });
+        if (!safety.allowed) {
           cancelRequested = true;
           return;
         }
@@ -212,6 +206,7 @@ async function runClaimedJob(job: ScrapeJobRecord, existingDedupeKeys: string[])
           cancelRequested = true;
         }
       } catch (error) {
+        cancelRequested = true;
         console.warn(`[cloud-scrape] heartbeat failed for ${job.id}:`, error);
       }
     })();
@@ -400,28 +395,7 @@ async function runClaimedJob(job: ScrapeJobRecord, existingDedupeKeys: string[])
 }
 
 export async function runCloudScrapeWorker() {
-  const bindings = getCloudflareBindings();
-  if (!bindings?.BROWSER) {
-    return { claimed: false, reason: "Browser Rendering binding unavailable" };
-  }
-
-  const env = getServerEnv();
-  if (!isEnabled(env.CLOUD_SCRAPE_ENABLED)) {
-    return { claimed: false, reason: "Cloud scrape disabled" };
-  }
-
-  if (await getAutomationSettings().then((settings) => settings.emergencyPaused).catch(() => false)) {
-    return { claimed: false, reason: "Emergency kill switch active" };
-  }
-
-  const workerName = env.CLOUD_SCRAPE_WORKER_NAME || DEFAULT_CLOUD_WORKER_NAME;
-  const job = await claimCloudJob(workerName);
-  if (!job) {
-    return { claimed: false, reason: "No pending scrape job" };
-  }
-
-  const existingDedupeKeys = await getExistingDedupeKeys();
-  await runClaimedJob(job, existingDedupeKeys);
-
-  return { claimed: true, jobId: job.id };
+  // The legacy crawler cannot safely pin DNS across browser redirects. Keep
+  // this entry point inert until a separately reviewed capture path replaces it.
+  return { claimed: false, reason: "Legacy browser crawler is disabled" };
 }

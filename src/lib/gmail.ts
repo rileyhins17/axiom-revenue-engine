@@ -248,7 +248,7 @@ export async function revokeToken(token: string): Promise<void> {
 
 // ─── Email Sending ──────────────────────────────────────────────────
 
-function buildRfc2822Message(options: {
+export function buildRfc2822Message(options: {
   from: string;
   fromName?: string;
   to: string;
@@ -370,6 +370,13 @@ export type GmailThreadMetadata = {
   }>;
 };
 
+// The old Gmail route has no current consent/provider release path. Keep the
+// historical message builder for tests and migration, but stop at the provider
+// boundary even if legacy database or environment switches are turned on.
+function isLegacyGmailSendAuthorized(): boolean {
+  return false;
+}
+
 /**
  * Send an email via the Gmail REST API.
  */
@@ -385,6 +392,9 @@ export async function sendGmailEmail(options: {
   inReplyTo?: string;
   references?: string;
 }): Promise<SendEmailResult> {
+  if (!isLegacyGmailSendAuthorized()) {
+    throw new Error("Legacy Gmail sending is disabled: no approved outbound route");
+  }
   const rawMessage = buildRfc2822Message(options);
   const encoded = base64UrlEncodeUtf8(rawMessage);
   const payload: Record<string, string> = { raw: encoded };

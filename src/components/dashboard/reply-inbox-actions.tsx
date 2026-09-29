@@ -44,7 +44,7 @@ export function ReplyInboxPanel({ items: initialItems }: { items: ReplyInboxItem
         <div className="flex items-center gap-2">
           <Inbox className="size-4 text-cyan-400" />
           <div>
-            <div className="text-sm font-semibold text-white">Reply Inbox</div>
+            <div className="text-sm font-semibold text-white">Earlier system replies</div>
             <div className="mt-0.5 text-[11px] text-zinc-500">
               {items.length} unhandled {items.length === 1 ? "reply" : "replies"} — respond fast
             </div>

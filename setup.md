@@ -1,6 +1,6 @@
 # Local Setup
 
-This repo is the Axiom Pipeline Engine. Local setup is for UI, unit tests, and Cloudflare-shaped smoke tests. Do not use local setup to send Gmail, sync inboxes, or run production cron tasks.
+This repo is the Axiom Revenue Engine. Local setup is for UI, unit tests, and Cloudflare-shaped smoke tests. Do not use local setup to send Gmail, sync inboxes, or run production cron tasks.
 
 ## 1. Install dependencies
 
@@ -23,7 +23,7 @@ Fill in local-safe values. Keep production secrets in Cloudflare, not Git.
 npm run db:migrate:local
 ```
 
-The Cloudflare resource name is still `axiom-ops-omniscient` for database continuity.
+The legacy D1 database name remains `axiom-ops-omniscient` temporarily for migration continuity. The new console Worker is `axiom-revenue-engine-console`; do not rename or delete the legacy database in place.
 
 ## 4. Start development
 

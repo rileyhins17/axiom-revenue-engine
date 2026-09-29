@@ -4,6 +4,7 @@ import { getErrorMessage } from "@/lib/errors";
 import { getDatabase } from "@/lib/cloudflare";
 import { getValidAccessToken, sendGmailReply } from "@/lib/gmail";
 import { getPrisma } from "@/lib/prisma";
+import { requireLegacyManualReplySafety } from "@/lib/legacy-manual-reply-safety";
 import { isAllowedReplyTarget } from "@/lib/reply-validation";
 import { requireApiSession } from "@/lib/session";
 
@@ -90,6 +91,16 @@ export async function POST(
 
   if (!isAllowedReplyTarget(to, lead.email, recordedRecipients.map((row) => row.recipientEmail))) {
     return NextResponse.json({ error: "Reply recipient does not belong to this client thread" }, { status: 400 });
+  }
+
+  try {
+    await requireLegacyManualReplySafety(prisma, lead, to);
+  } catch (error) {
+    console.warn("[emails/reply] blocked by manual reply safety policy:", error);
+    return NextResponse.json(
+      { error: "Email reply is blocked by the current stop or suppression policy" },
+      { status: 409 },
+    );
   }
 
   // Get Gmail connection

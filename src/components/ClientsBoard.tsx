@@ -133,7 +133,7 @@ function DealCard({
       draggable={Boolean(onDragStart)}
       onDragStart={(e) => onDragStart?.(e, lead.id)}
       onDragEnd={() => onDragEnd?.()}
-      className="group relative w-full rounded-xl border border-white/[0.08] bg-white/[0.025] p-3.5 text-left transition-colors hover:border-white/[0.14] hover:bg-white/[0.05] md:cursor-grab md:active:cursor-grabbing"
+      className="group relative w-full rounded-2xl border border-[#e1e9de] bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#c7d8c5] hover:shadow-md md:cursor-grab md:active:cursor-grabbing"
     >
       <button
         type="button"
@@ -144,18 +144,17 @@ function DealCard({
       <div className="pointer-events-none relative">
       <div className="flex items-start justify-between gap-2 mb-2.5">
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-white truncate leading-tight">
+          <div className="text-sm font-semibold text-[#263a2f] truncate leading-tight">
             {lead.businessName}
           </div>
-          <div className="text-[11px] text-zinc-500 truncate mt-0.5">
+          <div className="text-xs text-[#64766a] truncate mt-1">
             {lead.city} · {lead.niche}
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
           {healthMeta && health !== "WON" && health !== "LOST" && (
             <span className={cn(
-              "inline-flex items-center rounded border px-1 py-px text-[9px] font-semibold uppercase tracking-wide",
-              healthMeta.pillClasses,
+              "inline-flex items-center rounded-md border border-[#d7e2d3] bg-[#edf3eb] px-2 py-1 text-[10px] font-semibold text-[#405b48]",
             )}>
               {healthMeta.label}
             </span>
@@ -168,7 +167,7 @@ function DealCard({
                 aria-label={`Actions for ${lead.businessName}`}
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="inline-flex size-6 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-white/[0.08] hover:text-zinc-300 cursor-pointer"
+                className="inline-flex size-8 items-center justify-center rounded-lg text-[#53675a] transition-colors hover:bg-[#e8efe6] hover:text-[#24382d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] cursor-pointer"
               >
                 <MoreHorizontalIcon className="size-3.5" />
               </button>
@@ -200,7 +199,7 @@ function DealCard({
       </div>
 
       {lead.engagementType && (
-        <div className="text-[10.5px] font-medium text-zinc-400 mb-1.5">
+        <div className="text-xs font-medium text-[#526457] mb-1.5">
           {getEngagementTypeLabel(lead.engagementType)}
         </div>
       )}
@@ -209,21 +208,21 @@ function DealCard({
       {lead.nextAction && (
         <div className="flex items-start gap-1 mb-1.5">
           {overdue ? (
-            <Clock className="size-3 text-red-400 shrink-0 mt-px" />
+            <Clock className="size-3 text-[#9b2f2f] shrink-0 mt-px" />
           ) : (
-            <Clock className="size-3 text-zinc-600 shrink-0 mt-px" />
+            <Clock className="size-3 text-[#5b6d5f] shrink-0 mt-px" />
           )}
           <div className="min-w-0">
             <span className={cn(
-              "text-[10.5px] truncate block",
-              overdue ? "text-red-300" : "text-zinc-400",
+              "text-xs truncate block",
+              overdue ? "text-[#9b2f2f]" : "text-[#526457]",
             )}>
               {lead.nextAction}
             </span>
             {lead.nextActionDueAt && (
               <span className={cn(
-                "text-[10px]",
-                overdue ? "text-red-400/70" : "text-zinc-600",
+                "text-[11px] font-medium",
+                overdue ? "text-[#9b2f2f]" : "text-[#5b6d5f]",
               )}>
                 {formatDueDate(lead.nextActionDueAt)}
               </span>
@@ -234,14 +233,14 @@ function DealCard({
 
       <div className="flex items-center justify-between gap-2 mt-auto pt-0.5">
         {lead.monthlyValue ? (
-          <span className="font-mono text-xs font-semibold text-emerald-300">
-            ${lead.monthlyValue.toLocaleString()}/mo
+          <span className="font-mono text-xs font-semibold text-[#285d3d]" title="Recorded monthly estimate; not confirmed cash received">
+            ~${lead.monthlyValue.toLocaleString()}/mo
           </span>
         ) : (
-          <span className="font-mono text-xs text-zinc-600">—</span>
+          <span className="font-mono text-xs text-[#5b6d5f]">No monthly estimate</span>
         )}
         {renewalWarning && (
-          <span className="flex items-center gap-1 text-[10px] text-amber-400 font-medium">
+          <span className="flex items-center gap-1 text-[11px] text-[#755312] font-semibold">
             <AlertCircle className="size-3" />
             {daysUntilRenewal === 0 ? "Today" : `${daysUntilRenewal}d`}
           </span>
@@ -249,7 +248,7 @@ function DealCard({
       </div>
 
       {lead.outreachStatus === "REPLIED" && !lead.dealStage && (
-        <div className="mt-2 text-[10px] text-cyan-400 font-medium flex items-center gap-1">
+        <div className="mt-2 text-xs text-[#17657a] font-medium flex items-center gap-1">
           <MessageSquare className="size-3" />
           Replied — needs stage
         </div>
@@ -296,26 +295,25 @@ function KanbanColumn({
   onDragOver?: (e: React.DragEvent, stage: DealStage) => void;
   onDragLeave?: () => void;
 }) {
-  const stageMeta = getDealStageMeta(stage);
   const columnMrr = leads.reduce((s, l) => s + (l.monthlyValue ?? 0), 0);
 
   return (
-    <div className="flex flex-col min-w-[220px] w-[220px] shrink-0">
+    <section aria-label={`${label} stage`} className="flex flex-col min-w-[250px] w-[250px] shrink-0">
       <div className="flex items-center justify-between gap-2 mb-3 px-1">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-white">{label}</span>
+            <h2 className="text-sm font-semibold text-[#263a2f]">{label}</h2>
             {leads.length > 0 && (
-              <span className="font-mono text-[10px] text-zinc-500 border border-white/[0.09] bg-black/30 rounded px-1 py-0.5">
+              <span className="font-mono text-xs text-[#526457] border border-[#dfe7dd] bg-white rounded-md px-2 py-1">
                 {leads.length}
               </span>
             )}
           </div>
-          <div className="text-[10.5px] text-zinc-600 mt-0.5">{description}</div>
+          <div className="text-xs text-[#64766a] mt-1">{description}</div>
         </div>
         {columnMrr > 0 && (
-          <span className="font-mono text-[10.5px] text-emerald-400 shrink-0">
-            ${columnMrr.toLocaleString()}
+          <span className="font-mono text-xs font-medium text-[#285d3d] shrink-0" title="Sum of entered monthly estimates">
+            ~${columnMrr.toLocaleString()}/mo
           </span>
         )}
       </div>
@@ -325,10 +323,10 @@ function KanbanColumn({
         onDragLeave={() => onDragLeave?.()}
         onDrop={(e) => { e.preventDefault(); onDrop?.(e, stage); }}
         className={cn(
-          "flex-1 rounded-xl border p-2.5 flex flex-col gap-2 min-h-[120px] transition-colors",
+          "flex-1 rounded-2xl border border-[#e0e8dc] p-2.5 flex flex-col gap-2 min-h-[150px] transition-colors",
           isDragOver
-            ? "border-emerald-500/40 bg-emerald-500/5"
-            : stageMeta ? `${stageMeta.classes.split(" ").find((c) => c.startsWith("border-")) ?? "border-white/[0.06]"} bg-black/20` : "border-white/[0.06] bg-black/20",
+            ? "border-emerald-500/40 bg-[#edf4ec]"
+            : "bg-[#f1f5ef]",
         )}
       >
         {leads.map((lead) => (
@@ -336,26 +334,26 @@ function KanbanColumn({
         ))}
         {leads.length === 0 && !isDragOver && (
           <div className="flex-1 flex items-center justify-center">
-            <span className="text-[11px] text-zinc-700">Empty</span>
+            <span className="text-xs text-[#5b6d5f]">No items in this stage</span>
           </div>
         )}
         {isDragOver && (
-          <div className="flex-1 flex items-center justify-center border-2 border-dashed border-emerald-500/30 rounded-lg">
-            <span className="text-[11px] text-emerald-400 font-medium">Drop here</span>
+          <div className="flex-1 flex items-center justify-center border-2 border-dashed border-[#176443]/45 rounded-xl bg-white/70">
+            <span className="text-xs text-[#176443] font-semibold">Drop here</span>
           </div>
         )}
         {onAddFromInbox && leads.length === 0 && !isDragOver && (
           <button
             type="button"
             onClick={onAddFromInbox}
-            className="mt-1 flex items-center gap-1.5 text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
+            className="mt-1 min-h-10 flex items-center gap-1.5 text-xs font-medium text-[#53675a] hover:text-[#24382d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] transition-colors cursor-pointer"
           >
             <Plus className="size-3" />
             Add from inbox
           </button>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -373,13 +371,13 @@ function MobileStageSection({
   onDelete?: (lead: CrmLead) => void;
 }) {
   return (
-    <section className="rounded-xl border border-white/[0.06] bg-black/20 p-3">
+    <section className="rounded-2xl border border-[#e0e8dc] bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-white">{label}</h2>
-          <p className="mt-0.5 text-[11px] text-zinc-600">{description}</p>
+          <h2 className="text-sm font-semibold text-[#263a2f]">{label}</h2>
+          <p className="mt-1 text-xs text-[#64766a]">{description}</p>
         </div>
-        <span className="rounded-md border border-white/[0.09] bg-black/30 px-2 py-1 font-mono text-[10px] text-zinc-400">
+        <span className="rounded-md border border-[#dfe7dd] bg-[#f6f8f3] px-2 py-1 font-mono text-xs text-[#526457]">
           {leads.length}
         </span>
       </div>
@@ -389,8 +387,8 @@ function MobileStageSection({
             <DealCard key={lead.id} lead={lead} onEdit={onEdit} onDelete={onDelete} />
           ))
         ) : (
-          <div className="rounded-lg border border-dashed border-white/[0.06] px-3 py-6 text-center text-[11px] text-zinc-700">
-            Empty
+          <div className="rounded-xl border border-dashed border-[#dfe7dd] bg-[#f6f8f3] px-3 py-6 text-center text-xs text-[#5b6d5f]">
+            No clients in this stage yet
           </div>
         )}
       </div>
@@ -471,32 +469,33 @@ function DealDrawer({
     <div className="fixed inset-0 z-50 flex items-start justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className="relative flex h-[100dvh] w-full flex-col overflow-y-auto bg-[#070d14] shadow-2xl animate-in slide-in-from-bottom duration-200 sm:max-w-md sm:border-l sm:border-white/[0.08] sm:slide-in-from-right"
+        className="relative flex h-[100dvh] w-full flex-col overflow-y-auto bg-[#f6f8f3] shadow-2xl animate-in slide-in-from-bottom duration-200 sm:max-w-md sm:border-l sm:border-[#dfe7dd] sm:slide-in-from-right"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] sm:px-6 sm:pt-6">
+        <div className="flex items-start justify-between gap-4 border-b border-[#e3e9e0] px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] sm:px-6 sm:pt-6">
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-white truncate">{lead.businessName}</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">{lead.city} · {lead.niche}</p>
+            <h2 className="text-base font-semibold text-[#263a2f] truncate">{lead.businessName}</h2>
+            <p className="text-xs text-[#64766a] mt-0.5">{lead.city} · {lead.niche}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 text-zinc-500 hover:text-white transition-colors mt-0.5"
+            aria-label={`Close ${lead.businessName} deal editor`}
+            className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-[#53675a] hover:bg-[#e8efe6] hover:text-[#24382d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] transition-colors"
           >
             <X className="size-4" />
           </button>
         </div>
 
         {/* Contact info */}
-        <div className="flex flex-col gap-1.5 border-b border-white/[0.06] px-4 py-3 sm:px-6">
+        <div className="flex flex-col gap-1.5 border-b border-[#e3e9e0] px-4 py-3 sm:px-6">
           {lead.email && (
             <a
               href={`mailto:${lead.email}`}
-              className="flex items-center gap-2 text-xs text-zinc-400 hover:text-white transition-colors"
+              className="flex items-center gap-2 text-xs text-[#526457] hover:text-[#263a2f] transition-colors"
             >
-              <Mail className="size-3.5 shrink-0 text-zinc-600" />
+              <Mail className="size-3.5 shrink-0 text-[#5b6d5f]" />
               {lead.email}
             </a>
           )}
@@ -505,11 +504,11 @@ function DealDrawer({
               href={lead.websiteUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 text-xs text-zinc-400 hover:text-white transition-colors"
+              className="flex items-center gap-2 text-xs text-[#526457] hover:text-[#263a2f] transition-colors"
             >
-              <Globe className="size-3.5 shrink-0 text-zinc-600" />
+              <Globe className="size-3.5 shrink-0 text-[#5b6d5f]" />
               {lead.websiteDomain ?? lead.websiteUrl}
-              <ExternalLink className="size-3 text-zinc-700" />
+              <ExternalLink className="size-3 text-[#5b6d5f]" />
             </a>
           )}
         </div>
@@ -520,13 +519,13 @@ function DealDrawer({
           {/* Stage + Priority row */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Stage
               </label>
               <select
                 value={dealStage}
                 onChange={(e) => handleDealStageChange(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-2.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 cursor-pointer"
+                className="w-full rounded-lg border border-[#dfe7dd] bg-white px-2.5 py-2 text-sm text-[#263a2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443] cursor-pointer"
               >
                 <option value="">— None —</option>
                 {DEAL_STAGE_OPTIONS.map((opt) => (
@@ -536,13 +535,13 @@ function DealDrawer({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Priority
               </label>
               <select
                 value={clientPriority}
                 onChange={(e) => setClientPriority(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-2.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 cursor-pointer"
+                className="w-full rounded-lg border border-[#dfe7dd] bg-white px-2.5 py-2 text-sm text-[#263a2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443] cursor-pointer"
               >
                 <option value="">— None —</option>
                 {CLIENT_PRIORITY_OPTIONS.map((opt) => (
@@ -554,13 +553,13 @@ function DealDrawer({
 
           {/* Engagement Type */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+            <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
               Engagement Type
             </label>
             <select
               value={engagementType}
               onChange={(e) => setEngagementType(e.target.value)}
-              className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 cursor-pointer"
+              className="w-full rounded-lg border border-[#dfe7dd] bg-white px-3 py-2 text-sm text-[#263a2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443] cursor-pointer"
             >
               <option value="">— Select type —</option>
               {ENGAGEMENT_TYPE_OPTIONS.map((opt) => (
@@ -572,11 +571,11 @@ function DealDrawer({
           {/* Monthly Value */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Project Value
               </label>
               <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-zinc-500 pointer-events-none" />
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[#64766a] pointer-events-none" />
                 <input
                   type="number"
                   min={0}
@@ -584,16 +583,16 @@ function DealDrawer({
                   value={proposalValue}
                   onChange={(e) => setProposalValue(e.target.value)}
                   placeholder="3500"
-                  className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] pl-8 pr-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
+                  className="w-full rounded-lg border border-[#dfe7dd] bg-white pl-8 pr-3 py-2 text-sm text-[#263a2f] placeholder:text-[#5b6d5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443]"
                 />
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Monthly Value
               </label>
               <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-zinc-500 pointer-events-none" />
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[#64766a] pointer-events-none" />
                 <input
                   type="number"
                   min={0}
@@ -601,7 +600,7 @@ function DealDrawer({
                   value={monthlyValue}
                   onChange={(e) => setMonthlyValue(e.target.value)}
                   placeholder="150"
-                  className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] pl-8 pr-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
+                  className="w-full rounded-lg border border-[#dfe7dd] bg-white pl-8 pr-3 py-2 text-sm text-[#263a2f] placeholder:text-[#5b6d5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443]"
                 />
               </div>
             </div>
@@ -609,7 +608,7 @@ function DealDrawer({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Proposal Status
               </label>
               <input
@@ -617,11 +616,11 @@ function DealDrawer({
                 value={proposalStatus}
                 onChange={(e) => setProposalStatus(e.target.value)}
                 placeholder="draft / sent / accepted"
-                className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
+                className="w-full rounded-lg border border-[#dfe7dd] bg-white px-3 py-2 text-sm text-[#263a2f] placeholder:text-[#5b6d5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443]"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Package
               </label>
               <input
@@ -629,17 +628,17 @@ function DealDrawer({
                 value={packageRecommendation}
                 onChange={(e) => setPackageRecommendation(e.target.value)}
                 placeholder="Rebuild + care"
-                className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
+                className="w-full rounded-lg border border-[#dfe7dd] bg-white px-3 py-2 text-sm text-[#263a2f] placeholder:text-[#5b6d5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443]"
               />
             </div>
           </div>
 
           {/* Divider */}
-          <div className="border-t border-white/[0.05]" />
+          <div className="border-t border-[#e3e9e0]" />
 
           {/* Next Action */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+            <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
               Next Action
             </label>
             <input
@@ -647,22 +646,22 @@ function DealDrawer({
               value={nextAction}
               onChange={(e) => setNextAction(e.target.value)}
               placeholder="e.g. Follow up on proposal"
-              className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
+              className="w-full rounded-lg border border-[#dfe7dd] bg-white px-3 py-2 text-sm text-[#263a2f] placeholder:text-[#5b6d5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443]"
             />
           </div>
 
           {/* Next Action Due */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+            <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
               Due Date
             </label>
             <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-zinc-500 pointer-events-none" />
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[#64766a] pointer-events-none" />
               <input
                 type="date"
                 value={nextActionDueAt}
                 onChange={(e) => setNextActionDueAt(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] pl-8 pr-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 [color-scheme:dark]"
+                className="w-full rounded-lg border border-[#dfe7dd] bg-white pl-8 pr-3 py-2 text-sm text-[#263a2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443] [color-scheme:light]"
               />
             </div>
           </div>
@@ -670,7 +669,7 @@ function DealDrawer({
           {/* Lost reason — only when stage is LOST */}
           {isLost && (
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Lost Reason
               </label>
               <input
@@ -678,36 +677,36 @@ function DealDrawer({
                 value={dealLostReason}
                 onChange={(e) => setDealLostReason(e.target.value)}
                 placeholder="e.g. Budget, went with competitor…"
-                className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20"
+                className="w-full rounded-lg border border-[#dfe7dd] bg-white px-3 py-2 text-sm text-[#263a2f] placeholder:text-[#5b6d5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#9b2f2f]"
               />
             </div>
           )}
 
           {/* Divider */}
-          <div className="border-t border-white/[0.05]" />
+          <div className="border-t border-[#e3e9e0]" />
 
           {/* Proposal Sent / Signed dates */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Proposal Sent
               </label>
               <input
                 type="date"
                 value={proposalSentAt}
                 onChange={(e) => setProposalSentAt(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-2.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 [color-scheme:dark]"
+                className="w-full rounded-lg border border-[#dfe7dd] bg-white px-2.5 py-2 text-sm text-[#263a2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443] [color-scheme:light]"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Signed
               </label>
               <input
                 type="date"
                 value={signedAt}
                 onChange={(e) => setSignedAt(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-2.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 [color-scheme:dark]"
+                className="w-full rounded-lg border border-[#dfe7dd] bg-white px-2.5 py-2 text-sm text-[#263a2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443] [color-scheme:light]"
               />
             </div>
           </div>
@@ -715,30 +714,30 @@ function DealDrawer({
           {/* Project Start / Launch dates */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Project Start
               </label>
               <div className="relative">
-                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-zinc-500 pointer-events-none" />
+                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-[#64766a] pointer-events-none" />
                 <input
                   type="date"
                   value={projectStartDate}
                   onChange={(e) => setProjectStartDate(e.target.value)}
-                  className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] pl-7 pr-2 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 [color-scheme:dark]"
+                  className="w-full rounded-lg border border-[#dfe7dd] bg-white pl-7 pr-2 py-2 text-sm text-[#263a2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443] [color-scheme:light]"
                 />
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Launch Target
               </label>
               <div className="relative">
-                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-zinc-500 pointer-events-none" />
+                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-[#64766a] pointer-events-none" />
                 <input
                   type="date"
                   value={launchTargetDate}
                   onChange={(e) => setLaunchTargetDate(e.target.value)}
-                  className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] pl-7 pr-2 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 [color-scheme:dark]"
+                  className="w-full rounded-lg border border-[#dfe7dd] bg-white pl-7 pr-2 py-2 text-sm text-[#263a2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443] [color-scheme:light]"
                 />
               </div>
             </div>
@@ -747,7 +746,7 @@ function DealDrawer({
           {/* Owner / Renewal */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Project Owner
               </label>
               <input
@@ -755,26 +754,26 @@ function DealDrawer({
                 value={projectOwner}
                 onChange={(e) => setProjectOwner(e.target.value)}
                 placeholder="Aidan / Riley"
-                className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
+                className="w-full rounded-lg border border-[#dfe7dd] bg-white px-3 py-2 text-sm text-[#263a2f] placeholder:text-[#5b6d5f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443]"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+              <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
                 Renewal
               </label>
               <div className="relative">
-                <RefreshCw className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-zinc-500 pointer-events-none" />
+                <RefreshCw className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-[#64766a] pointer-events-none" />
                 <input
                   type="date"
                   value={renewalDate}
                   onChange={(e) => setRenewalDate(e.target.value)}
-                  className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] pl-7 pr-2 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 [color-scheme:dark]"
+                  className="w-full rounded-lg border border-[#dfe7dd] bg-white pl-7 pr-2 py-2 text-sm text-[#263a2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443] [color-scheme:light]"
                 />
               </div>
               {daysUntilRenewal !== null && (
                 <p className={cn(
                   "text-[11px] flex items-center gap-1",
-                  daysUntilRenewal <= 0 ? "text-red-400" : daysUntilRenewal <= 30 ? "text-amber-400" : "text-zinc-500",
+                  daysUntilRenewal <= 0 ? "text-[#9b2f2f]" : daysUntilRenewal <= 30 ? "text-[#755312]" : "text-[#64766a]",
                 )}>
                   <AlertCircle className="size-3" />
                   {daysUntilRenewal <= 0 ? "Overdue" : daysUntilRenewal === 1 ? "Tomorrow" : `In ${daysUntilRenewal}d`}
@@ -785,7 +784,7 @@ function DealDrawer({
 
           {/* Project Notes */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10.5px] uppercase tracking-[0.15em] text-zinc-500 font-semibold">
+            <label className="text-[10.5px] uppercase tracking-[0.15em] text-[#64766a] font-semibold">
               Notes
             </label>
             <textarea
@@ -793,7 +792,7 @@ function DealDrawer({
               onChange={(e) => setProjectNotes(e.target.value)}
               rows={3}
               placeholder="Scope, deliverables, special requirements…"
-              className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-zinc-600 resize-none focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
+              className="w-full rounded-lg border border-[#dfe7dd] bg-white px-3 py-2 text-sm text-[#263a2f] placeholder:text-[#5b6d5f] resize-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#176443]"
             />
           </div>
 
@@ -804,15 +803,15 @@ function DealDrawer({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 flex flex-col gap-2 border-t border-white/[0.06] bg-[#070d14]/96 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 backdrop-blur sm:px-6">
+        <div className="sticky bottom-0 flex flex-col gap-2 border-t border-[#e3e9e0] bg-[#f6f8f3]/96 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 backdrop-blur sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-1">
-              <div className="text-[10.5px] text-zinc-600">
+              <div className="text-[10.5px] text-[#5b6d5f]">
                 {lead.firstContactedAt ? `First contact ${formatDate(lead.firstContactedAt)}` : "Not yet contacted"}
               </div>
               <Link
                 href={`/clients/${lead.id}` as Route}
-                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 transition-colors hover:text-emerald-300"
+              className="inline-flex min-h-9 items-center gap-1.5 text-xs font-semibold text-[#285d3d] transition-colors hover:text-[#1d4c30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]"
               >
                 Open full profile
                 <ExternalLink className="size-3" />
@@ -822,7 +821,7 @@ function DealDrawer({
               type="button"
               disabled={saving}
               onClick={handleSave}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-200 transition-all hover:border-emerald-500/50 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto cursor-pointer"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#b7cdb8] bg-[#e7f0e5] px-4 py-2 text-sm font-semibold text-[#285d3d] transition-all hover:border-[#8eaf91] hover:bg-[#dcebd9] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto cursor-pointer"
             >
               <Save className="size-3.5" />
               {saving ? "Saving…" : "Save"}
@@ -831,7 +830,7 @@ function DealDrawer({
           <button
             type="button"
             onClick={() => { onClose(); onRemove(lead); }}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs font-medium text-red-400 transition hover:border-red-500/40 hover:bg-red-500/10 cursor-pointer"
+            className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#e5c4bf] bg-[#fff4f2] px-3 py-2 text-xs font-semibold text-[#9b2f2f] transition hover:border-[#d58d86] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9b2f2f] cursor-pointer"
           >
             <Trash2Icon className="size-3.5" />
             Remove from Board
@@ -876,18 +875,18 @@ function InboxSection({
   };
 
   return (
-    <div className="mb-6">
-      <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="size-4 text-cyan-400" />
-        <span className="text-sm font-semibold text-white">Inbox</span>
-        <span className="font-mono text-[10px] text-zinc-500 border border-white/[0.09] bg-black/30 rounded px-1 py-0.5">
+      <section aria-labelledby="client-replies-heading" className="mb-6 rounded-2xl border border-[#dce8dc] bg-[#edf4ec] p-4 sm:p-5">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <MessageSquare className="size-4 text-[#17657a]" aria-hidden="true" />
+        <h2 id="client-replies-heading" className="text-sm font-semibold text-[#263a2f]">Replies to review</h2>
+        <span className="font-mono text-[10px] text-[#64766a] border border-[#dfe7dd] bg-[#f4f7f1] rounded px-1 py-0.5">
           {leads.length}
         </span>
-        <span className="text-xs text-zinc-500">Replied or interested — move to a stage to track</span>
+        <span className="basis-full text-xs leading-5 text-[#526457] sm:basis-auto">Replied or interested — move to a stage to track</span>
         <div className="ml-auto flex items-center gap-2">
           {confirmReset ? (
             <>
-              <span className="flex items-center gap-1 text-[11px] text-amber-400">
+              <span className="flex items-center gap-1 text-[11px] text-[#755312]">
                 <AlertCircle className="size-3" />
                 Reset all {leads.length} inbox leads?
               </span>
@@ -895,7 +894,7 @@ function InboxSection({
                 type="button"
                 disabled={resetting}
                 onClick={() => void handleReset()}
-                className="rounded px-2 py-0.5 text-[11px] font-medium text-red-300 border border-red-500/30 hover:bg-red-500/10 transition disabled:opacity-50 cursor-pointer"
+                className="min-h-9 rounded-lg px-3 py-1 text-xs font-semibold text-[#9b2f2f] border border-[#e3b9b4] bg-white hover:bg-[#fff4f2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9b2f2f] transition disabled:opacity-50 cursor-pointer"
               >
                 {resetting ? "Resetting…" : "Yes, reset"}
               </button>
@@ -903,7 +902,7 @@ function InboxSection({
                 type="button"
                 disabled={resetting}
                 onClick={() => setConfirmReset(false)}
-                className="rounded px-2 py-0.5 text-[11px] font-medium text-zinc-400 border border-white/[0.08] hover:bg-white/[0.04] transition disabled:opacity-50 cursor-pointer"
+                className="min-h-9 rounded-lg px-3 py-1 text-xs font-medium text-[#526457] border border-[#dfe7dd] bg-white hover:bg-[#f1f5ef] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] transition disabled:opacity-50 cursor-pointer"
               >
                 Cancel
               </button>
@@ -912,7 +911,7 @@ function InboxSection({
             <button
               type="button"
               onClick={() => setConfirmReset(true)}
-              className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium text-zinc-500 border border-white/[0.06] hover:border-white/[0.12] hover:text-zinc-300 transition cursor-pointer"
+              className="flex min-h-9 items-center gap-1 rounded-lg bg-white px-3 py-1 text-xs font-medium text-[#526457] border border-[#dfe7dd] hover:border-[#c2d2c1] hover:text-[#24382d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] transition cursor-pointer"
             >
               <RefreshCw className="size-3" />
               Reset inbox
@@ -924,7 +923,7 @@ function InboxSection({
         {leads.map((lead) => (
           <div
             key={lead.id}
-            className="group/card rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-3 py-3 transition-all hover:border-cyan-500/30 hover:bg-cyan-500/10"
+            className="group/card rounded-xl border border-[#d5e4e3] bg-white px-4 py-4 shadow-sm transition hover:border-[#a8c9c6] hover:shadow-md"
           >
             <div className="flex items-start gap-2.5">
               <button
@@ -932,12 +931,12 @@ function InboxSection({
                 onClick={() => onEdit(lead)}
                 className="group flex min-w-0 flex-1 items-start gap-2.5 text-left cursor-pointer"
               >
-                <Building2 className="mt-0.5 size-3.5 shrink-0 text-cyan-400/70" />
+                <Building2 className="mt-0.5 size-4 shrink-0 text-[#17657a]" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-medium text-white">{lead.businessName}</div>
-                  <div className="mt-0.5 truncate text-[10px] text-zinc-500">{lead.city} / {lead.niche}</div>
+                  <div className="truncate text-xs font-medium text-[#263a2f]">{lead.businessName}</div>
+                  <div className="mt-1 truncate text-xs text-[#64766a]">{lead.city} / {lead.niche}</div>
                   {lead.email && (
-                    <div className="mt-0.5 truncate text-[10px] text-zinc-600">{lead.email}</div>
+                    <div className="mt-1 truncate text-xs text-[#5b6d5f]">{lead.email}</div>
                   )}
                 </div>
               </button>
@@ -945,7 +944,8 @@ function InboxSection({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="shrink-0 inline-flex size-6 items-center justify-center rounded-md text-zinc-600 opacity-0 transition-all group-hover/card:opacity-100 hover:bg-white/[0.08] hover:text-zinc-300 cursor-pointer"
+                    aria-label={`More actions for ${lead.businessName}`}
+                    className="shrink-0 inline-flex size-9 items-center justify-center rounded-lg text-[#53675a] transition-colors hover:bg-[#e8efe6] hover:text-[#24382d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] cursor-pointer"
                   >
                     <MoreHorizontalIcon className="size-3.5" />
                   </button>
@@ -989,7 +989,7 @@ function InboxSection({
                     nextActionDueAt: defaultDueDate(1),
                   })
                 }
-                className="rounded-md border border-white/[0.08] bg-black/20 px-2 py-1 text-[10.5px] font-medium text-zinc-400 transition hover:border-orange-500/30 hover:text-orange-300 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+                className="min-h-9 rounded-lg border border-[#dfe7dd] bg-[#f6f8f3] px-3 py-1.5 text-xs font-semibold text-[#526457] transition hover:border-[#d5b898] hover:bg-[#fff7ee] hover:text-[#755312] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
               >
                 → Discovery
               </button>
@@ -997,7 +997,7 @@ function InboxSection({
                 type="button"
                 disabled={saving}
                 onClick={() => void onQuickUpdate(lead.id, { dealStage: "PROPOSAL_SENT" })}
-                className="rounded-md border border-white/[0.08] bg-black/20 px-2 py-1 text-[10.5px] font-medium text-zinc-400 transition hover:border-amber-500/30 hover:text-amber-300 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+                className="min-h-9 rounded-lg border border-[#dfe7dd] bg-[#f6f8f3] px-3 py-1.5 text-xs font-semibold text-[#526457] transition hover:border-[#d5b898] hover:bg-[#fff7ee] hover:text-[#755312] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
               >
                 → Proposal
               </button>
@@ -1010,7 +1010,7 @@ function InboxSection({
                     dealLostReason: "Not qualified from CRM inbox",
                   })
                 }
-                className="rounded-md border border-white/[0.08] bg-black/20 px-2 py-1 text-[10.5px] font-medium text-zinc-500 transition hover:border-red-500/30 hover:text-red-300 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+                className="min-h-9 rounded-lg border border-[#dfe7dd] bg-[#f6f8f3] px-3 py-1.5 text-xs font-medium text-[#526457] transition hover:border-[#e3b9b4] hover:bg-[#fff4f2] hover:text-[#9b2f2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
               >
                 ✕ Lost
               </button>
@@ -1018,7 +1018,7 @@ function InboxSection({
           </div>
         ))}
       </div>
-    </div>
+      </section>
   );
 }
 
@@ -1036,21 +1036,21 @@ function StatTile({
   tone?: "emerald" | "amber" | "cyan" | "red" | "zinc";
 }) {
   const toneClasses = {
-    emerald: "text-emerald-300",
-    amber: "text-amber-300",
-    cyan: "text-cyan-300",
-    red: "text-red-300",
-    zinc: "text-zinc-200",
+    emerald: "text-[#285d3d]",
+    amber: "text-[#755312]",
+    cyan: "text-[#17657a]",
+    red: "text-[#9b2f2f]",
+    zinc: "text-[#314538]",
   }[tone];
 
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-      <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.15em] text-zinc-500">
+    <div className="min-w-0 rounded-xl border border-[#e1e5dc] bg-white px-4 py-3">
+      <div className="mb-1 flex min-h-7 items-center gap-2 text-xs font-semibold leading-5 text-[#526457]">
         {icon}
         {label}
       </div>
-      <div className={cn("font-mono text-lg font-semibold tabular-nums", toneClasses)}>{value}</div>
-      <div className="mt-0.5 text-[11px] text-zinc-600">{detail}</div>
+      <div className={cn("text-xl font-semibold tabular-nums tracking-tight", toneClasses)}>{value}</div>
+      <div className="mt-0.5 text-[11px] leading-4 text-[#64766a]">{detail}</div>
     </div>
   );
 }
@@ -1252,6 +1252,42 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
     [leads],
   );
 
+  const followUpPriority = useMemo(() => {
+    const overdue = leads
+      .filter((lead) => lead.dealStage && lead.dealStage !== "LOST" && isActionOverdue(lead.nextActionDueAt))
+      .sort((a, b) => toTime(a.nextActionDueAt) - toTime(b.nextActionDueAt))[0];
+    if (overdue) {
+      return {
+        lead: overdue,
+        title: "An agreed follow-up is overdue",
+        detail: overdue.nextAction || "Review the next step for this relationship.",
+        tag: formatDueDate(overdue.nextActionDueAt),
+      };
+    }
+
+    const reply = [...inboxLeads].sort((a, b) => toTime(b.lastUpdated) - toTime(a.lastUpdated))[0];
+    if (reply) {
+      return {
+        lead: reply,
+        title: "A reply is waiting for your review",
+        detail: "Read the conversation and choose the next step.",
+        tag: "Reply",
+      };
+    }
+
+    const renewal = [...renewalsSoon].sort((a, b) => toTime(a.renewalDate) - toTime(b.renewalDate))[0];
+    if (renewal) {
+      return {
+        lead: renewal,
+        title: "A renewal is coming up",
+        detail: `Recorded renewal date · ${formatDate(renewal.renewalDate)}`,
+        tag: `${getDaysUntilRenewal(renewal.renewalDate)}d`,
+      };
+    }
+
+    return null;
+  }, [leads, inboxLeads, renewalsSoon]);
+
   const filteredLeadsByStage = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return leadsByStage;
@@ -1283,6 +1319,11 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
     );
   }, [inboxLeads, searchQuery]);
 
+  const visibleMobileStages = DEAL_KANBAN_COLUMNS.filter((column) =>
+    (filteredLeadsByStage.get(column.stage)?.length ?? 0) > 0,
+  );
+  const hasStagedDeals = leads.some((lead) => Boolean(lead.dealStage));
+
   const handleRemoveFromBoard = useCallback(async () => {
     if (!deleteConfirm) return;
     setDeleting(true);
@@ -1308,7 +1349,7 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
   }, []);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-w-0 w-full flex-col gap-6">
       <AddClientDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
@@ -1325,65 +1366,72 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
         onConfirm={handleRemoveFromBoard}
       />
 
-      {/* Search + Add Client */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1 sm:max-w-sm">
-          <SearchIcon className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500" />
+      {/* Find or create a record. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1 sm:max-w-lg">
+          <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#64766a]" aria-hidden="true" />
           <input
             type="text"
+            aria-label="Search clients and opportunities"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search clients..."
-            className="w-full rounded-lg border border-white/[0.09] bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
+            placeholder="Search clients or opportunities"
+            className="min-h-12 w-full rounded-xl border border-[#d9ded3] bg-[#fffefa] py-2 pl-10 pr-3 text-sm text-[#263a2f] placeholder:text-[#68746a] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]"
           />
         </div>
         <button
           type="button"
           onClick={() => setShowAddDialog(true)}
           data-hotkey="add"
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:border-emerald-500/50 hover:bg-emerald-500/20 cursor-pointer"
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#164f3a] bg-[#164f3a] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#103f2e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] cursor-pointer"
         >
           <Plus className="size-3.5" />
-          Add Client
+          Add client
         </button>
       </div>
 
-      {/* Stats bar + export */}
+      <section aria-labelledby="client-follow-up-heading" className="grid gap-4 rounded-[1.5rem] border border-[#d7dfd1] bg-[#eaf0e5] p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6 sm:py-5">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id="client-follow-up-heading" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#49634f]">Your next follow-up</h2>
+            {followUpPriority && <span className="rounded-full border border-[#cfdbc9] bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-[#365840]">{followUpPriority.tag}</span>}
+          </div>
+          {followUpPriority ? <>
+            <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[#1c3024]">{followUpPriority.title}</p>
+            <p className="mt-1 text-sm text-[#526057]"><span className="font-medium text-[#263a2f]">{followUpPriority.lead.businessName}</span><span aria-hidden="true"> · </span>{followUpPriority.detail}</p>
+          </> : leads.length > 0 ? <>
+            <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[#1c3024]">No urgent follow-ups are recorded</p>
+            <p className="mt-1 text-sm text-[#526057]">Keep each relationship’s next action and due date current.</p>
+          </> : <>
+            <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[#1c3024]">Start with a real relationship</p>
+            <p className="mt-1 text-sm text-[#526057]">Add a client or opportunity when there’s someone and a next step to track.</p>
+          </>}
+        </div>
+        {followUpPriority ? <button type="button" onClick={() => setEditing(followUpPriority.lead)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#28563b] bg-[#28563b] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1b452e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] cursor-pointer">Review relationship <span aria-hidden="true">→</span></button> : null}
+      </section>
+
+      {/* Owner actions and relationship counts stay ahead of optional value estimates. */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="grid flex-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
           <StatTile
             icon={<MessageSquare className="size-3.5" />}
-            label="Review Inbox"
+            label="Replies to review"
             value={inboxLeads.length}
-            detail="replied or interested"
+            detail={inboxLeads.length ? "replied or interested" : "No replies awaiting review"}
             tone={inboxLeads.length > 0 ? "cyan" : "zinc"}
           />
           <StatTile
-            icon={<DollarSign className="size-3.5" />}
-            label="Open Pipeline"
-            value={formatCompactMoney(openPipelineValue)}
-            detail={`${proposalCount} proposal${proposalCount === 1 ? "" : "s"} pending`}
-            tone={openPipelineValue > 0 ? "amber" : "zinc"}
-          />
-          <StatTile
-            icon={<DollarSign className="size-3.5" />}
-            label="Active MRR"
-            value={`${formatCompactMoney(activeMrr)}/mo`}
-            detail="active and retained"
-            tone={activeMrr > 0 ? "emerald" : "zinc"}
-          />
-          <StatTile
             icon={<Clock className="size-3.5" />}
-            label="Due Actions"
+            label="Overdue actions"
             value={actionDueCount}
-            detail="overdue follow-ups"
+            detail={actionDueCount ? "follow-ups past due" : "All recorded dates are current"}
             tone={actionDueCount > 0 ? "red" : "zinc"}
           />
           <StatTile
             icon={<RefreshCw className="size-3.5" />}
-            label="Renewals"
+            label="Renewals due soon"
             value={renewalsSoon.length}
-            detail="within 30 days"
+            detail={renewalsSoon.length ? "within 30 days" : "None recorded in 30 days"}
             tone={renewalsSoon.length > 0 ? "amber" : "zinc"}
           />
         </div>
@@ -1391,7 +1439,7 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
           <button
             type="button"
             onClick={() => exportClientsCsv(clientLeads)}
-            className="mt-1 flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-xs font-medium text-zinc-400 transition hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white lg:w-auto cursor-pointer"
+            className="mt-1 flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-[#dfe7dd] bg-[#f0f4ee] px-3 py-2 text-xs font-medium text-[#526457] transition hover:border-[#c2d2c1] hover:bg-[#edf3eb] hover:text-[#263a2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] lg:w-auto cursor-pointer"
           >
             <Download className="size-3.5" />
             Export CSV
@@ -1399,8 +1447,16 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
         )}
       </div>
 
+      <details className="group rounded-2xl border border-[#dedfd5] bg-[#f8f6ef]">
+        <summary className="flex min-h-12 cursor-pointer items-center px-5 py-3 text-sm font-semibold text-[#405548] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]">Recorded value estimates <span className="ml-2 text-xs font-normal text-[#657067]">(optional)</span></summary>
+        <div className="grid gap-3 border-t border-[#e0dfd5] p-4 sm:grid-cols-2">
+          <StatTile icon={<DollarSign className="size-3.5" />} label="Pipeline monthly estimate" value={`~${formatCompactMoney(openPipelineValue)}`} detail={`${proposalCount} proposal${proposalCount === 1 ? "" : "s"} pending · estimate only`} tone={openPipelineValue > 0 ? "amber" : "zinc"} />
+          <StatTile icon={<DollarSign className="size-3.5" />} label="Recorded recurring estimate" value={`~${formatCompactMoney(activeMrr)}/mo`} detail="Entered in client records · not invoices or cash received" tone={activeMrr > 0 ? "emerald" : "zinc"} />
+        </div>
+      </details>
+
       {error && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300 flex items-center gap-2">
+        <div role="alert" className="rounded-xl border border-[#e5c4bf] bg-[#fff4f2] px-4 py-3 text-sm text-[#8d2929] flex items-center gap-2">
           <AlertCircle className="size-4 shrink-0" />
           {error}
         </div>
@@ -1408,8 +1464,8 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
 
       <InboxSection leads={filteredInbox} onEdit={setEditing} onQuickUpdate={handleSave} onReset={handleResetInbox} onDismiss={handleDismissInbox} saving={saving} />
 
-      <div className="flex flex-col gap-3 md:hidden">
-        {DEAL_KANBAN_COLUMNS.map((col) => (
+      {visibleMobileStages.length > 0 ? <div className="flex flex-col gap-3 md:hidden" aria-label="Deal stages with clients">
+        {visibleMobileStages.map((col) => (
           <MobileStageSection
             key={col.stage}
             label={col.label}
@@ -1419,10 +1475,12 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
             onDelete={setDeleteConfirm}
           />
         ))}
-      </div>
+      </div> : hasStagedDeals && searchQuery.trim() ? (
+        <p className="rounded-xl border border-[#dfe7dd] bg-white px-4 py-5 text-sm text-[#566a5d] md:hidden">No deals match this search.</p>
+      ) : null}
 
       {/* Kanban board with drag-and-drop */}
-      <div className="hidden gap-4 overflow-x-auto pb-4 md:flex">
+      {leads.length > 0 ? <div role="region" aria-label="Deal stages. Scroll horizontally to view every stage." tabIndex={0} className="hidden min-w-0 max-w-full gap-4 overflow-x-auto overscroll-x-contain rounded-2xl border border-[#e0e8dc] bg-white/70 p-4 pb-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443] md:flex">
         {DEAL_KANBAN_COLUMNS.map((col) => (
           <KanbanColumn
             key={col.stage}
@@ -1440,15 +1498,15 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
             onDragLeave={() => setDragOverStage(null)}
           />
         ))}
-      </div>
+      </div> : null}
 
       {/* Renewal Calendar */}
       {upcomingRenewals.length > 0 && (
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+        <section className="rounded-2xl border border-[#e0e8dc] bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
-            <Calendar className="size-4 text-amber-400" />
-            <span className="text-sm font-semibold text-white">Renewal Calendar</span>
-            <span className="font-mono text-[10px] text-zinc-500 border border-white/[0.09] bg-black/30 rounded px-1 py-0.5">
+            <Calendar className="size-4 text-[#755312]" />
+            <span className="text-sm font-semibold text-[#263a2f]">Renewal Calendar</span>
+            <span className="font-mono text-[10px] text-[#64766a] border border-[#dfe7dd] bg-[#f4f7f1] rounded px-1 py-0.5">
               {upcomingRenewals.length}
             </span>
           </div>
@@ -1463,27 +1521,27 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
                   key={lead.id}
                   href={`/clients/${lead.id}` as Route}
                   className={cn(
-                    "flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 transition-all hover:bg-white/[0.04]",
-                    isOverdue ? "border-red-500/20 bg-red-500/5" :
-                    isUrgent ? "border-amber-500/20 bg-amber-500/5" :
+                    "flex items-center justify-between gap-3 rounded-xl border px-3 py-3 transition-colors hover:bg-[#f1f5ef] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176443]",
+                    isOverdue ? "border-[#e5c4bf] bg-[#fff4f2]" :
+                    isUrgent ? "border-[#e9dab6] bg-amber-500/5" :
                     isSoon ? "border-amber-500/10 bg-amber-500/[0.02]" :
-                    "border-white/[0.06]"
+                    "border-[#e3e9e0]"
                   )}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-white truncate">{lead.businessName}</div>
-                    <div className="text-[10.5px] text-zinc-500 mt-0.5">
-                      {lead.monthlyValue ? `${formatCompactMoney(lead.monthlyValue)}/mo` : lead.niche}
+                    <div className="text-sm font-medium text-[#263a2f] truncate">{lead.businessName}</div>
+                    <div className="text-[10.5px] text-[#64766a] mt-0.5">
+                      {lead.monthlyValue ? `~${formatCompactMoney(lead.monthlyValue)}/mo estimate` : lead.niche}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
                     <div className={cn(
                       "text-xs font-semibold",
-                      isOverdue ? "text-red-300" : isUrgent ? "text-amber-300" : isSoon ? "text-amber-400" : "text-zinc-400"
+                      isOverdue ? "text-[#9b2f2f]" : isUrgent ? "text-[#755312]" : isSoon ? "text-[#755312]" : "text-[#526457]"
                     )}>
                       {isOverdue ? `${Math.abs(days)}d overdue` : days === 0 ? "Today" : `${days}d`}
                     </div>
-                    <div className="text-[10px] text-zinc-600 mt-0.5">
+                    <div className="text-[11px] text-[#5b6d5f] mt-1">
                       {formatDate(lead.renewalDate)}
                     </div>
                   </div>
@@ -1491,16 +1549,16 @@ export function ClientsBoard({ initialLeads }: { initialLeads: CrmLead[] }) {
               );
             })}
           </div>
-        </div>
+        </section>
       )}
 
       {leads.length === 0 && inboxLeads.length === 0 && (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] py-16 text-center">
-          <Building2 className="size-8 text-zinc-700" />
-          <div className="text-sm font-medium text-zinc-400">No clients yet</div>
-          <p className="text-xs text-zinc-600 max-w-xs">
-            Leads that reply or get marked Interested will appear here. Move them through deal stages as you close them.
-          </p>
+        <div className="flex items-start gap-4 rounded-[1.5rem] border border-[#dedfd5] bg-[#fffefa] px-5 py-7 shadow-sm sm:px-7 sm:py-8">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[#eaf0e5]"><Building2 className="size-5 text-[#42624d]" /></span>
+          <div>
+            <div className="text-base font-semibold text-[#202d26]">Your relationship board is ready</div>
+            <p className="mt-1 max-w-xl text-sm leading-6 text-[#5d685f]">When you add a client or opportunity, its stage and next action will appear here. Start with a real conversation or project you want to keep moving.</p>
+          </div>
         </div>
       )}
 

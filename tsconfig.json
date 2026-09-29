@@ -38,7 +38,7 @@
   ],
   "exclude": [
     "node_modules",
-    "axiom-pipeline-engine",
+    "axiom-revenue-engine",
     ".playwright-mcp",
     "tests"
   ]

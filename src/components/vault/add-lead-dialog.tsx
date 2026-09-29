@@ -72,11 +72,11 @@ export function AddLeadDialog({ open, onOpenChange, onCreated }: AddLeadDialogPr
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
+        const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error || "Failed to create lead");
       }
 
-      const data = await res.json();
+      const data = await res.json() as { lead: Record<string, unknown> };
       onCreated(data.lead);
       reset();
       onOpenChange(false);

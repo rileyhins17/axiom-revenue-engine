@@ -486,11 +486,10 @@ test("claim loop stops after every sendable mailbox has one claim", () => {
 
 test("automation capacity policy reserves daily sends for initial outreach", () => {
   const totalDailyCapacity = MAILBOX_DAILY_SEND_TARGET * 2;
-  const reservedInitialCapacity = totalDailyCapacity - AUTONOMOUS_FOLLOW_UP_DAILY_SEND_CAP;
 
-  assert.equal(totalDailyCapacity, 100);
-  assert(AUTONOMOUS_FOLLOW_UP_DAILY_SEND_CAP <= totalDailyCapacity * 0.25);
-  assert(AUTONOMOUS_DAILY_LEAD_INTAKE_CAP <= reservedInitialCapacity);
+  assert.equal(totalDailyCapacity, 10);
+  assert.equal(AUTONOMOUS_FOLLOW_UP_DAILY_SEND_CAP, 0);
+  assert(AUTONOMOUS_DAILY_LEAD_INTAKE_CAP > 0);
 });
 
 test("qualification scan is deep enough to get past stale already-contacted leads", () => {

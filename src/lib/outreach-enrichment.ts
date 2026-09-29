@@ -251,7 +251,7 @@ function buildLeadContext(lead: LeadRecord): string {
   return lines.join("\n");
 }
 
-const SYSTEM_PROMPT = `You are writing outreach intelligence for Axiom Infrastructure, an engineering-first web infrastructure firm for local businesses.
+const SYSTEM_PROMPT = `You are writing outreach intelligence for Axiom Web, a conversion-focused website and support partner for established local businesses.
 
 Your job is not to write polished agency strategy language. Your job is to produce grounded notes that help a human write a short, believable cold email.
 

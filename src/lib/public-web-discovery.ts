@@ -4,6 +4,7 @@ import {
     type ResolvedLink,
 } from "@/lib/public-email-intelligence";
 import type { AutomationBrowserContext, AutomationPage } from "@/lib/browser-rendering";
+import { normalizePublicWebsiteUrl } from "@/lib/revenue-engine/public-website-url";
 import type { ScrapeJobEventPayload } from "@/lib/scrape-jobs";
 
 type PageSnapshot = {
@@ -98,17 +99,18 @@ export async function collectWebsiteDiscoveryPages(
     website: string,
     sendEvent: (data: ScrapeJobEventPayload) => Promise<void> | void,
 ): Promise<{ rawFootprint: string; pages: EmailDiscoveryPage[] }> {
+    const normalizedWebsite = normalizePublicWebsiteUrl(website);
     const pages: EmailDiscoveryPage[] = [];
     const sections: string[] = [];
     const homepage = await context.newPage();
 
     try {
-        await homepage.goto(website, { waitUntil: "domcontentloaded", timeout: 15000 });
+        await homepage.goto(normalizedWebsite, { waitUntil: "domcontentloaded", timeout: 15000 });
         await waitForDiscoveryPageReady(homepage);
         const homepageSnapshot = await capturePageSnapshot(homepage);
 
         pages.push({
-            url: website,
+            url: normalizedWebsite,
             role: "homepage",
             sourceLabel: "Homepage",
             text: homepageSnapshot.text,
@@ -116,16 +118,22 @@ export async function collectWebsiteDiscoveryPages(
         });
         sections.push(buildDiscoverySection("Homepage", homepageSnapshot));
 
-        const contactLinks = pickRelevantContactLinks(website, homepageSnapshot.links, WEBSITE_DISCOVERY_CONTACT_PAGE_LIMIT);
+        const contactLinks = pickRelevantContactLinks(normalizedWebsite, homepageSnapshot.links, WEBSITE_DISCOVERY_CONTACT_PAGE_LIMIT);
         for (const link of contactLinks) {
+            let normalizedLink: string;
+            try {
+                normalizedLink = normalizePublicWebsiteUrl(link.url);
+            } catch {
+                continue;
+            }
             const subPage = await context.newPage();
             try {
-                await sendEvent({ message: `[EMAIL] Scanning ${link.role} page: ${link.url}` });
-                await subPage.goto(link.url, { waitUntil: "domcontentloaded", timeout: 12000 });
+                await sendEvent({ message: `[EMAIL] Scanning ${link.role} page: ${normalizedLink}` });
+                await subPage.goto(normalizedLink, { waitUntil: "domcontentloaded", timeout: 12000 });
                 await waitForDiscoveryPageReady(subPage);
                 const snapshot = await capturePageSnapshot(subPage);
                 pages.push({
-                    url: link.url,
+                    url: normalizedLink,
                     role: link.role,
                     sourceLabel: link.label || link.role,
                     text: snapshot.text,

@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/output/playwright/
 
 # next.js
 /.next/
@@ -53,6 +54,9 @@ preview*.cookies
 next-env.d.ts
 
 .open-next
+
+# Private production exports and checksums. Never commit customer/lead data.
+/backups/
 .wrangler
 .worker.pid
 dev-server.log

@@ -121,3 +121,22 @@ test("collectWebsiteDiscoveryPages scans the highest-signal subpages within the 
     ]),
   );
 });
+
+test("collectWebsiteDiscoveryPages rejects non-public targets before browser navigation", async () => {
+  const context = new FakeContext([{ text: "", links: [] }]);
+  await assert.rejects(
+    collectWebsiteDiscoveryPages(context, "http://127.0.0.1/admin", () => undefined),
+    /IP-address website targets are not allowed/,
+  );
+  assert.equal(context.pages[0]?.navigatedTo, "");
+});
+
+test("collectWebsiteDiscoveryPages does not navigate a private subpage target", async () => {
+  const context = new FakeContext([
+    { text: "Example homepage", links: [{ href: "http://127.0.0.1/contact", text: "Contact" }] },
+    { text: "private", links: [] },
+  ]);
+  const result = await collectWebsiteDiscoveryPages(context, "https://example.ca", () => undefined);
+  assert.equal(result.pages.length, 1);
+  assert.equal(context.pages[1]?.navigatedTo, "");
+});

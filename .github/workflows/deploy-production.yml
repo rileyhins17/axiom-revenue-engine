@@ -1,0 +1,79 @@
+name: Protected production deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Exact tested commit SHA to deploy
+        required: true
+        type: string
+      backup_reference:
+        description: Verified D1 export/checksum reference
+        required: true
+        type: string
+      approval_phrase:
+        description: Type DEPLOY AXIOM REVENUE ENGINE
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: axiom-revenue-engine-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' && inputs.approval_phrase == 'DEPLOY AXIOM REVENUE ENGINE'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      BETTER_AUTH_SECRET: ci-only-secret-that-is-longer-than-thirty-two-characters
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
+
+      - name: Validate release evidence
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+        run: node scripts/validate-release-inputs.mjs "$RELEASE_SHA" "$BACKUP_REFERENCE"
+
+      - name: Require the current main commit
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git fetch origin main --no-tags
+          test "$RELEASE_SHA" = "$(git rev-parse origin/main)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run check:safety
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build:cloudflare
+      - run: npx wrangler deploy --env="" --dry-run --autoconfig false
+
+      - name: Record release inputs
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+        run: |
+          printf 'Release SHA: %s\n' "$RELEASE_SHA"
+          printf 'Backup reference: %s\n' "$BACKUP_REFERENCE"
+
+      - name: Confirm production deployment remains blocked
+        run: node scripts/production-deploy-guard.mjs

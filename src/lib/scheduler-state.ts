@@ -16,6 +16,7 @@ export type AutomationBlockerReason =
   | "manual_pause"
   | "global_pause"
   | "emergency_stop"
+  | "human_approval_required"
   | "mailbox_disconnected"
   | "mailbox_disabled"
   | "missing_valid_email"
@@ -45,6 +46,7 @@ export const AUTOMATION_BLOCKER_REASONS = [
   "manual_pause",
   "global_pause",
   "emergency_stop",
+  "human_approval_required",
   "mailbox_disconnected",
   "mailbox_disabled",
   "missing_valid_email",
@@ -81,6 +83,7 @@ export const BLOCKER_PRECEDENCE: AutomationBlockerReason[] = [
   "manual_pause",
   "global_pause",
   "emergency_stop",
+  "human_approval_required",
   "mailbox_disconnected",
   "mailbox_disabled",
   "missing_valid_email",
@@ -120,6 +123,7 @@ export const TRANSIENT_BLOCKER_REASONS = new Set([
   "global_pause",
   "emergency_stop",
   "manual_pause",
+  "human_approval_required",
   "stale_claim_recovered",
   "stale_sender_claim_recovered",
 ]);
@@ -160,6 +164,7 @@ export const OPERATOR_ACTIONABLE_BLOCKER_REASONS = new Set<AutomationBlockerReas
   "mailbox_disconnected",
   "mailbox_disabled",
   "delivery_state_unknown",
+  "human_approval_required",
 ]);
 
 export function isRecoverableSchedulerBlockerReason(value: string | null | undefined) {
