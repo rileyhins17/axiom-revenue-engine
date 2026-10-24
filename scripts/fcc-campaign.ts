@@ -5,6 +5,9 @@
  *   npx tsx scripts/fcc-campaign.ts preview   <contacts.csv> <outDir>
  *   npx tsx scripts/fcc-campaign.ts test-send <contacts.csv> --to you@yourmailbox
  *   npx tsx scripts/fcc-campaign.ts import-sql <contacts.csv> <outFile.sql>
+ *   npx tsx scripts/fcc-campaign.ts smtp-test <contacts.csv>
+ *   npx tsx scripts/fcc-campaign.ts go-sql <founder name>
+ *   npx tsx scripts/fcc-campaign.ts pause-sql
  *
  * - prepare: dedupes to one row per mailbox, flags generic inboxes, writes the
  *   import file, a held-for-review file and the 30/day send plan.
@@ -14,12 +17,20 @@
  *   recipient.
  * - import-sql: SQL to load contacts into FccCampaignContact (migration 0086).
  *   Run it with wrangler only after review. It never touches the Lead table.
+ * - smtp-test: the live sender's SMTP + inbox-check path, sending step 1 and the
+ *   threaded step 2 to the sending mailbox only (FCC_SENDER_ADDRESS and
+ *   FCC_SMTP_PASSWORD in the terminal's environment). Never emails a contact.
+ * - go-sql: the SQL that records a founder's go for the current copy version.
+ *   Until it runs, the live sender (src/lib/fcc-campaign-sender.ts, weekdays at
+ *   10:00 Toronto) sends nothing. pause-sql locks it again.
  *
  * Contact files are personal contact data. Keep them OUT of this public repo
  * (outreach/ is gitignored).
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { Duplex } from "node:stream";
+import { connect as tlsConnect } from "node:tls";
 
 import {
   FCC_CAMPAIGN_KEY,
@@ -33,6 +44,9 @@ import {
   renderFccEmail,
   type FccCampaignContact,
 } from "../src/lib/fcc-campaign";
+import { fccMailboxFromImap } from "../src/lib/fcc-campaign-sender";
+import { openImap } from "../src/lib/revenue-engine/imap-client";
+import { openSmtp, type SmtpStream } from "../src/lib/revenue-engine/smtp-client";
 
 const mailingAddress = process.env.FCC_CAMPAIGN_MAILING_ADDRESS || "";
 
@@ -93,7 +107,8 @@ function prepare(csvPath: string, outDir: string) {
         dailyCap: FCC_DAILY_SEND_CAP,
         followUpAfterDays: FCC_FOLLOW_UP_DELAY_DAYS,
         planFinishesOn: lastDay,
-        liveSendGate: checkFccLiveSendGate({ mailingAddress, liveSendsEnabled: process.env.FCC_CAMPAIGN_LIVE === "1" }),
+        // The real lock lives in the app database; this tool can't lift it.
+        liveSendGate: checkFccLiveSendGate({ mailingAddress, liveSendsEnabled: false }),
       },
       null,
       2,
@@ -148,6 +163,53 @@ async function testSend(csvPath: string, to: string) {
   }
 }
 
+async function nodeTls(host: string, port: number): Promise<SmtpStream> {
+  const socket = tlsConnect({ host, port, servername: host });
+  await new Promise<void>((resolve, reject) => { socket.once("secureConnect", () => resolve()); socket.once("error", reject); });
+  const { readable, writable } = Duplex.toWeb(socket) as unknown as Pick<SmtpStream, "readable" | "writable">;
+  return { readable, writable, close: async () => { socket.end(); } };
+}
+
+/**
+ * The live sender's exact path (same SMTP and IMAP code), pointed only at the
+ * sending mailbox itself: proves the app password works for sending and for the
+ * reply check, and shows how the follow-up threads. Never emails a contact.
+ */
+async function smtpTest(csvPath: string) {
+  const from = process.env.FCC_SENDER_ADDRESS?.trim() || "";
+  const password = process.env.FCC_SMTP_PASSWORD?.trim() || "";
+  if (!from || !password) throw new Error("Set FCC_SENDER_ADDRESS and FCC_SMTP_PASSWORD (the Gmail app password) for this terminal only.");
+  const smtpHost = process.env.FCC_SMTP_HOST?.trim() || "smtp.gmail.com";
+  const imapHost = process.env.FCC_IMAP_HOST?.trim() || "imap.gmail.com";
+  const fromName = process.env.FCC_SENDER_NAME?.trim() || "Aidan Magee";
+  const [contact] = load(csvPath).filter((c) => c.sendable);
+  if (!contact) throw new Error("No sendable contact in that file to borrow the wording from.");
+  const startedAt = new Date().toISOString();
+  const domain = from.split("@")[1];
+  const firstId = `<fcc-test-${Date.now()}-1@${domain}>`;
+  const transport = await openSmtp(await nodeTls(smtpHost, 465), { host: smtpHost, username: from, password, fromName, fromAddress: from }, () => crypto.randomUUID());
+  try {
+    for (const step of [1, 2] as const) {
+      const email = renderFccEmail(contact, step, mailingAddress);
+      const thread: Record<string, string> = step === 2 ? { "In-Reply-To": firstId, References: firstId } : {};
+      await transport.send({
+        to: from, subject: `[TEST to ${contact.email}] ${email.subject}`, text: email.bodyPlain,
+        headers: { "Message-ID": step === 1 ? firstId : firstId.replace("-1@", "-2@"), "List-Unsubscribe": `<mailto:${from}?subject=stop>`, ...thread },
+      });
+      console.log(`Sent test step ${step} to ${from} (yourself)`);
+    }
+  } finally {
+    await transport.close();
+  }
+  const mailbox = await fccMailboxFromImap(await openImap(await nodeTls(imapHost, 993), { username: from, password }));
+  try {
+    const found = await mailbox.hasMessagesFrom([from], startedAt);
+    console.log(found ? "Inbox check works: it can see today's mail." : "Inbox check logged in but found nothing yet; try again in a minute.");
+  } finally {
+    await mailbox.close();
+  }
+}
+
 function sql(value: string | number | null) {
   if (value === null) return "NULL";
   return typeof value === "number" ? String(value) : `'${value.replace(/'/g, "''")}'`;
@@ -182,6 +244,16 @@ function importSql(csvPath: string, outFile: string) {
   console.log(`Wrote ${lines.length} inserts to ${outFile}`);
 }
 
+function goSql(by: string) {
+  if (!/^[A-Za-z][A-Za-z .'-]{0,79}$/.test(by)) throw new Error("Give the founder's name, e.g. go-sql Aidan");
+  const now = new Date().toISOString();
+  console.log(`UPDATE "FccCampaignSetting" SET "enabled" = 1, "approvedCopy" = ${sql(FCC_CAMPAIGN_KEY)}, "goBy" = ${sql(by)}, "goAt" = ${sql(now)}, "updatedAt" = ${sql(now)} WHERE "id" = 1;`);
+}
+
+function pauseSql() {
+  console.log(`UPDATE "FccCampaignSetting" SET "enabled" = 0, "updatedAt" = ${sql(new Date().toISOString())} WHERE "id" = 1;`);
+}
+
 const [command, csvPath, arg] = process.argv.slice(2);
 const toFlag = process.argv.indexOf("--to");
 
@@ -190,6 +262,9 @@ async function main() {
   else if (command === "preview" && csvPath && arg) preview(csvPath, arg);
   else if (command === "test-send" && csvPath && toFlag > 0) await testSend(csvPath, process.argv[toFlag + 1]);
   else if (command === "import-sql" && csvPath && arg) importSql(csvPath, arg);
+  else if (command === "smtp-test" && csvPath) await smtpTest(csvPath);
+  else if (command === "go-sql" && csvPath) goSql(process.argv.slice(3).join(" "));
+  else if (command === "pause-sql") pauseSql();
   else {
     console.error("Usage: see header of scripts/fcc-campaign.ts");
     process.exitCode = 2;

@@ -18,9 +18,9 @@ test('the actual worker routes a Caller minute tick only to sync and never into 
     .replace(/^export \{[^}]+\};\s*/gm,'')
     .replace('export default exportedWorker;','return exportedWorker;');
   let sync=0;const tasks:Promise<unknown>[]=[];
-  const worker=new Function('deps',`const {openNextWorkerModule,setCloudflareBindings,clearServerEnvCache,runEngineEmailCron,getCronTimeoutBudgets,runCallerSyncTick}=deps;\n${source}`)({
+  const worker=new Function('deps',`const {openNextWorkerModule,setCloudflareBindings,clearServerEnvCache,runEngineEmailCron,runFccCampaignCron,getCronTimeoutBudgets,runCallerSyncTick}=deps;\n${source}`)({
     openNextWorkerModule:{},setCloudflareBindings:()=>{},clearServerEnvCache:()=>{},
-    runEngineEmailCron:()=>{throw new Error('Email must not run');},getCronTimeoutBudgets:()=>{throw new Error('Discovery must not run');},
+    runEngineEmailCron:()=>{throw new Error('Email must not run');},runFccCampaignCron:()=>{throw new Error('FCC email must not run');},getCronTimeoutBudgets:()=>{throw new Error('Discovery must not run');},
     runCallerSyncTick:async()=>{sync++;return {enabled:false,attempted:0,synced:0,pending:0,needsReview:0};},
   });
   await worker.scheduled({cron:'* * * * *'},{},{waitUntil:(p:Promise<unknown>)=>tasks.push(p)});

@@ -10,6 +10,7 @@ import { setCloudflareBindings } from "./src/lib/cloudflare";
 import { getCronTimeoutBudgets } from "./src/lib/cron-timeouts";
 import { clearServerEnvCache } from "./src/lib/env";
 import { runEngineEmailCron } from "./src/lib/revenue-engine/engine-email-worker";
+import { runFccCampaignCron } from "./src/lib/fcc-campaign-worker";
 import { runCallerSyncTick } from "./src/lib/caller-v2/sync-tick";
 import { alertEmail, OWNER_ALERT_INBOXES, recordAndSelectAlerts, runHealthChecks } from "./src/lib/ops/health";
 import { placesKeyFromEnv, runDiscovery, SCHEDULED_REQUESTS_PER_RUN } from "./src/lib/revenue-engine/cloud-discovery";
@@ -33,7 +34,8 @@ async function runHealthCron(env) {
 }
 
 const worker = openNextWorkerModule;
-// Weekdays 10:00 Toronto (EDT); the sender itself refuses weekends and every closed gate.
+// Weekdays 10:00 Toronto (EDT): the website first-touch batch and the FCC campaign
+// batch. Each sender itself refuses weekends and every closed gate.
 const ENGINE_EMAIL_CRON = ["0 14 * * MON-FRI", "0 14 * * 2-6"];
 
 export { BucketCachePurge, DOQueueHandler, DOShardedTagCache };
@@ -183,6 +185,11 @@ const exportedWorker = {
         runEngineEmailCron(env)
           .then((result) => console.log(JSON.stringify({ event: "engine_email", ...result })))
           .catch((error) => console.error("[engine-email] failure:", error instanceof Error ? error.message : "unknown")),
+      );
+      ctx.waitUntil(
+        runFccCampaignCron(env)
+          .then((result) => console.log(JSON.stringify({ event: "fcc_campaign", ...result })))
+          .catch((error) => console.error("[fcc-campaign] failure:", error instanceof Error ? error.message : "unknown")),
       );
       return;
     }

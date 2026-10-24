@@ -217,6 +217,9 @@ requireMatch("wrangler.production.jsonc", productionWrangler, /"AUTH_PASSWORD_SI
 requireMatch("wrangler.production.jsonc", productionWrangler, /"allowed_destination_addresses"\s*:\s*\[\s*"rileyhinsperger@gmail\.com",\s*"aidanmageebusiness@gmail\.com"\s*\]/, "sign-in codes may only be emailed to the two owner inboxes");
 forbidMatch("wrangler.production.jsonc", productionWrangler, /GEMINI_API_KEY"\s*:/, "the Gemini key is a secret, never a checked-in var");
 forbidMatch("wrangler.production.jsonc", productionWrangler, /"AUTONOMOUS_(?:QUEUE|SEND|INTAKE)_ENABLED"\s*:\s*"true"/, "legacy autonomous switches stay off on live");
+forbidMatch("wrangler.production.jsonc", productionWrangler, /"FCC_(?:SMTP_PASSWORD|CAMPAIGN_MAILING_ADDRESS)"\s*:/, "the FCC mailbox password and mailing address are secrets, never checked-in vars");
+const fccMigration = await readFile(new URL("../migrations/0086_fcc_campaign_contacts.sql", import.meta.url), "utf8");
+requireMatch("migrations/0086_fcc_campaign_contacts.sql", fccMigration, /INSERT OR IGNORE INTO "FccCampaignSetting" \("id", "enabled", "dailyCap"\) VALUES \(1, 0, 30\);/, "the FCC campaign must start locked, capped at 30 a day");
 requireMatch("package.json", packageJson, /"test:owner-ui"\s*:\s*"tsx scripts\/verify-owner-ui-acceptance\.ts"/, "the owner UI acceptance gate must have a stable local command");
 requireMatch("package.json", packageJson, /"kw:prepare-import"\s*:\s*"tsx scripts\/prepare-private-kw-import\.ts"/, "the private KW import must use the guarded local CLI");
 requireMatch("package.json", packageJson, /"kw:prepare-m2-authorization"\s*:\s*"tsx scripts\/prepare-private-kw-m2-authorization\.ts"/, "M2 authorization preparation must use the bounded local CLI");

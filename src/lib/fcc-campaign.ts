@@ -209,7 +209,7 @@ export function checkFccLiveSendGate(config: FccCampaignConfig): FccSendGate {
     return { allowed: false, reason: "No mailing address set. CASL and CAN-SPAM require one in every cold email." };
   }
   if (!config.liveSendsEnabled) {
-    return { allowed: false, reason: "Live sends are off. Aidan gives the go in Slack, then set FCC_CAMPAIGN_LIVE=1." };
+    return { allowed: false, reason: "Live sends are off until a founder's go is recorded in FccCampaignSetting (scripts/fcc-campaign.ts go-sql)." };
   }
   return { allowed: true };
 }
