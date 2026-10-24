@@ -81,3 +81,7 @@ verify.js
 /axiom-pipeline-engine/
 /axiom-signin-*.png
 /ui-audit-*.png
+
+# FCC campaign contact data (personal contact info; never commit to this public repo)
+/outreach/
+fcc_*contacts*.csv
