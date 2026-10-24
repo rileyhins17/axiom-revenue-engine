@@ -12,7 +12,7 @@
  * - test-send: sends step 1 and step 2 for the first contact to YOUR mailbox
  *   only (needs GMAIL_ACCESS_TOKEN and GMAIL_SENDER_EMAIL). Refuses any other
  *   recipient.
- * - import-sql: SQL to load contacts into FccCampaignContact (migration 0053).
+ * - import-sql: SQL to load contacts into FccCampaignContact (migration 0086).
  *   Run it with wrangler only after review. It never touches the Lead table.
  *
  * Contact files are personal contact data. Keep them OUT of this public repo
