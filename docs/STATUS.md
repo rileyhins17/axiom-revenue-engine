@@ -1,3 +1,45 @@
+## Production 2026-10-24 (night): FCC campaign sender, locked (0086)
+
+Verified commit `53454d5` is live (the docs commit follows it).
+
+**Live state**
+- **App:** Worker `68f68f92-b226-401e-b657-d82485505801`. Rollback target `7b0b764f-c321-4183-aef0-a6291999f4be` (the 0085 code; 0086 only adds tables it never reads).
+- **Database:** migrations run through 0086 (89 receipts). Stops `01111`.
+- **FCC campaign: locked.** `FccCampaignSetting` is enabled 0, cap 30, no approved copy, no go. No contacts loaded. The secrets `FCC_SMTP_PASSWORD` and `FCC_CAMPAIGN_MAILING_ADDRESS` are not set, so the sender would refuse even if unlocked.
+- **Backup:** `backups/production/prod-export-20261025T010550Z.sql` (sha256 `c314a3c6…`), plus Time Travel bookmark `00004007-00000000-0000510f-1f5113bde062cca02e1fea0d95f240ee`.
+- **Post-release check:** live `EngineProspect` (1,743), call history (43), `CallerContactControl` (22), `DiscoveryHeld` (1,518), `Lead` (10,480) and `OutreachEmail` (1,937) are identical to the pre-release export. Health OK. The new version has the four `FCC_*` vars and `ENGINE_EMAIL_ENABLED` is still `"false"`.
+
+**Gate:**
+- Safety check.
+- `npm test`: 1,038 tests (995 pass, 3 skipped). The same 40 date-expired tests fail on the untouched 0085 code (1,018 tests, identical failure list). 20 new tests pass.
+- Typecheck; lint 0 errors (one old warning).
+- Clean build in a fresh checkout; production dry run.
+- Owner UI: 10 WCAG pages.
+
+**Rehearsal of 0086:** full live export in SQLite.
+- Only 0086 was pending. All 152 tables (438,602 rows) and every existing schema object were identical before and after (row hashes, not just counts).
+- New: 3 tables, 4 indexes, 2 triggers. Setting row locked; integrity ok; 0 foreign-key violations; stops `01111`.
+- The real sender, run on the upgraded copy for Monday 10:00 Toronto, returned "locked until a founder records the go" and opened no mail connection.
+- All 86 migration files applied on the local D1 engine. The triggers use no `CASE` (GOTCHAS DATA-015).
+- `scripts/rehearse-production-upgrade.mts` only fits the old 0053–0074 upgrade: on today's live export it re-applies 0053 and fails, after loading the export one autocommitted row at a time (over 10 minutes). This rehearsal loaded it in one transaction (3 seconds).
+
+**Why**
+- The FCC campaign (small US phone companies that missed their FCC filing) needs 30 emails a weekday from Aidan's Gmail, one follow-up after 3 days, and no follow-up after a reply. Riley approved the merge and this release on 2026-10-24; sending stays locked until Aidan says go.
+
+**Change**
+- **Migration 0086 (additive):** `FccCampaignContact`; `FccCampaignSend` (claimed before sending, no delete, forward-only); `FccCampaignSetting` (starts locked).
+- **Sender** (`src/lib/fcc-campaign-sender.ts`), on the existing weekday 14:00 UTC cron:
+  1. Due follow-ups first, in the same thread, then new first emails. At most 30 a day.
+  2. Before a follow-up, a read-only IMAP search of Aidan's mail for a reply from that company or a bounce. Bounces go on `EngineEmailSuppression`.
+  3. Locked unless the go names the current copy version (`FCC_CAMPAIGN_KEY`). A new copy version locks it again until a new go.
+- **Mail:** SMTP to smtp.gmail.com:465 and IMAP to imap.gmail.com:993 over `cloudflare:sockets`.
+- **Settings:** vars `FCC_SENDER_ADDRESS`, `FCC_SENDER_NAME`, `FCC_SMTP_HOST`, `FCC_IMAP_HOST`; secrets (not set yet) `FCC_SMTP_PASSWORD`, `FCC_CAMPAIGN_MAILING_ADDRESS`. The safety check refuses the secrets as vars.
+- **Runbook:** `docs/runbooks/FCC_CAMPAIGN.md`.
+
+**Not done yet:** Aidan's Gmail app password, `smtp-test`, the two secrets, loading the contacts, and Aidan's go (`go-sql`).
+
+**Spend:** none.
+
 ## Production 2026-09-28 (night): phone app, fewer wrong numbers (0085)
 
 Verified commit `7eb97a1` is live (the docs and gate commits follow it).

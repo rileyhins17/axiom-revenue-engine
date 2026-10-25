@@ -16,7 +16,7 @@ Code: `src/lib/fcc-campaign-sender.ts` (rules), `src/lib/fcc-campaign-worker.ts`
    npx tsx --env-file=outreach/fcc-campaign.env scripts/fcc-campaign.ts smtp-test <first-100.csv>
    ```
    Two test emails arrive in Aidan's own inbox, the second threaded under the first, and the inbox check says it works.
-3. **Release.** Merge the PR into `codex/revenue-engine-production`, then run the guarded release (`scripts/release-production.mjs`: backup, checksum, approval phrase). It applies migration 0086 and deploys.
+3. **Release.** Merge the PR into `codex/revenue-engine-production`, then run the guarded release (`scripts/release-production.mjs`: backup, checksum, approval phrase). It applies migration 0086 and deploys. Done 2026-10-24 (see `docs/STATUS.md`).
 4. **Secrets (once).**
    ```
    npx wrangler secret put FCC_SMTP_PASSWORD --config wrangler.production.jsonc
@@ -36,7 +36,7 @@ Code: `src/lib/fcc-campaign-sender.ts` (rules), `src/lib/fcc-campaign-worker.ts`
   npx tsx scripts/fcc-campaign.ts go-sql Aidan > outreach/fcc-go.sql
   npx wrangler d1 execute axiom-ops-omniscient --remote --config wrangler.production.jsonc --file outreach/fcc-go.sql
   ```
-  The next weekday at 10:00 it sends. Changing the email wording in code locks it again until a new go.
+  The next weekday at 10:00 it sends. If the email wording changes, bump `FCC_CAMPAIGN_KEY` in `src/lib/fcc-campaign.ts`: that locks sending again until a new go.
 - **Pause:** same, with `pause-sql` instead of `go-sql Aidan`.
 - **Check:** `SELECT "status", COUNT(*) FROM "FccCampaignContact" GROUP BY "status";` Each run logs an `fcc_campaign` line in the Worker logs (what was sent, replies, bounces, and anything held back).
 - **A contact marked `failed`** hit a mail-server error and is waiting for a person. To try again, set its status back to `ready`.
