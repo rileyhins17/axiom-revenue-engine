@@ -6,6 +6,7 @@ Verified commit `53454d5` is live (the docs commit follows it).
 - **App:** Worker `68f68f92-b226-401e-b657-d82485505801`. Rollback target `7b0b764f-c321-4183-aef0-a6291999f4be` (the 0085 code; 0086 only adds tables it never reads).
 - **Database:** migrations run through 0086 (89 receipts). Stops `01111`.
 - **FCC campaign: locked.** `FccCampaignSetting` is enabled 0, cap 30, no approved copy, no go. No contacts loaded. The secrets `FCC_SMTP_PASSWORD` and `FCC_CAMPAIGN_MAILING_ADDRESS` are not set, so the sender would refuse even if unlocked.
+- **Update 2026-10-25 00:12 (Riley's yes):** the first-100 list is loaded: 88 contacts, 76 `ready`, 12 generic inboxes `held` (Time Travel bookmark before the load: `00004013-00000000-0000510f-6d0f175f81186e3ddcf6411e7a687b32`). `FCC_CAMPAIGN_MAILING_ADDRESS` is set, which made Worker version `9135e2ab-7d7c-4bf6-83e2-bce1a26b088a` (same code as `68f68f92`). Still locked, 0 sends; `FCC_SMTP_PASSWORD` not set.
 - **Backup:** `backups/production/prod-export-20261025T010550Z.sql` (sha256 `c314a3c6…`), plus Time Travel bookmark `00004007-00000000-0000510f-1f5113bde062cca02e1fea0d95f240ee`.
 - **Post-release check:** live `EngineProspect` (1,743), call history (43), `CallerContactControl` (22), `DiscoveryHeld` (1,518), `Lead` (10,480) and `OutreachEmail` (1,937) are identical to the pre-release export. Health OK. The new version has the four `FCC_*` vars and `ENGINE_EMAIL_ENABLED` is still `"false"`.
 
