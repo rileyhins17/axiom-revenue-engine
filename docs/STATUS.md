@@ -1,3 +1,38 @@
+## Production 2026-10-26 (evening): FCC emails on Aidan's calmer v3 copy, still locked
+
+Verified commit `a833fd3` is live (the docs commit follows it).
+
+**Live state**
+- **App:** Worker `0eb7846a-edd6-4d77-9fd7-3e86d9b43830` (100% since 23:44 UTC). Rollback target `9135e2ab-7d7c-4bf6-83e2-bce1a26b088a` (the same code with the v2 copy).
+- **Database:** no migration (still through 0086, 89 receipts). Stops `01111`.
+- **FCC campaign: locked.** The copy key is now `fcc-march1-pack-v3-calmer`, and a go must name the current key, so nothing sends until Aidan's go for v3. `FccCampaignSetting`: enabled 0, cap 30, no approved copy, no go. 0 sends.
+- **Contacts under the v3 key:** 388 contacts, 314 `ready`, 74 `held`.
+  - Batch 1 (first 100): 88 contacts, 76 ready, 12 held.
+  - Batch 3 (Aidan's next 300, Oct 26): 300 contacts, 238 ready, 62 held (Aidan's 57 generic inboxes plus 5 more the classifier caught). All 300 were checked against the FCC's public list: still not recertified, none repeat batch 1.
+  - Batch 2 (94) has not been received.
+  - The 88 rows under the old v2 key stay but are inert: the sender only reads the current key.
+  - Time Travel bookmark before the load: `000040fe-00000000-00005110-dd90cf672dc227a9f52d0789b125d609`.
+- **Secrets:** `FCC_CAMPAIGN_MAILING_ADDRESS` set. `FCC_SMTP_PASSWORD` not set yet: Riley types it at a hidden prompt, `smtp-test` runs first (2 emails to Aidan's own inbox), then `wrangler secret put` reads it from stdin.
+- **Backup:** `backups/production/prod-export-20261026T233140Z.sql` (sha256 `03712ce5…`).
+- **Post-release check:** live `EngineProspect` (1,780), `CallerAttempt` (23), `CallerResult` (22), `CallerContactControl` (22), `DiscoveryHeld` (1,556), `Lead` (10,480), `OutreachEmail` (1,937) and `FccCampaignContact` (476) match the pre-release export.
+
+**Gate:**
+- Safety check.
+- `npm test`: 1,038 tests (995 pass, 3 skipped). The same 40 date-expired tests fail on the untouched live code `54eeb60` (identical failure list). The v3 copy test passes.
+- Typecheck; lint 0 errors (11 old warnings, none in FCC files).
+- Clean build in a fresh checkout. Smoke test: sign-in, health and Caller API OK.
+
+**Why**
+- Aidan's "calmer email v3" (Notion, Oct 25) drops the lines that read like the urgent "deficiency" cold emails telecom law firms warn RMD filers about. On Oct 26 he asked for the sender to be on v3 before his go, and Riley said do it.
+
+**Change**
+- `src/lib/fcc-campaign.ts`: `FCC_CAMPAIGN_KEY` is `fcc-march1-pack-v3-calmer`; new first email and follow-up text. Subject, footer, stop line and sending rules are unchanged.
+- `src/lib/fcc-campaign.test.ts`: checks the v3 lines and that the old urgent lines are gone.
+
+**Not done yet:** `FCC_SMTP_PASSWORD`, Aidan's go for v3 (`go-sql`), batch 2.
+
+**Spend:** none.
+
 ## Production 2026-10-24 (night): FCC campaign sender, locked (0086)
 
 Verified commit `53454d5` is live (the docs commit follows it).
