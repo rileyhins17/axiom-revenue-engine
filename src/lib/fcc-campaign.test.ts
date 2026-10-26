@@ -82,19 +82,24 @@ test("test sends only go to the sending mailbox", () => {
   assert.equal(checkFccTestRecipient("someone@else.example", "me@axiom.example").allowed, false);
 });
 
-test("renders v2 copy with a visible placeholder when no address is set", () => {
+test("renders the calmer v3 copy with a visible placeholder when no address is set", () => {
   const contact = { firstName: "Jane", company: "Example Co", filings: [{}, {}] as never };
   const first = renderFccEmail(contact, 1, null);
   assert.equal(first.subject, "Your 2026 RMD recertification");
-  assert.match(first.bodyPlain, /the filings for Example Co and 1 related company don't show a 2026 recertification/);
+  assert.match(first.bodyPlain, /the filings for Example Co and 1 related company don't show a 2026 recertification date/);
   const single = renderFccEmail({ firstName: "Sam", company: "Solo Co", filings: [{}] as never }, 1, null);
-  assert.match(single.bodyPlain, /Solo Co's filing doesn't show a 2026 recertification/);
+  assert.match(single.bodyPlain, /Solo Co's filing doesn't show a 2026 recertification date/);
+  assert.match(first.bodyPlain, /If that's wrong, please ignore this\./);
+  assert.match(first.bodyPlain, /we never hold your login/);
   assert.match(first.bodyPlain, /\[MAILING ADDRESS GOES HERE\]/);
   assert.match(first.bodyPlain, /Reply "stop"/);
   assert.match(first.bodyPlain, /not a law firm/);
+  // v3 drops the lines that read like the urgent "deficiency" cold emails law firms warn filers about.
+  assert.doesNotMatch(first.bodyPlain, /fastest way|get current|filing information in order|other carriers have to stop/);
 
   const follow = renderFccEmail(contact, 2, "123 Example St, Kitchener ON");
   assert.match(follow.subject, /^Re: /);
+  assert.match(follow.bodyPlain, /draft it for your officer to check and submit/);
   assert.match(follow.bodyPlain, /123 Example St, Kitchener ON/);
   assert.doesNotMatch(follow.bodyPlain, /MAILING ADDRESS GOES HERE/);
 });
