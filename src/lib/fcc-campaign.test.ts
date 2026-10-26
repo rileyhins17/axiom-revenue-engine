@@ -91,6 +91,8 @@ test("renders the calmer v3 copy with a visible placeholder when no address is s
   assert.match(single.bodyPlain, /Solo Co's filing doesn't show a 2026 recertification date/);
   assert.match(first.bodyPlain, /If that's wrong, please ignore this\./);
   assert.match(first.bodyPlain, /we never hold your login/);
+  assert.match(first.bodyPlain, /Aidan Magee, Axiom · axiominternational\.ca/);
+  assert.doesNotMatch(first.bodyPlain, /getaxiom\.ca/);
   assert.match(first.bodyPlain, /\[MAILING ADDRESS GOES HERE\]/);
   assert.match(first.bodyPlain, /Reply "stop"/);
   assert.match(first.bodyPlain, /not a law firm/);

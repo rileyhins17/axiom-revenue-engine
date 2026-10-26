@@ -250,9 +250,11 @@ function toHtml(plain: string) {
 /**
  * Aidan's "calmer email v3" (Notion Oct 25, approved on Slack Oct 26). It drops
  * v2's removal warning and "fastest way to get current" after a law firm warned
- * RMD filers about urgent "deficiency" cold emails. Step 1 is the first touch,
- * step 2 the single follow-up 3 days later in the same thread. A missing address
- * renders a visible placeholder so test emails can't pass for send-ready copy.
+ * RMD filers about urgent "deficiency" cold emails. The signature names
+ * axiominternational.ca, not the web-design site (Aidan, Slack Oct 26). Step 1
+ * is the first touch, step 2 the single follow-up 3 days later in the same
+ * thread. A missing address renders a visible placeholder so test emails can't
+ * pass for send-ready copy.
  */
 export function renderFccEmail(
   contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">,
@@ -267,7 +269,7 @@ export function renderFccEmail(
       `I'm Aidan Magee from Axiom. In the FCC Robocall Mitigation Database, ${filingSubject(contact)} show a 2026 recertification date (it was due March 1, 2026). If that's wrong, please ignore this. The FCC says it can refer filers who don't recertify for enforcement, though we haven't seen it remove anyone for this alone.`,
       `If it's still to do, we can draft the answers for your officer to check and submit from your own FCC login, and walk you through the FCC's own steps, including what to do if the Recertify button doesn't show. It's a flat price for the preparation, and we never hold your login.`,
       `A one-line reply is plenty. We're not a law firm and this isn't legal advice.`,
-      `Aidan Magee, Axiom · getaxiom.ca\n${address}\nReply "stop" and I won't email you again.`,
+      `Aidan Magee, Axiom · axiominternational.ca\n${address}\nReply "stop" and I won't email you again.`,
     ].join("\n\n");
     return { subject: "Your 2026 RMD recertification", bodyPlain, bodyHtml: toHtml(bodyPlain) };
   }
