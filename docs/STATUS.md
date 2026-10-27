@@ -1,9 +1,10 @@
-## Production 2026-10-26 (evening): FCC emails on Aidan's calmer v3 copy, still locked
+## Production 2026-10-26 (evening): FCC emails on Aidan's calmer v3 copy and axiominternational.ca, still locked
 
-Verified commit `a833fd3` is live (the docs commit follows it).
+Verified commit `0f0b081` is live (the docs commit follows it). It is `a833fd3` (v3 copy, released 23:44 UTC) plus Aidan's signature change (released 00:03 UTC Oct 27).
 
 **Live state**
-- **App:** Worker `0eb7846a-edd6-4d77-9fd7-3e86d9b43830` (100% since 23:44 UTC). Rollback target `9135e2ab-7d7c-4bf6-83e2-bce1a26b088a` (the same code with the v2 copy).
+- **App:** Worker `b3c17c18-752f-46d6-ac06-1979fe89b2b4` (100% since 00:03 UTC Oct 27). Rollback target `0eb7846a-edd6-4d77-9fd7-3e86d9b43830` (v3 with the old getaxiom.ca signature); before that `9135e2ab-7d7c-4bf6-83e2-bce1a26b088a` (the v2 copy).
+- **Signature (Aidan, Slack Oct 26):** the first email is signed "Aidan Magee, Axiom · axiominternational.ca", not the web-design site getaxiom.ca. Same copy key: no go had been recorded for v3, so the go will cover this wording.
 - **Database:** no migration (still through 0086, 89 receipts). Stops `01111`.
 - **FCC campaign: locked.** The copy key is now `fcc-march1-pack-v3-calmer`, and a go must name the current key, so nothing sends until Aidan's go for v3. `FccCampaignSetting`: enabled 0, cap 30, no approved copy, no go. 0 sends.
 - **Contacts under the v3 key:** 388 contacts, 314 `ready`, 74 `held`.
@@ -13,21 +14,21 @@ Verified commit `a833fd3` is live (the docs commit follows it).
   - The 88 rows under the old v2 key stay but are inert: the sender only reads the current key.
   - Time Travel bookmark before the load: `000040fe-00000000-00005110-dd90cf672dc227a9f52d0789b125d609`.
 - **Secrets:** `FCC_CAMPAIGN_MAILING_ADDRESS` set. `FCC_SMTP_PASSWORD` not set yet: Riley types it at a hidden prompt, `smtp-test` runs first (2 emails to Aidan's own inbox), then `wrangler secret put` reads it from stdin.
-- **Backup:** `backups/production/prod-export-20261026T233140Z.sql` (sha256 `03712ce5…`).
-- **Post-release check:** live `EngineProspect` (1,780), `CallerAttempt` (23), `CallerResult` (22), `CallerContactControl` (22), `DiscoveryHeld` (1,556), `Lead` (10,480), `OutreachEmail` (1,937) and `FccCampaignContact` (476) match the pre-release export.
+- **Backups:** `backups/production/prod-export-20261026T233140Z.sql` (sha256 `03712ce5…`) before the v3 release; `prod-export-20261026T235408Z.sql` (sha256 `7343dbd3…`) before the signature release.
+- **Post-release check (after both):** live `EngineProspect` (1,780), `CallerAttempt` (23), `CallerResult` (22), `CallerContactControl` (22), `DiscoveryHeld` (1,556), `Lead` (10,480), `OutreachEmail` (1,937) and `FccCampaignContact` (476) match the pre-release exports.
 
-**Gate:**
+**Gate (each release):**
 - Safety check.
-- `npm test`: 1,038 tests (995 pass, 3 skipped). The same 40 date-expired tests fail on the untouched live code `54eeb60` (identical failure list). The v3 copy test passes.
+- `npm test`: 1,038 tests (995 pass, 3 skipped). The same 40 date-expired tests fail on the untouched live code `54eeb60` (identical failure list). The v3 copy test passes, including the new signature.
 - Typecheck; lint 0 errors (11 old warnings, none in FCC files).
-- Clean build in a fresh checkout. Smoke test: sign-in, health and Caller API OK.
+- Clean build in a fresh checkout (the signature release's dry-run bundle was checked: it carries the v3 key and the new signature). Smoke test: sign-in, health and Caller API OK.
 
 **Why**
 - Aidan's "calmer email v3" (Notion, Oct 25) drops the lines that read like the urgent "deficiency" cold emails telecom law firms warn RMD filers about. On Oct 26 he asked for the sender to be on v3 before his go, and Riley said do it.
 
 **Change**
-- `src/lib/fcc-campaign.ts`: `FCC_CAMPAIGN_KEY` is `fcc-march1-pack-v3-calmer`; new first email and follow-up text. Subject, footer, stop line and sending rules are unchanged.
-- `src/lib/fcc-campaign.test.ts`: checks the v3 lines and that the old urgent lines are gone.
+- `src/lib/fcc-campaign.ts`: `FCC_CAMPAIGN_KEY` is `fcc-march1-pack-v3-calmer`; new first email and follow-up text; signature names axiominternational.ca. Subject, mailing address, stop line and sending rules are unchanged.
+- `src/lib/fcc-campaign.test.ts`: checks the v3 lines, the new signature, and that the old urgent lines and getaxiom.ca are gone.
 
 **Not done yet:** `FCC_SMTP_PASSWORD`, Aidan's go for v3 (`go-sql`), batch 2.
 
