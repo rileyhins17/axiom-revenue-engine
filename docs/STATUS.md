@@ -7,7 +7,8 @@ Verified commit `0f0b081` is live (the docs commit follows it). It is `a833fd3` 
 - **Signature (Aidan, Slack Oct 26):** the first email is signed "Aidan Magee, Axiom · axiominternational.ca", not the web-design site getaxiom.ca. Same copy key: no go had been recorded for v3, so the go will cover this wording.
 - **Database:** no migration (still through 0086, 89 receipts). Stops `01111`.
 - **FCC campaign: locked.** The copy key is now `fcc-march1-pack-v3-calmer`, and a go must name the current key, so nothing sends until Aidan's go for v3. `FccCampaignSetting`: enabled 0, cap 30, no approved copy, no go. 0 sends.
-- **Contacts under the v3 key:** 388 contacts, 314 `ready`, 74 `held`.
+- **Update 00:15 UTC Oct 27 (Aidan, Slack):** PBX Interactive (`rmd@pbxi.net`, batch 1) is held under both keys: its FCC filing reports an investigation, which goes to a lawyer, not us. Sharp Media Group and Star2Star have the same flag and are in batch 2: leave them out when batch 2 loads. Time Travel bookmark before the change: `00004106-00000000-00005111-734c6f7a83e036415629f350c77873ae`. v3 is now 313 `ready`, 75 `held`.
+- **Contacts under the v3 key (at release):** 388 contacts, 314 `ready`, 74 `held`.
   - Batch 1 (first 100): 88 contacts, 76 ready, 12 held.
   - Batch 3 (Aidan's next 300, Oct 26): 300 contacts, 238 ready, 62 held (Aidan's 57 generic inboxes plus 5 more the classifier caught). All 300 were checked against the FCC's public list: still not recertified, none repeat batch 1.
   - Batch 2 (94) has not been received.
