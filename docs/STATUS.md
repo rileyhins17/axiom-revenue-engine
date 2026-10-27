@@ -1,4 +1,4 @@
-## Production 2026-10-26 (evening): FCC emails on Aidan's calmer v3 copy and axiominternational.ca, Gmail password in, still locked
+## Production 2026-10-26 (evening): FCC emails on Aidan's calmer v3 copy and axiominternational.ca, Gmail password in, go recorded Oct 27
 
 Verified commit `0f0b081` is live (the docs commit follows it). It is `a833fd3` (v3 copy, released 23:44 UTC) plus Aidan's signature change (released 00:03 UTC Oct 27).
 
@@ -6,9 +6,10 @@ Verified commit `0f0b081` is live (the docs commit follows it). It is `a833fd3` 
 - **App:** Worker `db46e66b-fda4-4995-9dd7-fdca3c572bf2` (100% since 03:14 UTC Oct 27): the Gmail secret change on `b3c17c18-752f-46d6-ac06-1979fe89b2b4`, which was live from 00:03 UTC. Rollback target `b3c17c18` (same code, made before the Gmail secret); before that `0eb7846a-edd6-4d77-9fd7-3e86d9b43830` (v3 with the old getaxiom.ca signature), then `9135e2ab-7d7c-4bf6-83e2-bce1a26b088a` (the v2 copy).
 - **Signature (Aidan, Slack Oct 26):** the first email is signed "Aidan Magee, Axiom · axiominternational.ca", not the web-design site getaxiom.ca. Same copy key: no go had been recorded for v3, so the go will cover this wording.
 - **Database:** no migration (still through 0086, 89 receipts). Stops `01111`.
-- **FCC campaign: locked.** The copy key is now `fcc-march1-pack-v3-calmer`, and a go must name the current key, so nothing sends until Aidan's go for v3. `FccCampaignSetting`: enabled 0, cap 30, no approved copy, no go. 0 sends.
+- **FCC campaign: go recorded (Aidan, 16:29 UTC Oct 27).** The copy key is `fcc-march1-pack-v3-calmer`. `FccCampaignSetting`: enabled 1, cap 30, approved copy = that key, go by Aidan. First send: the weekday 14:00 UTC cron on Wed Oct 28 (10:00 Toronto). Time Travel bookmark before the go: `0000415c-00000000-00005111-504972ba46dcdd734402dbdab9d57c56`.
 - **Update 00:15 UTC Oct 27 (Aidan, Slack):** PBX Interactive (`rmd@pbxi.net`, batch 1) is held under both keys: its FCC filing reports an investigation, which goes to a lawyer, not us. Sharp Media Group and Star2Star have the same flag and are in batch 2: leave them out when batch 2 loads. Time Travel bookmark before the change: `00004106-00000000-00005111-734c6f7a83e036415629f350c77873ae`. v3 is now 313 `ready`, 75 `held`.
 - **Update 03:14 UTC Oct 27 (Riley):** `FCC_SMTP_PASSWORD` is set. Riley pasted Aidan's Gmail app password at the hidden prompt; `smtp-test` sent the 2 test emails to Aidan's own inbox and its inbox check passed, then `wrangler secret put` saved it (version `db46e66b`, same code). Health OK. Still locked: enabled 0, no approved copy, no go, 0 sends; v3 313 `ready`, 75 `held`.
+- **Update 16:29 UTC Oct 27 (Aidan's go, Slack 12:23 EDT):** recorded with `go-sql Aidan` (1 row changed). He asked for 30 today, but the sender runs only on the weekday 14:00 UTC cron and today's run had already passed while locked, so the first 30 go Wed. 0 sends at the go; v3 313 `ready`.
 - **Contacts under the v3 key (at release):** 388 contacts, 314 `ready`, 74 `held`.
   - Batch 1 (first 100): 88 contacts, 76 ready, 12 held.
   - Batch 3 (Aidan's next 300, Oct 26): 300 contacts, 238 ready, 62 held (Aidan's 57 generic inboxes plus 5 more the classifier caught). All 300 were checked against the FCC's public list: still not recertified, none repeat batch 1.
@@ -32,7 +33,7 @@ Verified commit `0f0b081` is live (the docs commit follows it). It is `a833fd3` 
 - `src/lib/fcc-campaign.ts`: `FCC_CAMPAIGN_KEY` is `fcc-march1-pack-v3-calmer`; new first email and follow-up text; signature names axiominternational.ca. Subject, mailing address, stop line and sending rules are unchanged.
 - `src/lib/fcc-campaign.test.ts`: checks the v3 lines, the new signature, and that the old urgent lines and getaxiom.ca are gone.
 
-**Not done yet:** Aidan's go for v3 (`go-sql`), batch 2 (without Sharp Media Group and Star2Star).
+**Not done yet:** batch 2 (without Sharp Media Group and Star2Star). Check Wednesday's first run (`fcc_campaign` line in the Worker logs, `FccCampaignSend`).
 
 **Spend:** none.
 
