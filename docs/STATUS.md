@@ -1,6 +1,15 @@
 ## 2026-10-27 (night): FCC emails spaced 1–3 minutes apart with a noon check and automatic pauses; FCC screen; old website campaign archived
 
-**Release:** RELEASE_PENDING
+**Release (Riley's yes in chat, 01:14 UTC Oct 28):** verified commit `f8698a2` is live as Worker `41d59d63-d758-4c9c-b516-4aad336a15ca` (the docs and gate commits follow it). Built and released from the clean `rv` clone with `scripts/release-production.mjs`. No migration (still through 0086, 89 receipts); stops `01111` before and after; smoke test OK. Rollback target `db46e66b-fda4-4995-9dd7-fdca3c572bf2` (`npx wrangler rollback db46e66b-fda4-4995-9dd7-fdca3c572bf2 --config wrangler.production.jsonc`). Backup `backups/production/prod-export-20261028T005232Z.sql` (sha256 `294dc696…6a072`); Time Travel bookmark at the export `000041a8-00000000-00005112-f9d066ac9477ab286b3801dab3852d77`.
+- **After release (checked live):** crons `0 11 * * MON-FRI`, `0 14 * * MON-FRI`, `* 14-19 * * *`, `*/15 * * * *`. FCC setting unchanged (enabled 1, cap 30, v3 key, go by Aidan). 0 FCC emails sent. v3 302 `ready`, 86 `held`. `/fcc` redirects a signed-out visitor to sign-in; `/api/fcc/control` answers 401; health OK. The first tick that can send is 14:00 UTC Wed Oct 28.
+- **Gate:** safety check. `npm test`: 1,049 tests, 1,003 pass, 3 skipped, 43 fail: the same 40 date-expired M2/KW tests as the baseline, plus 3 M2 setup tests that saw the repo's HEAD move because commits landed mid-run; rerun alone on a stable HEAD, that file passes 21/21. The 11 new FCC tests pass. Typecheck; lint 0 errors (11 old warnings). `build:cloudflare` here and in the clean clone; `wrangler deploy --dry-run` with the default and production configs (the production bundle carries the tick). Owner UI acceptance passed: 13 WCAG pages including Today, FCC and the archive; desktop 1440 px, mobile 390 px; 0 external requests.
+- **Build trap seen tonight:** the `fcc-campaign-prod` worktree can't build: its `node_modules` links to this worktree's, and OpenNext then tries to bundle sharp's native `.node` file. Build releases in a clone with its own `node_modules` (like `rv`).
+- **Owner decisions tonight (Riley, chat):** release tonight; push to the live branch; Claude posts the update to Aidan from Riley's Slack.
+
+**Next three actions**
+1. Wed before 10:00: Aidan sends the email from his Gmail to one Gmail and one Outlook address he owns and checks both land in the inbox. If either lands in spam, press Pause on the FCC screen before 10.
+2. Wed 10:05 and noon: open the FCC screen. The first email should show by about 10:01; the noon check decides the second batch.
+3. When Aidan sends `fcc_batch2_pipeline.csv`: run the batch 2 steps below, then confirm the counts on the FCC screen.
 
 **Checked first (step 1 of Aidan's 1:37 pm prompt, verified live 00:15 UTC Oct 28 through the Cloudflare API, read-only)**
 - The Settings "Emergency stop: Stopped" (`OutreachAutomationSetting`, stops `01111`) and the "Business email readiness: not ready" card (fixed text) do **not** block FCC: the FCC sender never reads either. They also can't stop FCC; the FCC screen's Pause is the only FCC stop.
