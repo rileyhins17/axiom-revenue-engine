@@ -34,9 +34,12 @@ async function runHealthCron(env) {
 }
 
 const worker = openNextWorkerModule;
-// Weekdays 10:00 Toronto (EDT): the website first-touch batch and the FCC campaign
-// batch. Each sender itself refuses weekends and every closed gate.
+// Weekdays 10:00 Toronto (EDT): the retired website first-touch batch, which
+// refuses to send while its own switches are off.
 const ENGINE_EMAIL_CRON = ["0 14 * * MON-FRI", "0 14 * * 2-6"];
+// Every minute, 14:00-19:59 UTC (10:00 Toronto in both EDT and EST): one FCC send
+// tick. The tick itself keeps Toronto send windows, weekdays and the 1-3 minute gap.
+const FCC_TICK_CRON = "* 14-19 * * *";
 
 export { BucketCachePurge, DOQueueHandler, DOShardedTagCache };
 
@@ -186,6 +189,9 @@ const exportedWorker = {
           .then((result) => console.log(JSON.stringify({ event: "engine_email", ...result })))
           .catch((error) => console.error("[engine-email] failure:", error instanceof Error ? error.message : "unknown")),
       );
+      return;
+    }
+    if (controller?.cron === FCC_TICK_CRON) {
       ctx.waitUntil(
         runFccCampaignCron(env)
           .then((result) => console.log(JSON.stringify({ event: "fcc_campaign", ...result })))

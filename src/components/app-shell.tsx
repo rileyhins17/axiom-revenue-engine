@@ -162,11 +162,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 const isActive = (pathname: string | null, url: string) => pathname === url || Boolean(pathname?.startsWith(`${url}/`));
-/** The four places used all day; everything else lives under More. */
-const PRIMARY_URLS = ["/dashboard", "/call", "/prospects", "/walk-ins"];
+/** The places used all day; everything else (including the archive) lives under More. */
+const PRIMARY_URLS = ["/dashboard", "/fcc"];
 
 /**
- * Phone navigation (the home-screen app on iPhone): four thumb-sized tabs and a More sheet,
+ * Phone navigation (the home-screen app on iPhone): thumb-sized tabs and a More sheet,
  * clear of the home indicator.
  */
 function MobileTabBar({ pathname, email, onSignOut }: { pathname: string | null; email: string; onSignOut: () => Promise<void> }) {
@@ -177,7 +177,7 @@ function MobileTabBar({ pathname, email, onSignOut }: { pathname: string | null;
 
   return (
     <nav aria-label="Primary" className="owner-mobile-nav fixed inset-x-0 bottom-0 z-50 md:hidden">
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-3">
         {primary.map((item) => {
           const active = isActive(pathname, item.url);
           const Icon = item.icon;

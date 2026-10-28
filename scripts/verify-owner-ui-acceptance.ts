@@ -447,14 +447,14 @@ async function assertResponsive(page: Page, label: string) {
 async function assertNav(page: Page, label: string) {
   // The shadcn Sidebar (desktop, full titles like "Call list") only mounts
   // its menu markup above the mobile breakpoint; the fixed bottom tab bar
-  // (nav[aria-label='Primary'], short labels like "Queue") is mobile-only:
-  // four tabs used all day plus a More sheet with the other pages.
+  // (nav[aria-label='Primary'], short labels like "FCC") is mobile-only:
+  // the tabs used all day plus a More sheet with the other pages.
   const isMobile = (page.viewportSize()?.width ?? DESKTOP_VIEWPORT.width) < 768;
   if (isMobile) {
     const tabBar = page.locator("nav[aria-label='Primary']");
     const mobileItems = await tabBar.locator("a[href]").evaluateAll((elements) =>
       elements.map((element) => element.textContent?.trim() ?? ""));
-    assert.deepEqual(mobileItems, ["Today", "Queue", "List", "Walk-ins"], `${label} mobile tab bar must list the four daily pages.`);
+    assert.deepEqual(mobileItems, ["Today", "FCC"], `${label} mobile tab bar must list the daily pages.`);
     // Unlayered .owner-icon-button CSS once outranked Tailwind's `hidden` (GOTCHAS UI-004).
     assert.equal(await page.locator("header [data-sidebar='trigger']").isVisible(), false, `${label} must not show the sidebar toggle on a phone.`);
     await tabBar.getByRole("button", { name: "More", exact: true }).click();
@@ -462,14 +462,14 @@ async function assertNav(page: Page, label: string) {
     await sheet.waitFor();
     const moreItems = await sheet.locator("a[href] .font-semibold").evaluateAll((elements) =>
       elements.map((element) => element.textContent?.trim() ?? ""));
-    assert.deepEqual(moreItems, ["Email", "Ask AI", "Settings"], `${label} More sheet must list the other owner pages.`);
+    assert.deepEqual(moreItems, ["Ask AI", "Settings", "Archive: Axiom Web"], `${label} More sheet must list the other owner pages.`);
     await sheet.getByRole("button", { name: "Sign out" }).waitFor();
     await page.keyboard.press("Escape");
     await sheet.waitFor({ state: "detached" });
   } else {
     const sidebarItems = await page.locator(".owner-nav-title").evaluateAll((elements) =>
       elements.map((element) => element.textContent?.trim() ?? ""));
-    assert.deepEqual(sidebarItems, ["Today", "Call queue", "Call list", "Walk-ins", "Email", "Ask AI", "Settings"], `${label} sidebar navigation must be the six owner pages.`);
+    assert.deepEqual(sidebarItems, ["Today", "FCC", "Ask AI", "Settings", "Archive: Axiom Web"], `${label} sidebar navigation must be the owner pages, with the old campaign behind the archive.`);
   }
 }
 
@@ -477,7 +477,7 @@ async function assertNav(page: Page, label: string) {
  * then load each one and wait for its 'load' event before opening the next —
  * an SSR heading is not proof that async script streaming finished. */
 export async function warmOwnerAcceptanceRoutes(page: Page, extraRoutes: string[] = []) {
-  for (const route of ["/dashboard", "/prospects", "/call", "/walk-ins", "/email", ...extraRoutes]) {
+  for (const route of ["/dashboard", "/fcc", "/archive", "/prospects", "/call", "/walk-ins", "/email", ...extraRoutes]) {
     const response = await page.context().request.get(route);
     try {
       assert.equal(response.status(), 200, `Owner route preparation failed: ${route}`);

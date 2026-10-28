@@ -28,8 +28,10 @@ const config = JSON.parse(readFileSync(path.join(repo, "wrangler.production.json
 if (config.name !== WORKER || config.account_id !== ACCOUNT || config.d1_databases?.[0]?.database_id !== DATABASE_ID) stop("config target mismatch");
 if (config.vars?.AUTONOMOUS_SEND_ENABLED !== "false" || config.vars?.AUTONOMOUS_QUEUE_ENABLED !== "false" || config.vars?.AUTONOMOUS_INTAKE_ENABLED !== "false" || config.vars?.ENGINE_EMAIL_ENABLED !== "false") stop("automation must stay off");
 // Allowed schedules: the gated weekday email batch (sends nothing while ENGINE_EMAIL_ENABLED is "false"),
-// the read-only health check and the capped weekday lead search. Weekdays are named: Cloudflare's 1 is Sunday.
-if (!["", "0 14 * * MON-FRI|*/15 * * * *|0 11 * * MON-FRI"].includes((config.triggers?.crons ?? []).join("|"))) stop("unexpected cron schedule");
+// the read-only health check, the capped weekday lead search, and the FCC send tick (sends nothing until a
+// founder's go for the current copy; it keeps its own Toronto send windows and weekdays).
+// Weekdays are named: Cloudflare's 1 is Sunday.
+if (!["", "0 14 * * MON-FRI|*/15 * * * *|0 11 * * MON-FRI|* 14-19 * * *"].includes((config.triggers?.crons ?? []).join("|"))) stop("unexpected cron schedule");
 
 const wrangler = (args, cwd = repo, input) => spawnSync(process.execPath, [path.join(cwd, "node_modules", "wrangler", "bin", "wrangler.js"), ...args, "--config", path.join(repo, "wrangler.production.jsonc")], { cwd, encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024, env: process.env });
 // Live settings guard: keep_vars preserves Worker-only settings (such as the Orbit

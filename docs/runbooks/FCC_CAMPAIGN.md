@@ -1,10 +1,12 @@
 # FCC campaign: going live
 
-**What it does.** Weekdays at 10:00 Toronto, the live app sends up to 30 FCC emails from Aidan's Gmail. Follow-ups that are due go first (3 days after the first email, in the same thread), then new first emails fill the rest. Before each follow-up it checks Aidan's mail: if anyone at that company wrote back, or the first email bounced, there is no follow-up. Bounces go on the permanent do-not-email list. Generic inboxes (support@, info@ and the like) are never sent to.
+**What it does (Aidan's send rules, Oct 27).** On weekdays the live app sends FCC emails from Aidan's Gmail, one at a time, 1 to 3 minutes apart (random), so 30 take about an hour. The first 30 start at 10:00 Toronto time. From 12:30 up to 30 more go, but only if today has 1 bounce or fewer: 60 a day is the ceiling. Follow-ups that are due go first (3 days after the first email, in the same thread) and count toward the day. Before each email it checks Aidan's inbox: if anyone at that company wrote back, or an email bounced, that contact stops. Bounces go on the permanent do-not-email list. Generic inboxes (support@, info@ and the like) are never sent to. The emails are plain text with one link (the signature), no tracking and no attachments.
 
-**What it never does.** Send anything before a founder's go is recorded. Send more than 30 a day. Email anyone twice for the same step, even after a crash. Change or delete anything in Aidan's mailbox (the inbox check is read-only).
+**When it pauses itself.** Any of these pauses the whole campaign until Riley or Aidan presses Resume on the FCC screen: a Google "critical security alert" or "suspicious" notice, or a Gmail "sending limit" or "message blocked" bounce in the inbox that day; 3 or more bounces in a day; Gmail refusing the login; Gmail refusing an email. The reason shows on the FCC screen. Nothing can text anyone, so someone watches the FCC screen around 10:05 and at noon.
 
-Code: `src/lib/fcc-campaign-sender.ts` (rules), `src/lib/fcc-campaign-worker.ts` (live wiring), `migrations/0086_fcc_campaign_contacts.sql` (tables, starts locked), `scripts/fcc-campaign.ts` (tools).
+**What it never does.** Send anything before a founder's go is recorded. Send more than 60 a day. Send two emails at once. Email anyone twice for the same step, even after a crash. Change or delete anything in Aidan's mailbox (the inbox check is read-only). Obey or touch the old website outreach stops in Settings: the FCC screen's Pause is the only FCC stop.
+
+Code: `src/lib/fcc-campaign-tick.ts` (the minute-by-minute schedule and safety pauses), `src/lib/fcc-campaign-sender.ts` (who gets what, claims), `src/lib/fcc-campaign-control.ts` (pause/resume), `src/lib/fcc-campaign-worker.ts` (live wiring, cron `* 14-19 * * *`), `src/app/fcc/page.tsx` (screen), `migrations/0086_fcc_campaign_contacts.sql` (tables, starts locked), `scripts/fcc-campaign.ts` (tools). Decision: `docs/adr/0063-fcc-send-tick.md`.
 
 ## One-time setup
 
@@ -37,6 +39,6 @@ Code: `src/lib/fcc-campaign-sender.ts` (rules), `src/lib/fcc-campaign-worker.ts`
   npx wrangler d1 execute axiom-ops-omniscient --remote --config wrangler.production.jsonc --file outreach/fcc-go.sql
   ```
   The next weekday at 10:00 it sends. If the email wording changes, bump `FCC_CAMPAIGN_KEY` in `src/lib/fcc-campaign.ts`: that locks sending again until a new go.
-- **Pause:** same, with `pause-sql` instead of `go-sql Aidan`.
+- **Pause or resume:** the big button on the FCC screen (operations.getaxiom.ca/fcc). It only changes FCC sending. Resume works only while a go is recorded for the current copy key. Without the app, `pause-sql` does the same as Pause.
 - **Check:** `SELECT "status", COUNT(*) FROM "FccCampaignContact" GROUP BY "status";` Each run logs an `fcc_campaign` line in the Worker logs (what was sent, replies, bounces, and anything held back).
 - **A contact marked `failed`** hit a mail-server error and is waiting for a person. To try again, set its status back to `ready`.

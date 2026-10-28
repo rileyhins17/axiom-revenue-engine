@@ -13,6 +13,7 @@ test("live schedules name their weekdays (Cloudflare's 1 is Sunday, so 1-5 meant
   }
   assert.ok(crons.includes("0 11 * * MON-FRI"), "the lead search runs Monday to Friday at 7am Toronto");
   assert.ok(crons.includes("0 14 * * MON-FRI"), "the gated email batch runs Monday to Friday at 10am Toronto");
+  assert.ok(crons.includes("* 14-19 * * *"), "the FCC send tick runs every minute from 10am Toronto, in summer and winter time");
 });
 
 test("every live schedule has its own handler in worker.mjs, so none falls through to the legacy tick", () => {

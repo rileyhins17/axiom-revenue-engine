@@ -35,8 +35,9 @@ export default async function EmailPage() {
   return <section className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6">
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-semibold">Email</h1>
-        <p className="text-sm text-slate-600">One short first email to businesses with a weak website and a public email address. Never more than {HARD_DAILY_CAP} a day, never twice, never after an unsubscribe or a &ldquo;do not contact&rdquo;.</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Archive: Axiom Web</p>
+        <h1 className="text-2xl font-semibold">Website email</h1>
+        <p className="text-sm text-slate-600">The old website campaign&apos;s automatic email, archived and off. FCC emails are on the FCC screen. This one sent one short first email to businesses with a weak website and a public email address. Never more than {HARD_DAILY_CAP} a day, never twice, never after an unsubscribe or a &ldquo;do not contact&rdquo;.</p>
       </div>
       <span className={`rounded-full px-3 py-1 text-sm font-medium ring-1 ring-inset ${status.tone}`}>{status.text}</span>
     </header>

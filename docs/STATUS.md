@@ -1,3 +1,35 @@
+## 2026-10-27 (night): FCC emails spaced 1–3 minutes apart with a noon check and automatic pauses; FCC screen; old website campaign archived
+
+**Release:** RELEASE_PENDING
+
+**Checked first (step 1 of Aidan's 1:37 pm prompt, verified live 00:15 UTC Oct 28 through the Cloudflare API, read-only)**
+- The Settings "Emergency stop: Stopped" (`OutreachAutomationSetting`, stops `01111`) and the "Business email readiness: not ready" card (fixed text) do **not** block FCC: the FCC sender never reads either. They also can't stop FCC; the FCC screen's Pause is the only FCC stop.
+- Go recorded (Aidan, 16:29 UTC Oct 27), enabled 1, cap 30, key `fcc-march1-pack-v3-calmer`. 0 FCC emails ever sent. Worker `db46e66b` live with `FCC_SMTP_PASSWORD` and `FCC_CAMPAIGN_MAILING_ADDRESS` set; crons `0 11 * * MON-FRI`, `0 14 * * MON-FRI`, `*/15 * * * *`. Migrations through 0086.
+- Dry run (the real sender code on an in-memory copy of the live FCC tables, fake mail, nothing sent): Wednesday's first 30 are 8 compliance inboxes (3 batch 1, 5 batch 3) then 22 named contacts from batch 1. The old code sends all 30 at 10:00 in about a minute; the new code sends them 10:00 to about 11:02 and the second 30 (more batch 1 named) from 12:30 to about 13:35. Exact lists: `outreach/dryrun-current-code.json` and `outreach/dryrun-new-code.json` (ignored: personal data).
+
+**Change**
+- **Sending (Aidan's send rules, Slack 19:59 EDT Oct 27; ADR 0063).** A new cron `* 14-19 * * *` runs one FCC tick a minute (`src/lib/fcc-campaign-tick.ts`). Each tick sends at most one email, 1–3 minutes (random) after the last, so 30 take about an hour. First 30 from 10:00 Toronto. Up to 30 more from 12:30 only if today has 1 bounce or fewer, so 60 a day is the ceiling. The tick reads Toronto time, so it stays 10:00 after the clocks change Nov 1. Nothing sends without an inbox check first.
+- **Automatic pause** (sets `FccCampaignSetting.enabled` to 0; the reason goes in `KvStore` `fcc.control`; only a founder's Resume reopens it): a Google "critical security alert" or "suspicious" notice, or a Gmail "sending limit" / "message blocked" bounce, in the inbox that day; 3+ bounces in a day; Gmail refusing the login; Gmail refusing an email.
+- **Bug fixed:** Gmail's own limits and blocks come back as SMTP 550/552 (e.g. `550 5.4.5 Daily user sending limit exceeded`). The old sender treated any 550–553 as a bounce, so hitting a limit would have marked every remaining contact bounced and put them on the permanent do-not-email list. Now only recipient errors count as bounces; anything about the sender stops the day and pauses.
+- **No double sends:** the claim is one guarded SQL statement (day's cap plus a 50-second gap), so overlapping ticks can't send two at once.
+- **FCC screen** (`/fcc`, sidebar "FCC"): live / paused / locked, next send in plain English, sent today and all time, ready/held by batch, follow-ups due, replies, bounces and failed sends (who and when), the sender's last note, and a big Pause/Resume button (Riley or Aidan only; `/api/fcc/control` changes only `FccCampaignSetting.enabled` and `KvStore`). Read-only otherwise.
+- **Old website campaign behind "Archive: Axiom Web"** (`/archive`). Today (`/dashboard`) shows FCC first. The old Today content (the 435-business call queue, walk-ins, the "I'm Riley, a web designer" automatic email, scoreboards) is on `/archive` unchanged; `/call`, `/prospects`, `/walk-ins` and `/email` still open from there. `/email` is now titled "Website email" and marked archived, so the Zoho notice and "Replies land in riley@getaxiom.ca" only show inside the archive. Sidebar: Today, FCC, Ask AI, Settings, Archive. Phone tabs: Today, FCC, More. No data deleted.
+- Allowlists updated for the new cron: `scripts/check-safety-config.mjs`, `scripts/release-production.mjs`, `src/lib/ops/schedules.test.ts`.
+
+**Production data changes tonight (Cloudflare API, Riley's session)**
+- Held the 10 contacts Aidan's Claude emailed by hand on Oct 27 (Aidan follows up himself Fri Oct 30; the pipeline has `gilbert.g@phoenixinternet.com`) and Centra IP (`patrickb@centraip.com`, which Aidan emailed by hand Oct 26 per his Daily log), under both keys. Bookmark before: `000041a3-00000000-00005112-bfc52478e7b5176380b98f98ffe518e8`.
+- Fixed 5 greetings that would have read "Hi Rival,", "Hi Tj,", "Hi New-miracles,", "Hi Srs," and "Hi Wholesale," (`firstName` only; the approved copy is unchanged). Bookmark before: `000041a6-00000000-00005112-e5e88b26d0798cc7437a6f94f189130b`.
+- `KvStore` `fcc.batchNames` labels the two import times "Batch 1" and "Batch 3" for the screen.
+- v3 now: 302 `ready`, 86 `held`. Batch 1: 74 ready, 14 held. Batch 3: 228 ready, 72 held.
+
+**Not done / needs people**
+- **Batch 2 (94):** `fcc_batch2_pipeline.csv` was never shared with Riley (only batches 1 and 3 are on Slack). Aidan has to send it. Then: leave out Sharp Media Group and Star2Star; hold any of Aidan's Oct 26 hand-sent five (Gateway TelNet, Talkroute, VoiceStep, Convergence Solutions, Telzio); check overlap with batches 1 and 3; import; add its name to `fcc.batchNames`.
+- **Gmail + Outlook test before 10:** Aidan sends the email from his Gmail to one Gmail and one Outlook address he owns and checks both land in the inbox. The repo's `test-send` and `smtp-test` only send to the sender itself.
+- **Watching:** nothing can text Aidan. Someone checks the FCC screen around 10:05 and at noon; a pause shows its reason there.
+- **Follow-ups go first and count toward the day:** Wednesday–Friday's follow-ups are due Sat/Sun/Mon, so Mon Nov 2 and Tue Nov 3 will be mostly follow-ups.
+
+**Spend:** about 360 more Worker invocations a day, most returning at once; inside the plan. No change.
+
 ## Production 2026-10-26 (evening): FCC emails on Aidan's calmer v3 copy and axiominternational.ca, Gmail password in, go recorded Oct 27
 
 Verified commit `0f0b081` is live (the docs commit follows it). It is `a833fd3` (v3 copy, released 23:44 UTC) plus Aidan's signature change (released 00:03 UTC Oct 27).

@@ -20,7 +20,22 @@ export type FccMailbox = {
   hasMessagesFrom(fromPatterns: string[], sinceIso: string): Promise<boolean>;
   /** True when a bounce mentioning `email` arrived on or after `sinceIso`'s day. */
   hasBounceFor(email: string, sinceIso: string): Promise<boolean>;
+  /** How many bounce messages arrived from `sinceIso`'s day (not earlier). Cheap: one search. */
+  bounceCount(sinceIso: string): Promise<number>;
+  /** The addresses among `emails` that a bounce from `sinceIso`'s day (not earlier) mentions. */
+  bouncedAmong(emails: string[], sinceIso: string): Promise<string[]>;
+  /** A Google notice from `sinceIso`'s day (not earlier) that means sending must stop, or null. */
+  googleWarning(sinceIso: string): Promise<string | null>;
   close(): Promise<void>;
+};
+
+export type FccRunOptions = {
+  /** Most emails today, counting earlier runs. Defaults to the daily cap. */
+  cap?: number;
+  /** Most emails this run. */
+  limit?: number;
+  /** No email is claimed within this many ms of any other claim that day. */
+  minGapMs?: number;
 };
 
 export type FccSendConfig = {
@@ -51,8 +66,25 @@ const SHARED_MAIL_DOMAINS = new Set([
   "juno.com", "netzero.net",
 ]);
 
-const torontoDay = (now: Date) => now.toLocaleDateString("en-CA", { timeZone: "America/Toronto" });
-const torontoWeekday = (now: Date) => new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "America/Toronto" }).format(now);
+/**
+ * Google notices that put the mailbox at risk. Any one of them pauses the whole
+ * campaign until a founder looks (Aidan's send rules, Oct 27). Plain "Security
+ * alert" emails (a new sign-in, an app password) are routine and do not count.
+ */
+const GOOGLE_WARNINGS: Array<[criteria: string, reason: string]> = [
+  [`FROM "accounts.google.com" SUBJECT "critical security alert"`, "Google sent a critical security alert"],
+  [`FROM "accounts.google.com" SUBJECT "suspicious"`, "Google reported suspicious activity"],
+  [`FROM "mailer-daemon" BODY "limit for sending"`, "Gmail says the sending limit was reached"],
+  [`FROM "mailer-daemon" BODY "sending limit"`, "Gmail says the sending limit was reached"],
+  [`FROM "mailer-daemon" BODY "message blocked"`, "Gmail says a message was blocked"],
+  [`FROM "mailer-daemon" BODY "has been blocked"`, "Gmail says a message was blocked"],
+];
+
+/** A 5xx that is about Gmail or the sender (a limit, a block, a login), not about the one recipient. */
+const SENDER_PROBLEM = /\b5\.4\.5\b|\b5\.7\.\d+|limit|quota|blocked|spam|policy|auth|password|log ?in/i;
+
+export const torontoDay = (now: Date) => now.toLocaleDateString("en-CA", { timeZone: "America/Toronto" });
+export const torontoWeekday = (now: Date) => new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "America/Toronto" }).format(now);
 const domainOf = (email: string) => email.slice(email.lastIndexOf("@") + 1).toLowerCase();
 const changes = (result: unknown) => {
   const r = result as { changes?: number; meta?: { changes?: number } };
@@ -81,6 +113,24 @@ export async function fccMailboxFromImap(session: ImapSession): Promise<FccMailb
     },
     async hasBounceFor(email, sinceIso) {
       return (await session.search(`SINCE ${since(sinceIso)} OR FROM "mailer-daemon" FROM "postmaster" BODY ${imapQuote(email)}`)).length > 0;
+    },
+    async bounceCount(sinceIso) {
+      return (await session.search(`SINCE ${imapDate(sinceIso)} OR FROM "mailer-daemon" FROM "postmaster"`)).length;
+    },
+    async bouncedAmong(emails, sinceIso) {
+      const day = imapDate(sinceIso);
+      const hits: string[] = [];
+      for (const email of emails) {
+        if ((await session.search(`SINCE ${day} OR FROM "mailer-daemon" FROM "postmaster" BODY ${imapQuote(email)}`)).length > 0) hits.push(email);
+      }
+      return hits;
+    },
+    async googleWarning(sinceIso) {
+      const day = imapDate(sinceIso);
+      for (const [criteria, reason] of GOOGLE_WARNINGS) {
+        if ((await session.search(`SINCE ${day} ${criteria}`)).length > 0) return reason;
+      }
+      return null;
     },
     close: () => session.close(),
   };
@@ -113,21 +163,29 @@ async function isSuppressed(db: ProspectDb, email: string) {
     .bind(email, `@${domainOf(email)}`).first<{ hit: number }>());
 }
 
-/** One weekday batch: due follow-ups first, then new first emails, up to the daily cap. Safe to re-run. */
-export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now = new Date()): Promise<FccRunResult> {
+/** Why nothing may be sent right now, or null when every switch and setting allows it. */
+export function fccClosedGate(setting: Awaited<ReturnType<typeof fccSetting>>, config: FccSendConfig, now: Date): string | null {
+  if (!setting) return "setting row missing";
+  if (setting.enabled !== 1 || !setting.goBy) return "locked until a founder records the go";
+  if (setting.approvedCopy !== FCC_CAMPAIGN_KEY) return "this copy version is not approved";
+  if ((config.mailingAddress ?? "").trim().length < 10) return "no mailing address";
+  if (!config.transport || !config.mailbox || !config.fromAddress) return "sender not configured";
+  if (["Sat", "Sun"].includes(torontoWeekday(now))) return "weekend";
+  return null;
+}
+
+/** Due follow-ups first, then new first emails, up to the day's cap (or `options.limit`). Safe to re-run. */
+export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now = new Date(), options: FccRunOptions = {}): Promise<FccRunResult> {
   const setting = await fccSetting(db);
-  if (!setting) return { status: "SKIPPED", reason: "setting row missing" };
-  if (setting.enabled !== 1 || !setting.goBy) return { status: "SKIPPED", reason: "locked until a founder records the go" };
-  if (setting.approvedCopy !== FCC_CAMPAIGN_KEY) return { status: "SKIPPED", reason: "this copy version is not approved" };
+  const closed = fccClosedGate(setting, config, now);
+  if (closed || !setting) return { status: "SKIPPED", reason: closed ?? "setting row missing" };
   const address = (config.mailingAddress ?? "").trim();
-  if (address.length < 10) return { status: "SKIPPED", reason: "no mailing address" };
-  if (!config.transport || !config.mailbox || !config.fromAddress) return { status: "SKIPPED", reason: "sender not configured" };
-  if (["Sat", "Sun"].includes(torontoWeekday(now))) return { status: "SKIPPED", reason: "weekend" };
 
   const day = torontoDay(now);
-  const cap = Math.min(FCC_DAILY_SEND_CAP, Math.max(0, setting.dailyCap));
+  const cap = options.cap ?? Math.min(FCC_DAILY_SEND_CAP, Math.max(0, setting.dailyCap));
   let remaining = cap - await fccSentToday(db, day);
   if (remaining <= 0) return { status: "SKIPPED", reason: "daily cap reached" };
+  let budget = options.limit ?? Number.POSITIVE_INFINITY;
 
   const columns = `c."id", c."email", c."firstName", c."company", c."filingsJson", c."step1SentAt", c."step1MessageId"`;
   const { results: followUps } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
@@ -161,10 +219,21 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     transport ??= await config.transport!();
     const sendId = config.newId();
     const messageId = `<fcc-${contact.id}-${step}@${fromDomain}>`;
-    const claim = await db.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status")
-      VALUES (?,?,?,?,?,?,'CLAIMED') ON CONFLICT DO NOTHING`).bind(sendId, contact.id, step, contact.email, day, messageId).run();
-    if (changes(claim) !== 1) return true;
+    // One statement, so two runs at once can never both pass the day's cap or the gap between emails.
+    const claimedAt = now.toISOString();
+    const gapSince = options.minGapMs ? new Date(now.getTime() - options.minGapMs).toISOString() : "9999-12-31";
+    const claim = await db.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","createdAt")
+      SELECT ?,?,?,?,?,?,'CLAIMED',?
+      WHERE (SELECT COUNT(*) FROM "FccCampaignSend" WHERE "sendDay" = ? AND "status" IN ('CLAIMED','SENT')) < ?
+        AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" WHERE "sendDay" = ? AND "createdAt" > ?)
+      ON CONFLICT DO NOTHING`).bind(sendId, contact.id, step, contact.email, day, messageId, claimedAt, day, cap, day, gapSince).run();
+    if (changes(claim) !== 1) {
+      const taken = await db.prepare(`SELECT 1 AS hit FROM "FccCampaignSend" WHERE "contactId" = ? AND "step" = ? AND "status" <> 'FAILED'`)
+        .bind(contact.id, step).first<{ hit: number }>();
+      return Boolean(taken); // already claimed: try the next one; otherwise too soon or the cap: stop quietly
+    }
     remaining -= 1;
+    budget -= 1;
     let filings: FccCampaignContact["filings"] = [];
     try { filings = JSON.parse(contact.filingsJson) as FccCampaignContact["filings"]; } catch { filings = []; }
     const email = renderFccEmail({ firstName: contact.firstName, company: contact.company, filings: filings.length ? filings : [{} as never] }, step, address);
@@ -192,13 +261,14 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       const detail = (error instanceof Error ? error.message : String(error)).slice(0, 300);
       await db.prepare(`UPDATE "FccCampaignSend" SET "status"='FAILED', "detail"=?, "finishedAt"=? WHERE "sendId"=?`)
         .bind(detail, new Date().toISOString(), sendId).run();
-      if (error instanceof PermanentEmailError) {
+      if (error instanceof PermanentEmailError && !SENDER_PROBLEM.test(detail)) {
         await stop(contact, "bounced", detail);
         await suppressBounce(contact.email);
         counts.bounced += 1;
         return true;
       }
-      // Provider trouble: stop for today, never hammer. The contact waits for a person to look.
+      // Provider trouble (including Gmail's own limits and blocks, which also come back as 5xx):
+      // stop for today, never hammer. The contact waits for a person to look.
       await stop(contact, "failed", detail);
       counts.failed += 1;
       return false;
@@ -208,14 +278,14 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   let followUpsHeldBack: string | null = null;
   try {
     for (const contact of followUps) {
-      if (remaining <= 0) break;
+      if (remaining <= 0 || budget <= 0) break;
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
       const domain = domainOf(contact.email);
       const patterns = SHARED_MAIL_DOMAINS.has(domain) || shared.has(domain) ? [contact.email] : [contact.email, `@${domain}`];
       let replied = false;
       let bounced = false;
       try {
-        mailbox ??= await config.mailbox();
+        mailbox ??= await config.mailbox!();
         replied = await mailbox.hasMessagesFrom(patterns, contact.step1SentAt!);
         bounced = !replied && await mailbox.hasBounceFor(contact.email, contact.step1SentAt!);
       } catch (error) {
@@ -233,7 +303,7 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       if (!(await send(contact, 2))) return finish();
     }
     for (const contact of firsts) {
-      if (remaining <= 0) break;
+      if (remaining <= 0 || budget <= 0) break;
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
       if (!(await send(contact, 1))) return finish();
     }

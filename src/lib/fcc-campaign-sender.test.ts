@@ -73,6 +73,9 @@ function fakeMailbox(state: { from?: string[]; bounced?: string[]; broken?: bool
         return patterns.some((pattern) => (state.from ?? []).some((sender) => pattern.startsWith("@") ? sender.endsWith(pattern) : sender === pattern));
       },
       async hasBounceFor(email) { return (state.bounced ?? []).includes(email); },
+      async bounceCount() { return (state.bounced ?? []).length; },
+      async bouncedAmong(emails) { return emails.filter((email) => (state.bounced ?? []).includes(email)); },
+      async googleWarning() { return null; },
       async close() {},
     };
   };
@@ -256,7 +259,20 @@ test("a broken inbox check holds back follow-ups but first emails still go; a re
   assert.equal((raw.prepare(`SELECT COUNT(*) AS n FROM "FccCampaignSend" WHERE "contactId" = 'third'`).get() as { n: number }).n, 0);
 });
 
-test("the worker's weekday 10am batch runs the FCC sender next to the website batch", async () => {
+test("Gmail's own limits and blocks stop the day without blaming the recipient", async () => {
+  const { raw, db } = database();
+  for (const id of ["c1", "c2", "c3"]) addContact(raw, id, `${id}@co-${id}.example`);
+  recordGo(raw);
+  let calls = 0;
+  const t = fakeTransport(() => (++calls === 2 ? new PermanentEmailError("SMTP 550-5.4.5 Daily user sending limit exceeded. 550 5.4.5 gsmtp") : null));
+  const result = await runFccDailySend(db, config(t.factory, fakeMailbox().factory), MONDAY);
+  assert.equal(result.status === "RAN" && result.failed, 1);
+  assert.equal(result.status === "RAN" && result.bounced, 0);
+  assert.deepEqual(["c1", "c2", "c3"].map((id) => statusOf(raw, id)), ["step1_sent", "failed", "ready"]);
+  assert.equal((raw.prepare(`SELECT COUNT(*) AS n FROM "EngineEmailSuppression"`).get() as { n: number }).n, 0, "nobody is put on the do-not-email list");
+});
+
+test("the worker's weekday 10am schedule runs only the retired website batch; the FCC tick has its own schedule", async () => {
   const source = readFileSync(new URL("../../worker.mjs", import.meta.url), "utf8")
     .replace(/^import[\s\S]*?from\s+"[^"]+";\s*/gm, "")
     .replace(/^export \{[^}]+\};\s*/gm, "")
@@ -272,5 +288,8 @@ test("the worker's weekday 10am batch runs the FCC sender next to the website ba
   const tasks: Promise<unknown>[] = [];
   await worker.scheduled({ cron: "0 14 * * MON-FRI" }, {}, { waitUntil: (p) => tasks.push(p) });
   await Promise.all(tasks);
-  assert.deepEqual(runs.sort(), ["fcc", "website"]);
+  assert.deepEqual(runs, ["website"]);
+  await worker.scheduled({ cron: "* 14-19 * * *" }, {}, { waitUntil: (p) => tasks.push(p) });
+  await Promise.all(tasks);
+  assert.deepEqual(runs, ["website", "fcc"]);
 });

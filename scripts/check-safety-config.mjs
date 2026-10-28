@@ -211,7 +211,7 @@ requireMatch("wrangler.site-check.jsonc", siteCheckWrangler, /"crons"\s*:\s*\[\s
 forbidMatch("wrangler.site-check.jsonc", siteCheckWrangler, /send_email|"services"|kv_namespaces|r2_buckets|"queues"|"routes"|ENGINE_EMAIL|AUTONOMOUS_/, "the website check may only read businesses and grade websites");
 const productionWrangler = await readFile(new URL("../wrangler.production.jsonc", import.meta.url), "utf8");
 requireMatch("wrangler.production.jsonc", productionWrangler, /"ENGINE_EMAIL_ENABLED"\s*:\s*"false"/, "live email sending must be off in source; the owner enables it deliberately");
-requireMatch("wrangler.production.jsonc", productionWrangler, /"crons"\s*:\s*\[\s*(?:"0 14 \* \* MON-FRI"\s*,\s*"\*\/15 \* \* \* \*"\s*,\s*"0 11 \* \* MON-FRI"\s*)?\]/, "live may only schedule the gated email batch, the read-only health check and the capped lead search");
+requireMatch("wrangler.production.jsonc", productionWrangler, /"crons"\s*:\s*\[\s*(?:"0 14 \* \* MON-FRI"\s*,\s*"\*\/15 \* \* \* \*"\s*,\s*"0 11 \* \* MON-FRI"\s*,\s*"\* 14-19 \* \* \*"\s*)?\]/, "live may only schedule the gated email batch, the read-only health check, the capped lead search and the gated FCC send tick");
 requireMatch("wrangler.production.jsonc", productionWrangler, /"AI_MONTHLY_BUDGET_USD"\s*:\s*"(?:[0-9]|10)"/, "the AI budget must be set and at most US$10 a month");
 requireMatch("wrangler.production.jsonc", productionWrangler, /"AUTH_PASSWORD_SIGNIN"\s*:\s*"false"/, "live sign-in must be by emailed code only");
 requireMatch("wrangler.production.jsonc", productionWrangler, /"allowed_destination_addresses"\s*:\s*\[\s*"rileyhinsperger@gmail\.com",\s*"aidanmageebusiness@gmail\.com"\s*\]/, "sign-in codes may only be emailed to the two owner inboxes");
