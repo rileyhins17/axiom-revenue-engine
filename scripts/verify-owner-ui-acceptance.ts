@@ -577,14 +577,32 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     stage = "desktop today";
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1 }).waitFor();
-    await page.getByText("Results so far", { exact: true }).waitFor();
-    await page.getByText("Retries due today", { exact: true }).waitFor();
-    await page.getByText("Start calling", { exact: false }).first().waitFor();
+    await page.getByText("Open FCC", { exact: false }).first().waitFor();
+    await page.getByText("Archive: Axiom Web", { exact: false }).first().waitFor();
+    assert.equal(await page.getByText("Start calling", { exact: false }).count(), 0, "Today must not show the old website campaign's call queue.");
     await assertNav(page, "desktop Today");
     await assertWcag(page, "desktop Today");
     pagesScanned += 1;
     const desktopWidth = await assertResponsive(page, "desktop Today");
     await page.screenshot({ path: join(outputDirectory, "today-desktop.png"), fullPage: true });
+
+    stage = "desktop fcc";
+    await page.goto("/fcc", { waitUntil: "load" });
+    await page.getByRole("heading", { level: 1, name: "FCC emails" }).waitFor();
+    await page.getByRole("heading", { level: 2, name: "Next send" }).waitFor();
+    await assertNav(page, "desktop FCC");
+    await assertWcag(page, "desktop FCC");
+    pagesScanned += 1;
+    await page.screenshot({ path: join(outputDirectory, "fcc-desktop.png"), fullPage: true });
+
+    stage = "desktop archive";
+    await page.goto("/archive", { waitUntil: "load" });
+    await page.getByRole("heading", { level: 1, name: "Archive: Axiom Web" }).waitFor();
+    await page.getByText("Results so far", { exact: true }).waitFor();
+    await page.getByText("Retries due today", { exact: true }).waitFor();
+    await page.getByText("Start calling", { exact: false }).first().waitFor();
+    await assertWcag(page, "desktop Archive");
+    pagesScanned += 1;
 
     stage = "desktop call list";
     await page.goto("/prospects", { waitUntil: "domcontentloaded" });
@@ -728,7 +746,7 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     await assertWcag(page, "desktop Walk-ins");
     pagesScanned += 1;
     await page.goto("/email", { waitUntil: "load" });
-    await page.getByRole("heading", { level: 1, name: "Email" }).waitFor();
+    await page.getByRole("heading", { level: 1, name: "Website email" }).waitFor();
     await page.getByText("Automatic email is off", { exact: true }).waitFor();
     await assertWcag(page, "desktop Email");
     pagesScanned += 1;
@@ -769,6 +787,14 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     pagesScanned += 1;
     const mobileWidth = await assertResponsive(page, "mobile Today");
     await page.screenshot({ path: join(outputDirectory, "today-mobile.png"), fullPage: true });
+
+    await page.goto("/fcc", { waitUntil: "load" });
+    await page.getByRole("heading", { level: 1, name: "FCC emails" }).waitFor();
+    await assertNav(page, "mobile FCC");
+    await assertWcag(page, "mobile FCC");
+    pagesScanned += 1;
+    await assertResponsive(page, "mobile FCC");
+    await page.screenshot({ path: join(outputDirectory, "fcc-mobile.png"), fullPage: true });
 
     await page.goto("/prospects", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { level: 1, name: "Call list" }).waitFor();
