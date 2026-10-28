@@ -51,6 +51,6 @@ export function CallerLaunch({ prospectId, phone, label, className = '' }: { pro
     title={enabled ? 'Call. With Axiom Caller installed on this computer, this opens Caller instead.' : 'Call this number'}>
     <Phone className="size-4 shrink-0" aria-hidden="true" /><span className="tabular-nums">{label ?? displayPhone(phone)}</span>
     {/* Connected calling paused: a quiet desktop-only note; tapping still dials. */}
-    {enabled ? null : <span className="hidden rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 md:inline">Caller paused</span>}
+    {enabled ? null : <span className="hidden rounded-full border border-[#e3dccd] bg-[#f1ece1] px-2 py-0.5 text-[11px] font-medium text-[#4a463f] md:inline">Caller paused</span>}
   </a>;
 }

@@ -1,7 +1,11 @@
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 
+import { AlertTriangle } from "lucide-react";
+
+import { Notice, OwnerPage, PageHeader } from "@/components/owner/kit";
 import { CallQueue } from "@/components/prospects/call-queue";
+import { buttonVariants } from "@/components/ui/button";
 import { FindLeadsButton } from "@/components/prospects/find-leads-button";
 import { cachedBrief } from "@/lib/ai/call-brief";
 import { getCloudflareBindings, getDatabase } from "@/lib/cloudflare";
@@ -29,41 +33,37 @@ export default async function CallQueuePage({ searchParams }: { searchParams: Pr
     queue = next;
     callsToday = stats?.byActor[caller.toUpperCase()]?.calls ?? 0;
   } catch {
-    return <section className="mx-auto max-w-6xl px-6 py-8"><h1 className="text-2xl font-semibold">Call queue</h1><p className="mt-2 text-sm">The queue could not be loaded. Refresh in a minute.</p></section>;
+    return <OwnerPage><PageHeader eyebrow="Archive: Axiom Web" title="Call queue" /><Notice tone="warning" icon={AlertTriangle} title="The queue couldn't be loaded." role="status">Refresh in a minute.</Notice></OwnerPage>;
   }
   const row = queue.row;
   const env = (getCloudflareBindings() ?? {}) as Record<string, unknown>;
   const aiReady = typeof env.GEMINI_API_KEY === "string" && env.GEMINI_API_KEY.trim().length > 0;
   const history = row ? historyView((await listActivityFor(db, [row.prospectId])).get(row.prospectId) ?? []) : [];
   const brief = row ? await cachedBrief(db, { prospectId: row.prospectId, name: row.name, city: row.city, niche: row.niche, label: row.label, websiteUrl: row.websiteUrl, reasons: row.reasons, history }, caller).catch(() => null) : null;
-  return <section className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-6">
-    <header className="flex flex-wrap items-end justify-between gap-3">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-semibold">Call queue</h1>
-        <p className="hidden text-sm text-slate-600 sm:block">One business at a time. Log what happened and the next one loads. Anyone called today is held until tomorrow.</p>
-      </div>
-      <div className="flex items-center gap-3">
-        {skipped.length ? <Link href={"/call" as Route} className="text-sm font-medium text-[#7a5818] hover:underline">Bring back {skipped.length} skipped</Link> : null}
+  return <OwnerPage>
+    <PageHeader eyebrow="Archive: Axiom Web" title="Call queue"
+      description="One business at a time. Log what happened and the next one loads. Anyone called today is held until tomorrow."
+      actions={<>
+        {skipped.length ? <Link href={"/call" as Route} className={buttonVariants({ variant: "link", size: "sm" })}>Bring back {skipped.length} skipped</Link> : null}
         <p className="owner-goal-chip" aria-label={`${callsToday} of ${DAILY_DIAL_GOAL} calls today`}>
           <span className="font-semibold tabular-nums">{callsToday}</span><span className="opacity-70">/ {DAILY_DIAL_GOAL} today</span>
           <span className="owner-goal-track" aria-hidden="true"><span style={{ width: `${Math.min(100, Math.round((callsToday / DAILY_DIAL_GOAL) * 100))}%` }} /></span>
         </p>
-      </div>
-    </header>
+      </>} />
     {row && row.phone ? <CallQueue caller={caller} remaining={queue.remaining} skipped={skipped} aiReady={aiReady} brief={brief} business={{
       prospectId: row.prospectId, name: row.name, city: row.city, niche: row.niche, label: row.label, reasons: row.reasons,
       phone: row.phone, address: row.address, websiteUrl: row.websiteUrl, mapsUrl: mapsUrl(row), attempts: row.attempts, followUpAt: row.followUpAt,
       altPhone: row.altPhone ?? null, googleRatingCount: row.googleRatingCount ?? null, googleRating: row.googleRating ?? null,
       history,
-    }} /> : <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
+    }} /> : <div className="owner-panel py-10 text-center">
       <div className="owner-float mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl bg-[#0a0a0a] text-2xl shadow-[0_14px_30px_-12px_rgba(184,137,59,0.6)]" aria-hidden="true">🎉</div>
       <p className="font-display text-2xl">All caught up</p>
-      <p className="mt-2 text-sm text-slate-600">Everyone with a phone number has been called today or is waiting on a follow-up date. Try walk-ins, or check back tomorrow.</p>
+      <p className="mx-auto mt-2 max-w-md text-sm text-[#5c584f]">Everyone with a phone number has been called today or is waiting on a follow-up date. Try walk-ins, or check back tomorrow.</p>
       <div className="mt-5 flex justify-center"><FindLeadsButton /></div>
-      <div className="mt-4 flex justify-center gap-3 text-sm font-medium">
-        <Link href={"/walk-ins" as Route} className="rounded-lg border border-slate-300 px-3 py-2 hover:bg-slate-50">Walk-ins</Link>
-        <Link href={"/prospects" as Route} className="rounded-lg border border-slate-300 px-3 py-2 hover:bg-slate-50">Full call list</Link>
+      <div className="mt-3 flex justify-center gap-2">
+        <Link href={"/walk-ins" as Route} className={buttonVariants({ variant: "outline", size: "sm" })}>Walk-ins</Link>
+        <Link href={"/prospects" as Route} className={buttonVariants({ variant: "outline", size: "sm" })}>Full call list</Link>
       </div>
     </div>}
-  </section>;
+  </OwnerPage>;
 }

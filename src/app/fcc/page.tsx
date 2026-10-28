@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Inbox, Lock, MailCheck, MailX, PauseCircle, Reply, Send, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BadgeCheck, CalendarClock, CheckCircle2, Clock, Inbox, Layers, ListChecks, Lock, MailCheck, MailX, PauseCircle, Reply, Send, type LucideIcon } from "lucide-react";
 
 import { FccPauseButton } from "@/components/fcc/fcc-pause-button";
+import { Badge, Empty, Notice, OwnerPage, PageHeader, Panel, StatCard, type Tone } from "@/components/owner/kit";
 import { getDatabase } from "@/lib/cloudflare";
 import { fccScreen, type FccPerson, type FccScreen } from "@/lib/fcc-campaign-status";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
@@ -12,30 +13,25 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "FCC | Axiom Revenue Engine" };
 
 const when = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+/** "Sat, Oct 31" for a stored timestamp; anything else is shown as it is. */
+const day = (value: string) => Number.isNaN(Date.parse(value)) ? value
+  : new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", weekday: "short", month: "short", day: "numeric" }).format(new Date(value));
 
-const STATES: Record<FccScreen["state"], { text: string; tone: string; icon: LucideIcon }> = {
-  live: { text: "Live", tone: "bg-emerald-50 text-emerald-900 ring-emerald-200", icon: CheckCircle2 },
-  paused: { text: "Paused", tone: "bg-amber-50 text-amber-900 ring-amber-200", icon: PauseCircle },
-  locked: { text: "Locked", tone: "bg-slate-100 text-slate-700 ring-slate-200", icon: Lock },
+const STATES: Record<FccScreen["state"], { text: string; tone: Tone; icon: LucideIcon }> = {
+  live: { text: "Live", tone: "success", icon: CheckCircle2 },
+  paused: { text: "Paused", tone: "warning", icon: PauseCircle },
+  locked: { text: "Locked", tone: "neutral", icon: Lock },
 };
 
-function Stat({ icon: Icon, label, value, note }: { icon: LucideIcon; label: string; value: string | number; note?: string }) {
-  return <div className="rounded-xl border border-slate-200 bg-white p-4">
-    <p className="flex items-center gap-2 text-xs font-medium text-slate-600"><Icon className="size-4" aria-hidden="true" />{label}</p>
-    <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
-    {note ? <p className="mt-0.5 text-xs text-slate-600">{note}</p> : null}
-  </div>;
-}
-
-function People({ title, icon: Icon, empty, people }: { title: string; icon: LucideIcon; empty: string; people: FccPerson[] }) {
-  return <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5">
-    <h2 className="flex items-center gap-2 font-semibold"><Icon className="size-4" aria-hidden="true" />{title}<span className="text-sm font-normal text-slate-600">({people.length})</span></h2>
-    {people.length ? <ul className="mt-2 divide-y divide-slate-100">{people.map((person) => <li key={`${person.email}-${person.at}`} className="py-2.5">
-      <p className="truncate text-sm font-medium">{person.company}</p>
-      <p className="truncate text-xs text-slate-600">{person.email} · {when(person.at)}</p>
-      {person.note ? <p className="mt-0.5 text-xs text-slate-600">{person.note}</p> : null}
-    </li>)}</ul> : <p className="mt-2 text-sm text-slate-600">{empty}</p>}
-  </div>;
+function People({ title, icon, empty, people }: { title: string; icon: LucideIcon; empty: string; people: FccPerson[] }) {
+  return <Panel title={title} icon={icon} count={people.length}>
+    {people.length ? <ul className="owner-list">{people.map((person) => <li key={`${person.email}-${person.at}`}>
+      <p className="text-sm font-semibold">{person.company}</p>
+      <p className="owner-meta break-all">{person.email}</p>
+      <p className="owner-meta">{when(person.at)}</p>
+      {person.note ? <p className="mt-1 text-sm text-[#3b3a36]">{person.note}</p> : null}
+    </li>)}</ul> : <Empty>{empty}</Empty>}
+  </Panel>;
 }
 
 export default async function FccPage() {
@@ -44,62 +40,59 @@ export default async function FccPage() {
   try {
     data = await fccScreen(getDatabase() as unknown as ProspectDb);
   } catch {
-    return <section className="mx-auto max-w-6xl px-6 py-8"><h1 className="text-2xl font-semibold">FCC emails</h1><p className="mt-2 text-sm">The FCC numbers couldn&apos;t be loaded. Refresh in a minute.</p></section>;
+    return <OwnerPage>
+      <PageHeader eyebrow="Campaign" title="FCC emails" />
+      <Notice tone="warning" icon={AlertTriangle} title="The FCC numbers couldn't be loaded." role="status">Refresh in a minute.</Notice>
+    </OwnerPage>;
   }
   const owner = Boolean(getM2OwnerIdentityActor(session.user.email ?? ""));
   const state = STATES[data.state];
-  const StateIcon = state.icon;
   const sentToday = data.sentToday.first + data.sentToday.followUps;
+  const cap = data.batchSize * 2;
 
-  return <section className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6">
-    <header className="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="text-2xl font-semibold">FCC emails</h1>
-        <p className="max-w-3xl text-sm text-slate-600">The FCC March 1 pack, from Aidan&apos;s Gmail. On weekdays: {data.batchSize} from 10 a.m., one every 1 to 3 minutes, then up to {data.batchSize} more from 12:30 if 1 or fewer bounced. {data.batchSize * 2} a day at most. One follow-up 3 days later. Stops for anyone who replies or bounces.</p>
-      </div>
-      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ring-1 ring-inset ${state.tone}`}><StateIcon className="size-4" aria-hidden="true" />{state.text}</span>
-    </header>
+  return <OwnerPage>
+    <PageHeader eyebrow="Campaign" title="FCC emails" status={<Badge tone={state.tone} icon={state.icon}>{state.text}</Badge>}
+      description="The FCC March 1 pack, sent from Aidan's Gmail on weekdays." />
 
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-      <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="flex items-center gap-2 font-semibold"><CalendarClock className="size-4" aria-hidden="true" />Next send</h2>
-        <p className="text-lg">{data.nextSend}</p>
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <Panel title="Next send" icon={CalendarClock}>
+        <p className="text-lg font-medium leading-snug">{data.nextSend}</p>
         {data.state === "paused" && data.control?.action === "paused"
-          ? <p className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>Paused by {data.control.by}, {when(data.control.at)}: {data.control.reason}</span></p>
+          ? <div className="mt-4"><Notice tone="warning" icon={AlertTriangle} title={`Paused by ${data.control.by}, ${when(data.control.at)}`}>{data.control.reason}</Notice></div>
           : null}
-        {data.state === "locked" ? <p className="text-sm text-slate-600">No go is recorded for the current email, so nothing can send.</p>
-          : data.goBy && data.goAt ? <p className="text-sm text-slate-600">Go given by {data.goBy}, {when(data.goAt)}.</p> : null}
-        {data.lastRun ? <p className="flex gap-2 text-sm text-slate-600"><Clock className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>Last check {when(data.lastRun.at)}: {data.lastRun.note}</span></p> : null}
-      </div>
-      <aside className="h-fit space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="font-semibold">Pause or resume</h2>
+        <ul className="mt-4 space-y-1.5 text-sm text-[#5c584f]">
+          {data.state === "locked" ? <li className="flex gap-2"><Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>No go is recorded for the current email, so nothing can send.</span></li>
+            : data.goBy && data.goAt ? <li className="flex gap-2"><BadgeCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>Go given by {data.goBy}, {when(data.goAt)}</span></li> : null}
+          {data.lastRun ? <li className="flex gap-2"><Clock className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>Last check {when(data.lastRun.at)}: {data.lastRun.note}</span></li> : null}
+        </ul>
+      </Panel>
+      <Panel title="Pause or resume" icon={PauseCircle}>
         {data.state === "locked"
-          ? <p className="text-sm text-slate-600">Locked until a founder gives the go on this email.</p>
-          : owner ? <FccPauseButton state={data.state} /> : <p className="text-sm text-slate-600">Only Riley or Aidan can pause or resume FCC emails.</p>}
-        <p className="text-xs text-slate-600">The emergency stop in Settings is for the old website outreach and does not stop FCC emails. Use this button.</p>
-      </aside>
+          ? <Empty>Locked until a founder gives the go on this email.</Empty>
+          : owner ? <FccPauseButton state={data.state} /> : <Empty>Only Riley or Aidan can pause or resume FCC emails.</Empty>}
+        <p className="owner-meta mt-3">This is the only FCC stop. The emergency stop in Settings is for the old website outreach.</p>
+      </Panel>
     </div>
 
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-      <Stat icon={Send} label="Sent today" value={sentToday} note={`${data.sentToday.first} first, ${data.sentToday.followUps} follow-up · max ${data.batchSize * 2}`} />
-      <Stat icon={MailCheck} label="Sent all time" value={data.sentAllTime.first + data.sentAllTime.followUps} note={`${data.sentAllTime.first} first, ${data.sentAllTime.followUps} follow-up`} />
-      <Stat icon={Inbox} label="Ready to send" value={data.ready} note="waiting for a first email" />
-      <Stat icon={Lock} label="Held" value={data.held} note="generic inboxes and holds" />
-      <Stat icon={Reply} label="Follow-ups due" value={data.followUpsDue} note={data.followUpsLater ? `${data.followUpsLater} more from ${data.nextFollowUpDay}` : "none scheduled yet"} />
-      <Stat icon={MailX} label="Bounced today" value={data.bouncesToday} note="1 or fewer by noon: second batch goes" />
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
+      <StatCard icon={Send} label="Sent today" value={sentToday} detail={`${data.sentToday.first} first, ${data.sentToday.followUps} follow-up · max ${cap}`} />
+      <StatCard icon={MailCheck} label="Sent all time" value={data.sentAllTime.first + data.sentAllTime.followUps} detail={`${data.sentAllTime.first} first, ${data.sentAllTime.followUps} follow-up`} />
+      <StatCard icon={Inbox} label="Ready to send" value={data.ready} detail="Waiting for a first email" />
+      <StatCard icon={Lock} label="Held" value={data.held} detail="Generic inboxes and holds" />
+      <StatCard icon={Reply} label="Follow-ups due" value={data.followUpsDue} detail={data.followUpsLater && data.nextFollowUpDay ? `${data.followUpsLater} more from ${day(data.nextFollowUpDay)}` : "None scheduled yet"} />
+      <StatCard icon={MailX} label="Bounced today" value={data.bouncesToday} detail="1 or fewer by noon: the second batch goes" />
     </div>
 
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-      <h2 className="border-b border-slate-200 px-5 py-3 font-semibold">By batch</h2>
-      {data.batches.length ? <table className="w-full text-left text-sm">
-        <thead className="text-xs uppercase tracking-wide text-slate-600"><tr><th className="px-5 py-2">Batch</th><th className="px-5 py-2">Loaded</th><th className="px-5 py-2 text-right">Ready</th><th className="px-5 py-2 text-right">Held</th><th className="px-5 py-2 text-right">Emailed</th><th className="px-5 py-2 text-right">Stopped</th></tr></thead>
-        <tbody>{data.batches.map((batch) => <tr key={batch.loadedAt} className="border-t border-slate-100">
-          <td className="px-5 py-2 font-medium">{batch.name}</td><td className="px-5 py-2">{when(batch.loadedAt)}</td>
-          <td className="px-5 py-2 text-right tabular-nums">{batch.ready}</td><td className="px-5 py-2 text-right tabular-nums">{batch.held}</td>
-          <td className="px-5 py-2 text-right tabular-nums">{batch.emailed}</td><td className="px-5 py-2 text-right tabular-nums">{batch.stopped}</td>
+    <Panel title="By batch" icon={Layers} flush>
+      {data.batches.length ? <div className="overflow-x-auto"><table className="owner-table min-w-[560px]">
+        <thead><tr><th>Batch</th><th>Loaded</th><th className="text-right">Ready</th><th className="text-right">Held</th><th className="text-right">Emailed</th><th className="text-right">Stopped</th></tr></thead>
+        <tbody>{data.batches.map((batch) => <tr key={batch.loadedAt}>
+          <td className="whitespace-nowrap font-semibold">{batch.name}</td><td className="whitespace-nowrap">{when(batch.loadedAt)}</td>
+          <td className="text-right tabular-nums">{batch.ready}</td><td className="text-right tabular-nums">{batch.held}</td>
+          <td className="text-right tabular-nums">{batch.emailed}</td><td className="text-right tabular-nums">{batch.stopped}</td>
         </tr>)}</tbody>
-      </table> : <p className="px-5 py-6 text-sm text-slate-600">No contacts loaded yet.</p>}
-    </div>
+      </table></div> : <div className="px-5 py-6 sm:px-6"><Empty>No contacts loaded yet.</Empty></div>}
+    </Panel>
 
     <div className="grid gap-4 lg:grid-cols-3">
       <People title="Replies" icon={Reply} people={data.replies} empty="No replies recorded yet. Aidan's Gmail shows replies first; the sender checks for them before each follow-up." />
@@ -107,6 +100,15 @@ export default async function FccPage() {
       <People title="Problems" icon={AlertTriangle} people={data.problems} empty="No email has failed to send." />
     </div>
 
-    <p className="text-xs text-slate-600">This screen only reads the campaign. Pause and Resume are its only controls, and they only affect FCC emails.</p>
-  </section>;
+    <Panel title="How sending works" icon={ListChecks}>
+      <ul className="owner-list text-sm text-[#3b3a36]">
+        <li>Weekdays from 10 a.m.: {data.batchSize} emails, one every 1 to 3 minutes.</li>
+        <li>From 12:30: up to {data.batchSize} more, only if 1 or fewer bounced in the morning. {cap} a day at most.</li>
+        <li>One follow-up 3 days later. Anyone who replies or bounces gets nothing more.</li>
+        <li>It pauses itself on a Google warning, Gmail refusing a send, or 3 bounces in a day.</li>
+      </ul>
+    </Panel>
+
+    <p className="owner-meta">This screen only reads the campaign. Pause and Resume are its only controls, and they only affect FCC emails.</p>
+  </OwnerPage>;
 }

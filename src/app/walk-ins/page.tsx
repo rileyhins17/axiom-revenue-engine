@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { Route as RouteIcon } from "lucide-react";
+import { AlertTriangle, Route as RouteIcon } from "lucide-react";
 
+import { Empty, Notice, OwnerPage, PageHeader, Panel } from "@/components/owner/kit";
 import { WalkInCard, type WalkInView } from "@/components/prospects/walk-in-card";
+import { buttonVariants } from "@/components/ui/button";
 import { getDatabase } from "@/lib/cloudflare";
 import { mapsUrl, OUTCOME_TEXT, titleCase, torontoToday } from "@/lib/prospect-format";
 import { listProspects, type ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
@@ -28,7 +30,7 @@ export default async function WalkInsPage() {
   try {
     rows = await listProspects(db, "visit", torontoToday(), 1000);
   } catch {
-    return <section className="mx-auto max-w-6xl px-6 py-8"><h1 className="text-2xl font-semibold">Walk-ins</h1><p className="mt-2 text-sm">Could not load. Refresh in a minute.</p></section>;
+    return <OwnerPage><PageHeader eyebrow="Archive: Axiom Web" title="Walk-ins" /><Notice tone="warning" icon={AlertTriangle} title="The walk-ins couldn't be loaded." role="status">Refresh in a minute.</Notice></OwnerPage>;
   }
   const byCity = CITIES.map((city) => ({
     city,
@@ -38,20 +40,18 @@ export default async function WalkInsPage() {
     })),
   })).filter((group) => group.stops.length);
 
-  return <section className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6">
-    <header>
-      <h1 className="text-2xl font-semibold">Walk-ins</h1>
-      <p className="text-sm text-slate-600">{rows.length} businesses with a street address and a weak or missing website. Open a route, walk in, and log the visit.</p>
-    </header>
-    {byCity.length === 0 ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm">No walk-in addresses yet. The next engine run adds more.</p> : null}
-    {byCity.map((group) => <div key={group.city} className="space-y-3">
+  return <OwnerPage>
+    <PageHeader eyebrow="Archive: Axiom Web" title="Walk-ins"
+      description={`${rows.length} businesses with a street address and a weak or missing website. Open a route, walk in, and log the visit.`} />
+    {byCity.length === 0 ? <Panel><Empty>No walk-in addresses yet. The next engine run adds more.</Empty></Panel> : null}
+    {byCity.map((group) => <section key={group.city} className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">{titleCase(group.city)} <span className="text-sm font-normal text-slate-600">({group.stops.length})</span></h2>
-        <a href={routeUrl(group.stops)} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-[#1a1a1a]">
-          <RouteIcon className="size-4" aria-hidden="true" />Route first {Math.min(10, group.stops.length)} stops
+        <h2 className="text-lg font-semibold">{titleCase(group.city)} <span className="text-sm font-medium text-[#6b665c]">({group.stops.length})</span></h2>
+        <a href={routeUrl(group.stops)} target="_blank" rel="noreferrer noopener" className={buttonVariants({ size: "sm" })}>
+          <RouteIcon aria-hidden="true" />{group.stops.length === 1 ? "Route to this stop" : `Route first ${Math.min(10, group.stops.length)} stops`}
         </a>
       </div>
       <ol className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{group.stops.map((stop, index) => <WalkInCard key={stop.prospectId} stop={stop} index={index + 1} />)}</ol>
-    </div>)}
-  </section>;
+    </section>)}
+  </OwnerPage>;
 }

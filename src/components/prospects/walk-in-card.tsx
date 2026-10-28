@@ -4,6 +4,8 @@ import { MapPin } from "lucide-react";
 
 import { useState } from "react";
 
+import { Button, buttonVariants } from "@/components/ui/button";
+
 import { LogActivityForm } from "./log-activity-form";
 import { CallerLaunch } from "./caller-launch";
 
@@ -14,20 +16,20 @@ export type WalkInView = {
 
 export function WalkInCard({ stop, index }: { stop: WalkInView; index: number }) {
   const [open, setOpen] = useState(false);
-  return <li className="rounded-xl border border-slate-200 bg-white p-4">
-    <div className="flex items-start justify-between gap-3">
+  return <li className="owner-panel flex flex-col gap-3">
+    <div className="flex items-start gap-3">
+      <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#0a0a0a] text-xs font-semibold text-[#f2e3c2]">{index}</span>
       <div className="min-w-0">
-        <p className="font-semibold"><span className="mr-2 inline-flex size-6 items-center justify-center rounded-full bg-slate-900 text-xs text-white">{index}</span>{stop.name}</p>
-        <p className="mt-1 text-sm">{stop.address}</p>
-        <p className="mt-1 text-xs text-slate-600">{stop.niche} · {stop.label === "NO_WEBSITE" ? "No website" : stop.reasons[0] ?? "Weak website"}{stop.last ? ` · last: ${stop.last}` : ""}</p>
-      </div>
-      <div className="flex shrink-0 flex-col items-end gap-1 text-xs">
-        <a href={stop.mapsUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 font-medium text-[#7a5818] hover:underline"><MapPin className="size-3.5" aria-hidden="true" />Map</a>
-        {stop.phone ? <CallerLaunch prospectId={stop.prospectId} phone={stop.phone} className="tabular-nums text-slate-700 hover:underline" /> : null}
+        <p className="font-semibold leading-snug">{stop.name}</p>
+        <p className="mt-0.5 text-sm text-[#3b3a36]">{stop.address}</p>
+        <p className="owner-meta mt-0.5">{stop.niche} · {stop.label === "NO_WEBSITE" ? "No website" : stop.reasons[0] ?? "Weak website"}{stop.last ? ` · last: ${stop.last}` : ""}</p>
       </div>
     </div>
-    <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}
-      className="mt-3 rounded-md owner-cta px-3 py-1.5 text-sm font-semibold  ">{open ? "Close" : "Log visit"}</button>
+    <div className="flex flex-wrap items-center gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen((value) => !value)} aria-expanded={open}>{open ? "Close" : "Log visit"}</Button>
+      <a href={stop.mapsUrl} target="_blank" rel="noreferrer noopener" className={buttonVariants({ variant: "ghost", size: "sm" })}><MapPin aria-hidden="true" />Map</a>
+      {stop.phone ? <CallerLaunch prospectId={stop.prospectId} phone={stop.phone} className={buttonVariants({ variant: "ghost", size: "sm" })} /> : null}
+    </div>
     {open ? <LogActivityForm prospectId={stop.prospectId} defaultChannel="VISIT" /> : null}
   </li>;
 }

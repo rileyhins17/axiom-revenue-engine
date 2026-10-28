@@ -14,11 +14,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { APP_NAV_ITEMS } from "@/lib/navigation";
+import { APP_NAV_ITEMS, getNavItemForPath } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  // Archived screens (call queue, walk-ins...) light up Archive.
+  const current = getNavItemForPath(pathname)?.url;
 
   return (
     <Sidebar className="owner-sidebar owner-app-shell">
@@ -38,7 +40,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu className="gap-1.5">
               {APP_NAV_ITEMS.map((item) => {
-                const isActive = pathname === item.url || pathname?.startsWith(`${item.url}/`);
+                const isActive = current === item.url;
                 const Icon = item.icon;
 
                 return (

@@ -12,15 +12,18 @@ export type AppNavItem = {
 };
 
 export const APP_NAV_ITEMS: AppNavItem[] = [
-  { title: "Today", label: "Today", description: "FCC first", url: "/dashboard", icon: CalendarDays, shortcut: "⌘1", keywords: ["home", "overview", "today", "dashboard", "results"] },
-  { title: "FCC", label: "FCC", description: "FCC emails: status and pause", url: "/fcc" as Route, icon: Send, shortcut: "⌘2", keywords: ["fcc", "email", "campaign", "pause", "resume", "rmd", "robocall"] },
+  { title: "Today", label: "Today", description: "Overview", url: "/dashboard", icon: CalendarDays, shortcut: "⌘1", keywords: ["home", "overview", "today", "dashboard", "results"] },
+  { title: "FCC", label: "FCC", description: "Status and pause", url: "/fcc" as Route, icon: Send, shortcut: "⌘2", keywords: ["fcc", "email", "campaign", "pause", "resume", "rmd", "robocall"] },
   { title: "Ask AI", label: "Ask AI", description: "Your sales assistant", url: "/ask" as Route, icon: Sparkles, shortcut: "⌘3", keywords: ["ai", "ask", "assistant", "chat", "help", "question"] },
-  { title: "Settings", label: "Settings", description: "Stop switch, account", url: "/settings", icon: Settings, shortcut: "⌘4", keywords: ["stop", "safety", "account", "settings"] },
-  { title: "Archive: Axiom Web", label: "Archive", description: "Old website campaign, paused", url: "/archive" as Route, icon: Archive, shortcut: "⌘5", keywords: ["archive", "axiom web", "website", "call queue", "call list", "walk-ins", "old"] },
+  { title: "Settings", label: "Settings", description: "Account and tools", url: "/settings", icon: Settings, shortcut: "⌘4", keywords: ["stop", "safety", "account", "settings"] },
+  { title: "Archive: Axiom Web", label: "Archive", description: "Old website campaign", url: "/archive" as Route, icon: Archive, shortcut: "⌘5", keywords: ["archive", "axiom web", "website", "call queue", "call list", "walk-ins", "old"] },
 ];
 
 /** Screens of the paused Axiom Web website campaign. They still open, from the archive. */
 export const ARCHIVED_URLS = ["/call", "/prospects", "/walk-ins", "/email"];
+
+/** What each archived screen is called, for the top bar ("Archive › Call queue"). */
+export const ARCHIVED_PAGE_NAMES: Record<string, string> = { "/call": "Call queue", "/prospects": "Call list", "/walk-ins": "Walk-ins", "/email": "Website email" };
 
 export function getNavItemForPath(pathname: string | null | undefined) {
   if (!pathname) return null;

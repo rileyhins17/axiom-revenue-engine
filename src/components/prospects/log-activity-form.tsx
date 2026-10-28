@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { celebrate } from "@/components/motion/celebrate";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const OUTCOMES = [
   { value: "NO_ANSWER", label: "No answer" },
@@ -46,27 +48,26 @@ export function LogActivityForm({ prospectId, defaultChannel = "CALL" }: { prosp
     }
   }
 
-  return <div className="mt-3 space-y-3 rounded-lg border border-slate-200 p-3">
+  return <div className="space-y-3 rounded-xl border border-[#e6e1d6] bg-[#faf7f0] p-4">
     <div className="flex gap-2" role="group" aria-label="Call or visit">
       {(["CALL", "VISIT"] as const).map((value) => <button key={value} type="button" onClick={() => setChannel(value)} aria-pressed={channel === value}
-        className={`rounded-md px-3 py-1.5 text-sm font-medium ${channel === value ? "bg-[#0a0a0a] text-[#fbf6ea]" : "border border-slate-300"}`}>{value === "CALL" ? "Call" : "Visit"}</button>)}
+        className="owner-chip">{value === "CALL" ? "Call" : "Visit"}</button>)}
     </div>
     <div className="flex flex-wrap gap-2" role="group" aria-label="What happened">
       {OUTCOMES.map((option) => <button key={option.value} type="button" onClick={() => setOutcome(option.value)} aria-pressed={outcome === option.value}
-        className={`rounded-full px-3 py-1.5 text-xs font-medium ${outcome === option.value ? (option.value === "DO_NOT_CONTACT" ? "bg-rose-700 text-white" : "owner-cta") : "border border-slate-300"}`}>{option.label}</button>)}
+        className={cn("owner-chip", option.value === "DO_NOT_CONTACT" && outcome === option.value && "!border-[#a1231b] !bg-[#a1231b] !text-white")}>{option.label}</button>)}
     </div>
     <label className="block text-xs font-medium">Notes
       <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} rows={2}
-        placeholder="Who you spoke to, what they said, what to do next" className="mt-1 w-full rounded-md border border-slate-300 bg-white p-2 text-sm" />
+        placeholder="Who you spoke to, what they said, what to do next" className="mt-1 w-full rounded-xl border border-[#d9d2c3] bg-[#fffdf8] p-2.5 text-sm" />
     </label>
     <label className="block text-xs font-medium">Follow up on (optional)
-      <input type="date" value={followUpAt} onChange={(event) => setFollowUpAt(event.target.value)} className="mt-1 block rounded-md border border-slate-300 bg-white p-2 text-sm" />
+      <input type="date" value={followUpAt} onChange={(event) => setFollowUpAt(event.target.value)} className="mt-1 block h-10 rounded-xl border border-[#d9d2c3] bg-[#fffdf8] px-3 text-sm" />
     </label>
     <div className="flex items-center gap-3">
-      <button type="button" onClick={() => void save()} disabled={state === "SAVING"}
-        className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{state === "SAVING" ? "Saving…" : "Save"}</button>
-      {state === "SAVED" ? <span className="text-xs text-[#7a5818]">Saved</span> : null}
-      {error ? <span role="alert" className="text-xs text-rose-700">{error}</span> : null}
+      <Button type="button" onClick={() => void save()} disabled={state === "SAVING"}>{state === "SAVING" ? "Saving…" : "Save"}</Button>
+      {state === "SAVED" ? <span className="text-xs font-semibold text-[#1f6b45]">Saved</span> : null}
+      {error ? <span role="alert" className="text-xs font-medium text-[#a1231b]">{error}</span> : null}
     </div>
   </div>;
 }

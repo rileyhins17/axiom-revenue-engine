@@ -1,8 +1,9 @@
 import { CallerLinks } from '@/components/settings/caller-links';
 import {CallerConversions} from '@/components/settings/caller-conversions';
-import { SettingsClient } from "./SettingsClient";
+import { SettingsAccount, SettingsOutreach } from "./SettingsClient";
 
 import { CallerConnect } from "@/components/settings/caller-connect";
+import { OwnerPage, PageHeader } from "@/components/owner/kit";
 
 import { getPrisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
@@ -43,13 +44,13 @@ export default async function SettingsPage() {
       };
 
   return (
-    <div className="space-y-6">
-      <SettingsClient
-        userProfile={userProfile}
-        isAdmin={session.user.role === "admin"}
-        emergencyControl={emergencyControl}
-      />
-      <div className="mx-auto w-full max-w-5xl"><CallerConnect /><CallerLinks /><CallerConversions /></div>
-    </div>
+    <OwnerPage>
+      <PageHeader eyebrow="Settings" title="Settings" description="Your account, the Axiom Caller extension, and the old website outreach controls." />
+      <SettingsAccount userProfile={userProfile} />
+      <CallerConnect />
+      <CallerLinks />
+      <CallerConversions />
+      <SettingsOutreach isAdmin={session.user.role === "admin"} emergencyControl={emergencyControl} />
+    </OwnerPage>
   );
 }

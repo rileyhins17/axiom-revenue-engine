@@ -11,7 +11,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { LayoutBreadcrumb } from "@/components/layout-breadcrumb";
 import { SearchTrigger } from "@/components/system/search-trigger";
 import { HotkeyProvider } from "@/components/system/hotkey-provider";
-import { APP_NAV_ITEMS } from "@/lib/navigation";
+import { APP_NAV_ITEMS, getNavItemForPath } from "@/lib/navigation";
 import { isPublicPath } from "@/lib/public-paths";
 import { cn } from "@/lib/utils";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -63,7 +63,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     : "";
   const initials = (() => {
     if (!displayName) return sessionEmail?.[0]?.toUpperCase() ?? "?";
-    return displayName.slice(0, 2).toUpperCase();
+    return displayName.slice(0, 1).toUpperCase();
   })();
 
   return (
@@ -161,7 +161,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-const isActive = (pathname: string | null, url: string) => pathname === url || Boolean(pathname?.startsWith(`${url}/`));
 /** The places used all day; everything else (including the archive) lives under More. */
 const PRIMARY_URLS = ["/dashboard", "/fcc"];
 
@@ -173,13 +172,15 @@ function MobileTabBar({ pathname, email, onSignOut }: { pathname: string | null;
   const [open, setOpen] = useState(false);
   const primary = APP_NAV_ITEMS.filter((item) => PRIMARY_URLS.includes(item.url));
   const more = APP_NAV_ITEMS.filter((item) => !PRIMARY_URLS.includes(item.url));
-  const moreActive = more.some((item) => isActive(pathname, item.url));
+  // Archived screens count as Archive, which lives under More.
+  const current = getNavItemForPath(pathname)?.url;
+  const moreActive = more.some((item) => item.url === current);
 
   return (
     <nav aria-label="Primary" className="owner-mobile-nav fixed inset-x-0 bottom-0 z-50 md:hidden">
       <div className="grid grid-cols-3">
         {primary.map((item) => {
-          const active = isActive(pathname, item.url);
+          const active = item.url === current;
           const Icon = item.icon;
           return (
             <Link key={item.url} href={item.url} prefetch aria-current={active ? "page" : undefined}
@@ -206,7 +207,7 @@ function MobileTabBar({ pathname, email, onSignOut }: { pathname: string | null;
                 const Icon = item.icon;
                 return (
                   <li key={item.url}>
-                    <Link href={item.url} onClick={() => setOpen(false)} aria-current={isActive(pathname, item.url) ? "page" : undefined} className="owner-more-item">
+                    <Link href={item.url} onClick={() => setOpen(false)} aria-current={item.url === current ? "page" : undefined} className="owner-more-item">
                       <Icon className="size-5" aria-hidden="true" />
                       <span className="min-w-0">
                         <span className="block font-semibold">{item.title}</span>

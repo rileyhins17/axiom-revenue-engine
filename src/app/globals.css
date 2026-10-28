@@ -2906,7 +2906,7 @@ nav[aria-label="Primary"] .text-zinc-700,
 .owner-app-shell .owner-nav-item:hover svg { transform: scale(1.12) rotate(-4deg); }
 
 /* Gold focus rings everywhere, and a quiet scrollbar */
-.owner-app-shell :is(a, button, input, textarea, select, [tabindex]):focus-visible { outline: 2px solid #b8893b !important; outline-offset: 2px; border-radius: 8px; }
+.owner-app-shell :is(a, button, input, textarea, select, [tabindex]):focus-visible { outline: 2px solid #b8893b !important; outline-offset: 2px; }
 .owner-app-shell ::selection { background: #f4ead6; color: #0a0a0a; }
 .owner-app-shell * { scrollbar-width: thin; scrollbar-color: #d6ccb6 transparent; }
 .owner-app-shell ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -3014,3 +3014,123 @@ nav[aria-label="Primary"] .text-zinc-700,
 }
 @media (min-width: 768px) and (max-width: 1023px) { .owner-decision .owner-action-bar { padding-bottom: calc(10px + env(safe-area-inset-bottom)); } }
 @media (prefers-reduced-motion: reduce) { .owner-app-shell .owner-mobile-nav-item:active { transform: none; } }
+
+/* ==========================================================================
+   Owner UI kit, 2026-10-28: one way to build a page, a section, a number, a
+   notice and a button, in the same Obsidian & Ivory palette. Components live
+   in src/components/owner/kit.tsx; buttons in src/components/ui/button.tsx.
+   ========================================================================== */
+:root {
+  --owner-paper: #f7f5ef;
+  --owner-white: #fffdf8;
+  --owner-ink: #0a0a0a;
+  --owner-line: #e6e1d6;
+  --owner-line-strong: #d6ccb6;
+  --owner-muted: #5c584f;
+  --owner-subtle: #6b665c;
+  --owner-gold: #b8893b;
+  --owner-gold-deep: #8a6420;
+  --owner-gold-soft: #f4ead6;
+  --owner-gold-light: #e3c07a;
+  --owner-success: #1f6b45;
+  --owner-success-soft: #e8f3eb;
+  --owner-success-line: #c3dfcb;
+  --owner-warning: #7a5208;
+  --owner-warning-soft: #fbf2de;
+  --owner-warning-line: #ecd6a6;
+  --owner-danger: #a1231b;
+  --owner-danger-soft: #fcedeb;
+  --owner-danger-line: #efc4bf;
+}
+
+@layer components {
+  /* Page header */
+  .owner-eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--owner-gold-deep); }
+  .owner-lede { max-width: 46rem; font-size: 15px; line-height: 1.6; color: var(--owner-muted); }
+
+  /* Panels: every section of every page */
+  .owner-panel { min-width: 0; border-radius: 18px; border: 1px solid var(--owner-line); background: var(--owner-white); padding: 20px; }
+  .owner-panel.is-flush { padding: 0; overflow: hidden; }
+  .owner-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .owner-panel.is-flush > .owner-panel-head { margin: 0; padding: 16px 20px; border-bottom: 1px solid var(--owner-line); }
+  .owner-panel-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; letter-spacing: -0.005em; color: var(--owner-ink); }
+  .owner-panel-title > svg { width: 16px; height: 16px; flex: none; color: var(--owner-gold-deep); }
+  .owner-panel-count { font-weight: 500; color: var(--owner-subtle); }
+  .owner-panel-description { margin-top: 4px; font-size: 13.5px; line-height: 1.5; color: var(--owner-muted); }
+  .owner-panel-action { flex: none; }
+  @media (min-width: 640px) {
+    .owner-panel { padding: 24px; }
+    .owner-panel.is-flush > .owner-panel-head { padding: 18px 24px; }
+  }
+  :where(a.owner-panel) { display: block; }
+  a.owner-panel { transition: transform 260ms cubic-bezier(.2,.8,.2,1), box-shadow 260ms ease, border-color 260ms ease; }
+  a.owner-panel:hover { transform: translateY(-2px); border-color: var(--owner-line-strong); box-shadow: 0 18px 40px -24px rgba(10, 10, 10, 0.35); }
+
+  /* Numbers */
+  .owner-stat { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; }
+  .owner-stat-label { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; color: var(--owner-muted); }
+  .owner-stat-label > svg { width: 15px; height: 15px; flex: none; color: var(--owner-gold-deep); }
+  .owner-stat-value { font-size: 28px; line-height: 1.1; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: var(--owner-ink); }
+  .owner-stat-detail { font-size: 12.5px; line-height: 1.45; color: var(--owner-muted); }
+  @media (min-width: 640px) { .owner-stat { padding: 18px 20px; } }
+
+  /* The one dark card per page: the thing that matters most right now */
+  .owner-feature { position: relative; display: flex; min-width: 0; flex-direction: column; overflow: hidden; border-radius: 18px; padding: 24px; color: #f7f1e3;
+    background: radial-gradient(900px 300px at 110% -40%, rgba(227, 192, 122, 0.24), transparent 60%), linear-gradient(135deg, #141414 0%, #0a0a0a 60%, #17130c 100%);
+    box-shadow: 0 22px 44px -26px rgba(10, 10, 10, 0.7); transition: transform 260ms cubic-bezier(.2,.8,.2,1), box-shadow 260ms ease; }
+  .owner-feature::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, rgba(227, 192, 122, 0.22) 50%, transparent 70%); transform: translateX(-120%); transition: transform 900ms cubic-bezier(.2,.8,.2,1); pointer-events: none; }
+  a.owner-feature:hover { transform: translateY(-2px); box-shadow: 0 26px 50px -24px rgba(184, 137, 59, 0.45); }
+  a.owner-feature:hover::after { transform: translateX(120%); }
+  .owner-feature > * { position: relative; }
+  .owner-feature-label { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: #e9dfc8; }
+  .owner-feature-label > svg { width: 16px; height: 16px; color: var(--owner-gold-light); }
+  .owner-feature-value { margin-top: 10px; font-family: var(--font-fraunces), Georgia, serif; font-size: 60px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .owner-feature-text { margin-top: 10px; font-size: 15px; line-height: 1.55; color: #e9dfc8; }
+  .owner-feature-text b { color: #fbf6ea; }
+  @media (min-width: 640px) { .owner-feature { padding: 28px; } }
+
+  /* Status badges */
+  .owner-badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; border: 1px solid transparent; padding: 3px 10px; font-size: 12.5px; font-weight: 600; line-height: 1.35; white-space: nowrap; }
+  .owner-badge > svg { width: 14px; height: 14px; flex: none; }
+  .owner-badge[data-tone="success"] { background: var(--owner-success-soft); border-color: var(--owner-success-line); color: var(--owner-success); }
+  .owner-badge[data-tone="warning"] { background: var(--owner-warning-soft); border-color: var(--owner-warning-line); color: var(--owner-warning); }
+  .owner-badge[data-tone="danger"] { background: var(--owner-danger-soft); border-color: var(--owner-danger-line); color: var(--owner-danger); }
+  .owner-badge[data-tone="neutral"] { background: #f1ece1; border-color: #e3dccd; color: #4a463f; }
+  .owner-badge[data-tone="gold"] { background: var(--owner-gold-soft); border-color: #e6d6b3; color: var(--owner-gold-deep); }
+
+  /* Notices: something to know or do, with at most one action */
+  .owner-notice { display: flex; flex-direction: column; gap: 12px; border-radius: 16px; border: 1px solid; padding: 14px 16px; font-size: 14px; line-height: 1.55; color: var(--owner-ink); }
+  .owner-notice-body { display: flex; min-width: 0; flex: 1; gap: 12px; }
+  .owner-notice-body > svg { margin-top: 2px; width: 18px; height: 18px; flex: none; }
+  .owner-notice-title { font-weight: 600; }
+  .owner-notice[data-tone="info"] { background: #fbf6ea; border-color: #ecdcb8; }
+  .owner-notice[data-tone="info"] .owner-notice-body > svg { color: var(--owner-gold-deep); }
+  .owner-notice[data-tone="warning"] { background: var(--owner-warning-soft); border-color: var(--owner-warning-line); }
+  .owner-notice[data-tone="warning"] .owner-notice-body > svg { color: var(--owner-warning); }
+  .owner-notice[data-tone="danger"] { background: var(--owner-danger-soft); border-color: var(--owner-danger-line); }
+  .owner-notice[data-tone="danger"] .owner-notice-body > svg { color: var(--owner-danger); }
+  .owner-notice[data-tone="success"] { background: var(--owner-success-soft); border-color: var(--owner-success-line); }
+  .owner-notice[data-tone="success"] .owner-notice-body > svg { color: var(--owner-success); }
+  @media (min-width: 640px) { .owner-notice { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; } }
+
+  /* Lists inside panels */
+  .owner-list > li { padding: 12px 0; }
+  .owner-list > li + li { border-top: 1px solid #efe9dc; }
+  .owner-list > li:first-child { padding-top: 0; }
+  .owner-list > li:last-child { padding-bottom: 0; }
+  .owner-empty { font-size: 14px; line-height: 1.55; color: var(--owner-muted); }
+  .owner-meta { font-size: 12.5px; line-height: 1.5; color: var(--owner-muted); }
+
+  /* Tables inside flush panels */
+  .owner-table { width: 100%; text-align: left; font-size: 14px; }
+  .owner-table thead th { padding: 10px 20px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--owner-muted); background: #faf7f0; border-bottom: 1px solid var(--owner-line); }
+  .owner-table tbody td { padding: 12px 20px; border-top: 1px solid #efe9dc; }
+  .owner-table tbody tr:first-child td { border-top: 0; }
+  @media (min-width: 640px) { .owner-table thead th, .owner-table tbody td { padding-left: 24px; padding-right: 24px; } }
+
+  /* Chips: filters and choices (one look, one active state) */
+  .owner-chip { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; border-radius: 999px; border: 1px solid #ddd5c5; background: var(--owner-white); padding: 0 14px; font-size: 14px; font-weight: 500; color: #2b2925; white-space: nowrap; transition: background 160ms ease, border-color 160ms ease, color 160ms ease; }
+  .owner-chip:hover { border-color: var(--owner-line-strong); background: #f7f2e7; }
+  .owner-chip:is([aria-current="page"], [aria-pressed="true"], [data-active="true"]) { background: var(--owner-ink); border-color: var(--owner-ink); color: #fbf6ea; }
+  .owner-chip-count { font-variant-numeric: tabular-nums; opacity: 0.75; }
+}

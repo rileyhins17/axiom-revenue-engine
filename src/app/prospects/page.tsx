@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
+import { Empty, Notice, OwnerPage, PageHeader, Panel } from "@/components/owner/kit";
 import { ProspectRow, type ProspectRowView } from "@/components/prospects/prospect-row";
 import { getDatabase } from "@/lib/cloudflare";
 import { historyView, prospectOutcomeText, titleCase } from "@/lib/prospect-format";
@@ -38,8 +40,7 @@ function href(current: Search, change: Partial<Search>) {
 }
 
 function Chip({ active, to, children }: { active: boolean; to: string; children: React.ReactNode }) {
-  return <Link href={to as never} aria-current={active ? "page" : undefined}
-    className={`rounded-full px-3 py-1 text-sm ${active ? "bg-[#0a0a0a] text-[#fbf6ea]" : "border border-slate-300 hover:bg-slate-100"}`}>{children}</Link>;
+  return <Link href={to as never} aria-current={active ? "page" : undefined} className="owner-chip">{children}</Link>;
 }
 
 export default async function ProspectsPage({ searchParams }: { searchParams: Promise<Search> }) {
@@ -53,7 +54,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
   try {
     [rows, counts] = await Promise.all([listProspects(db, view, today, 1000), prospectCounts(db, today)]);
   } catch {
-    return <section className="mx-auto max-w-6xl px-6 py-8"><h1 className="text-2xl font-semibold">Call list</h1><p className="mt-2 text-sm">The call list could not be loaded. Refresh in a minute.</p></section>;
+    return <OwnerPage><PageHeader eyebrow="Archive: Axiom Web" title="Call list" /><Notice tone="warning" icon={AlertTriangle} title="The call list couldn't be loaded." role="status">Refresh in a minute.</Notice></OwnerPage>;
   }
   const q = search.q?.trim().toLowerCase() ?? "";
   const filtered = rows.filter((row) => (!search.city || row.city === search.city) && (!search.trade || row.niche === search.trade)
@@ -81,52 +82,49 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
 
   const activeFilters = [search.city, search.trade, search.kind].filter(Boolean).length;
   const filterChips = <>
-    <span className="text-slate-600">City</span>
+    <span className="text-[#5c584f]">City</span>
     <Chip active={!search.city} to={href(search, { city: undefined })}>All</Chip>
     {CITIES.map((city) => <Chip key={city} active={search.city === city} to={href(search, { city })}>{title(city)}</Chip>)}
-    <span className="ml-3 text-slate-600">Trade</span>
+    <span className="ml-3 text-[#5c584f]">Trade</span>
     <Chip active={!search.trade} to={href(search, { trade: undefined })}>All</Chip>
     {TRADES.map((trade) => <Chip key={trade} active={search.trade === trade} to={href(search, { trade })}>{title(trade)}</Chip>)}
-    <span className="ml-3 text-slate-600">Website</span>
+    <span className="ml-3 text-[#5c584f]">Website</span>
     <Chip active={!search.kind} to={href(search, { kind: undefined })}>Any</Chip>
     <Chip active={search.kind === "bad"} to={href(search, { kind: "bad" })}>Weak</Chip>
     <Chip active={search.kind === "none"} to={href(search, { kind: "none" })}>None</Chip>
   </>;
 
-  return <section className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-6">
-    <header className="flex flex-wrap items-end justify-between gap-3">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-semibold">Call list</h1>
-        <p className="hidden text-sm text-slate-600 sm:block">Local roofing, HVAC, landscaping, plumbing and electrical businesses across Waterloo Region and nearby towns with a weak website or none. Call, log what happened, and it&apos;s shared between Riley and Aidan.</p>
-      </div>
-      <form action="/prospects" className="flex w-full gap-2 sm:w-auto">
-        {Object.entries({ view, city: search.city, trade: search.trade, kind: search.kind }).filter(([, value]) => value).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
-        <input name="q" defaultValue={search.q ?? ""} placeholder="Search name or phone" aria-label="Search" type="search" enterKeyHint="search" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm sm:w-64" />
-      </form>
-    </header>
+  return <OwnerPage>
+    <PageHeader eyebrow="Archive: Axiom Web" title="Call list" description={<>Local roofing, HVAC, landscaping, plumbing and electrical businesses across Waterloo Region and nearby towns with a weak website or none. Call, log what happened, and it&apos;s shared between Riley and Aidan.</>}
+      actions={<>
+        <form action="/prospects" className="flex w-full gap-2 sm:w-auto">
+          {Object.entries({ view, city: search.city, trade: search.trade, kind: search.kind }).filter(([, value]) => value).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+          <input name="q" defaultValue={search.q ?? ""} placeholder="Search name or phone" aria-label="Search" type="search" enterKeyHint="search" className="h-10 w-full rounded-xl border border-[#d9d2c3] bg-[#fffdf8] px-3 text-sm sm:w-64" />
+        </form>
+      </>} />
 
-    <nav className="owner-scroll-row flex gap-2 border-b border-slate-200 pb-3 md:flex-wrap" aria-label="Lists">
+    <nav className="owner-scroll-row flex gap-2 border-b border-[#e6e1d6] pb-4 md:flex-wrap" aria-label="Lists">
       {TABS.map((tab) => <Chip key={tab.view} active={tab.view === view} to={href(search, { view: tab.view })}>{tab.label} ({counts[tab.view]})</Chip>)}
     </nav>
-    <p className="-mt-2 text-sm text-slate-600">{TABS.find((tab) => tab.view === view)?.help}</p>
+    <p className="-mt-2 text-sm text-[#5c584f]">{TABS.find((tab) => tab.view === view)?.help}</p>
     {/* Phones: the town/trade/website filters fold away; a computer shows them inline. */}
-    <details className="owner-filters rounded-xl border border-slate-200 bg-white md:hidden">
+    <details className="owner-filters owner-panel is-flush md:hidden">
       <summary className="flex min-h-11 cursor-pointer items-center justify-between px-4 text-sm font-semibold">
-        Filters{activeFilters ? <span className="rounded-full bg-[#0a0a0a] px-2 py-0.5 text-xs text-[#f2e3c2]">{activeFilters} on</span> : <span className="text-xs font-normal text-slate-600">town, trade, website</span>}
+        Filters{activeFilters ? <span className="rounded-full bg-[#0a0a0a] px-2 py-0.5 text-xs text-[#f2e3c2]">{activeFilters} on</span> : <span className="text-xs font-normal text-[#5c584f]">town, trade, website</span>}
       </summary>
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 p-3 text-sm">{filterChips}</div>
+      <div className="flex flex-wrap items-center gap-2 border-t border-[#e6e1d6] p-3 text-sm">{filterChips}</div>
     </details>
     <div className="hidden flex-wrap items-center gap-2 text-sm md:flex">{filterChips}</div>
 
-    <p className="text-sm text-slate-600">{filtered.length} businesses{filtered.length > shown.length ? ` (showing first ${shown.length})` : ""}</p>
-    {shown.length === 0 ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm">Nothing matches. Try another list or clear the filters.</p> :
-      <div className="rounded-xl border border-slate-200 bg-white md:overflow-x-auto">
+    <p className="text-sm text-[#5c584f]">{filtered.length} businesses{filtered.length > shown.length ? ` (showing first ${shown.length})` : ""}</p>
+    {shown.length === 0 ? <Panel><Empty>Nothing matches. Try another list or clear the filters.</Empty></Panel> :
+      <div className="owner-panel is-flush md:overflow-x-auto">
         <table className="owner-card-table w-full text-left md:min-w-[960px]">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+          <thead className="border-b border-[#e6e1d6] bg-[#faf7f0] text-xs uppercase tracking-wide text-[#5c584f]">
             <tr><th className="px-3 py-2 font-semibold">Business</th><th className="px-3 py-2 font-semibold">Where</th><th className="px-3 py-2 font-semibold">Why call</th><th className="px-3 py-2 font-semibold">Phone</th><th className="px-3 py-2 font-semibold">Last result</th><th className="px-3 py-2" /></tr>
           </thead>
           <tbody>{views.map((row) => <ProspectRow key={row.prospectId} row={row} />)}</tbody>
         </table>
       </div>}
-  </section>;
+  </OwnerPage>;
 }

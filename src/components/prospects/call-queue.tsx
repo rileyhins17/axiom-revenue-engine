@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { celebrate } from "@/components/motion/celebrate";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { displayPhone, telHref, titleCase } from "@/lib/prospect-format";
+import { cn } from "@/lib/utils";
 
 import { AiBrief } from "./ai-brief";
 import { CallerLaunch, useCallerHandoff } from "./caller-launch";
@@ -53,8 +55,8 @@ function opener(business: QueueBusiness, caller: string) {
 /** Google's reviews say how established a business is; none at all often means an old listing. */
 function Reviews({ count, stars }: { count: number | null | undefined; stars: number | null | undefined }) {
   if (count === null || count === undefined) return null;
-  if (count === 0) return <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700" title="No Google reviews: the listing may be old, so the number may not work.">No Google reviews</span>;
-  return <span className="inline-flex items-center gap-1 rounded-full bg-[#f4ead6] px-2.5 py-0.5 text-xs font-semibold text-[#6b4d16]">
+  if (count === 0) return <span className="owner-badge" data-tone="neutral" title="No Google reviews: the listing may be old, so the number may not work.">No Google reviews</span>;
+  return <span className="owner-badge" data-tone="gold">
     <Star className="size-3 fill-current" aria-hidden="true" />{stars ?? "–"} · {count} review{count === 1 ? "" : "s"}
   </span>;
 }
@@ -128,95 +130,94 @@ export function CallQueue({ business, remaining, caller, skipped, aiReady, brief
   return <div className="owner-queue grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-5">
     {/* 1. Who, and the Call button. */}
     <section key={business.prospectId} className={`${leaving ? "owner-slide-out" : "owner-slide-in"} min-w-0 lg:col-start-1 lg:row-start-1`} aria-label="Business to call">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="owner-panel">
         <div className="flex items-start justify-between gap-3">
-          <p className="min-w-0 truncate text-sm text-slate-600">{titleCase(business.city)} · {titleCase(business.niche)}</p>
-          <p className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium tabular-nums text-slate-700">{remaining} left</p>
+          <p className="min-w-0 truncate text-sm text-[#5c584f]">{titleCase(business.city)} · {titleCase(business.niche)}</p>
+          <p className="owner-badge shrink-0 tabular-nums" data-tone="neutral">{remaining} left</p>
         </div>
         <h2 className="font-display mt-1 text-[1.75rem] leading-tight tracking-tight sm:text-3xl">{business.name}</h2>
         <div className="mt-2.5 flex flex-wrap gap-1.5">
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${business.label === "NO_WEBSITE" ? "bg-amber-50 text-amber-900 ring-amber-200" : "bg-rose-50 text-rose-800 ring-rose-200"}`}>{website}</span>
-          {business.followUpAt ? <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">Follow-up due {business.followUpAt}</span> : null}
-          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">{business.attempts ? `Tried ${business.attempts}×` : "Never called"}</span>
+          <span className="owner-badge" data-tone={business.label === "NO_WEBSITE" ? "warning" : "danger"}>{website}</span>
+          {business.followUpAt ? <span className="owner-badge" data-tone="warning">Follow-up due {business.followUpAt}</span> : null}
+          <span className="owner-badge" data-tone="neutral">{business.attempts ? `Tried ${business.attempts}×` : "Never called"}</span>
           <Reviews count={business.googleRatingCount} stars={business.googleRating} />
         </div>
 
         <CallerLaunch prospectId={business.prospectId} phone={business.phone} label={`Call ${displayPhone(business.phone)}`}
-          className="owner-cta owner-call-button mt-5 w-full justify-center px-6 py-4 text-lg sm:w-auto sm:text-xl" />
-        {business.altPhone ? <p className="mt-2.5 text-sm text-slate-700">
-          No luck? <a href={telHref(business.altPhone)} className="font-semibold tabular-nums text-[#7a5818] underline underline-offset-2">Try {displayPhone(business.altPhone)}</a>
-          <span className="text-slate-600"> (Google&apos;s number; their website lists the one above)</span>
+          className={cn(buttonVariants({ size: "lg" }), "owner-call-button mt-5 h-14 w-full px-6 text-lg sm:w-auto sm:text-xl")} />
+        {business.altPhone ? <p className="mt-2.5 text-sm text-[#3b3a36]">
+          No luck? <a href={telHref(business.altPhone)} className="font-semibold tabular-nums text-[#8a6420] underline underline-offset-2">Try {displayPhone(business.altPhone)}</a>
+          <span className="text-[#5c584f]"> (Google&apos;s number; their website lists the one above)</span>
         </p> : null}
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <a href={business.mapsUrl} target="_blank" rel="noreferrer noopener" className="owner-soft-button"><MapPin className="size-4" aria-hidden="true" />Map</a>
-          {business.websiteUrl ? <a href={business.websiteUrl} target="_blank" rel="noreferrer noopener" className="owner-soft-button"><ExternalLink className="size-4" aria-hidden="true" />Their website</a> : null}
+          <a href={business.mapsUrl} target="_blank" rel="noreferrer noopener" className={buttonVariants({ variant: "outline", size: "sm" })}><MapPin aria-hidden="true" />Map</a>
+          {business.websiteUrl ? <a href={business.websiteUrl} target="_blank" rel="noreferrer noopener" className={buttonVariants({ variant: "outline", size: "sm" })}><ExternalLink aria-hidden="true" />Their website</a> : null}
         </div>
-        {business.address ? <p className="mt-2.5 text-xs text-slate-600">{business.address}</p> : null}
+        {business.address ? <p className="mt-2.5 text-xs text-[#5c584f]">{business.address}</p> : null}
       </div>
     </section>
 
     {/* 2. What happened: beside the business on a computer, straight after the Call button on a phone. */}
     {callerSelected
-      ? <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 lg:col-start-2 lg:row-span-2 lg:row-start-1" role="status">This record is open in Caller. Review and save the result there.</aside>
-      : <aside className="owner-decision h-fit space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1" aria-label="Log the call">
-        <h3 className="font-semibold">What happened?</h3>
+      ? <aside className="owner-panel h-fit lg:col-start-2 lg:row-span-2 lg:row-start-1" role="status">This record is open in Caller. Review and save the result there.</aside>
+      : <aside className="owner-panel owner-decision h-fit space-y-4 lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1" aria-label="Log the call">
+        <h3 className="owner-panel-title">What happened?</h3>
         <div className="grid grid-cols-2 gap-2" role="group" aria-label="Call outcome">
           {OUTCOMES.map((option) => {
             const active = outcome === option.value;
-            const tone = active ? (option.tone === "stop" || option.tone === "bad" ? "border-rose-700 bg-rose-700 text-white" : option.tone === "good" ? "owner-cta border-emerald-700" : "border-slate-900 bg-[#0a0a0a] text-[#fbf6ea]") : "border-slate-300 bg-white hover:bg-slate-50";
+            const tone = active ? (option.tone === "stop" || option.tone === "bad" ? "border-[#a1231b] bg-[#a1231b] text-white" : "border-[#0a0a0a] bg-[#0a0a0a] text-[#fbf6ea]") : "border-[#d9d2c3] bg-[#fffdf8] hover:border-[#cfc6b3] hover:bg-[#f7f2e7]";
             return <button key={option.value} type="button" aria-pressed={active} onClick={() => pick(option.value)}
               className={`owner-press owner-outcome flex min-h-12 items-center justify-between rounded-xl border px-3 py-2 text-left text-sm font-medium ${tone}`}>
-              {option.label}<kbd className={`owner-kbd rounded px-1.5 text-[11px] ${active ? "bg-white/20" : "bg-slate-100 text-slate-600"}`}>{option.key}</kbd>
+              {option.label}<kbd className={`owner-kbd rounded px-1.5 text-[11px] ${active ? "bg-white/20" : "bg-[#f1ece1] text-[#5c584f]"}`}>{option.key}</kbd>
             </button>;
           })}
         </div>
 
         <div>
-          <p className="text-sm font-medium">Follow up {outcome && NEEDS_DATE.has(outcome) ? null : <span className="font-normal text-slate-600">(optional)</span>}</p>
+          <p className="text-sm font-medium">Follow up {outcome && NEEDS_DATE.has(outcome) ? null : <span className="font-normal text-[#5c584f]">(optional)</span>}</p>
           <div className="mt-1.5 flex flex-wrap gap-2">
             {FOLLOW_UPS.map(([label, days]) => {
               const value = inDays(days);
               return <button key={label} type="button" onClick={() => setFollowUpAt(value)} aria-pressed={followUpAt === value}
-                className={`min-h-9 rounded-full px-3 py-1 text-xs font-medium ${followUpAt === value ? "bg-amber-600 text-white" : "border border-slate-300 bg-white hover:bg-slate-50"}`}>{label}</button>;
+                className="owner-chip">{label}</button>;
             })}
-            <input type="date" aria-label="Follow-up date" value={followUpAt} onChange={(event) => setFollowUpAt(event.target.value)} className="min-h-9 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs" />
-            {followUpAt ? <button type="button" onClick={() => setFollowUpAt("")} className="min-h-9 px-1 text-xs text-slate-600 underline">clear</button> : null}
+            <input type="date" aria-label="Follow-up date" value={followUpAt} onChange={(event) => setFollowUpAt(event.target.value)} className="min-h-9 rounded-full border border-[#ddd5c5] bg-[#fffdf8] px-3 text-sm" />
+            {followUpAt ? <button type="button" onClick={() => setFollowUpAt("")} className={buttonVariants({ variant: "link", size: "sm" })}>Clear</button> : null}
           </div>
         </div>
 
-        <label className="block text-sm font-medium">Notes <span className="owner-kbd font-normal text-slate-600">(N)</span>
+        <label className="block text-sm font-medium">Notes <span className="owner-kbd font-normal text-[#5c584f]">(N)</span>
           <textarea ref={noteRef} value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} rows={2}
-            placeholder="Who you spoke to, what they said, what's next" className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 text-sm" />
+            placeholder="Who you spoke to, what they said, what's next" className="mt-1 w-full rounded-xl border border-[#d9d2c3] bg-[#fffdf8] p-2.5 text-sm" />
         </label>
-        {error ? <p role="alert" className="text-sm text-rose-700">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm text-[#a1231b]">{error}</p> : null}
 
         {/* On a phone this bar stays pinned above the tab bar, so saving is always one tap away. */}
         <div className="owner-action-bar flex gap-2">
-          <button type="button" onClick={skip} className="inline-flex min-h-12 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50"><SkipForward className="size-4" aria-hidden="true" />Skip</button>
-          <button type="button" onClick={() => void save()} disabled={saving}
-            className="owner-cta min-h-12 flex-1 rounded-xl px-4 font-semibold disabled:opacity-50">{saving ? "Saving…" : outcome ? "Save & next" : "Pick what happened"}</button>
+          <Button type="button" variant="outline" onClick={skip} className="h-12"><SkipForward aria-hidden="true" />Skip</Button>
+          <Button type="button" onClick={() => void save()} disabled={saving} className="h-12 flex-1 text-base">{saving ? "Saving…" : outcome ? "Save & next" : "Pick what happened"}</Button>
         </div>
-        <p className="owner-kbd text-xs text-slate-600">Keys: 1–0 outcome · N notes · Ctrl+Enter save · S skip</p>
+        <p className="owner-kbd text-xs text-[#5c584f]">Keys: 1–0 outcome · N notes · Ctrl+Enter save · S skip</p>
       </aside>}
 
     {/* 3. What to say. */}
     <section className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-2" aria-label="What to say">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Why they need you</h3>
-        <ul className="mt-3 space-y-2 text-sm">{business.reasons.length ? business.reasons.slice(0, 5).map((reason) => <li key={reason} className="flex gap-2"><ChevronRight className="mt-0.5 size-4 shrink-0 text-rose-700" aria-hidden="true" />{reason}</li>) : <li className="text-slate-600">No details recorded.</li>}</ul>
+      <div className="owner-panel">
+        <h3 className="owner-panel-title">Why they need you</h3>
+        <ul className="mt-3 space-y-2 text-sm">{business.reasons.length ? business.reasons.slice(0, 5).map((reason) => <li key={reason} className="flex gap-2"><ChevronRight className="mt-0.5 size-4 shrink-0 text-[#a1231b]" aria-hidden="true" />{reason}</li>) : <li className="text-[#5c584f]">No details recorded.</li>}</ul>
       </div>
       <AiBrief prospectId={business.prospectId} initial={brief} aiReady={aiReady} />
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Quick opener</h3>
+      <div className="owner-panel">
+        <h3 className="owner-panel-title">Quick opener</h3>
         <p className="mt-3 text-sm leading-relaxed">{opener(business, caller)}</p>
-        <p className="mt-3 text-xs text-slate-600">Goal: book a 15-minute look at a free mock-up. Don&apos;t promise results.</p>
+        <p className="mt-3 text-xs text-[#5c584f]">Goal: book a 15-minute look at a free mock-up. Don&apos;t promise results.</p>
       </div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">History</h3>
+      <div className="owner-panel">
+        <h3 className="owner-panel-title">History</h3>
         {business.history.length ? <ul className="mt-3 space-y-2 text-sm">{business.history.map((item) => <li key={item.id}>
-          <span className="font-medium">{item.when} · {item.who} · {item.what}</span>{item.note ? <span className="text-slate-600"> — {item.note}</span> : null}
-        </li>)}</ul> : <p className="mt-3 text-sm text-slate-600">First time anyone&apos;s calling them.</p>}
+          <span className="font-medium">{item.when} · {item.who} · {item.what}</span>{item.note ? <span className="text-[#5c584f]"> — {item.note}</span> : null}
+        </li>)}</ul> : <p className="mt-3 text-sm text-[#5c584f]">First time anyone&apos;s calling them.</p>}
       </div>
     </section>
   </div>;

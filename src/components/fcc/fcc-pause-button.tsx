@@ -4,6 +4,8 @@ import { Pause, Play } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
+
 /** The one control on the FCC screen. It only ever touches FCC emails. */
 export function FccPauseButton({ state }: { state: "live" | "paused" }) {
   const router = useRouter();
@@ -20,11 +22,11 @@ export function FccPauseButton({ state }: { state: "live" | "paused" }) {
   }
   return <div className="space-y-2">
     {action === "pause"
-      ? <button type="button" disabled={busy} onClick={() => void submit()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-700 px-5 py-4 text-lg font-semibold text-white hover:bg-rose-800 disabled:opacity-50"><Pause className="size-5" aria-hidden="true" />Pause FCC emails</button>
-      : <button type="button" disabled={busy} onClick={() => void submit()} className="owner-cta flex w-full items-center justify-center gap-2 rounded-xl px-5 py-4 text-lg font-semibold disabled:opacity-50"><Play className="size-5" aria-hidden="true" />Resume FCC emails</button>}
-    <p className="text-xs text-slate-600">{action === "pause"
+      ? <Button type="button" variant="destructive" size="lg" disabled={busy} onClick={() => void submit()} className="w-full"><Pause aria-hidden="true" />Pause FCC emails</Button>
+      : <Button type="button" size="lg" disabled={busy} onClick={() => void submit()} className="w-full"><Play aria-hidden="true" />Resume FCC emails</Button>}
+    <p className="owner-meta">{action === "pause"
       ? "Stops FCC emails within a minute. Nothing else changes."
       : "Starts again at the next send time. Only FCC emails."}</p>
-    {error ? <p role="alert" className="text-sm text-rose-700">{error}</p> : null}
+    {error ? <p role="alert" className="text-sm font-medium text-[#a1231b]">{error}</p> : null}
   </div>;
 }

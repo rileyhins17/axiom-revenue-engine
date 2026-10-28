@@ -3,7 +3,7 @@
 import { Building2, MessageSquareText, User } from "lucide-react";
 import { usePathname } from "next/navigation";
 
-import { getNavItemForPath } from "@/lib/navigation";
+import { ARCHIVED_PAGE_NAMES, getNavItemForPath } from "@/lib/navigation";
 
 export function LayoutBreadcrumb() {
   const pathname = usePathname();
@@ -49,14 +49,15 @@ export function LayoutBreadcrumb() {
 
   if (route) {
     const Icon = route.icon;
+    const archived = pathname ? ARCHIVED_PAGE_NAMES[pathname] : undefined;
     return (
-      <div className="owner-breadcrumb flex min-w-0 items-center gap-3 text-sm">
-        <div className="owner-breadcrumb-icon grid size-8 shrink-0 place-items-center rounded-lg">
-          <Icon className="size-3.5" />
-        </div>
-        <div className="flex min-w-0 items-baseline gap-2.5">
+      <div className="owner-breadcrumb flex min-w-0 items-center gap-2.5 text-sm">
+        <Icon className="size-4 shrink-0 text-[#8a6420]" aria-hidden="true" />
+        <div className="flex min-w-0 items-baseline gap-2">
           <span className="truncate font-semibold tracking-tight">{route.label}</span>
-          <span className="hidden truncate text-[11px] text-[#52645a] md:inline">{route.description}</span>
+          {archived
+            ? <><span className="text-[#8a857a]" aria-hidden="true">›</span><span className="truncate font-medium text-[#3b3a36]">{archived}</span></>
+            : <span className="hidden truncate text-xs text-[#5c584f] md:inline">{route.description}</span>}
         </div>
       </div>
     );

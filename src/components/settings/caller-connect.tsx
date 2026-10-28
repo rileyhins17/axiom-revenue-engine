@@ -1,6 +1,8 @@
 "use client";
 
 import { Check, Copy, Headset, KeyRound } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useState } from "react";
 
 type Token = { id: string; label: string; createdAt: string; lastUsedAt: string | null; revokedAt: string | null };
@@ -25,10 +27,10 @@ export function CallerConnect() {
     return response.json() as Promise<{ token?: string }>;
   }
 
-  return <section id="caller" className="rounded-2xl border border-slate-200 bg-white p-5">
-    <h2 className="flex items-center gap-2 font-semibold"><Headset className="size-4" aria-hidden="true" />Axiom Caller extension</h2>
-    <p className="mt-1 text-sm text-slate-600">Connect your Axiom Caller workspace. Results save locally first, then sync here under your account.</p>
-    <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-slate-700">
+  return <section id="caller" className="owner-panel">
+    <h2 className="owner-panel-title"><Headset aria-hidden="true" />Axiom Caller extension</h2>
+    <p className="owner-panel-description">Connect your Axiom Caller workspace. Results save locally first, then sync here under your account.</p>
+    <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-[#3b3a36]">
       <li>Create a key below and copy it (it&apos;s only shown once).</li>
       <li>In the extension, expand <b>Revenue Engine &amp; Orbit</b>, choose Revenue Engine, and paste the key.</li>
       <li>Check the displayed operator and workspace, then open a business with <b>Open Caller</b> or its call button.</li>
@@ -37,18 +39,18 @@ export function CallerConnect() {
       <p className="text-xs font-semibold text-[#5c4210]">Your new key (copy it now)</p>
       <div className="mt-2 flex items-center gap-2">
         <code className="min-w-0 flex-1 truncate rounded bg-white px-2 py-1.5 text-xs ring-1 ring-[#efe2c6]">{fresh}</code>
-        <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(fresh); setCopied(true); } catch { setError('Copy failed. Select and copy the key manually.'); } }} className="owner-press inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium">
+        <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(fresh); setCopied(true); } catch { setError('Copy failed. Select and copy the key manually.'); } }} className={buttonVariants({ variant: "outline", size: "xs" })}>
           {copied ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}{copied ? "Copied" : "Copy"}
         </button>
       </div>
     </div> : null}
     <button type="button" onClick={async () => { const result = await post({ action: "create", label: "Axiom Caller" }); if (result?.token) { setFresh(result.token); setCopied(false); void load(); } }}
-      className="owner-cta mt-4 inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold"><KeyRound className="size-4" aria-hidden="true" />Create extension key</button>
-    {error ? <p role="alert" className="mt-2 text-sm text-rose-700">{error}</p> : null}
-    {tokens.length ? <ul className="mt-4 divide-y divide-slate-100 text-sm">{tokens.map((token) => <li key={token.id} className="flex items-center justify-between gap-3 py-2">
-      <span><span className="font-medium">{token.label}</span> <span className="text-slate-600">· made {day(token.createdAt)} · last used {day(token.lastUsedAt)}</span></span>
-      {token.revokedAt ? <span className="text-xs text-slate-600">Revoked</span>
-        : <button type="button" onClick={async () => { await post({ action: "revoke", id: token.id }); void load(); }} className="text-xs font-medium text-rose-700 hover:underline">Revoke</button>}
+      className={cn(buttonVariants(), "mt-4")}><KeyRound className="size-4" aria-hidden="true" />Create extension key</button>
+    {error ? <p role="alert" className="mt-2 text-sm text-[#a1231b]">{error}</p> : null}
+    {tokens.length ? <ul className="mt-4 divide-y divide-[#efe9dc] text-sm">{tokens.map((token) => <li key={token.id} className="flex items-center justify-between gap-3 py-2">
+      <span><span className="font-medium">{token.label}</span> <span className="text-[#5c584f]">· made {day(token.createdAt)} · last used {day(token.lastUsedAt)}</span></span>
+      {token.revokedAt ? <span className="text-xs text-[#5c584f]">Revoked</span>
+        : <button type="button" onClick={async () => { await post({ action: "revoke", id: token.id }); void load(); }} className="text-xs font-semibold text-[#a1231b] hover:underline">Revoke</button>}
     </li>)}</ul> : null}
   </section>;
 }

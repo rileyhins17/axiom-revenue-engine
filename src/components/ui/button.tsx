@@ -4,34 +4,41 @@ import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+// One set of buttons for the whole owner app (Obsidian & Ivory):
+// default = the main action of a section (ink), gold = the main action on a dark card,
+// outline = a second action, secondary = a quiet filled action, ghost = a low-key action,
+// destructive = stops or removes something, link = an inline text action.
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-150 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/55 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06101a] aria-invalid:ring-destructive/30 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b8893b] aria-invalid:border-[#a1231b]",
   {
     variants: {
       variant: {
         default:
-          "bg-gradient-to-b from-emerald-300 to-emerald-500 text-[#02160d] font-semibold border border-emerald-400/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_24px_rgba(16,185,129,0.18)] hover:brightness-110 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_10px_32px_rgba(16,185,129,0.28)] active:translate-y-px",
+          "bg-[#0a0a0a] text-[#fbf6ea] shadow-[0_10px_24px_-14px_rgba(10,10,10,0.7)] hover:bg-[#1c1c1c] hover:shadow-[0_12px_28px_-14px_rgba(184,137,59,0.55)]",
+        gold:
+          "bg-[#f7e9c8] text-[#0a0a0a] shadow-[0_8px_24px_-10px_rgba(227,192,122,0.6)] hover:bg-[#fbf1da]",
         destructive:
-          "bg-gradient-to-b from-rose-500 to-rose-600 text-white border border-rose-500/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_24px_rgba(244,63,94,0.2)] hover:brightness-110",
+          "bg-[#a1231b] text-white shadow-[0_10px_24px_-14px_rgba(161,35,27,0.7)] hover:bg-[#8c1d16]",
         outline:
-          "border border-white/[0.12] bg-white/[0.025] text-zinc-200 hover:border-white/[0.2] hover:bg-white/[0.06] hover:text-white",
+          "border border-[#d9d2c3] bg-[#fffdf8] text-[#0a0a0a] hover:border-[#cfc6b3] hover:bg-[#f7f2e7]",
         secondary:
-          "bg-white/[0.06] text-zinc-100 border border-white/[0.08] hover:bg-white/[0.1] hover:border-white/[0.14]",
+          "bg-[#f1ebdd] text-[#0a0a0a] hover:bg-[#e9e1cd]",
         ghost:
-          "text-zinc-400 hover:bg-white/[0.05] hover:text-white",
-        link: "text-emerald-300 underline-offset-4 hover:underline hover:text-emerald-200",
+          "text-[#3b3a36] hover:bg-[#f1ebdd] hover:text-[#0a0a0a]",
+        link: "text-[#8a6420] underline-offset-4 hover:underline active:scale-100",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
-        "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
+        default: "h-10 px-4",
+        xs: "h-8 gap-1.5 rounded-lg px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3.5",
+        sm: "h-9 gap-1.5 px-3",
+        lg: "h-12 px-5 text-base [&_svg:not([class*='size-'])]:size-5",
+        icon: "size-10",
+        "icon-xs": "size-8 rounded-lg [&_svg:not([class*='size-'])]:size-3.5",
+        "icon-sm": "size-9",
+        "icon-lg": "size-12",
       },
     },
+    compoundVariants: [{ variant: "link", class: "h-auto px-0 py-0" }],
     defaultVariants: {
       variant: "default",
       size: "default",
