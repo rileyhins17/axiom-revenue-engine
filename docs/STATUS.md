@@ -17,7 +17,7 @@
 - Allowlists updated for the new cron: `scripts/check-safety-config.mjs`, `scripts/release-production.mjs`, `src/lib/ops/schedules.test.ts`.
 
 **Production data changes tonight (Cloudflare API, Riley's session)**
-- Held the 10 contacts Aidan's Claude emailed by hand on Oct 27 (Aidan follows up himself Fri Oct 30; the pipeline has `gilbert.g@phoenixinternet.com`) and Centra IP (`patrickb@centraip.com`, which Aidan emailed by hand Oct 26 per his Daily log), under both keys. Bookmark before: `000041a3-00000000-00005112-bfc52478e7b5176380b98f98ffe518e8`.
+- Held the 10 contacts Aidan's Claude emailed by hand on Oct 27 (Aidan follows up himself Fri Oct 30; for Phoenix Internet the pipeline's address form was held) and Centra IP (listed as Advanced Communications, which Aidan emailed by hand Oct 26 per his Daily log), under both keys. Addresses are in Slack and the database, not here: this repo is public. Bookmark before: `000041a3-00000000-00005112-bfc52478e7b5176380b98f98ffe518e8`.
 - Fixed 5 greetings that would have read "Hi Rival,", "Hi Tj,", "Hi New-miracles,", "Hi Srs," and "Hi Wholesale," (`firstName` only; the approved copy is unchanged). Bookmark before: `000041a6-00000000-00005112-e5e88b26d0798cc7437a6f94f189130b`.
 - `KvStore` `fcc.batchNames` labels the two import times "Batch 1" and "Batch 3" for the screen.
 - v3 now: 302 `ready`, 86 `held`. Batch 1: 74 ready, 14 held. Batch 3: 228 ready, 72 held.
