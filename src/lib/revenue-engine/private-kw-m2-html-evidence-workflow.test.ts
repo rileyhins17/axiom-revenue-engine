@@ -22,6 +22,11 @@ import { preparePrivateKwImport, PRIVATE_KW_IMPORT_VERSION } from "@/lib/revenue
 import { buildPrivateKwPersistencePlan } from "@/lib/revenue-engine/private-kw-persistence-plan";
 import { buildPrivateKwShadowSliceManifest, PRIVATE_KW_SHADOW_SLICE_SIZE, PRIVATE_KW_SHADOW_SLICE_VERSION } from "@/lib/revenue-engine/private-kw-shadow-slice";
 import { executePrivateKwM2HtmlEvidence, reloadPrivateKwM2WebsiteEvidenceReceipt } from "@/lib/revenue-engine/private-kw-m2-html-evidence-workflow";
+import { pinClock } from "@/lib/revenue-engine/test-support/pinned-clock";
+
+// The fixtures carry real Aug-Sep 2026 dates (freshness windows, approvals that expire), so the
+// clock is pinned inside them; otherwise these tests fail once the real date passes them.
+test.after(pinClock("2026-09-21T16:00:00.000Z"));
 
 import {
   PRIVATE_KW_M2_HTML_EVIDENCE_WORKFLOW_VERSION,

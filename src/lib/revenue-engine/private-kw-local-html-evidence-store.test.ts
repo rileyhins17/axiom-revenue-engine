@@ -23,6 +23,11 @@ import {
   type PrivateKwM2ExecutionAuthorization,
 } from "./private-kw-m2-authorization";
 import { privateKwPublicHttpTransportReceiptDigest } from "./private-kw-public-http-transport";
+import { pinClock } from "./test-support/pinned-clock";
+
+// The fixtures carry real Aug-Sep 2026 dates (freshness windows, approvals that expire), so the
+// clock is pinned inside them; otherwise these tests fail once the real date passes them.
+test.after(pinClock("2026-09-21T16:00:00.000Z"));
 
 const HTML = Buffer.from("<!doctype html><html><title>Roofing</title><body>public facts</body></html>");
 const NOW = "2026-09-21T12:00:00.000Z";

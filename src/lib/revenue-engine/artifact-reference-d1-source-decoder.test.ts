@@ -121,6 +121,12 @@ import {
   WEBSITE_CAPTURE_VERSION,
   type WebsiteCaptureResult,
 } from "@/lib/revenue-engine/website-capture";
+import { pinClock, pinDatabaseClock } from "@/lib/revenue-engine/test-support/pinned-clock";
+
+// The fixtures carry real Aug-Sep 2026 dates (freshness windows, availability receipts), so the
+// clock, and the test database's clock, are pinned inside them; otherwise these tests fail once
+// the real date passes them.
+test.after(pinClock("2026-09-21T16:00:00.000Z"));
 
 const BUSINESS_ID = "business:atomic-decoder-roofing";
 const WORKFLOW_ID = "11111111-1111-4111-8111-111111111111";
@@ -328,6 +334,7 @@ function lease(attempt: FixtureWorkflowAttemptSnapshot): FixtureWorkflowLeaseCla
 
 function freshDatabase() {
   const database = new Database(":memory:");
+  pinDatabaseClock(database);
   database.pragma("foreign_keys = ON");
   for (const migration of [
     "0054_revenue_shadow_kernel.sql",
