@@ -1,19 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { CheckCircle2, Mail, Settings, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleHelp, Info, Mail, ShieldCheck, UserRound } from "lucide-react";
 
 import { EmergencyControlCard } from "@/components/emergency-control-card";
-import { PageHeader } from "@/components/ui/page-header";
-
-type MailboxStatus = {
-  email: string;
-  connected: boolean;
-  status: string | null;
-};
+import { Badge, Notice, Panel } from "@/components/owner/kit";
 
 type EmergencyState = {
-  emergencyPaused: boolean;
+  status: "VERIFIED" | "UNAVAILABLE";
+  emergencyPaused: boolean | null;
   emergencyPausedAt: string | null;
   emergencyPausedBy: string | null;
   emergencyPauseReason: string | null;
@@ -27,104 +21,92 @@ type UserProfile = {
   role: string | null;
 };
 
-type RuntimeStatus = {
-  currentUserEmail: string;
-  globalDailySendCap: number;
-};
+export function SettingsAccount({ userProfile }: { userProfile: UserProfile }) {
+  return (
+    <Panel title="Your account" icon={UserRound}>
+      <dl aria-label="Your account" className="divide-y divide-[#efe9dc]">
+        <AccountRow label="Name" value={userProfile.name || "Name not set"} />
+        <AccountRow label="Email" value={userProfile.email} />
+        <AccountRow label="Access" value={userProfile.role ?? "user"} capitalize />
+      </dl>
+    </Panel>
+  );
+}
 
-export function SettingsClient({
-  userProfile,
+/** The paused website campaign's controls. None of them touch FCC emails. */
+export function SettingsOutreach({
   isAdmin,
-  runtimeStatus,
-  mailboxes,
   emergencyControl,
 }: {
-  userProfile: UserProfile;
   isAdmin: boolean;
-  runtimeStatus: RuntimeStatus;
-  mailboxes: MailboxStatus[];
   emergencyControl: EmergencyState;
 }) {
-  return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <PageHeader
-        eyebrow="Workspace controls"
-        title="Settings"
-        description="Connect sending identities, review operating limits, and control autonomous work."
-        icon={Settings}
-        status={<span className="v2-pill"><span className="capitalize text-emerald-300">{userProfile.role ?? "user"}</span><span className="font-mono text-zinc-300">{runtimeStatus.currentUserEmail}</span></span>}
-        metrics={[
-          { label: "Daily send limit", value: runtimeStatus.globalDailySendCap, detail: "workspace total", tone: "info" },
-          { label: "Connected inboxes", value: mailboxes.filter((mailbox) => mailbox.connected).length, detail: `of ${mailboxes.length}`, tone: "positive" },
-        ]}
-      />
+  const stopVerified = emergencyControl.status === "VERIFIED" && typeof emergencyControl.emergencyPaused === "boolean";
+  const stopState = stopVerified ? (emergencyControl.emergencyPaused ? "Stopped" : "Clear") : "Unknown";
 
-      <Panel>
-        <SectionTitle
-          title="Sender mailboxes"
-          detail={`Connect once via Google OAuth. Runtime cap: ${runtimeStatus.globalDailySendCap}/day total.`}
-        />
-        <div className="space-y-3">
-          {mailboxes.map((mailbox) => (
-            <MailboxRow key={mailbox.email} mailbox={mailbox} />
-          ))}
-        </div>
+  return (
+    <>
+      <div className="space-y-3 pt-2">
+        <p className="owner-eyebrow">Old website outreach</p>
+        <Notice tone="info" icon={Info}>
+          These two are for the paused website campaign. They don&apos;t affect FCC emails: FCC has its own Pause button on the FCC screen.
+        </Notice>
+      </div>
+
+      <Panel
+        title={<span id="safety-heading">Emergency stop</span>}
+        icon={ShieldCheck}
+        action={<Badge tone={stopState === "Stopped" ? "danger" : stopState === "Clear" ? "success" : "warning"}
+          icon={stopState === "Stopped" ? AlertTriangle : stopState === "Clear" ? CheckCircle2 : CircleHelp}>{stopState}</Badge>}
+        description={stopVerified
+          ? emergencyControl.emergencyPaused
+            ? "The saved setting confirms the stop is engaged. Autonomous intake, queueing, and sending are blocked."
+            : "The saved setting confirms the stop is clear. This does not mean email or other providers are ready."
+          : "The stop could not be checked. Treat the system as unavailable until an administrator can verify it."}
+      >
+        {isAdmin && stopVerified ? (
+          <EmergencyControlCard initialState={{
+            emergencyPaused: emergencyControl.emergencyPaused as boolean,
+            emergencyPausedAt: emergencyControl.emergencyPausedAt,
+            emergencyPausedBy: emergencyControl.emergencyPausedBy,
+            emergencyPauseReason: emergencyControl.emergencyPauseReason,
+          }} />
+        ) : !stopVerified ? (
+          <Notice tone="warning" icon={CircleHelp} role="status">
+            {isAdmin ? "The stop control is unavailable while its state is unknown. Refresh this page after the settings service recovers." : "Ask an administrator to verify the stop before any external work."}
+          </Notice>
+        ) : (
+          <p className="owner-empty">You can view the saved stop state. Only an administrator can change it.</p>
+        )}
       </Panel>
 
-      {isAdmin ? <EmergencyControlCard initialState={emergencyControl} /> : null}
-    </div>
+      <Panel
+        title={<span id="readiness-heading">Business email readiness</span>}
+        icon={Mail}
+        action={<Badge tone="neutral">Not ready</Badge>}
+        description="Five checks remain: incoming mail, replies, sender setup, contact eligibility, and approval of each message."
+      >
+        <details className="rounded-xl border border-[#e6e1d6] bg-[#faf7f0] px-4 py-3">
+          <summary className="cursor-pointer text-sm font-semibold text-[#0a0a0a]">See the five checks</summary>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-5 text-[#3b3a36]">
+            <li>Incoming mail must be shown to reach the right owner.</li>
+            <li>A working reply path and reply owner must be confirmed.</li>
+            <li>Provider access and sender-domain approval must be confirmed separately from forwarding.</li>
+            <li>Each contact must be eligible for the specific message; a verified address alone is not permission.</li>
+            <li>An owner must approve the exact message before sending.</li>
+          </ul>
+          <p className="owner-meta mt-3 border-t border-[#e6e1d6] pt-3">These checks are separate. This page does not connect a provider, buy a service, or turn on sending. The planned setup does not require paid Google Workspace mailboxes.</p>
+        </details>
+      </Panel>
+    </>
   );
 }
 
-function MailboxRow({ mailbox }: { mailbox: MailboxStatus }) {
-  const statusLabel = mailbox.connected
-    ? `Connected · ${mailbox.status?.toLowerCase() ?? "warming"}`
-    : "Not connected";
+function AccountRow({ label, value, capitalize = false }: { label: string; value: string; capitalize?: boolean }) {
   return (
-    <div
-      className="v2-tile flex flex-col gap-4 p-4 transition hover:border-white/[0.12] sm:flex-row sm:items-center sm:justify-between"
-      role="group"
-      aria-label={`Mailbox ${mailbox.email} — ${statusLabel}`}
-    >
-      <div className="flex min-w-0 items-center gap-3">
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-lg border ${mailbox.connected ? "border-emerald-400/30 bg-emerald-400/[0.08]" : "border-zinc-700 bg-black/30"}`}
-          aria-hidden="true"
-        >
-          {mailbox.connected ? <CheckCircle2 className="h-4 w-4 text-emerald-300" /> : <XCircle className="h-4 w-4 text-zinc-500" />}
-        </div>
-        <div className="min-w-0">
-          <div className="truncate font-mono text-sm text-white">{mailbox.email}</div>
-          <div className="mt-0.5 text-[11px] text-zinc-400">{statusLabel}</div>
-        </div>
-      </div>
-      {mailbox.connected ? (
-        <span className="rounded-md border border-emerald-400/25 bg-emerald-400/10 px-2 py-1 text-[10px] font-mono uppercase tracking-widest text-emerald-300">
-          Active
-        </span>
-      ) : (
-        <a
-          href={`/api/outreach/gmail/connect?email=${encodeURIComponent(mailbox.email)}`}
-          aria-label={`Connect ${mailbox.email} via Google OAuth`}
-          className="v2-btn-primary v2-focus-ring inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold whitespace-nowrap sm:w-auto cursor-pointer"
-        >
-          <Mail className="h-4 w-4" aria-hidden="true" />
-          Connect Gmail
-        </a>
-      )}
-    </div>
-  );
-}
-
-function Panel({ children }: { children: ReactNode }) {
-  return <div className="v2-card p-4 sm:p-5">{children}</div>;
-}
-
-function SectionTitle({ title, detail }: { title: string; detail: string }) {
-  return (
-    <div className="mb-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">{title}</div>
-      <p className="mt-1 text-xs leading-5 text-zinc-500">{detail}</p>
+    <div className="flex flex-wrap justify-between gap-2 py-3 text-sm first:pt-0 last:pb-0">
+      <dt className="text-[#5c584f]">{label}</dt>
+      <dd className={`break-all font-medium text-[#0a0a0a] ${capitalize ? "capitalize" : ""}`}>{value}</dd>
     </div>
   );
 }

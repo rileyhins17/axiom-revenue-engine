@@ -19,7 +19,8 @@ if (
 const nextConfig: NextConfig = {
   typedRoutes: true,
 
-  // Keep ignored local datasets and checkpoints out of deployable server traces.
+  // Next's file tracer can otherwise copy ignored local research and SQLite
+  // checkpoints into the deployable server bundle when routes use fs.
   outputFileTracingExcludes: {
     "/*": [
       "./data/**/*",

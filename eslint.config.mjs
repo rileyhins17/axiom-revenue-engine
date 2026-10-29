@@ -11,13 +11,18 @@ const eslintConfig = defineConfig([
     ".next/**",
     ".open-next/**",
     ".wrangler/**",
+    // Wrangler dev bundles next to a nested config (scripts/site-check-probe).
+    "**/.wrangler/**",
     ".playwright-mcp/**",
     ".claude/**",
-    "Axiom-Pipeline-Engine/**",
-    "axiom-pipeline-engine/**",
+    ".superpowers/**",
+    "backups/**",
+    "axiom-revenue-engine/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "cloudflare-env.d.ts",
+    "src/engine/worker-env.d.ts",
   ]),
 ]);
 

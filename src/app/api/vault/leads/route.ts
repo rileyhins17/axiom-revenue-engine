@@ -19,6 +19,48 @@ function archiveWhereClause(mode: ArchiveMode) {
   return "COALESCE(isArchived, 0) = 0";
 }
 
+const latestQualificationJoin = `
+  LEFT JOIN (
+    SELECT
+      q1."leadId" AS "qualificationLeadId",
+      q1."totalScore" AS "qualificationTotalScore",
+      q1."websiteNeedScore" AS "qualificationWebsiteNeedScore",
+      q1."businessFitScore" AS "qualificationBusinessFitScore",
+      q1."reachabilityScore" AS "qualificationReachabilityScore",
+      q1."timingScore" AS "qualificationTimingScore",
+      q1."hardGateStatus" AS "qualificationHardGateStatus",
+      q1."band" AS "qualificationBand",
+      q1."recommendedChannel" AS "qualificationRecommendedChannel",
+      q1."autonomousEmailEligible" AS "qualificationAutonomousEmailEligible",
+      q1."reasonCodesJson" AS "qualificationReasonCodesJson",
+      q1."evidenceJson" AS "qualificationEvidenceJson",
+      q1."policyVersion" AS "qualificationPolicyVersion",
+      q1."createdAt" AS "qualificationCreatedAt"
+    FROM "QualificationSnapshot" q1
+    WHERE q1."id" = (
+      SELECT q2."id"
+      FROM "QualificationSnapshot" q2
+      WHERE q2."leadId" = q1."leadId"
+      ORDER BY q2."createdAt" DESC, q2."id" DESC
+      LIMIT 1
+    )
+  ) quality ON quality."qualificationLeadId" = "Lead"."id"`;
+
+const qualificationSelect = `
+  quality."qualificationTotalScore",
+  quality."qualificationWebsiteNeedScore",
+  quality."qualificationBusinessFitScore",
+  quality."qualificationReachabilityScore",
+  quality."qualificationTimingScore",
+  quality."qualificationHardGateStatus",
+  quality."qualificationBand",
+  quality."qualificationRecommendedChannel",
+  quality."qualificationAutonomousEmailEligible",
+  quality."qualificationReasonCodesJson",
+  quality."qualificationEvidenceJson",
+  quality."qualificationPolicyVersion",
+  quality."qualificationCreatedAt"`;
+
 export async function GET(request: Request) {
   const authResult = await requireApiSession(request);
   if ("response" in authResult) return authResult.response;
@@ -56,8 +98,10 @@ export async function GET(request: Request) {
               contactName, tacticalNote, outreachStatus, outreachChannel,
               firstContactedAt, lastContactedAt, nextFollowUpDue, outreachNotes,
               axiomScore, axiomTier, disqualifyReason, emailType, emailConfidence,
-              isArchived, createdAt
+              isArchived, createdAt,
+              ${qualificationSelect}
        FROM "Lead"
+       ${latestQualificationJoin}
        WHERE ${archiveWhere}
          AND ("businessName" LIKE ?1 OR "email" LIKE ?1 OR "city" LIKE ?1 OR "niche" LIKE ?1 OR "contactName" LIKE ?1)
        ORDER BY createdAt DESC
@@ -80,8 +124,10 @@ export async function GET(request: Request) {
               contactName, tacticalNote, outreachStatus, outreachChannel,
               firstContactedAt, lastContactedAt, nextFollowUpDue, outreachNotes,
               axiomScore, axiomTier, disqualifyReason, emailType, emailConfidence,
-              isArchived, createdAt
+              isArchived, createdAt,
+              ${qualificationSelect}
        FROM "Lead"
+       ${latestQualificationJoin}
        WHERE ${archiveWhere}
        ORDER BY createdAt DESC
        LIMIT ${limit}`;

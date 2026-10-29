@@ -46,8 +46,8 @@ export function RefreshButton() {
   return (
     <div className="flex items-center gap-2">
       {lastUpdated ? (
-        <span className="hidden text-[11px] text-zinc-500 sm:inline" aria-live="polite">
-          Last updated <span className="font-mono text-zinc-400">{lastUpdated}</span>
+        <span className="hidden text-[11px] text-[#52645a] sm:inline" aria-live="polite">
+          Last updated <span className="font-mono text-[#43584b]">{lastUpdated}</span>
         </span>
       ) : null}
       <button
@@ -56,7 +56,7 @@ export function RefreshButton() {
         aria-label={refreshing ? "Refreshing data" : "Refresh data"}
         title="Re-run all dashboard queries"
         onClick={refreshData}
-        className="v2-focus-ring inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 py-1.5 text-[11px] font-medium text-zinc-400 transition hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white disabled:opacity-50 cursor-pointer"
+        className="v2-focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#dce5dd] bg-white px-3 py-1.5 text-[11px] font-medium text-[#43584b] transition hover:border-[#bad1c3] hover:bg-[#f4f8f4] disabled:opacity-50 cursor-pointer"
       >
         {refreshing ? (
           <Loader2Icon className="size-3 animate-spin" aria-hidden="true" />

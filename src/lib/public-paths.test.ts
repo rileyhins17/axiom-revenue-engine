@@ -11,6 +11,7 @@ test("internal cron reaches its bearer-authenticated route", () => {
 
 test("ordinary application APIs remain session protected", () => {
   assert.equal(isPublicPath("/api/vault/leads"), false);
+  assert.equal(isPublicPath("/api/v1/leads"), false);
   assert.equal(isPublicPath("/api/outreach/automation/overview"), false);
 });
 

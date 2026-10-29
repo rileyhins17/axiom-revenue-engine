@@ -1,0 +1,129 @@
+{
+  "version": "staging-console-release/v1",
+  "preparedAt": "2026-08-28T23:38:10.886Z",
+  "preparedBy": "CODEX_INTEGRATION_OWNER",
+  "candidate": {
+    "releaseSha": "cfd3cb24945b86de77d2b730d54f92f2b91532fb",
+    "parentSha": "3bcd8eef36b386187c7eb72803515b65269bf71d",
+    "treeSha": "a3be008f4396c3838b70d669d0d28e767493e234",
+    "committedAt": "2026-08-28T19:30:13-04:00",
+    "subject": "feat-owner-quality-lab",
+    "sourceBlobs": [
+      { "path": "package-lock.json", "blobSha": "85108450828809058fcd75675617b78bf8490b0e" },
+      { "path": "wrangler.jsonc", "blobSha": "ead3b564f3e333cf3f9b825707ead9dcba8271bf" },
+      { "path": "scripts/check-safety-config.mjs", "blobSha": "5fa29149c21e1aefe86654871b334ad021b18100" },
+      { "path": "scripts/verify-owner-ui-acceptance.ts", "blobSha": "9a588d85fcbf2a13fc4638659453d55d8c89a7f3" },
+      { "path": "src/app/api/v1/leads/[businessId]/route.ts", "blobSha": "edef5c81226906b4712a9982ea61d7e4c306f07a" },
+      { "path": "src/app/api/v1/leads/evaluation/validate/route.ts", "blobSha": "cbb56b66f3a596fdb8a84b05d3abf7e851e592ba" },
+      { "path": "src/app/api/v1/leads/route.ts", "blobSha": "fb24374af17d4bc4647dffc94db9322a3a3fd179" },
+      { "path": "src/app/leads/[businessId]/page.tsx", "blobSha": "60fcb19cdd07ddece48289172a0b25a17d219a80" },
+      { "path": "src/app/leads/evaluation/page.tsx", "blobSha": "8c884923da0f801bc2783280d3a30174f80c9782" },
+      { "path": "src/app/leads/page.tsx", "blobSha": "8cec87b2350ed03f421d4dc4be5c38b29cfa83c2" },
+      { "path": "src/components/leads/owner-lead-detail.tsx", "blobSha": "6b16b41d7c84d0e865cc9973a9c2fbd09ba3d04c" },
+      { "path": "src/components/leads/owner-lead-evaluation-workspace.tsx", "blobSha": "1409cb764c06b1e11c865fd817e2634b2a4fb158" },
+      { "path": "src/components/leads/owner-lead-list.tsx", "blobSha": "6d3992fc98e3541b924ae2d028c8cfa32570771e" },
+      { "path": "src/lib/revenue-engine/owner-labeling-upload.ts", "blobSha": "ca7dfdf08f27a0b00737ee955cd3c702c8bec445" },
+      { "path": "src/lib/revenue-engine/owner-labeling-workspace.ts", "blobSha": "c433ca6989288aedf1bf6ef51aa0a708d5ac88e2" },
+      { "path": "src/lib/revenue-engine/owner-lead-detail-read-model.ts", "blobSha": "06a6c4025a77080528247e34203037bc6a78775d" },
+      { "path": "src/lib/revenue-engine/owner-lead-projection.ts", "blobSha": "ed99e355940e82db5136d0de5f0b09e32072391b" },
+      { "path": "src/lib/revenue-engine/owner-lead-read-model.ts", "blobSha": "401865cf0498b5a52fa26498701100fbf8b2b248" }
+    ]
+  },
+  "scope": {
+    "ownerRoutes": ["/leads", "/leads/[businessId]", "/leads/evaluation"],
+    "apiRoutes": ["/api/v1/leads", "/api/v1/leads/[businessId]", "/api/v1/leads/evaluation/validate"],
+    "dataPolicy": "SYNTHETIC_ONLY",
+    "engineWorkerIncluded": false,
+    "databaseMigrationIncluded": false,
+    "providerIntegrationIncluded": false,
+    "mailboxIntegrationIncluded": false
+  },
+  "target": {
+    "environment": "staging",
+    "workerName": "axiom-revenue-engine-console-staging",
+    "baseUrl": "https://axiom-revenue-engine-console-staging.aidan-magee2.workers.dev/",
+    "database": {
+      "binding": "DB",
+      "name": "axiom-revenue-engine-staging",
+      "id": "322fcf89-312c-44f0-b238-c4a348f6d6ad"
+    },
+    "browserBinding": "BROWSER",
+    "assetsBinding": "ASSETS",
+    "expectedSecretNames": ["BETTER_AUTH_SECRET"],
+    "providerSecretNames": [],
+    "serviceBindings": [],
+    "queueBindings": [],
+    "cronTriggers": []
+  },
+  "verification": {
+    "verifiedAt": "2026-08-28T23:38:10.886Z",
+    "platform": "windows-local",
+    "safety": { "command": "npm run check:safety", "status": "PASS" },
+    "unitTests": { "command": "npm test", "status": "PASS", "total": 449, "failed": 0 },
+    "typecheck": { "command": "npm run typecheck", "status": "PASS" },
+    "lint": { "command": "npm run lint", "status": "PASS" },
+    "cloudflareBuild": {
+      "command": "npm run build:cloudflare",
+      "status": "PASS",
+      "sanitizedFiles": 2018,
+      "localSecretValuesRemoved": 1
+    },
+    "defaultDryRun": {
+      "command": "npx wrangler deploy --env=\"\" --dry-run --autoconfig false",
+      "status": "PASS"
+    },
+    "stagingDryRun": {
+      "command": "npx wrangler deploy --env staging --dry-run --autoconfig false",
+      "status": "PASS",
+      "databaseBinding": "axiom-revenue-engine-staging",
+      "autonomousIntake": false,
+      "autonomousQueue": false,
+      "autonomousSend": false,
+      "dailyLeadCap": 0,
+      "dailySendCap": 0,
+      "dailyFollowUpCap": 0
+    },
+    "ownerUi": {
+      "command": "npm run test:owner-ui",
+      "status": "PASS",
+      "pagesScanned": 6,
+      "externalRequests": 0,
+      "desktopListReadyMs": 492,
+      "desktopDossierReadyMs": 2361,
+      "desktopWidth": 1440,
+      "mobileWidth": 390
+    },
+    "linuxCi": { "status": "PENDING", "runId": null },
+    "stagingSmoke": { "status": "NOT_RUN", "reason": "DEPLOYMENT_NOT_AUTHORIZED" },
+    "knownWarnings": [
+      "OPENNEXT_WINDOWS_COMPATIBILITY_WARNING",
+      "GENERATED_DUPLICATE_OPTIONS_WARNING"
+    ]
+  },
+  "rollback": {
+    "sourceSha": "7725098232829b7aca64a81d730db3b1729a5c7a",
+    "codeVersion": "941b37bc-38e8-4c6c-9111-d475e9871727",
+    "deploymentId": "c4bdd4af-85ec-4075-9a5a-7ded9f42add4",
+    "action": "RESTORE_RECORDED_STAGING_VERSION",
+    "databaseRollbackRequired": false
+  },
+  "approval": {
+    "status": "PENDING",
+    "requiredPhrase": "DEPLOY AXIOM REVENUE ENGINE CONSOLE TO ISOLATED STAGING",
+    "approvedBy": null,
+    "approvedAt": null
+  },
+  "readiness": "PREPARED_NOT_APPROVED",
+  "authority": {
+    "deploymentAuthorized": false,
+    "databaseMigrationAuthorized": false,
+    "engineDeploymentAuthorized": false,
+    "providerOperationsAuthorized": 0,
+    "externalWebsiteRequestsAuthorized": 0,
+    "mailboxOperationsAuthorized": 0,
+    "prospectContactsAuthorized": 0,
+    "costAuthorizedCad": 0
+  },
+  "packetId": "staging-console-release:a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9",
+  "packetDigest": "a0bc324a554b0abeb31e55a90f8f912f475daaec71145a2d3a48c5b347e558c9"
+}

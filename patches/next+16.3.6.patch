@@ -1,0 +1,21 @@
+diff --git a/node_modules/next/dist/build/collect-build-traces.js b/node_modules/next/dist/build/collect-build-traces.js
+index 725b877..0a426bb 100644
+--- a/node_modules/next/dist/build/collect-build-traces.js
++++ b/node_modules/next/dist/build/collect-build-traces.js
+@@ -522,14 +522,14 @@ async function collectBuildTraces({ dir, config, distDir, edgeRuntimeRoutes, sta
+             if (combinedExcludes == null ? void 0 : combinedExcludes.size) {
+                 const resolvedGlobs = [
+                     ...combinedExcludes
+-                ].map((exclude)=>_path.default.join(dir, exclude));
++                ].map((exclude)=>_path.default.join(dir, exclude).replace(/\\/g, '/'));
+                 // pre compile before forEach
+                 const isMatch = (0, _picomatch.default)(resolvedGlobs, {
+                     dot: true,
+                     contains: true
+                 });
+                 combined.forEach((file)=>{
+-                    if (isMatch(_path.default.join(pageDir, file))) {
++                    if (isMatch(_path.default.join(pageDir, file).replace(/\\/g, '/'))) {
+                         combined.delete(file);
+                     }
+                 });

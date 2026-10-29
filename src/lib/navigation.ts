@@ -1,11 +1,4 @@
-import {
-  Bot,
-  Database,
-  LayoutDashboard,
-  Settings,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
+import { Archive, CalendarDays, Send, Settings, Sparkles, type LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 export type AppNavItem = {
@@ -16,61 +9,25 @@ export type AppNavItem = {
   icon: LucideIcon;
   shortcut: string;
   keywords: string[];
-  badgeKey?: "readyForTouch" | "followUp" | "replied" | "total";
 };
 
 export const APP_NAV_ITEMS: AppNavItem[] = [
-  {
-    title: "Dashboard",
-    label: "Dashboard",
-    description: "Pipeline overview",
-    url: "/dashboard",
-    icon: LayoutDashboard,
-    shortcut: "⌘1",
-    keywords: ["home", "overview", "status", "dashboard"],
-  },
-  {
-    title: "Vault",
-    label: "Vault",
-    description: "Lead database",
-    url: "/vault",
-    icon: Database,
-    shortcut: "⌘2",
-    keywords: ["database", "records", "export", "leads"],
-    badgeKey: "total",
-  },
-  {
-    title: "Clients",
-    label: "Clients",
-    description: "Deal pipeline & client management",
-    url: "/clients" as Route,
-    icon: Users,
-    shortcut: "⌘3",
-    keywords: ["crm", "deal", "client", "pipeline", "retainer", "revenue"],
-    badgeKey: "replied",
-  },
-  {
-    title: "Automation",
-    label: "Automation",
-    description: "Sequences & sends",
-    url: "/automation",
-    icon: Bot,
-    shortcut: "⌘4",
-    keywords: ["scheduler", "sequence", "mailbox", "follow-up"],
-    badgeKey: "followUp",
-  },
-  {
-    title: "Settings",
-    label: "Settings",
-    description: "Mailbox connections",
-    url: "/settings",
-    icon: Settings,
-    shortcut: "⌘5",
-    keywords: ["runtime", "gmail", "config", "preferences"],
-  },
+  { title: "Today", label: "Today", description: "Overview", url: "/dashboard", icon: CalendarDays, shortcut: "⌘1", keywords: ["home", "overview", "today", "dashboard", "results"] },
+  { title: "FCC", label: "FCC", description: "Status and pause", url: "/fcc" as Route, icon: Send, shortcut: "⌘2", keywords: ["fcc", "email", "campaign", "pause", "resume", "rmd", "robocall"] },
+  { title: "Ask AI", label: "Ask AI", description: "Your sales assistant", url: "/ask" as Route, icon: Sparkles, shortcut: "⌘3", keywords: ["ai", "ask", "assistant", "chat", "help", "question"] },
+  { title: "Settings", label: "Settings", description: "Account and tools", url: "/settings", icon: Settings, shortcut: "⌘4", keywords: ["stop", "safety", "account", "settings"] },
+  { title: "Archive: Axiom Web", label: "Archive", description: "Old website campaign", url: "/archive" as Route, icon: Archive, shortcut: "⌘5", keywords: ["archive", "axiom web", "website", "call queue", "call list", "walk-ins", "old"] },
 ];
+
+/** Screens of the paused Axiom Web website campaign. They still open, from the archive. */
+export const ARCHIVED_URLS = ["/call", "/prospects", "/walk-ins", "/email"];
+
+/** What each archived screen is called, for the top bar ("Archive › Call queue"). */
+export const ARCHIVED_PAGE_NAMES: Record<string, string> = { "/call": "Call queue", "/prospects": "Call list", "/walk-ins": "Walk-ins", "/email": "Website email" };
 
 export function getNavItemForPath(pathname: string | null | undefined) {
   if (!pathname) return null;
-  return APP_NAV_ITEMS.find((item) => pathname === item.url || pathname.startsWith(`${item.url}/`)) ?? null;
+  const within = (url: string) => pathname === url || pathname.startsWith(`${url}/`);
+  return APP_NAV_ITEMS.find((item) => within(item.url))
+    ?? (ARCHIVED_URLS.some(within) ? APP_NAV_ITEMS.find((item) => item.url === "/archive") ?? null : null);
 }

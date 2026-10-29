@@ -78,9 +78,22 @@ type Lead = {
     emailConfidence: number | null;
     isArchived: boolean | number | string | null;
     createdAt: string;
+    qualificationTotalScore: number | null;
+    qualificationWebsiteNeedScore: number | null;
+    qualificationBusinessFitScore: number | null;
+    qualificationReachabilityScore: number | null;
+    qualificationTimingScore: number | null;
+    qualificationHardGateStatus: string | null;
+    qualificationBand: string | null;
+    qualificationRecommendedChannel: string | null;
+    qualificationAutonomousEmailEligible: boolean | number | null;
+    qualificationReasonCodesJson: string | null;
+    qualificationEvidenceJson: string | null;
+    qualificationPolicyVersion: string | null;
+    qualificationCreatedAt: string | null;
 };
 
-type SortKey = "businessName" | "city" | "rating" | "reviewCount" | "createdAt" | "niche";
+type SortKey = "businessName" | "city" | "rating" | "reviewCount" | "createdAt" | "niche" | "qualificationTotalScore";
 type SortDir = "asc" | "desc";
 type ContactFilter = "ALL" | "YES" | "NO";
 type ArchiveFilter = "active" | "archived" | "all";
@@ -256,12 +269,65 @@ function FieldValue({ label, value, mono = false }: { label: string; value: Reac
     );
 }
 
+function QualificationSummary({ lead, compact = false }: { lead: Lead; compact?: boolean }) {
+    if (lead.qualificationTotalScore == null) {
+        return <span className="text-[11px] text-zinc-600">Audit required</span>;
+    }
+
+    const band = lead.qualificationBand || "REVIEW";
+    const tone = band === "PRIORITY"
+        ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
+        : band === "OUTREACH"
+            ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
+            : band === "RESEARCH"
+                ? "border-zinc-500/20 bg-zinc-500/10 text-zinc-400"
+                : "border-amber-400/25 bg-amber-400/10 text-amber-200";
+
+    if (compact) {
+        return (
+            <div className="flex items-center gap-2">
+                <span className={`inline-flex rounded-md border px-2 py-1 font-mono text-xs font-semibold ${tone}`}>
+                    {lead.qualificationTotalScore}
+                </span>
+                <span className="text-[10px] text-zinc-500">{band} / {lead.qualificationRecommendedChannel || "RESEARCH"}</span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Quality snapshot</div>
+                    <div className="mt-1 text-[10px] text-zinc-600">Legacy shadow score; current evidence audit still required before outreach.</div>
+                </div>
+                <span className={`inline-flex rounded-md border px-2.5 py-1 font-mono text-sm font-semibold ${tone}`}>
+                    {lead.qualificationTotalScore}/100
+                </span>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <FieldValue label="Website need" value={`${lead.qualificationWebsiteNeedScore ?? 0}/40`} mono />
+                <FieldValue label="Business fit" value={`${lead.qualificationBusinessFitScore ?? 0}/25`} mono />
+                <FieldValue label="Reachability" value={`${lead.qualificationReachabilityScore ?? 0}/20`} mono />
+                <FieldValue label="Timing" value={`${lead.qualificationTimingScore ?? 0}/15`} mono />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-white/[0.06] pt-3 text-[11px] text-zinc-500">
+                <span>Band: <strong className="font-medium text-zinc-300">{band}</strong></span>
+                <span>Best route: <strong className="font-medium text-zinc-300">{lead.qualificationRecommendedChannel || "RESEARCH"}</strong></span>
+                <span>Policy: <strong className="font-mono font-medium text-zinc-400">{lead.qualificationPolicyVersion || "unknown"}</strong></span>
+            </div>
+        </div>
+    );
+}
+
 function LeadDetails({ lead }: { lead: Lead }) {
     const websiteHref = getLeadWebsiteHref(lead);
     const websiteDisplay = getLeadWebsiteDisplay(lead);
 
     return (
-        <div className="grid min-w-0 grid-cols-1 gap-5 text-xs md:grid-cols-[1fr_1fr_1.35fr]">
+        <div className="space-y-4">
+            <QualificationSummary lead={lead} />
+            <div className="grid min-w-0 grid-cols-1 gap-5 text-xs md:grid-cols-[1fr_1fr_1.35fr]">
             <div className="min-w-0 space-y-3">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Verification</div>
                 <FieldValue label="Contact" value={lead.contactName || "No named contact"} />
@@ -332,6 +398,7 @@ function LeadDetails({ lead }: { lead: Lead }) {
                     </div>
                 ) : null}
             </div>
+            </div>
         </div>
     );
 }
@@ -378,6 +445,7 @@ function MobileLeadCard({
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                         <ArchiveStateBadge lead={lead} />
                         <StatusBadge status={lead.websiteStatus} />
+                        <QualificationSummary lead={lead} compact />
                         <ContactIndicators lead={lead} />
                         <OutreachStatusInline status={lead.outreachStatus} />
                     </div>
@@ -483,9 +551,9 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
         fetch(`/api/vault/leads?archive=${archiveFilter}&limit=5000`, { signal: controller.signal })
             .then(async (response) => {
                 await assertResponseOk(response, "Unable to load Vault leads");
-                return response.json();
+                return await response.json() as VaultLeadsResponse;
             })
-            .then((data: VaultLeadsResponse) => {
+            .then((data) => {
                 setLeads(data.leads ?? []);
                 if (data.counts) {
                     setVaultCounts(data.counts);
@@ -510,7 +578,7 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
     const [hasSocialFilter, setHasSocialFilter] = useState<ContactFilter>("ALL");
     const [nicheFilter, setNicheFilter] = useState("ALL");
     const [cityFilter, setCityFilter] = useState("ALL");
-    const [sortKey, setSortKey] = useState<SortKey>("createdAt");
+    const [sortKey, setSortKey] = useState<SortKey>("qualificationTotalScore");
     const [sortDir, setSortDir] = useState<SortDir>("desc");
     const [page, setPage] = useState(0);
     const [perPage, setPerPage] = useState(25);
@@ -605,8 +673,9 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
         filtered.sort((a, b) => {
             let aValue = a[sortKey] as string | number | null;
             let bValue = b[sortKey] as string | number | null;
-            if (aValue == null) aValue = sortKey === "rating" || sortKey === "reviewCount" ? 0 : "";
-            if (bValue == null) bValue = sortKey === "rating" || sortKey === "reviewCount" ? 0 : "";
+            const numericSort = sortKey === "rating" || sortKey === "reviewCount" || sortKey === "qualificationTotalScore";
+            if (aValue == null) aValue = numericSort ? 0 : "";
+            if (bValue == null) bValue = numericSort ? 0 : "";
             if (typeof aValue === "string") aValue = aValue.toLowerCase();
             if (typeof bValue === "string") bValue = bValue.toLowerCase();
             if (aValue < bValue) return sortDir === "asc" ? -1 : 1;
@@ -1226,6 +1295,7 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                             </TableHead>
                             {[
                                 { key: "businessName" as const, label: "Business" },
+                                { key: "qualificationTotalScore" as const, label: "Priority" },
                                 { key: "niche" as const, label: "Niche" },
                                 { key: "city" as const, label: "City" },
                             ].map((column) => (
@@ -1277,7 +1347,7 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                     <TableBody>
                         {pagedLeads.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={9} className="h-40 text-center">
+                                <TableCell colSpan={10} className="h-40 text-center">
                                     <Globe className="mx-auto h-9 w-9 text-zinc-700" />
                                     <p className="mt-3 text-sm text-zinc-500">No matching leads</p>
                                     <p className="mt-1 text-[11px] text-zinc-700">
@@ -1290,6 +1360,14 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                                 <React.Fragment key={lead.id}>
                                     <TableRow
                                         onClick={() => setExpandedId((current) => (current === lead.id ? null : lead.id))}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                                event.preventDefault();
+                                                setExpandedId((current) => (current === lead.id ? null : lead.id));
+                                            }
+                                        }}
+                                        tabIndex={0}
+                                        aria-expanded={expandedId === lead.id}
                                         className={`cursor-pointer border-white/[0.04] transition-colors ${
                                             expandedId === lead.id ? "bg-white/[0.035]" : "hover:bg-white/[0.02]"
                                         }`}
@@ -1318,6 +1396,9 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                                                     </div>
                                                 ) : null}
                                             </div>
+                                        </TableCell>
+                                        <TableCell className="min-w-[150px]">
+                                            <QualificationSummary lead={lead} compact />
                                         </TableCell>
                                         <TableCell className="max-w-[180px]">
                                             <span className="block truncate font-mono text-[11px] text-zinc-400">{lead.niche || "-"}</span>
@@ -1392,7 +1473,7 @@ export default function VaultDataTable({ totalCount }: { totalCount: number }) {
                                     </TableRow>
                                     {expandedId === lead.id ? (
                                         <TableRow className="border-white/[0.04] bg-white/[0.015]">
-                                            <TableCell colSpan={9} className="px-5 py-4 align-top">
+                                            <TableCell colSpan={10} className="px-5 py-4 align-top">
                                                 <LeadDetails lead={lead} />
                                             </TableCell>
                                         </TableRow>

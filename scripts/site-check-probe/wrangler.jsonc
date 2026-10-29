@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Verification harness only (see worker.ts). Run with `wrangler dev --remote`; never deploy.
+  "name": "axiom-site-check-probe",
+  "account_id": "fe468a56a5b8c7f8fc5d39e265c2f791",
+  "main": "worker.ts",
+  "compatibility_date": "2026-08-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "browser": { "binding": "BROWSER" }
+}

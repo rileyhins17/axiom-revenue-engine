@@ -165,11 +165,11 @@ function ReplyComposer({
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(data.error || "Failed to generate reply");
       }
 
-      const data = await res.json();
+      const data = await res.json() as { generatedReply?: string };
       setReplyText(data.generatedReply || "");
       textareaRef.current?.focus();
     } catch (err) {
@@ -200,7 +200,7 @@ function ReplyComposer({
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(data.error || "Failed to send reply");
       }
 
@@ -464,10 +464,14 @@ export function EmailThreadPanel({ leadId, leadName, leadEmail }: EmailThreadPan
     try {
       const res = await fetch(`/api/clients/${leadId}/emails`);
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(data.error || "Failed to load email threads");
       }
-      const data = await res.json();
+      const data = await res.json() as {
+        threads?: EmailThread[];
+        senderEmail?: string | null;
+        warning?: string | null;
+      };
       setThreads(data.threads || []);
       setSenderEmail(data.senderEmail || null);
       setWarning(data.warning || null);

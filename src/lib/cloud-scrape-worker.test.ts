@@ -1,11 +1,30 @@
 import { strict as assert } from "node:assert";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
   isTransientCloudBrowserError,
+  runCloudScrapeWorker,
   shouldSkipCloudMapsDetailPages,
   shouldUseExistingLeadForScrapeDedupe,
 } from "./cloud-scrape-worker";
+
+test("legacy cloud crawler is inert under every binding configuration", async () => {
+  assert.deepEqual(await runCloudScrapeWorker(), {
+    claimed: false,
+    reason: "Legacy browser crawler is disabled",
+  });
+});
+
+test("cloud worker cannot read bindings, environment, jobs, or providers", () => {
+  const source = readFileSync(new URL("./cloud-scrape-worker.ts", import.meta.url), "utf8");
+  const entrypoint = source.slice(source.indexOf("export async function runCloudScrapeWorker()"));
+  const body = entrypoint.slice(0, entrypoint.indexOf("\n}"));
+  assert.doesNotMatch(
+    body,
+    /getCloudflareBindings|getServerEnv|getAutomationSettings|claimCloudJob|executeScrapeJob|launchAutomationBrowser/,
+  );
+});
 
 test("archived empty scrape ghosts do not block a future quality scrape", () => {
   assert.equal(
@@ -41,15 +60,15 @@ test("usable existing leads still participate in scrape dedupe", () => {
 
 test("cloud scrape skips Maps detail pages unless explicitly enabled", () => {
   assert.equal(
-    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: "false" }),
+    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: false }),
     true,
   );
   assert.equal(
-    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: "" }),
+    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: false }),
     true,
   );
   assert.equal(
-    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: "true" }),
+    shouldSkipCloudMapsDetailPages({ CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: true }),
     false,
   );
 });

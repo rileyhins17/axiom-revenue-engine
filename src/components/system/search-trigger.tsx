@@ -15,8 +15,8 @@ export function SearchTrigger() {
   const shortcut = `${isMac ? "⌘" : "Ctrl"} K`;
   return (
     <button
-      aria-label={`Open command palette (${shortcut})`}
-      title={`Open command palette · ${shortcut}`}
+      aria-label={`Search workspace (${shortcut})`}
+      title={`Search workspace · ${shortcut}`}
       className="v2-focus-ring hidden h-9 w-[19rem] items-center gap-2 rounded-lg border border-white/[0.09] bg-black/20 px-3 text-zinc-500 transition-colors hover:border-white/[0.16] hover:text-zinc-200 xl:inline-flex"
       onClick={() => {
         window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, ctrlKey: true, bubbles: true }));

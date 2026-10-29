@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Cloud website check (docs/adr/0062-cloud-lead-supply.md): grades the homepages of
+  // businesses that list a website on Cloudflare's browser. Separate from the main app
+  // (axiom-ops-omniscient) so it cannot affect calling. Deploy with
+  // scripts/release-site-check.mjs, never a bare `wrangler deploy`.
+  "name": "axiom-site-check",
+  "account_id": "fe468a56a5b8c7f8fc5d39e265c2f791",
+  "main": "src/site-check/worker.ts",
+  "compatibility_date": "2026-08-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "browser": { "binding": "BROWSER" },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "axiom-ops-omniscient", "database_id": "e42f3d48-5813-4d18-86c4-4471b55aa65e" }
+  ],
+  "triggers": {
+    // Every 10 minutes, 7:00 to 19:50 Toronto (EDT), Monday to Friday.
+    "crons": ["*/10 11-23 * * MON-FRI"]
+  },
+  "vars": {
+    // "false" stops all checks without a redeploy of anything else.
+    "SITE_CHECK_ENABLED": "true"
+  },
+  "observability": { "enabled": true }
+}

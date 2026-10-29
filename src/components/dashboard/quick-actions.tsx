@@ -26,11 +26,11 @@ export function QuickActions() {
           Add Lead
         </button>
         <Link
-          href="/vault"
+          href="/leads"
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/[0.09] bg-white/[0.025] px-3.5 py-2 text-sm font-semibold text-zinc-300 transition hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white"
         >
           <DatabaseIcon className="size-3.5" />
-          View Vault
+          Review Leads
         </Link>
         <Link
           href="/clients"
