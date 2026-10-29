@@ -93,6 +93,73 @@ test("a refused login fails without echoing the password", async () => {
   });
 });
 
+/** A fake Gmail that really evaluates SEARCH criteria (SINCE, FROM, SUBJECT, BODY, NOT, OR) against stored messages. */
+function gmailHolding(messages: Array<{ from: string; subject: string; body: string }>) {
+  const plain = gmail({});
+  return (tag: string, command: string) => {
+    if (!command.startsWith("SEARCH ")) return plain(tag, command);
+    const tokens = command.slice(7).match(/"(?:[^"\\]|\\.)*"|\S+/g) ?? [];
+    const unquote = (token: string) => token.replace(/^"|"$/g, "").replace(/\\(.)/g, "$1").toLowerCase();
+    const matches = (message: { from: string; subject: string; body: string }) => {
+      const key = (): boolean => {
+        const token = tokens.shift();
+        if (token === "SINCE") { tokens.shift(); return true; }
+        if (token === "NOT") return !key();
+        if (token === "OR") { const left = key(); const right = key(); return left || right; }
+        const value = unquote(tokens.shift() ?? "");
+        if (token === "FROM") return message.from.toLowerCase().includes(value);
+        if (token === "SUBJECT") return message.subject.toLowerCase().includes(value);
+        if (token === "BODY") return message.body.toLowerCase().includes(value);
+        throw new Error(`unexpected search key ${token}`);
+      };
+      let hit = true;
+      while (tokens.length) hit = key() && hit;
+      return hit;
+    };
+    const hits = messages.map((message, index) => ({ message, index })).filter(({ message }) => { tokens.splice(0, tokens.length, ...(command.slice(7).match(/"(?:[^"\\]|\\.)*"|\S+/g) ?? [])); return matches(message); }).map(({ index }) => index + 1);
+    return [`* SEARCH${hits.length ? ` ${hits.join(" ")}` : ""}`, `${tag} OK SEARCH completed (Success)`];
+  };
+}
+
+const remoteBlock = {
+  from: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>", subject: "Delivery Status Notification (Failure)",
+  body: "Message blocked. Your message to pat@bluepeak.example has been blocked. See technical details below for more information. The response from the remote server was: 550 5.7.1 Message rejected by the recipient's spam filter",
+};
+const googleBlock = {
+  from: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>", subject: "Delivery Status Notification (Failure)",
+  body: "Message blocked. Your message to sam@omega.example has been blocked. See technical details below for more information. The response was: 552-5.7.0 This message was blocked because its content presents a potential security issue.",
+};
+const googleSpamVerdict = {
+  from: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>", subject: "Delivery Status Notification (Failure)",
+  body: "Message blocked. Your message to kim@gamma.example has been blocked. The response from the remote server was: 550-5.7.1 Our system has detected that this message is likely unsolicited mail. To reduce the amount of spam sent to Gmail, this message has been blocked.",
+};
+const limitReached = {
+  from: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>", subject: "Delivery Status Notification (Failure)",
+  body: "Message not delivered. You have reached a limit for sending mail. Your message was not sent.",
+};
+
+test("a recipient's own spam filter bouncing one email is a bounce, not a Google warning", async () => {
+  const server = fakeServer(gmailHolding([remoteBlock]));
+  const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
+  assert.equal(await mailbox.googleWarning("2026-10-29T12:00:00.000Z"), null);
+  assert.equal(await mailbox.bounceCount("2026-10-29T12:00:00.000Z"), 1);
+  assert.deepEqual(await mailbox.bouncedAmong(["pat@bluepeak.example", "lee@fine.example"], "2026-10-29T12:00:00.000Z"), ["pat@bluepeak.example"]);
+  await mailbox.close();
+});
+
+test("Google's own blocks, spam verdicts and sending limits still pause the campaign", async () => {
+  for (const [message, reason] of [
+    [googleBlock, "Gmail says a message was blocked"],
+    [googleSpamVerdict, "Gmail says a message looked like spam"],
+    [limitReached, "Gmail says the sending limit was reached"],
+  ] as const) {
+    const server = fakeServer(gmailHolding([remoteBlock, message]));
+    const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
+    assert.equal(await mailbox.googleWarning("2026-10-29T12:00:00.000Z"), reason);
+    await mailbox.close();
+  }
+});
+
 test("the FCC inbox check searches All Mail from a day before the first email, for replies and for bounces", async () => {
   const server = fakeServer(gmail({ 'FROM "@beta.example"': "12", 'BODY "gone@x.example"': "30" }));
   const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));

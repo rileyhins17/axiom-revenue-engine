@@ -75,14 +75,23 @@ const SHARED_MAIL_DOMAINS = new Set([
  * Google notices that put the mailbox at risk. Any one of them pauses the whole
  * campaign until a founder looks (Aidan's send rules, Oct 27). Plain "Security
  * alert" emails (a new sign-in, an app password) are routine and do not count.
+ *
+ * A "Message blocked" bounce that quotes the recipient's own server ("The
+ * response from the remote server was: 550 5.7.1 ...") is that one company's
+ * spam filter refusing one email, not Google acting on the mailbox: it stays an
+ * ordinary bounce (the three-bounces-a-day pause still covers it). On Oct 29 a
+ * Microsoft 365 rejection of that shape paused the campaign after 53 sends.
+ * Google's own blocks never mention a remote server, and its spam filter says
+ * "unsolicited mail" even when it answers as the recipient's server.
  */
 const GOOGLE_WARNINGS: Array<[criteria: string, reason: string]> = [
   [`FROM "accounts.google.com" SUBJECT "critical security alert"`, "Google sent a critical security alert"],
   [`FROM "accounts.google.com" SUBJECT "suspicious"`, "Google reported suspicious activity"],
   [`FROM "mailer-daemon" BODY "limit for sending"`, "Gmail says the sending limit was reached"],
   [`FROM "mailer-daemon" BODY "sending limit"`, "Gmail says the sending limit was reached"],
-  [`FROM "mailer-daemon" BODY "message blocked"`, "Gmail says a message was blocked"],
-  [`FROM "mailer-daemon" BODY "has been blocked"`, "Gmail says a message was blocked"],
+  [`FROM "mailer-daemon" BODY "unsolicited mail"`, "Gmail says a message looked like spam"],
+  [`FROM "mailer-daemon" NOT BODY "remote server" BODY "message blocked"`, "Gmail says a message was blocked"],
+  [`FROM "mailer-daemon" NOT BODY "remote server" BODY "has been blocked"`, "Gmail says a message was blocked"],
 ];
 
 /** A 5xx that is about Gmail or the sender (a limit, a block, a login), not about the one recipient. */
