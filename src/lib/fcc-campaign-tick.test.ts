@@ -4,7 +4,7 @@ import test from "node:test";
 
 import Database from "better-sqlite3";
 
-import { FCC_CAMPAIGN_KEY } from "@/lib/fcc-campaign";
+import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION } from "@/lib/fcc-campaign";
 import { pauseFcc, readFccNotes, resumeFcc } from "@/lib/fcc-campaign-control";
 import type { FccMailbox, FccSendConfig } from "@/lib/fcc-campaign-sender";
 import { FCC_GAP_MAX_MS, FCC_GAP_MIN_MS, gapAfter, runFccSendTick, torontoMinute, type FccTickResult } from "@/lib/fcc-campaign-tick";
@@ -31,7 +31,7 @@ function database() {
       }) };
     },
   };
-  raw.prepare(`UPDATE "FccCampaignSetting" SET "enabled" = 1, "approvedCopy" = ?, "goBy" = 'Aidan', "goAt" = '2026-10-27T16:29:22Z' WHERE "id" = 1`).run(FCC_CAMPAIGN_KEY);
+  raw.prepare(`UPDATE "FccCampaignSetting" SET "enabled" = 1, "approvedCopy" = ?, "goBy" = 'Aidan', "goAt" = '2026-10-27T16:29:22Z' WHERE "id" = 1`).run(FCC_COPY_VERSION);
   return { raw, db };
 }
 

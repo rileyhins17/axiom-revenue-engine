@@ -5,7 +5,7 @@
  * reopens a campaign a founder already gave the go on for the current copy.
  * Nothing here reads or changes the retired outreach switches.
  */
-import { FCC_CAMPAIGN_KEY } from "@/lib/fcc-campaign";
+import { FCC_COPY_VERSION } from "@/lib/fcc-campaign";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
 const CONTROL_KEY = "fcc.control";
@@ -45,14 +45,14 @@ export async function pauseFcc(db: ProspectDb, reason: string, by: string, now =
 /** Restarts FCC sending, but only for the copy a founder already gave the go on. */
 export async function resumeFcc(db: ProspectDb, by: string, now = new Date()): Promise<FccResumeResult> {
   const result = await db.prepare(`UPDATE "FccCampaignSetting" SET "enabled" = 1, "updatedAt" = ?
-    WHERE "id" = 1 AND "enabled" = 0 AND "approvedCopy" = ? AND "goBy" IS NOT NULL`).bind(now.toISOString(), FCC_CAMPAIGN_KEY).run();
+    WHERE "id" = 1 AND "enabled" = 0 AND "approvedCopy" = ? AND "goBy" IS NOT NULL`).bind(now.toISOString(), FCC_COPY_VERSION).run();
   if (changes(result) === 1) {
     await put(db, CONTROL_KEY, { action: "resumed", reason: null, by: by.slice(0, 120), at: now.toISOString() } satisfies FccControlNote, now);
     return "RESUMED";
   }
   const setting = await db.prepare(`SELECT "enabled","approvedCopy","goBy" FROM "FccCampaignSetting" WHERE "id" = 1`).bind()
     .first<{ enabled: number; approvedCopy: string | null; goBy: string | null }>();
-  return setting?.enabled === 1 && setting.approvedCopy === FCC_CAMPAIGN_KEY && setting.goBy ? "ALREADY_LIVE" : "LOCKED";
+  return setting?.enabled === 1 && setting.approvedCopy === FCC_COPY_VERSION && setting.goBy ? "ALREADY_LIVE" : "LOCKED";
 }
 
 const BOUNCE_SCAN_KEY = "fcc.bounceScan";

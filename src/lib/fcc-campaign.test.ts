@@ -7,10 +7,14 @@ import {
   checkFccLiveSendGate,
   checkFccTestRecipient,
   classifyFccEmail,
+  companyPossessive,
+  companyShortName,
   deriveFirstName,
+  fccCopyOfMessageId,
   parseFccFilingCsv,
   planFccSendSchedule,
   renderFccEmail,
+  renderFccEmailV4,
 } from "@/lib/fcc-campaign";
 
 const HEADER =
@@ -104,6 +108,43 @@ test("renders the calmer v3 copy with a visible placeholder when no address is s
   assert.match(follow.bodyPlain, /draft it for your officer to check and submit/);
   assert.match(follow.bodyPlain, /123 Example St, Kitchener ON/);
   assert.doesNotMatch(follow.bodyPlain, /MAILING ADDRESS GOES HERE/);
+});
+
+test("renders Aidan's v2 email word for word, with the address and opt-out in both emails", () => {
+  const address = "123 Example St, Kitchener ON";
+  const contact = { firstName: "Jane", company: "Crocker Communications", filings: [{ rmdNumber: "RMD0001234" }] as never };
+  const first = renderFccEmailV4(contact, 1, address);
+  assert.equal(first.subject, "Question about Crocker Communications' RMD listing");
+  assert.equal(first.bodyPlain, [
+    "Hi Jane,",
+    "I was going through the FCC's Robocall Mitigation Database and noticed Crocker Communications' listing (RMD0001234) doesn't show a 2026 recertification yet. It was due March 1, and you're not alone: about 3,600 providers show the same thing.",
+    "Is it already handled? If so, no need to reply.",
+    "If not, I can send you a short list of what looks out of date on the listing, free. If you'd like help after that, I prepare the updates and a fresh mitigation plan, and your officer files it from your own login in about 15 minutes. It's a flat $450, and we never hold your login.",
+    "Want me to send the list?",
+    `Aidan Magee\nAxiom · axiominternational.ca · ${address}\nNot useful? Reply "no thanks" and I won't follow up.`,
+  ].join("\n\n"));
+  assert.doesNotMatch(first.bodyPlain, /https?:|www\.|enforcement/i);
+  assert.equal(renderFccEmailV4({ ...contact, company: "Talktone, Inc." }, 1, address).subject, "Question about Talktone's RMD listing");
+  assert.equal(companyPossessive("Joe's"), "Joe's", "never \"Company's's\"");
+  for (const [full, short] of [
+    ["Bestline Communications, LP", "Bestline Communications"], ["Minerva Valley Telephone Co., Inc.", "Minerva Valley Telephone"],
+    ["Clarity Telecom, LLC DBA Bluepeak Fiber", "Bluepeak Fiber"], ["White Cloud Communications US LLC DBA: Broadlinc", "Broadlinc"],
+    ["The Ponderosa Telephone Co.", "Ponderosa Telephone"], ["kaleva telephone company", "Kaleva Telephone Company"],
+    ["TelWare Corporation", "TelWare Corporation"], ["StarTechTel.com, Inc.", "StarTechTel.com"], ["Crocker Communications", "Crocker Communications"],
+  ]) assert.equal(companyShortName(full), short, full);
+  assert.match(renderFccEmailV4(contact, 1, null).bodyPlain, /\[MAILING ADDRESS GOES HERE\]/);
+
+  const follow = renderFccEmailV4(contact, 2, address);
+  assert.equal(follow.subject, "Re: Question about Crocker Communications' RMD listing");
+  assert.equal(follow.bodyPlain, [
+    "Hi Jane,",
+    "Bumping this in case it got buried. Crocker Communications' listing (RMD0001234) still shows no 2026 recertification. Want the free list? A one-word reply is fine.",
+    `Aidan\nAxiom · axiominternational.ca · ${address}\nNot useful? Reply "no thanks" and I won't follow up.`,
+  ].join("\n\n"));
+
+  assert.equal(fccCopyOfMessageId("<fcc-v4-abc-1@mail.example>"), "v4");
+  assert.equal(fccCopyOfMessageId("<fcc-abc-1@mail.example>"), "v3");
+  assert.equal(fccCopyOfMessageId(null), "v3");
 });
 
 test("schedule never exceeds the daily cap and follow-ups land 3 days later", () => {

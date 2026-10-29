@@ -25,12 +25,16 @@ const globalForAuth = globalThis as typeof globalThis & {
 };
 
 export function getAuth() {
-  if (globalForAuth.axiomAuth) {
+  const bindings = getCloudflareBindings();
+  // On Cloudflare every call builds its own instance. A shared one can be left waiting forever
+  // when the request that started it is cut off (a cancelled page preload), and then every later
+  // sign-in check on that copy of the Worker hangs: /fcc, /dashboard and /api/auth/get-session
+  // all hung from 1:08 pm Oct 28 until the next release. Building one takes a few milliseconds.
+  if (!bindings?.DB && globalForAuth.axiomAuth) {
     return globalForAuth.axiomAuth;
   }
 
   const env = getServerEnv();
-  const bindings = getCloudflareBindings();
 
   // Determine database config — use CF D1 when available, local SQLite otherwise
   let databaseConfig: { database: unknown };
@@ -180,6 +184,8 @@ export function getAuth() {
     ],
   });
 
-  globalForAuth.axiomAuth = auth;
+  if (!bindings?.DB) {
+    globalForAuth.axiomAuth = auth;
+  }
   return auth;
 }

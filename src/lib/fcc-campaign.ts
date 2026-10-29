@@ -8,7 +8,8 @@
  * - contacts live in their own table (FccCampaignContact), never in Lead, so the
  *   autonomous website scheduler can never pick them up or send them the
  *   website pitch;
- * - copy is fixed (Aidan's "calmer email v3", Notion Oct 25), not AI-generated;
+ * - copy is fixed (Aidan's "v2" email, Notion Oct 28; the first 60 used his
+ *   "calmer email v3", Notion Oct 25), not AI-generated;
  * - live sending is hard-blocked until a CASL/CAN-SPAM mailing address is
  *   configured AND the campaign is explicitly enabled. Test sends only ever go
  *   to the sender's own mailbox.
@@ -23,6 +24,12 @@ export const FCC_CAMPAIGN_NAME = "FCC March 1 pack";
 export const FCC_DAILY_SEND_CAP = 30;
 export const FCC_FOLLOW_UP_DELAY_DAYS = 3;
 export const FCC_MAX_FOLLOW_UPS = 1;
+/**
+ * The copy a founder's go must name (FccCampaignSetting.approvedCopy). Aidan's "v2" email (Notion
+ * task, Oct 28) replaced the calmer v3 for every first email from Oct 29. Contacts keep the v3 list
+ * key; which copy a person got is in their first email's Message-ID ("<fcc-v4-..." for this one).
+ */
+export const FCC_COPY_VERSION = "fcc-march1-pack-v4-question";
 
 export type FccFilingRow = {
   business_name: string;
@@ -278,6 +285,71 @@ export function renderFccEmail(
     `Aidan\n${address} · Reply "stop" and I won't email you again.`,
   ].join("\n\n");
   return { subject: "Re: Your 2026 RMD recertification", bodyPlain, bodyHtml: toHtml(bodyPlain) };
+}
+
+const SMALL_WORDS = new Set(["a", "an", "and", "at", "for", "in", "of", "on", "or", "the", "to"]);
+
+/**
+ * The name a person would say: "Talktone" for "Talktone, Inc.", "LFT Fiber" for "... dba LFT Fiber",
+ * "Ponderosa Telephone" for "The Ponderosa Telephone Co.". Spelled-out words such as "Company" or
+ * "Corporation" stay, because some names need them; an all-lowercase filing name gets capitals.
+ */
+export function companyShortName(company: string) {
+  const full = company.trim();
+  let name = full.match(/\b(?:dba|d\/b\/a)\b:?\s*(.+)$/i)?.[1]?.trim() || full;
+  name = name.replace(/(?:,?\s+(?:inc|incorporated|llc|l\.l\.c|ltd|lp|l\.p|llp|pllc|corp|co)\.?)+$/i, "").replace(/^the\s+/i, "").trim();
+  if (name && name === name.toLowerCase()) {
+    name = name.split(" ").map((word, index) => index > 0 && SMALL_WORDS.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+  }
+  return name || full;
+}
+
+/** "Talktone's", "Crocker Communications'"; a name that already ends in 's stays as it is. */
+export function companyPossessive(company: string) {
+  const name = company.trim();
+  if (/'s$/i.test(name)) return name;
+  return /s$/i.test(name) ? `${name}'` : `${name}'s`;
+}
+
+/** Which copy a person's first email used, read from its Message-ID. */
+export function fccCopyOfMessageId(messageId: string | null | undefined): "v3" | "v4" {
+  return messageId?.startsWith("<fcc-v4-") ? "v4" : "v3";
+}
+
+/**
+ * Aidan's "v2" email (Notion task, Oct 28): a short question that names the listing, states the
+ * flat $450 and asks yes or no. Plain text, no links. Step 2 is the day-3 bump in the same thread.
+ * Both end with the mailing address and an opt-out line, which US anti-spam law requires in every
+ * email; Aidan's day-3 text had neither, and that footer is the only thing added to his words.
+ */
+export function renderFccEmailV4(
+  contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">,
+  step: 1 | 2,
+  mailingAddress: string | null | undefined,
+): RenderedFccEmail {
+  const address = String(mailingAddress || "").trim() || ADDRESS_PLACEHOLDER;
+  const possessive = companyPossessive(companyShortName(contact.company));
+  const rmd = contact.filings.find((filing) => filing?.rmdNumber?.trim())?.rmdNumber.trim();
+  const listing = rmd ? `${possessive} listing (${rmd})` : `${possessive} listing`;
+  const subject = `Question about ${possessive} RMD listing`;
+  const footer = `Axiom · axiominternational.ca · ${address}\nNot useful? Reply "no thanks" and I won't follow up.`;
+  if (step === 1) {
+    const bodyPlain = [
+      `Hi ${contact.firstName},`,
+      `I was going through the FCC's Robocall Mitigation Database and noticed ${listing} doesn't show a 2026 recertification yet. It was due March 1, and you're not alone: about 3,600 providers show the same thing.`,
+      `Is it already handled? If so, no need to reply.`,
+      `If not, I can send you a short list of what looks out of date on the listing, free. If you'd like help after that, I prepare the updates and a fresh mitigation plan, and your officer files it from your own login in about 15 minutes. It's a flat $450, and we never hold your login.`,
+      `Want me to send the list?`,
+      `Aidan Magee\n${footer}`,
+    ].join("\n\n");
+    return { subject, bodyPlain, bodyHtml: toHtml(bodyPlain) };
+  }
+  const bodyPlain = [
+    `Hi ${contact.firstName},`,
+    `Bumping this in case it got buried. ${listing} still shows no 2026 recertification. Want the free list? A one-word reply is fine.`,
+    `Aidan\n${footer}`,
+  ].join("\n\n");
+  return { subject: `Re: ${subject}`, bodyPlain, bodyHtml: toHtml(bodyPlain) };
 }
 
 /**

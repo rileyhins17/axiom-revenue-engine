@@ -34,6 +34,7 @@ import { connect as tlsConnect } from "node:tls";
 
 import {
   FCC_CAMPAIGN_KEY,
+  FCC_COPY_VERSION,
   FCC_DAILY_SEND_CAP,
   FCC_FOLLOW_UP_DELAY_DAYS,
   buildFccCampaignContacts,
@@ -41,7 +42,7 @@ import {
   checkFccTestRecipient,
   parseFccFilingCsv,
   planFccSendSchedule,
-  renderFccEmail,
+  renderFccEmailV4,
   type FccCampaignContact,
 } from "../src/lib/fcc-campaign";
 import { fccMailboxFromImap } from "../src/lib/fcc-campaign-sender";
@@ -133,7 +134,7 @@ function preview(csvPath: string, outDir: string) {
   const samples = [contacts[0], contacts.find((c) => c.filings.length > 1)].filter(Boolean) as FccCampaignContact[];
   for (const [index, contact] of samples.entries()) {
     for (const step of [1, 2] as const) {
-      const email = renderFccEmail(contact, step, mailingAddress);
+      const email = renderFccEmailV4(contact, step, mailingAddress);
       writeFileSync(join(outDir, `preview_${index + 1}_step${step}.eml`), eml(contact.email, email.subject, email.bodyPlain));
     }
   }
@@ -150,7 +151,7 @@ async function testSend(csvPath: string, to: string) {
   const [contact] = load(csvPath).filter((c) => c.sendable);
   let threadId: string | undefined;
   for (const step of [1, 2] as const) {
-    const email = renderFccEmail(contact, step, mailingAddress);
+    const email = renderFccEmailV4(contact, step, mailingAddress);
     const raw = eml(to, `[TEST to ${contact.email}] ${email.subject}`, email.bodyPlain).replace(/^To:/, `From: ${sender}\r\nTo:`);
     const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
       method: "POST",
@@ -190,7 +191,7 @@ async function smtpTest(csvPath: string) {
   const transport = await openSmtp(await nodeTls(smtpHost, 465), { host: smtpHost, username: from, password, fromName, fromAddress: from }, () => crypto.randomUUID());
   try {
     for (const step of [1, 2] as const) {
-      const email = renderFccEmail(contact, step, mailingAddress);
+      const email = renderFccEmailV4(contact, step, mailingAddress);
       const thread: Record<string, string> = step === 2 ? { "In-Reply-To": firstId, References: firstId } : {};
       await transport.send({
         to: from, subject: `[TEST to ${contact.email}] ${email.subject}`, text: email.bodyPlain,
@@ -247,7 +248,7 @@ function importSql(csvPath: string, outFile: string) {
 function goSql(by: string) {
   if (!/^[A-Za-z][A-Za-z .'-]{0,79}$/.test(by)) throw new Error("Give the founder's name, e.g. go-sql Aidan");
   const now = new Date().toISOString();
-  console.log(`UPDATE "FccCampaignSetting" SET "enabled" = 1, "approvedCopy" = ${sql(FCC_CAMPAIGN_KEY)}, "goBy" = ${sql(by)}, "goAt" = ${sql(now)}, "updatedAt" = ${sql(now)} WHERE "id" = 1;`);
+  console.log(`UPDATE "FccCampaignSetting" SET "enabled" = 1, "approvedCopy" = ${sql(FCC_COPY_VERSION)}, "goBy" = ${sql(by)}, "goAt" = ${sql(now)}, "updatedAt" = ${sql(now)} WHERE "id" = 1;`);
 }
 
 function pauseSql() {

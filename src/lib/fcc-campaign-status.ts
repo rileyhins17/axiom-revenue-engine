@@ -2,7 +2,7 @@
  * What the FCC screen and the Today card show. Read-only: nothing here changes
  * the campaign. Every number comes straight from the FCC tables.
  */
-import { FCC_CAMPAIGN_KEY, FCC_DAILY_SEND_CAP } from "@/lib/fcc-campaign";
+import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP } from "@/lib/fcc-campaign";
 import { readFccNotes, type FccControlNote, type FccRunNote } from "@/lib/fcc-campaign-control";
 import { fccSentToday, torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
 import { FCC_SECOND_BATCH_MAX_BOUNCES, FCC_SEND_WINDOWS, fccBouncesToday, torontoMinute } from "@/lib/fcc-campaign-tick";
@@ -69,7 +69,7 @@ export async function fccScreen(db: ProspectDb, now = new Date()): Promise<FccSc
   const day = torontoDay(now);
   const setting = await db.prepare(`SELECT "enabled","dailyCap","approvedCopy","goBy","goAt" FROM "FccCampaignSetting" WHERE "id" = 1`).bind()
     .first<{ enabled: number; dailyCap: number; approvedCopy: string | null; goBy: string | null; goAt: string | null }>();
-  const approved = setting?.approvedCopy === FCC_CAMPAIGN_KEY && Boolean(setting?.goBy);
+  const approved = setting?.approvedCopy === FCC_COPY_VERSION && Boolean(setting?.goBy);
   const state: FccState = !setting || !approved ? "locked" : setting.enabled === 1 ? "live" : "paused";
   const batchSize = Math.min(FCC_DAILY_SEND_CAP, Math.max(0, setting?.dailyCap ?? 0));
 

@@ -4,7 +4,7 @@ import test from "node:test";
 
 import Database from "better-sqlite3";
 
-import { FCC_CAMPAIGN_KEY } from "@/lib/fcc-campaign";
+import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION } from "@/lib/fcc-campaign";
 import { runFccDailySend, type FccMailbox, type FccSendConfig } from "@/lib/fcc-campaign-sender";
 import { PermanentEmailError, type OutgoingEmail } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
@@ -44,7 +44,7 @@ function addContact(raw: Database.Database, id: string, email: string, options: 
   );
 }
 
-const recordGo = (raw: Database.Database, copy = FCC_CAMPAIGN_KEY) =>
+const recordGo = (raw: Database.Database, copy = FCC_COPY_VERSION) =>
   raw.prepare(`UPDATE "FccCampaignSetting" SET "enabled" = 1, "approvedCopy" = ?, "goBy" = 'Aidan', "goAt" = '2026-10-25T20:00:00Z' WHERE "id" = 1`).run(copy);
 
 const statusOf = (raw: Database.Database, id: string) =>
@@ -93,9 +93,11 @@ test("stays locked until a founder records the go for this exact copy", async ()
   const t = fakeTransport();
   const m = fakeMailbox();
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), MONDAY), { status: "SKIPPED", reason: "locked until a founder records the go" });
-  raw.prepare(`UPDATE "FccCampaignSetting" SET "enabled" = 1, "approvedCopy" = ?`).run(FCC_CAMPAIGN_KEY);
+  raw.prepare(`UPDATE "FccCampaignSetting" SET "enabled" = 1, "approvedCopy" = ?`).run(FCC_COPY_VERSION);
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), MONDAY), { status: "SKIPPED", reason: "locked until a founder records the go" });
   recordGo(raw, "an-older-copy");
+  assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), MONDAY), { status: "SKIPPED", reason: "this copy version is not approved" });
+  recordGo(raw, FCC_CAMPAIGN_KEY); // the go Aidan gave the calmer v3 does not cover his v2 email
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), MONDAY), { status: "SKIPPED", reason: "this copy version is not approved" });
   recordGo(raw);
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory, { mailingAddress: "" }), MONDAY), { status: "SKIPPED", reason: "no mailing address" });
@@ -121,10 +123,10 @@ test("sends at most 30 a day, named contacts first, never held inboxes, and neve
   assert.equal(t.sent.length, 30);
   assert.equal(new Set(t.sent.map((m) => m.to)).size, 30);
   assert.ok(t.sent.every((message) => message.to.startsWith("person")), "named contacts go before unclear ones");
-  assert.ok(t.sent.every((message) => message.text.includes(ADDRESS) && /Reply "stop"/.test(message.text)));
+  assert.ok(t.sent.every((message) => message.text.includes(ADDRESS) && /Reply "no thanks"/.test(message.text)));
   assert.equal(statusOf(raw, "held"), "held");
   const first = raw.prepare(`SELECT "status","step2DueAt","step1MessageId" FROM "FccCampaignContact" WHERE "id" = 'n1'`).get() as Record<string, string>;
-  assert.deepEqual(first, { status: "step1_sent", step2DueAt: "2026-10-29", step1MessageId: "<fcc-n1-1@mail.example>" });
+  assert.deepEqual(first, { status: "step1_sent", step2DueAt: "2026-10-29", step1MessageId: "<fcc-v4-n1-1@mail.example>" });
 
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-10-26T18:00:00Z")), { status: "SKIPPED", reason: "daily cap reached" });
   const tuesday = await runFccDailySend(db, config(t.factory, m.factory), TUESDAY);
@@ -152,7 +154,9 @@ test("follow-ups go out 3 days later in the same thread, before any new first em
   assert.equal(followUps.length, 10);
   for (const message of followUps) {
     const original = t.sent.find((sent) => sent.to === message.to && !sent.subject.startsWith("Re:"))!;
-    assert.match(message.subject, /^Re: Your 2026 RMD recertification$/);
+    assert.equal(message.subject, `Re: ${original.subject}`);
+    assert.match(message.subject, /^Re: Question about .+ RMD listing$/);
+    assert.match(message.text, /^Hi Jane,\n\nBumping this in case it got buried\./);
     assert.equal(message.headers["In-Reply-To"], original.headers["Message-ID"]);
     assert.equal(message.headers.References, original.headers["Message-ID"]);
     assert.notEqual(message.headers["Message-ID"], original.headers["Message-ID"]);
@@ -164,6 +168,29 @@ test("follow-ups go out 3 days later in the same thread, before any new first em
   const nextMonday = await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-11-02T15:00:00Z"));
   assert.equal(nextMonday.status === "RAN" && nextMonday.followUps, 2, "a follow-up due on the weekend goes on Monday");
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-11-03T15:00:00Z")), { status: "SKIPPED", reason: "nothing to send" });
+});
+
+test("people who got the calmer v3 first email get its follow-up; everyone new gets Aidan's v2", async () => {
+  const { raw, db } = database();
+  addContact(raw, "old", "pat@old-tel.example");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1SentAt" = '2026-10-28T15:00:00Z',
+    "step1MessageId" = '<fcc-old-1@mail.example>', "step2DueAt" = '2026-10-31' WHERE "id" = 'old'`).run();
+  raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status")
+    VALUES ('v3-first','old',1,'pat@old-tel.example','2026-10-28','<fcc-old-1@mail.example>','SENT')`).run();
+  addContact(raw, "new", "lee@new-tel.example", { company: "Talktone" });
+  recordGo(raw);
+  const t = fakeTransport();
+  const monday = await runFccDailySend(db, config(t.factory, fakeMailbox().factory), new Date("2026-11-02T15:00:00Z"));
+  assert.equal(monday.status === "RAN" && `${monday.followUps}+${monday.firstEmails}`, "1+1");
+  const [followUp, first] = t.sent;
+  assert.equal(followUp.to, "pat@old-tel.example");
+  assert.equal(followUp.subject, "Re: Your 2026 RMD recertification");
+  assert.equal(followUp.headers["In-Reply-To"], "<fcc-old-1@mail.example>");
+  assert.equal(followUp.headers["Message-ID"], "<fcc-old-2@mail.example>");
+  assert.equal(first.to, "lee@new-tel.example");
+  assert.equal(first.subject, "Question about Talktone's RMD listing");
+  assert.match(first.text, /noticed Talktone's listing \(RMD-new\) doesn't show a 2026 recertification yet/);
+  assert.equal(first.headers["Message-ID"], "<fcc-v4-new-1@mail.example>");
 });
 
 test("anyone at the company writing back stops the follow-up; shared mail services don't", async () => {

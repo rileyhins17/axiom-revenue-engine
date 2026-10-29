@@ -8,8 +8,13 @@
  * follow-ups. A follow-up goes in the same thread FCC_FOLLOW_UP_DELAY_DAYS after
  * the first email, and only after the inbox shows no reply and no bounce.
  * Every email is claimed before it is sent, so a crash can never double-send.
+ * First emails use the approved copy (FCC_COPY_VERSION); a follow-up uses the copy
+ * of the person's own first email, so the 60 sent on the calmer v3 keep its follow-up.
  */
-import { renderFccEmail, FCC_CAMPAIGN_KEY, FCC_DAILY_SEND_CAP, FCC_FOLLOW_UP_DELAY_DAYS, type FccCampaignContact } from "@/lib/fcc-campaign";
+import {
+  fccCopyOfMessageId, renderFccEmail, renderFccEmailV4, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_FOLLOW_UP_DELAY_DAYS,
+  type FccCampaignContact,
+} from "@/lib/fcc-campaign";
 import { PermanentEmailError, type EmailTransport } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { imapDate, imapQuote, type ImapSession } from "@/lib/revenue-engine/imap-client";
@@ -167,7 +172,7 @@ async function isSuppressed(db: ProspectDb, email: string) {
 export function fccClosedGate(setting: Awaited<ReturnType<typeof fccSetting>>, config: FccSendConfig, now: Date): string | null {
   if (!setting) return "setting row missing";
   if (setting.enabled !== 1 || !setting.goBy) return "locked until a founder records the go";
-  if (setting.approvedCopy !== FCC_CAMPAIGN_KEY) return "this copy version is not approved";
+  if (setting.approvedCopy !== FCC_COPY_VERSION) return "this copy version is not approved";
   if ((config.mailingAddress ?? "").trim().length < 10) return "no mailing address";
   if (!config.transport || !config.mailbox || !config.fromAddress) return "sender not configured";
   if (["Sat", "Sun"].includes(torontoWeekday(now))) return "weekend";
@@ -218,7 +223,8 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     // Connect before claiming: a mailbox that refuses the login must not mark anyone as failed.
     transport ??= await config.transport!();
     const sendId = config.newId();
-    const messageId = `<fcc-${contact.id}-${step}@${fromDomain}>`;
+    const copy = step === 1 ? "v4" : fccCopyOfMessageId(contact.step1MessageId);
+    const messageId = copy === "v4" ? `<fcc-v4-${contact.id}-${step}@${fromDomain}>` : `<fcc-${contact.id}-${step}@${fromDomain}>`;
     // One statement, so two runs at once can never both pass the day's cap or the gap between emails.
     const claimedAt = now.toISOString();
     const gapSince = options.minGapMs ? new Date(now.getTime() - options.minGapMs).toISOString() : "9999-12-31";
@@ -236,7 +242,8 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     budget -= 1;
     let filings: FccCampaignContact["filings"] = [];
     try { filings = JSON.parse(contact.filingsJson) as FccCampaignContact["filings"]; } catch { filings = []; }
-    const email = renderFccEmail({ firstName: contact.firstName, company: contact.company, filings: filings.length ? filings : [{} as never] }, step, address);
+    const render = copy === "v4" ? renderFccEmailV4 : renderFccEmail;
+    const email = render({ firstName: contact.firstName, company: contact.company, filings: filings.length ? filings : [{} as never] }, step, address);
     const thread: Record<string, string> = step === 2 && contact.step1MessageId
       ? { "In-Reply-To": contact.step1MessageId, References: contact.step1MessageId }
       : {};
