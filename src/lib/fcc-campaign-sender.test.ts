@@ -434,6 +434,21 @@ test("the hot list reads the inbox first for anyone emailed in March, and holds 
   assert.ok(held.status === "RAN" && /inbox check failed/.test(held.followUpsHeldBack ?? ""));
 });
 
+test("a reply found by the hot-list check also stops that person's March email in the same run", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "not-yet-emailed@back-tel.example");
+  addContact(raw, "m2", "already-emailed@back2-tel.example");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1MessageId" = '<x>', "step1SentAt" = '2026-10-20T14:00:00Z', "step2DueAt" = '2026-10-23' WHERE "id" = 'm2'`).run();
+  addNov6Contact(raw, "h1", "not-yet-emailed@back-tel.example");
+  addNov6Contact(raw, "h2", "already-emailed@back2-tel.example");
+  recordGo(raw);
+  const t = fakeTransport();
+  const m = fakeMailbox({ from: ["not-yet-emailed@back-tel.example", "already-emailed@back2-tel.example"] });
+  await runFccDailySend(db, config(t.factory, m.factory), MONDAY);
+  assert.equal(t.sent.length, 0, "no hot-list email, March email or follow-up");
+  for (const id of ["h1", "h2", "m1", "m2"]) assert.equal(statusOf(raw, id), "replied");
+});
+
 test("the worker's weekday 10am schedule runs only the retired website batch; the FCC tick has its own schedule", async () => {
   const source = readFileSync(new URL("../../worker.mjs", import.meta.url), "utf8")
     .replace(/^import[\s\S]*?from\s+"[^"]+";\s*/gm, "")
