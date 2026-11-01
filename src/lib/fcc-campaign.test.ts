@@ -15,6 +15,8 @@ import {
   planFccSendSchedule,
   renderFccEmail,
   renderFccEmailV4,
+  renderFccEmailV5,
+  fccSignature,
 } from "@/lib/fcc-campaign";
 
 const HEADER =
@@ -145,6 +147,36 @@ test("renders Aidan's v2 email word for word, with the address and opt-out in bo
   assert.equal(fccCopyOfMessageId("<fcc-v4-abc-1@mail.example>"), "v4");
   assert.equal(fccCopyOfMessageId("<fcc-abc-1@mail.example>"), "v3");
   assert.equal(fccCopyOfMessageId(null), "v3");
+});
+
+test("v5 keeps Aidan's words and signs with the founders' signature: plain domain linking to the FCC page, logo, opt-out", () => {
+  const address = "257 Kipling Ave, Kitchener, ON N2C 2B9, Canada";
+  const contact = { firstName: "Jane", company: "Crocker Communications", filings: [{ rmdNumber: "RMD0001234" }] as never };
+  const v4 = renderFccEmailV4(contact, 1, address);
+  const first = renderFccEmailV5(contact, 1, address, { name: "Riley Hinsperger", title: "Co-founder", phone: "519-555-0100" });
+  assert.equal(first.subject, v4.subject);
+  assert.ok(first.bodyPlain.startsWith(v4.bodyPlain.split("\n\nAidan Magee")[0]), "the same words as v4 up to the sign-off");
+  assert.ok(first.bodyPlain.endsWith([
+    "Want me to send the list?", "",
+    "Riley Hinsperger\nCo-founder\n257 Kipling Ave,\nKitchener, ON N2C 2B9, Canada\nC: 519-555-0100\naxiominternational.ca/fcc-filings", "",
+    "Not useful? Reply \"no thanks\" and I won't follow up.",
+  ].join("\n")));
+  assert.match(first.bodyHtml, /<a href="https:\/\/axiominternational\.ca\/fcc-filings\/" style="color:#1a56c4">axiominternational\.ca<\/a>/);
+  assert.match(first.bodyHtml, /<img src="https:\/\/axiominternational\.ca\/brand\/axiom-lockup-400\.png" alt="Axiom International"/);
+  assert.match(first.bodyHtml, /font-weight:bold">Riley Hinsperger<\/div>/);
+  assert.match(first.bodyHtml, /C: 519-555-0100/);
+  assert.match(first.bodyHtml, /Not useful\? Reply &quot;no thanks&quot; and I won&#39;t follow up\.|Not useful\? Reply &quot;no thanks&quot; and I won't follow up\./);
+
+  const plainest = fccSignature({ name: "Aidan Magee" }, address);
+  assert.equal(plainest.plain.split("\n")[1], "Co-founder", "the title defaults to Co-founder");
+  assert.doesNotMatch(plainest.plain, /C: /, "no phone line without a phone");
+  assert.match(fccSignature({ name: "A <b>&" }, address).html, /A &lt;b&gt;&amp;/, "names are escaped");
+
+  const follow = renderFccEmailV5(contact, 2, address, { name: "Aidan Magee" });
+  assert.equal(follow.subject, "Re: Question about Crocker Communications' RMD listing");
+  assert.match(follow.bodyPlain, /^Hi Jane,\n\nBumping this in case it got buried\./);
+  assert.match(follow.bodyPlain, /Aidan Magee\nCo-founder\n257 Kipling Ave,/);
+  assert.equal(fccCopyOfMessageId("<fcc-v5-abc-1@mail.example>"), "v5");
 });
 
 test("schedule never exceeds the daily cap and follow-ups land 3 days later", () => {

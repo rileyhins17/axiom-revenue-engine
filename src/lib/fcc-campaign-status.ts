@@ -134,7 +134,7 @@ export type FccStats = {
   weekdaysLeft: number | null;
 };
 
-const VERSION_NAMES: Record<string, string> = { v3: "Calmer email (Oct 28)", v4: "Question email (Oct 29 on)" };
+const VERSION_NAMES: Record<string, string> = { v3: "Calmer email (Oct 28)", v4: "Question email (Oct 29–Nov 1)", v5: "Question email, new signature" };
 const rate = (part: number, whole: number) => (whole > 0 ? part / whole : null);
 
 /**
@@ -148,7 +148,7 @@ export async function fccStats(db: ProspectDb, inboxes: FccInboxRef[], now = new
   const name = (key: string) => inboxes.find((inbox) => inbox.key === key)?.name ?? (key || "First inbox");
   const since = new Date(now.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
   const [groups, sends, setting] = await Promise.all([
-    db.prepare(`SELECT CASE WHEN "step1MessageId" LIKE '<fcc-v4-%' THEN 'v4' ELSE 'v3' END AS version, COALESCE("senderAddress",'') AS inbox,
+    db.prepare(`SELECT CASE WHEN "step1MessageId" LIKE '<fcc-v5-%' THEN 'v5' WHEN "step1MessageId" LIKE '<fcc-v4-%' THEN 'v4' ELSE 'v3' END AS version, COALESCE("senderAddress",'') AS inbox,
         COUNT(*) AS emailed, SUM("step2SentAt" IS NOT NULL) AS followedUp,
         SUM("status" = 'replied' AND lower(COALESCE("stoppedReason",'')) NOT LIKE '%automatic reply%') AS real,
         SUM("status" = 'replied' AND lower(COALESCE("stoppedReason",'')) LIKE '%automatic reply%') AS automatic,

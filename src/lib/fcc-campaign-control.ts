@@ -88,6 +88,19 @@ export async function claimFccReplyCheckTry(db: ProspectDb, slot: string, now = 
   return changes(result) === 1;
 }
 
+const SIGNATURES_KEY = "fcc.signatures";
+
+/** Each inbox's signature title and cell ("" is the first inbox, otherwise the inbox's address). */
+export type FccSignatureSettings = Record<string, { title?: string | null; phone?: string | null }>;
+
+export async function readFccSignatures(db: ProspectDb) {
+  return (await get<FccSignatureSettings>(db, SIGNATURES_KEY)) ?? {};
+}
+
+export async function saveFccSignatures(db: ProspectDb, settings: FccSignatureSettings, now = new Date()) {
+  await put(db, SIGNATURES_KEY, settings, now);
+}
+
 /** The sender's latest note, shown on the FCC screen. */
 export async function noteFccRun(db: ProspectDb, note: string, now = new Date()) {
   await put(db, RUN_KEY, { note: note.slice(0, 300), at: now.toISOString() } satisfies FccRunNote, now);

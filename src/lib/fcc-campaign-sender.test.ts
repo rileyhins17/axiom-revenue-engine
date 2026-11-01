@@ -123,10 +123,12 @@ test("sends at most 30 a day, named contacts first, never held inboxes, and neve
   assert.equal(t.sent.length, 30);
   assert.equal(new Set(t.sent.map((m) => m.to)).size, 30);
   assert.ok(t.sent.every((message) => message.to.startsWith("person")), "named contacts go before unclear ones");
-  assert.ok(t.sent.every((message) => message.text.includes(ADDRESS) && /Reply "no thanks"/.test(message.text)));
+  assert.ok(t.sent.every((message) => message.text.includes("257 Example St,\nKitchener, ON N2C 0A0, Canada") && /Reply "no thanks"/.test(message.text)));
+  assert.ok(t.sent.every((message) => message.html?.includes('<a href="https://axiominternational.ca/fcc-filings/" style="color:#1a56c4">axiominternational.ca</a>')),
+    "the signature link shows the plain domain and opens the FCC page");
   assert.equal(statusOf(raw, "held"), "held");
   const first = raw.prepare(`SELECT "status","step2DueAt","step1MessageId" FROM "FccCampaignContact" WHERE "id" = 'n1'`).get() as Record<string, string>;
-  assert.deepEqual(first, { status: "step1_sent", step2DueAt: "2026-10-29", step1MessageId: "<fcc-v4-n1-1@mail.example>" });
+  assert.deepEqual(first, { status: "step1_sent", step2DueAt: "2026-10-29", step1MessageId: "<fcc-v5-n1-1@mail.example>" });
 
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-10-26T18:00:00Z")), { status: "SKIPPED", reason: "daily cap reached" });
   const tuesday = await runFccDailySend(db, config(t.factory, m.factory), TUESDAY);
@@ -190,7 +192,7 @@ test("people who got the calmer v3 first email get its follow-up; everyone new g
   assert.equal(first.to, "lee@new-tel.example");
   assert.equal(first.subject, "Question about Talktone's RMD listing");
   assert.match(first.text, /noticed Talktone's listing \(RMD-new\) doesn't show a 2026 recertification yet/);
-  assert.equal(first.headers["Message-ID"], "<fcc-v4-new-1@mail.example>");
+  assert.equal(first.headers["Message-ID"], "<fcc-v5-new-1@mail.example>");
 });
 
 test("anyone at the company writing back stops the follow-up; shared mail services don't", async () => {

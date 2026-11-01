@@ -9,9 +9,20 @@ const b64 = (value: string) => btoa(String.fromCharCode(...encoder.encode(value)
 const headerText = (value: string) => /^[\x20-\x7e]*$/.test(value) ? value : `=?UTF-8?B?${b64(value)}?=`;
 const clean = (value: string) => value.replace(/[\r\n]/g, " ");
 
-/** Builds an RFC 5322 message with a base64 text body (no dot-stuffing needed). */
+/** Builds an RFC 5322 message with base64 bodies (no dot-stuffing needed): plain text, or plain text and HTML side by side. */
 export function buildMessage(auth: SmtpAuth, message: OutgoingEmail, messageId: string, date = new Date()): string {
-  const body = b64(message.text).replace(/.{1,76}/g, "$&\r\n");
+  const encode = (text: string) => b64(text).replace(/.{1,76}/g, "$&\r\n");
+  const boundary = `axiom-${messageId.replace(/[^A-Za-z0-9]/g, "").slice(0, 40)}`;
+  const content = message.html
+    ? { "Content-Type": `multipart/alternative; boundary="${boundary}"` }
+    : { "Content-Type": "text/plain; charset=utf-8", "Content-Transfer-Encoding": "base64" };
+  const body = message.html
+    ? [
+      `--${boundary}`, "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: base64", "", encode(message.text),
+      `--${boundary}`, "Content-Type: text/html; charset=utf-8", "Content-Transfer-Encoding: base64", "", encode(message.html),
+      `--${boundary}--`, "",
+    ].join("\r\n")
+    : encode(message.text);
   const headers = {
     From: `${headerText(auth.fromName)} <${auth.fromAddress}>`,
     To: clean(message.to),
@@ -19,8 +30,7 @@ export function buildMessage(auth: SmtpAuth, message: OutgoingEmail, messageId: 
     Date: date.toUTCString().replace("GMT", "+0000"),
     "Message-ID": `<${messageId}@${auth.fromAddress.split("@")[1]}>`,
     "MIME-Version": "1.0",
-    "Content-Type": "text/plain; charset=utf-8",
-    "Content-Transfer-Encoding": "base64",
+    ...content,
     ...Object.fromEntries(Object.entries(message.headers).map(([k, v]) => [k, clean(v)])),
   };
   return `${Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join("\r\n")}\r\n\r\n${body}`;

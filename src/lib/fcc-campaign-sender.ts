@@ -16,9 +16,10 @@
  * that sent that person's first email, so it lands in the same thread.
  */
 import {
-  fccCopyOfMessageId, renderFccEmail, renderFccEmailV4, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_FOLLOW_UP_DELAY_DAYS,
+  fccCopyOfMessageId, renderFccEmail, renderFccEmailV5, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_FOLLOW_UP_DELAY_DAYS,
   type FccCampaignContact,
 } from "@/lib/fcc-campaign";
+import { readFccSignatures } from "@/lib/fcc-campaign-control";
 import { PermanentEmailError, type EmailTransport } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { imapDate, imapQuote, type ImapSession } from "@/lib/revenue-engine/imap-client";
@@ -212,6 +213,9 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   const cap = options.cap ?? Math.min(FCC_DAILY_SEND_CAP, Math.max(0, setting.dailyCap));
   let remaining = cap - await fccSentToday(db, day, config);
   const inbox = senderKey(config);
+  // Title and cell are optional extras: if they can't be read, the email still goes with name and title only.
+  const signatures = await readFccSignatures(db).catch(() => ({} as Awaited<ReturnType<typeof readFccSignatures>>));
+  const signer = { name: config.fromName?.trim() || "Aidan Magee", ...(signatures[inbox] ?? {}) };
   if (remaining <= 0) return { status: "SKIPPED", reason: "daily cap reached" };
   let budget = options.limit ?? Number.POSITIVE_INFINITY;
 
@@ -247,8 +251,9 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     // Connect before claiming: a mailbox that refuses the login must not mark anyone as failed.
     transport ??= await config.transport!();
     const sendId = config.newId();
-    const copy = step === 1 ? "v4" : fccCopyOfMessageId(contact.step1MessageId);
-    const messageId = copy === "v4" ? `<fcc-v4-${contact.id}-${step}@${fromDomain}>` : `<fcc-${contact.id}-${step}@${fromDomain}>`;
+    // A follow-up keeps its first email's version in its Message-ID, so results can be split by version.
+    const copy = step === 1 ? "v5" : fccCopyOfMessageId(contact.step1MessageId);
+    const messageId = copy === "v3" ? `<fcc-${contact.id}-${step}@${fromDomain}>` : `<fcc-${copy}-${contact.id}-${step}@${fromDomain}>`;
     // One statement, so two runs at once can never both pass the day's cap or the gap between emails.
     const claimedAt = now.toISOString();
     const gapSince = options.minGapMs ? new Date(now.getTime() - options.minGapMs).toISOString() : "9999-12-31";
@@ -267,14 +272,14 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     let filings: FccCampaignContact["filings"] = [];
     try { filings = JSON.parse(contact.filingsJson) as FccCampaignContact["filings"]; } catch { filings = []; }
     const recipient = { firstName: contact.firstName, company: contact.company, filings: filings.length ? filings : [{} as never] };
-    // v3 is Aidan's own wording ("I'm Aidan Magee from Axiom"); only v4 is signed by whichever inbox sends it.
-    const email = copy === "v4" ? renderFccEmailV4(recipient, step, address, config.fromName) : renderFccEmail(recipient, step, address);
+    // v3 is Aidan's own wording ("I'm Aidan Magee from Axiom"); v4 and v5 carry the sending founder's signature.
+    const email = copy === "v3" ? renderFccEmail(recipient, step, address) : renderFccEmailV5(recipient, step, address, signer);
     const thread: Record<string, string> = step === 2 && contact.step1MessageId
       ? { "In-Reply-To": contact.step1MessageId, References: contact.step1MessageId }
       : {};
     try {
       await transport.send({
-        to: contact.email, subject: email.subject, text: email.bodyPlain,
+        to: contact.email, subject: email.subject, text: email.bodyPlain, ...(copy === "v3" ? {} : { html: email.bodyHtml }),
         headers: { "Message-ID": messageId, "List-Unsubscribe": `<mailto:${config.fromAddress}?subject=stop>`, ...thread },
       });
       const sentAt = new Date().toISOString();
