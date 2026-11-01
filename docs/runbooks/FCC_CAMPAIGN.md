@@ -71,4 +71,4 @@ A one-time first email to the hot list (`fcc_hot_list_nov6.csv`, outside this re
    npx wrangler d1 execute axiom-ops-omniscient --remote --config wrangler.production.jsonc --file <path>\fcc-go.sql
    ```
    Weekdays from 10:00 Toronto, the tick sends 30 then up to 30 more (from 12:30, only if today has 1 bounce or fewer). At 60 a day it takes Monday to Thursday, before the 6th.
-6. **Watch:** the same FCC screen and `fcc_campaign` log lines. Count the hot list with `SELECT "status", COUNT(*) FROM "FccCampaignContact" WHERE "campaignKey" = 'fcc-nov6-hot' GROUP BY "status";` (`step1_sent` = emailed, `held` = not sent). Pause with the FCC screen or `pause-sql`.
+6. **Watch:** the same FCC screen, which shows the hot list as its own "November 6 list" row, and `fcc_campaign` log lines. To count it directly, use `SELECT "status", COUNT(*) FROM "FccCampaignContact" WHERE "campaignKey" = 'fcc-nov6-hot' GROUP BY "status";` (`step1_sent` = emailed, `held` = not sent). Pause with the FCC screen or `pause-sql`.
