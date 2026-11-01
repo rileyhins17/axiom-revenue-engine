@@ -124,7 +124,7 @@ test("renders Aidan's v2 email word for word, with the address and opt-out in bo
     "Is it already handled? If so, no need to reply.",
     "If not, I can send you a short list of what looks out of date on the listing, free. If you'd like help after that, I prepare the updates and a fresh mitigation plan, and your officer files it from your own login in about 15 minutes. It's a flat $450, and we never hold your login.",
     "Want me to send the list?",
-    `Aidan Magee\nAxiom · axiominternational.ca · ${address}\nNot useful? Reply "no thanks" and I won't follow up.`,
+    `Aidan Magee\nAxiom · axiominternational.ca/fcc-filings · ${address}\nNot useful? Reply "no thanks" and I won't follow up.`,
   ].join("\n\n"));
   assert.doesNotMatch(first.bodyPlain, /https?:|www\.|enforcement/i);
   assert.equal(renderFccEmailV4({ ...contact, company: "Talktone, Inc." }, 1, address).subject, "Question about Talktone's RMD listing");
@@ -142,7 +142,7 @@ test("renders Aidan's v2 email word for word, with the address and opt-out in bo
   assert.equal(follow.bodyPlain, [
     "Hi Jane,",
     "Bumping this in case it got buried. Crocker Communications' listing (RMD0001234) still shows no 2026 recertification. Want the free list? A one-word reply is fine.",
-    `Aidan\nAxiom · axiominternational.ca · ${address}\nNot useful? Reply "no thanks" and I won't follow up.`,
+    `Aidan\nAxiom · axiominternational.ca/fcc-filings · ${address}\nNot useful? Reply "no thanks" and I won't follow up.`,
   ].join("\n\n"));
 
   assert.equal(fccCopyOfMessageId("<fcc-v4-abc-1@mail.example>"), "v4");

@@ -108,7 +108,7 @@ test("the first 30 go from 10:00, 1 to 3 minutes apart, in about an hour; nothin
   assert.ok(early.every((result) => result.status === "SKIPPED" && result.reason === "outside the send windows"));
   assert.equal(h.sent.length, 0);
 
-  await h.run(db, WED_10AM, WED_10AM + 2 * 60 * MINUTE);
+  await h.run(db, WED_10AM, WED_10AM + 90 * MINUTE);
   assert.equal(h.sent.length, 30, "the first batch stops at 30");
   assert.ok(h.sent[0]!.at - WED_10AM < 20_000, "the first email goes at 10:00");
   const gaps = h.sent.slice(1).map((send, i) => send.at - h.sent[i]!.at);
@@ -117,47 +117,48 @@ test("the first 30 go from 10:00, 1 to 3 minutes apart, in about an hour; nothin
   assert.ok(minutes > 40 && minutes < 95, `30 emails took ${minutes} minutes`);
   assert.equal(new Set(h.sent.map((send) => send.to)).size, 30, "nobody twice");
 
-  const lull = await h.run(db, WED_10AM + 2 * 60 * MINUTE, WED_10AM + 150 * MINUTE);
+  const lull = await h.run(db, WED_10AM + 90 * MINUTE, WED_10AM + 105 * MINUTE);
   assert.ok(lull.every((result) => result.status === "SKIPPED"));
-  assert.equal(h.sent.length, 30, "nothing between 12:00 and 12:30");
+  assert.equal(h.sent.length, 30, "nothing between 11:30 and 11:45");
 });
 
-test("the second 30 go from 12:30 when the morning had 1 bounce or fewer, and 60 is the ceiling", async () => {
+test("the next 30 go from 11:45 and 1:30 when the day has 1 bounce or fewer, and 90 is the ceiling", async () => {
   const { raw, db } = database();
-  addContacts(raw, 80);
+  addContacts(raw, 120);
   const h = harness({ bounced: ["person3@co3.example"] });
-  await h.run(db, WED_10AM, WED_10AM + 270 * MINUTE);
+  await h.run(db, WED_10AM, WED_10AM + 300 * MINUTE);
   assert.equal(statusCount(raw, "bounced"), 1);
-  assert.ok(h.sent.some((send) => send.at >= WED_10AM + 150 * MINUTE), "the second batch went after 12:30");
-  assert.ok(h.sent.filter((send) => send.at < WED_10AM + 150 * MINUTE).length <= 30);
-  assert.equal(h.sent.length, 60, "60 a day, no more");
+  assert.ok(h.sent.filter((send) => send.at < WED_10AM + 105 * MINUTE).length <= 30);
+  assert.ok(h.sent.filter((send) => send.at < WED_10AM + 210 * MINUTE).length <= 60);
+  assert.ok(h.sent.some((send) => send.at >= WED_10AM + 210 * MINUTE), "the third batch went after 1:30");
+  assert.equal(h.sent.length, 90, "90 a day, no more");
   assert.equal(enabled(raw), 1);
   const notes = await readFccNotes(db);
-  assert.match(notes.lastRun?.note ?? "", /today's limit reached|Sent email 60/);
+  assert.match(notes.lastRun?.note ?? "", /today's limit reached|Sent email 90/);
 });
 
-test("2 bounces by noon means no second batch; 3 pauses everything until a founder resumes", async () => {
+test("2 bounces in the first batch means no later batches; 3 pauses everything until a founder resumes", async () => {
   const { raw, db } = database();
   addContacts(raw, 80);
   const two = harness({ bounced: ["person1@co1.example", "person2@co2.example"] });
-  await two.run(db, WED_10AM, WED_10AM + 150 * MINUTE);
+  await two.run(db, WED_10AM, WED_10AM + 105 * MINUTE);
   const loginsByNoon = two.logins();
-  await two.run(db, WED_10AM + 150 * MINUTE, WED_10AM + 270 * MINUTE);
-  assert.equal(two.sent.length, 30, "no second batch");
-  assert.equal(two.logins(), loginsByNoon, "once the second batch is off, nothing logs in to Gmail");
+  await two.run(db, WED_10AM + 105 * MINUTE, WED_10AM + 300 * MINUTE);
+  assert.equal(two.sent.length, 30, "no later batches");
+  assert.equal(two.logins(), loginsByNoon, "once the later batches are off, nothing logs in to Gmail");
   assert.ok(two.scans() <= 2, `bounces are matched only when a new one arrives (${two.scans()} scans)`);
   assert.equal(enabled(raw), 1, "2 bounces don't pause the campaign");
-  assert.match((await readFccNotes(db)).lastRun?.note ?? "", /No second batch today: 2 emails bounced/);
+  assert.match((await readFccNotes(db)).lastRun?.note ?? "", /No more batches today: 2 emails bounced/);
 
   const fresh = database();
   addContacts(fresh.raw, 80);
   const three = harness({ bounced: ["person1@co1.example", "person2@co2.example", "person3@co3.example"] });
-  const results = await three.run(fresh.db, WED_10AM, WED_10AM + 120 * MINUTE);
+  const results = await three.run(fresh.db, WED_10AM, WED_10AM + 90 * MINUTE);
   assert.ok(results.some((result) => result.status === "PAUSED" && /3 emails bounced today/.test(result.reason)));
   assert.equal(enabled(fresh.raw), 0);
   assert.ok(three.sent.length < 30, "it stopped mid-batch");
   const stoppedAt = three.sent.length;
-  await three.run(fresh.db, WED_10AM + 120 * MINUTE, WED_10AM + 270 * MINUTE);
+  await three.run(fresh.db, WED_10AM + 90 * MINUTE, WED_10AM + 300 * MINUTE);
   assert.equal(three.sent.length, stoppedAt, "nothing more while paused");
   const control = (await readFccNotes(fresh.db)).control;
   assert.equal(control?.action, "paused");

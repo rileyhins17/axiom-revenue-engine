@@ -13,10 +13,13 @@
  * The November 6 hot list (FCC_NOV6_CAMPAIGN_KEY) goes first: one first email each, no follow-up.
  * Everything else waits until the hot list has been sent or stopped, and anyone on the hot list
  * is out of the March queue for good: no March first email and no March follow-up.
+ * A hold or stop on someone's March row also stops their hot-list email, and a reply, stop or
+ * non-generic hold anywhere at a company stops it for that company's other mailboxes.
+ * After FCC_NOV6_LAST_SEND_DAY the hot list closes and anyone it never reached rejoins the March queue.
  */
 import {
   fccCopyOfMessageId, renderFccEmail, renderFccEmailNov6, renderFccEmailV4, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP,
-  FCC_FOLLOW_UP_DELAY_DAYS, FCC_NOV6_CAMPAIGN_KEY, type FccCampaignContact,
+  FCC_FOLLOW_UP_DELAY_DAYS, FCC_NOV6_CAMPAIGN_KEY, FCC_NOV6_LAST_SEND_DAY, type FccCampaignContact,
 } from "@/lib/fcc-campaign";
 import { PermanentEmailError, type EmailTransport } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
@@ -205,22 +208,25 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   let budget = options.limit ?? Number.POSITIVE_INFINITY;
 
   const columns = `c."id", c."email", c."firstName", c."company", c."filingsJson", c."step1SentAt", c."step1MessageId"`;
+  const hotOpen = day <= FCC_NOV6_LAST_SEND_DAY;
+  // While the hot list is open it owns its people. Once it closes, only those it actually reached stay out of the March queue.
+  const notOnHotList = `NOT EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1 AND (? = 1 OR h."status" <> 'ready'))`;
   const { results: followUps } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'step1_sent' AND c."step2DueAt" <= ? AND c."step1MessageId" IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 2 AND s."status" IN ('CLAIMED','SENT'))
-      AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1)
-    ORDER BY c."step2DueAt", c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, day, FCC_NOV6_CAMPAIGN_KEY).all<ContactRow>();
+      AND ${notOnHotList}
+    ORDER BY c."step2DueAt", c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, day, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
   const { results: firsts } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
-      AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1)
+      AND ${notOnHotList}
     ORDER BY CASE c."emailKind" WHEN 'compliance' THEN 0 WHEN 'named' THEN 1 ELSE 2 END, c."createdAt", c."id" LIMIT 200`)
-    .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY).all<ContactRow>();
-  const { results: hot } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
+    .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
+  const { results: hot } = hotOpen ? await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
-      AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" m WHERE m."email" = c."email" AND m."campaignKey" = ? AND m."status" IN ('replied','bounced','suppressed'))
-    ORDER BY c."createdAt", c."id" LIMIT 1000`).bind(FCC_NOV6_CAMPAIGN_KEY, FCC_CAMPAIGN_KEY).all<ContactRow>();
+      AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" m WHERE m."email" = c."email" AND m."campaignKey" = ? AND m."status" IN ('replied','bounced','suppressed','held','failed'))
+    ORDER BY c."createdAt", c."id" LIMIT 1000`).bind(FCC_NOV6_CAMPAIGN_KEY, FCC_CAMPAIGN_KEY).all<ContactRow>() : { results: [] as ContactRow[] };
   if (followUps.length === 0 && firsts.length === 0 && hot.length === 0) return { status: "SKIPPED", reason: "nothing to send" };
 
   const counts = { firstEmails: 0, followUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0 };
@@ -316,6 +322,14 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     for (const contact of hot) {
       if (remaining <= 0 || budget <= 0) return finish();
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
+      // Someone else at this company replied, said stop, or was held for a reason about the company.
+      const companyDomain = domainOf(contact.email);
+      if (!SHARED_MAIL_DOMAINS.has(companyDomain) && !shared.has(companyDomain)) {
+        const stoppedAtCompany = await db.prepare(`SELECT 1 AS hit FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "email" LIKE ?
+          AND ("status" IN ('replied','suppressed') OR ("status" = 'held' AND COALESCE("holdReason",'') NOT LIKE '%eneric inbox%')) LIMIT 1`)
+          .bind(FCC_CAMPAIGN_KEY, `%@${companyDomain}`).first<{ hit: number }>();
+        if (stoppedAtCompany) { await stop(contact, "suppressed", "Someone else at this company replied, said stop or is on hold"); counts.suppressed += 1; continue; }
+      }
       // Replies to the March email are only recorded when its follow-up comes up, and the hot list goes
       // first, so read the inbox here. If the inbox can't be read, this person waits; nobody else needs it.
       const march = await db.prepare(`SELECT "id","status","step1SentAt","createdAt" FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "email" = ?`)

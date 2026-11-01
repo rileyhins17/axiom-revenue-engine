@@ -5,8 +5,8 @@
  * in a burst.
  *
  * - First batch: up to the daily cap (30) from 10:00 Toronto time.
- * - Second batch: up to 30 more from 12:30, only when today has 1 bounce or fewer.
- *   So 60 a day is the ceiling.
+ * - Second and third batches: up to 30 more each from 11:45 and 13:30, only when
+ *   today has 1 bounce or fewer. So 90 a day is the ceiling (Aidan, Nov 1).
  * - Pause everything (a founder must press Resume) on a Google warning in the
  *   inbox, 3 or more bounces in a day, a login Gmail refuses, or an email Gmail
  *   refuses.
@@ -22,12 +22,14 @@ import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
 /** Minutes after midnight, Toronto time. */
 export const FCC_SEND_WINDOWS = [
-  { batch: 1, start: 10 * 60, end: 12 * 60 },
-  { batch: 2, start: 12 * 60 + 30, end: 14 * 60 + 30 },
+  { batch: 1, start: 10 * 60, end: 11 * 60 + 30 },
+  { batch: 2, start: 11 * 60 + 45, end: 13 * 60 + 15 },
+  // Ends with the Worker's cron, which stops at 15:00 Toronto time in winter.
+  { batch: 3, start: 13 * 60 + 30, end: 15 * 60 },
 ] as const;
 export const FCC_GAP_MIN_MS = 60_000;
 export const FCC_GAP_MAX_MS = 180_000;
-/** The second batch goes only when the day has at most this many bounces. */
+/** The batches after the first go only when the day has at most this many bounces. */
 export const FCC_SECOND_BATCH_MAX_BOUNCES = 1;
 /** This many bounces in a day pauses the campaign. */
 export const FCC_PAUSE_BOUNCES = 3;
@@ -86,14 +88,14 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
     await noteFccRun(db, `Paused: ${reason}`, now);
     return { status: "PAUSED", reason };
   };
-  const noSecondBatch = async (bounces: number): Promise<FccTickResult> => {
-    await noteFccRun(db, `No second batch today: ${bounces} emails bounced this morning.`, now);
-    return { status: "SKIPPED", reason: "no second batch: too many bounces" };
+  const noMoreBatches = async (bounces: number): Promise<FccTickResult> => {
+    await noteFccRun(db, `No more batches today: ${bounces} emails bounced.`, now);
+    return { status: "SKIPPED", reason: "no more batches: too many bounces" };
   };
   // Decide from what is already known before logging in to Gmail at all.
   const knownBounces = await fccBouncesToday(db, day);
   if (knownBounces >= FCC_PAUSE_BOUNCES) return pause(`${knownBounces} emails bounced today`);
-  if (window.batch === 2 && knownBounces > FCC_SECOND_BATCH_MAX_BOUNCES) return noSecondBatch(knownBounces);
+  if (window.batch > 1 && knownBounces > FCC_SECOND_BATCH_MAX_BOUNCES) return noMoreBatches(knownBounces);
 
   let mailbox: FccMailbox;
   try {
@@ -126,7 +128,7 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
     }
     const bounces = await fccBouncesToday(db, day);
     if (bounces >= FCC_PAUSE_BOUNCES) return await pause(`${bounces} emails bounced today`);
-    if (window.batch === 2 && bounces > FCC_SECOND_BATCH_MAX_BOUNCES) return await noSecondBatch(bounces);
+    if (window.batch > 1 && bounces > FCC_SECOND_BATCH_MAX_BOUNCES) return await noMoreBatches(bounces);
 
     const delay = Math.max(0, dueAt - now.getTime()) + Math.floor(random() * JITTER_MS);
     if (delay > 0) await wait(delay);

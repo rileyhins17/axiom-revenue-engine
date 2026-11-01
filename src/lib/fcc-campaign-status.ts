@@ -2,7 +2,7 @@
  * What the FCC screen and the Today card show. Read-only: nothing here changes
  * the campaign. Every number comes straight from the FCC tables.
  */
-import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_NOV6_CAMPAIGN_KEY } from "@/lib/fcc-campaign";
+import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_NOV6_CAMPAIGN_KEY, FCC_NOV6_LAST_SEND_DAY } from "@/lib/fcc-campaign";
 import { readFccNotes, type FccControlNote, type FccRunNote } from "@/lib/fcc-campaign-control";
 import { fccSentToday, torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
 import { FCC_SECOND_BATCH_MAX_BOUNCES, FCC_SEND_WINDOWS, fccBouncesToday, torontoMinute } from "@/lib/fcc-campaign-tick";
@@ -34,9 +34,14 @@ export type FccScreen = {
   problems: FccPerson[];
 };
 
-const [FIRST, SECOND] = FCC_SEND_WINDOWS;
-/** A March row whose address is sendable on the hot list: the sender leaves it out of the March queue for good. Binds the hot-list key. */
-const ON_HOT_LIST = `EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1)`;
+const [FIRST, ...LATER] = FCC_SEND_WINDOWS;
+const clockTime = (minute: number) => {
+  const hour = Math.floor(minute / 60);
+  const mm = String(minute % 60).padStart(2, "0");
+  return hour < 12 ? `${hour}:${mm} a.m.` : `${hour === 12 ? 12 : hour - 12}:${mm} p.m.`;
+};
+/** A March row the hot list owns: sendable there, and either the hot list is still open or it reached them. Binds the hot-list key, then today. */
+const ON_HOT_LIST = `EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1 AND (h."status" <> 'ready' OR ? <= '${FCC_NOV6_LAST_SEND_DAY}'))`;
 const toronto = (now: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", ...options }).format(now);
 
 /** The next weekday after today, as "Thursday, October 29". */
@@ -55,15 +60,18 @@ export function fccNextSend(state: FccState, now: Date, sentToday: number, batch
   const tomorrow = `${nextWeekday(now)} at 10:00 a.m.`;
   if (["Sat", "Sun"].includes(torontoWeekday(now))) return tomorrow;
   const minute = torontoMinute(now);
-  const secondAllowed = bouncesToday <= FCC_SECOND_BATCH_MAX_BOUNCES;
+  const moreAllowed = bouncesToday <= FCC_SECOND_BATCH_MAX_BOUNCES;
   if (minute < FIRST.start) return `Today at 10:00 a.m. (first ${batchSize}, one every 1 to 3 minutes).`;
   if (minute < FIRST.end && sentToday < batchSize) return `Sending now: one email every 1 to 3 minutes until ${batchSize} are out.`;
-  if (minute < SECOND.start && sentToday < batchSize * 2) {
-    return secondAllowed
-      ? `Today at 12:30 p.m. (up to ${batchSize} more, because ${bouncesToday === 0 ? "nothing has bounced" : "only 1 has bounced"}).`
-      : `${tomorrow} No second batch today: ${bouncesToday} emails bounced this morning.`;
+  for (const window of LATER) {
+    if (sentToday >= batchSize * window.batch) continue;
+    if (minute < window.start) {
+      return moreAllowed
+        ? `Today at ${clockTime(window.start)} (up to ${batchSize} more, because ${bouncesToday === 0 ? "nothing has bounced" : "only 1 has bounced"}).`
+        : `${tomorrow} No more batches today: ${bouncesToday} emails bounced.`;
+    }
+    if (minute < window.end && moreAllowed) return "Sending now: the next batch, one email every 1 to 3 minutes.";
   }
-  if (minute < SECOND.end && sentToday < batchSize * 2 && secondAllowed) return "Sending now: the second batch, one email every 1 to 3 minutes.";
   return tomorrow;
 }
 
@@ -82,7 +90,7 @@ export async function fccScreen(db: ProspectDb, now = new Date()): Promise<FccSc
     db.prepare(`SELECT c."createdAt", COUNT(*) AS total, SUM(c."status" = 'ready' AND NOT ${ON_HOT_LIST}) AS ready, SUM(c."status" = 'held') AS held,
         SUM(c."step1SentAt" IS NOT NULL) AS emailed, SUM(c."status" IN ('replied','bounced','suppressed','failed')) AS stopped
       FROM "FccCampaignContact" c WHERE c."campaignKey" = ? GROUP BY c."createdAt" ORDER BY c."createdAt"`)
-      .bind(FCC_NOV6_CAMPAIGN_KEY, FCC_CAMPAIGN_KEY).all<{ createdAt: string; total: number; ready: number; held: number; emailed: number; stopped: number }>(),
+      .bind(FCC_NOV6_CAMPAIGN_KEY, day, FCC_CAMPAIGN_KEY).all<{ createdAt: string; total: number; ready: number; held: number; emailed: number; stopped: number }>(),
     // One row for the whole hot list: the importer gives each of its contacts its own createdAt to keep file order.
     db.prepare(`SELECT MIN("createdAt") AS createdAt, COUNT(*) AS total, SUM("status" = 'ready') AS ready, SUM("status" = 'held') AS held,
         SUM("step1SentAt" IS NOT NULL) AS emailed, SUM("status" IN ('replied','bounced','suppressed','failed')) AS stopped
@@ -90,7 +98,7 @@ export async function fccScreen(db: ProspectDb, now = new Date()): Promise<FccSc
       .bind(FCC_NOV6_CAMPAIGN_KEY).first<{ createdAt: string | null; total: number; ready: number; held: number; emailed: number; stopped: number }>(),
     db.prepare(`SELECT SUM(c."step2DueAt" <= ?) AS due, SUM(c."step2DueAt" > ?) AS later, MIN(CASE WHEN c."step2DueAt" > ? THEN c."step2DueAt" END) AS nextDay
       FROM "FccCampaignContact" c WHERE c."campaignKey" = ? AND c."status" = 'step1_sent' AND NOT ${ON_HOT_LIST}`)
-      .bind(day, day, day, FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY).first<{ due: number | null; later: number | null; nextDay: string | null }>(),
+      .bind(day, day, day, FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, day).first<{ due: number | null; later: number | null; nextDay: string | null }>(),
     // One row per address: a reply or bounce on someone on both lists stops both of their rows.
     db.prepare(`SELECT "company","email",MAX("updatedAt") AS at,"stoppedReason" AS note FROM "FccCampaignContact"
       WHERE "campaignKey" IN (?, ?) AND "status" = 'replied' GROUP BY "email" ORDER BY at DESC LIMIT 50`).bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY).all<FccPerson>(),

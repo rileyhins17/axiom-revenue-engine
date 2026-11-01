@@ -48,7 +48,7 @@ export default async function FccPage() {
   const owner = Boolean(getM2OwnerIdentityActor(session.user.email ?? ""));
   const state = STATES[data.state];
   const sentToday = data.sentToday.first + data.sentToday.followUps;
-  const cap = data.batchSize * 2;
+  const cap = data.batchSize * 3;
 
   return <OwnerPage>
     <PageHeader eyebrow="Campaign" title="FCC emails" status={<Badge tone={state.tone} icon={state.icon}>{state.text}</Badge>}
@@ -80,7 +80,7 @@ export default async function FccPage() {
       <StatCard icon={Inbox} label="Ready to send" value={data.ready} detail="Waiting for a first email" />
       <StatCard icon={Lock} label="Held" value={data.held} detail="Generic inboxes and holds" />
       <StatCard icon={Reply} label="Follow-ups due" value={data.followUpsDue} detail={data.followUpsLater && data.nextFollowUpDay ? `${data.followUpsLater} more from ${day(data.nextFollowUpDay)}` : "None scheduled yet"} />
-      <StatCard icon={MailX} label="Bounced today" value={data.bouncesToday} detail="1 or fewer by noon: the second batch goes" />
+      <StatCard icon={MailX} label="Bounced today" value={data.bouncesToday} detail="1 or fewer: the later batches go" />
     </div>
 
     <Panel title="By batch" icon={Layers} flush>
@@ -103,7 +103,7 @@ export default async function FccPage() {
     <Panel title="How sending works" icon={ListChecks}>
       <ul className="owner-list text-sm text-[#3b3a36]">
         <li>Weekdays from 10 a.m.: {data.batchSize} emails, one every 1 to 3 minutes.</li>
-        <li>From 12:30: up to {data.batchSize} more, only if 1 or fewer bounced in the morning. {cap} a day at most.</li>
+        <li>From 11:45 and from 1:30: up to {data.batchSize} more each, only if 1 or fewer have bounced that day. {cap} a day at most.</li>
         <li>One follow-up 3 days later. Anyone who replies or bounces gets nothing more.</li>
         <li>It pauses itself on a Google warning, Gmail refusing a send, or 3 bounces in a day.</li>
       </ul>

@@ -23,6 +23,8 @@ export const FCC_CAMPAIGN_KEY = "fcc-march1-pack-v3-calmer";
 export const FCC_CAMPAIGN_NAME = "FCC March 1 pack";
 /** The one-off November 6 hot list (fcc_hot_list_nov6.csv). Its own key, so it never mixes with the March pack. */
 export const FCC_NOV6_CAMPAIGN_KEY = "fcc-nov6-hot";
+/** The last Toronto day the hot-list email can go. Its reply promises a pack within one business day of a November 6 deadline. */
+export const FCC_NOV6_LAST_SEND_DAY = "2026-11-05";
 export const FCC_DAILY_SEND_CAP = 30;
 export const FCC_FOLLOW_UP_DELAY_DAYS = 3;
 export const FCC_MAX_FOLLOW_UPS = 1;
@@ -421,7 +423,7 @@ export function renderFccEmailV4(
   const rmd = contact.filings.find((filing) => filing?.rmdNumber?.trim())?.rmdNumber.trim();
   const listing = rmd ? `${possessive} listing (${rmd})` : `${possessive} listing`;
   const subject = `Question about ${possessive} RMD listing`;
-  const footer = `Axiom · axiominternational.ca · ${address}\nNot useful? Reply "no thanks" and I won't follow up.`;
+  const footer = `Axiom · axiominternational.ca/fcc-filings · ${address}\nNot useful? Reply "no thanks" and I won't follow up.`;
   if (step === 1) {
     const bodyPlain = [
       `Hi ${contact.firstName},`,

@@ -395,6 +395,67 @@ test("the hot list skips anyone who already replied, bounced or was suppressed o
   assert.equal(statusOf(raw, "h2"), "ready");
 });
 
+test("a hold or failure on someone's March row also stops their hot-list email", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "under-investigation@probe-tel.example");
+  addContact(raw, "m2", "stuck@failed-tel.example");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'held', "holdReason" = 'Their FCC filing reports an investigation' WHERE "id" = 'm1'`).run();
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'failed' WHERE "id" = 'm2'`).run();
+  addNov6Contact(raw, "h1", "under-investigation@probe-tel.example");
+  addNov6Contact(raw, "h2", "stuck@failed-tel.example");
+  addNov6Contact(raw, "h3", "fine@fine-tel.example");
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), MONDAY);
+  assert.deepEqual(t.sent.map((message) => message.to), ["fine@fine-tel.example"]);
+  assert.deepEqual(["h1", "h2"].map((id) => statusOf(raw, id)), ["ready", "ready"], "their rows wait in case the hold is lifted");
+});
+
+test("a reply, stop or company hold at another mailbox stops the hot-list email, but a generic inbox hold or a shared host does not", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "boss@replied-tel.example");
+  addContact(raw, "m2", "boss@stopped-tel.example");
+  addContact(raw, "m3", "boss@probe-tel.example");
+  addContact(raw, "m4", "support@generic-tel.example", { sendable: false });
+  addContact(raw, "m5", "friend@gmail.com");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'replied' WHERE "id" IN ('m1','m5')`).run();
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'suppressed' WHERE "id" = 'm2'`).run();
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'held', "holdReason" = 'Their FCC filing reports an investigation' WHERE "id" = 'm3'`).run();
+  raw.prepare(`UPDATE "FccCampaignContact" SET "holdReason" = 'Generic inbox (support@/noc@/info@ style). Check before sending.' WHERE "id" = 'm4'`).run();
+  addNov6Contact(raw, "h1", "other@replied-tel.example");
+  addNov6Contact(raw, "h2", "other@stopped-tel.example");
+  addNov6Contact(raw, "h3", "other@probe-tel.example");
+  addNov6Contact(raw, "h4", "owner@generic-tel.example");
+  addNov6Contact(raw, "h5", "someone@gmail.com");
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), MONDAY);
+  assert.deepEqual(t.sent.map((message) => message.to).sort(), ["owner@generic-tel.example", "someone@gmail.com"]);
+  assert.deepEqual(["h1", "h2", "h3"].map((id) => statusOf(raw, id)), ["suppressed", "suppressed", "suppressed"]);
+});
+
+test("the hot list closes after its last day, and anyone it never reached rejoins the March queue", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "reached@reached-tel.example");
+  addContact(raw, "m2", "leftover@left-tel.example");
+  addNov6Contact(raw, "h1", "reached@reached-tel.example");
+  addNov6Contact(raw, "h2", "leftover@left-tel.example");
+  recordGo(raw);
+  const thursday = new Date("2026-11-05T15:00:00Z");
+  const first = fakeTransport();
+  await runFccDailySend(db, config(first.factory, fakeMailbox().factory), thursday, { limit: 1 });
+  assert.deepEqual(first.sent.map((message) => message.to), ["reached@reached-tel.example"], "the last day still sends");
+  assert.match(first.sent[0]!.headers["Message-ID"], /^<fcc-nov6-/);
+
+  const friday = new Date("2026-11-06T15:00:00Z");
+  const after = fakeTransport();
+  await runFccDailySend(db, config(after.factory, fakeMailbox().factory), friday);
+  assert.deepEqual(after.sent.map((message) => message.to), ["leftover@left-tel.example"], "nobody the hot list reached gets the March email too");
+  assert.doesNotMatch(after.sent[0]!.headers["Message-ID"], /^<fcc-nov6-/, "no November 6 line after it has passed");
+  assert.equal(statusOf(raw, "h2"), "ready");
+  assert.equal(statusOf(raw, "m2"), "step1_sent");
+});
+
 test("the hot list reads the inbox first for anyone emailed in March, and holds them if it can't", async () => {
   const opened = (raw: Database.Database, id: string) =>
     raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1MessageId" = '<x>', "step1SentAt" = '2026-10-20T14:00:00Z', "step2DueAt" = '2026-12-01' WHERE "id" = ?`).run(id);
