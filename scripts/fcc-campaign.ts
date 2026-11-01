@@ -5,6 +5,7 @@
  *   npx tsx scripts/fcc-campaign.ts preview   <contacts.csv> <outDir>
  *   npx tsx scripts/fcc-campaign.ts test-send <contacts.csv> --to you@yourmailbox
  *   npx tsx scripts/fcc-campaign.ts import-sql <contacts.csv> <outFile.sql>
+ *   npx tsx scripts/fcc-campaign.ts import-nov6-sql <hot.csv> <outFile.sql>
  *   npx tsx scripts/fcc-campaign.ts smtp-test <contacts.csv>
  *   npx tsx scripts/fcc-campaign.ts go-sql <founder name>
  *   npx tsx scripts/fcc-campaign.ts pause-sql
@@ -17,6 +18,8 @@
  *   recipient.
  * - import-sql: SQL to load contacts into FccCampaignContact (migration 0086).
  *   Run it with wrangler only after review. It never touches the Lead table.
+ * - import-nov6-sql: the same, for the November 6 hot list (fcc_hot_list_nov6.csv), under
+ *   FCC_NOV6_CAMPAIGN_KEY. File order is kept (createdAt rises by 1 ms per row).
  * - smtp-test: the live sender's SMTP + inbox-check path, sending step 1 and the
  *   threaded step 2 to the sending mailbox only (FCC_SENDER_ADDRESS and
  *   FCC_SMTP_PASSWORD in the terminal's environment). Never emails a contact.
@@ -37,7 +40,9 @@ import {
   FCC_COPY_VERSION,
   FCC_DAILY_SEND_CAP,
   FCC_FOLLOW_UP_DELAY_DAYS,
+  FCC_NOV6_CAMPAIGN_KEY,
   buildFccCampaignContacts,
+  buildFccNov6Contacts,
   checkFccLiveSendGate,
   checkFccTestRecipient,
   parseFccFilingCsv,
@@ -216,33 +221,44 @@ function sql(value: string | number | null) {
   return typeof value === "number" ? String(value) : `'${value.replace(/'/g, "''")}'`;
 }
 
+function contactInsert(c: FccCampaignContact, campaignKey: string, createdAt: string) {
+  return `INSERT OR IGNORE INTO "FccCampaignContact" ("id","campaignKey","email","firstName","contactName","title","phone","company","filingsJson","emailKind","sendable","holdReason","status","createdAt","updatedAt") VALUES (${[
+    crypto.randomUUID(),
+    campaignKey,
+    c.email,
+    c.firstName,
+    c.contactName,
+    c.title,
+    c.phone,
+    c.company,
+    JSON.stringify(c.filings),
+    c.emailKind,
+    c.sendable ? 1 : 0,
+    c.holdReason,
+    c.sendable ? "ready" : "held",
+    createdAt,
+    createdAt,
+  ]
+    .map(sql)
+    .join(",")});`;
+}
+
 function importSql(csvPath: string, outFile: string) {
   const contacts = load(csvPath);
   const now = new Date().toISOString();
-  const lines = contacts.map(
-    (c) =>
-      `INSERT OR IGNORE INTO "FccCampaignContact" ("id","campaignKey","email","firstName","contactName","title","phone","company","filingsJson","emailKind","sendable","holdReason","status","createdAt","updatedAt") VALUES (${[
-        crypto.randomUUID(),
-        FCC_CAMPAIGN_KEY,
-        c.email,
-        c.firstName,
-        c.contactName,
-        c.title,
-        c.phone,
-        c.company,
-        JSON.stringify(c.filings),
-        c.emailKind,
-        c.sendable ? 1 : 0,
-        c.holdReason,
-        c.sendable ? "ready" : "held",
-        now,
-        now,
-      ]
-        .map(sql)
-        .join(",")});`,
-  );
+  const lines = contacts.map((c) => contactInsert(c, FCC_CAMPAIGN_KEY, now));
   writeFileSync(outFile, lines.join("\n") + "\n");
   console.log(`Wrote ${lines.length} inserts to ${outFile}`);
+}
+
+/** The November 6 hot list. createdAt rises one millisecond per row, so the sender's createdAt order is the file order. */
+function importNov6Sql(csvPath: string, outFile: string) {
+  const contacts = buildFccNov6Contacts(readFileSync(csvPath, "utf8"));
+  const base = Date.now();
+  const lines = contacts.map((c, index) => contactInsert(c, FCC_NOV6_CAMPAIGN_KEY, new Date(base + index).toISOString()));
+  writeFileSync(outFile, lines.join("\n") + "\n");
+  const sendable = contacts.filter((c) => c.sendable).length;
+  console.log(JSON.stringify({ campaign: FCC_NOV6_CAMPAIGN_KEY, rows: lines.length, sendable, held: lines.length - sendable, outFile }, null, 2));
 }
 
 function goSql(by: string) {
@@ -263,6 +279,7 @@ async function main() {
   else if (command === "preview" && csvPath && arg) preview(csvPath, arg);
   else if (command === "test-send" && csvPath && toFlag > 0) await testSend(csvPath, process.argv[toFlag + 1]);
   else if (command === "import-sql" && csvPath && arg) importSql(csvPath, arg);
+  else if (command === "import-nov6-sql" && csvPath && arg) importNov6Sql(csvPath, arg);
   else if (command === "smtp-test" && csvPath) await smtpTest(csvPath);
   else if (command === "go-sql" && csvPath) goSql(process.argv.slice(3).join(" "));
   else if (command === "pause-sql") pauseSql();

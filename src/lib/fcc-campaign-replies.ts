@@ -17,7 +17,7 @@
  * - Automatic replies (out of office) stop follow-ups, as they always have,
  *   and are labelled as automatic.
  */
-import { FCC_CAMPAIGN_KEY } from "@/lib/fcc-campaign";
+import { FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY } from "@/lib/fcc-campaign";
 import { claimFccReplyCheckTry, readFccReplyCheck, saveFccReplyCheck } from "@/lib/fcc-campaign-control";
 import { SHARED_MAIL_DOMAINS, domainOf, sharedCampaignDomains, torontoDay } from "@/lib/fcc-campaign-sender";
 import { torontoMinute } from "@/lib/fcc-campaign-tick";
@@ -74,9 +74,9 @@ export async function runFccReplyCheck(db: ProspectDb, config: FccReplyCheckConf
 
   // Everyone still being emailed, anyone the follow-up check stopped since the last run, and anyone a founder stopped.
   const { results: contacts } = await db.prepare(`SELECT "id","email","firstName","company","status","step1SentAt","stoppedReason","updatedAt"
-    FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "step1SentAt" IS NOT NULL
+    FROM "FccCampaignContact" WHERE "campaignKey" IN (?, ?) AND "step1SentAt" IS NOT NULL
       AND ("status" IN ('step1_sent','step2_sent','suppressed') OR ("status" = 'replied' AND "updatedAt" > ?))`)
-    .bind(FCC_CAMPAIGN_KEY, last?.at ?? now.toISOString()).all<ContactRow>();
+    .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, last?.at ?? now.toISOString()).all<ContactRow>();
   if (contacts.length === 0) {
     await saveFccReplyCheck(db, { day, at: now.toISOString(), found: 0, inboxes: last?.inboxes }, now);
     return { status: "RAN", since: null, messages: 0, found: 0, unreadInboxes: [] };

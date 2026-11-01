@@ -1,3 +1,11 @@
+## 2026-11-01 (Sun, evening): November 6 hot-list email ready to release (PR #14, rebuilt on `87258a5`)
+
+- **Why:** The CommLaw Group reports the FCC is sending notices to some providers that missed March 1, and at least one sets a November 6 deadline. No universal extension is confirmed, and we have not seen a notice. The hot list is the contacts whose public FCC record has `enable_recertify` on and no 2026 recertification. That the flag controls the Recertify button is our reading, not an FCC statement.
+- **Code:** a one-off first email under campaign key `fcc-nov6-hot`, ahead of follow-ups, signed like v5 by whichever inbox sends it, with no follow-up. A hold or stop on a March row stops it, unless the only reason is a signed 2026 declaration, because its line is written for them. A reply, stop or company hold at another mailbox stops it. Everyone on it gets an inbox check first. It closes after Thu Nov 5, and anyone it never reached rejoins the March queue. The daily reply check reads this list too.
+- **Approval gate:** releasing this changes `FCC_COPY_VERSION` to `fcc-march1-pack-v6-nov6`, which stops all FCC sending until a founder's go names it. Aidan said go on Nov 1. Release and go belong together.
+- **Volume:** unchanged at 60 per inbox. The Nov 1 meeting chose Riley's inbox now and 80 a day after a clean week.
+- **Checks:** FCC tests pass and typecheck clean on this branch; `verify` runs on the PR. Not run against live Cloudflare.
+
 ## 2026-11-01 (Sun): daily reply check live (`829751b1`), then Riley's inbox, FCC stats and the new signature (`4e497952`); batch 4 loaded
 
 - **Release 1 (Riley in the Nov 1 meeting with Aidan: "add a daily reply checker"):** commit `c7a2cf32` live as Worker `829751b1-ee5d-4ac9-bb6b-7476de68d0c7` at 19:47 UTC. From 9:00 Toronto (the `*/15` cron, at most one try an hour, once a day) it reads each sending inbox's All Mail and Spam over IMAP, matches mail from FCC contacts (exact address, or a company domain no other contact shares), emails both founders "FCC: N new replies" with a quote of each, and only then marks those contacts `replied`. New mail from contacts a founder stopped is reported too. First run 20:00 UTC: 0 new (scanned back to Oct 28). No migration. Rollback target `bd7efbe1`. Backup `backups/production/prod-export-20261101T194622Z.sql` (sha256 `b3055788…543537`).
