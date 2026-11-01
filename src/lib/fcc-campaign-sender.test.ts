@@ -449,6 +449,21 @@ test("a reply found by the hot-list check also stops that person's March email i
   for (const id of ["h1", "h2", "m1", "m2"]) assert.equal(statusOf(raw, id), "replied");
 });
 
+test("when the inbox can't be read, someone on both lists gets neither email that run", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "both-one@one-tel.example");
+  addContact(raw, "m2", "both-two@two-tel.example");
+  addContact(raw, "m3", "march-only@three-tel.example");
+  addNov6Contact(raw, "h1", "both-one@one-tel.example");
+  addNov6Contact(raw, "h2", "both-two@two-tel.example");
+  recordGo(raw);
+  const t = fakeTransport();
+  const result = await runFccDailySend(db, config(t.factory, fakeMailbox({ broken: true }).factory), MONDAY);
+  assert.deepEqual(t.sent.map((message) => message.to), ["march-only@three-tel.example"]);
+  for (const id of ["h1", "h2", "m1", "m2"]) assert.equal(statusOf(raw, id), "ready");
+  assert.ok(result.status === "RAN" && /inbox check failed/.test(result.followUpsHeldBack ?? ""));
+});
+
 test("the worker's weekday 10am schedule runs only the retired website batch; the FCC tick has its own schedule", async () => {
   const source = readFileSync(new URL("../../worker.mjs", import.meta.url), "utf8")
     .replace(/^import[\s\S]*?from\s+"[^"]+";\s*/gm, "")

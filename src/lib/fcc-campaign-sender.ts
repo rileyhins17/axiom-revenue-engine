@@ -310,16 +310,16 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   try {
     // The hot list goes first. When the cap or the gap runs out, this returns before any follow-up or first email.
     let inboxDown = false;
-    const stoppedHere = new Set<string>();
+    const heldThisRun = new Set<string>();
     for (const contact of hot) {
       if (remaining <= 0 || budget <= 0) return finish();
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
       // Replies to the March email are only recorded when its follow-up comes up, and the hot list goes
-      // first, so read the inbox here. If the inbox can't be read, this person waits; nobody else needs it.
+      // first, so read the inbox here. If the inbox can't be read, this person waits in both queues; nobody else needs it.
       const march = await db.prepare(`SELECT "id","status","step1SentAt","createdAt" FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "email" = ?`)
         .bind(FCC_CAMPAIGN_KEY, contact.email).first<{ id: string; status: string; step1SentAt: string | null; createdAt: string }>();
       if (march) {
-        if (inboxDown) continue;
+        if (inboxDown) { heldThisRun.add(contact.email); continue; }
         const since = march.step1SentAt ?? march.createdAt;
         const domain = domainOf(contact.email);
         const patterns = SHARED_MAIL_DOMAINS.has(domain) || shared.has(domain) ? [contact.email] : [contact.email, `@${domain}`];
@@ -331,6 +331,7 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
           bounced = !replied && await mailbox.hasBounceFor(contact.email, since);
         } catch (error) {
           inboxDown = true;
+          heldThisRun.add(contact.email);
           followUpsHeldBack = `inbox check failed: ${(error instanceof Error ? error.message : String(error)).slice(0, 200)}`;
           continue;
         }
@@ -341,7 +342,7 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
           await stop(contact, status, reason);
           if (march.status === "ready" || march.status === "step1_sent") await stop(march, status, reason);
           if (bounced) await suppressBounce(contact.email);
-          stoppedHere.add(contact.email);
+          heldThisRun.add(contact.email);
           counts[status] += 1;
           continue;
         }
@@ -350,7 +351,7 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     }
     for (const contact of followUps) {
       if (remaining <= 0 || budget <= 0) break;
-      if (stoppedHere.has(contact.email)) continue;
+      if (heldThisRun.has(contact.email)) continue;
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
       const domain = domainOf(contact.email);
       const patterns = SHARED_MAIL_DOMAINS.has(domain) || shared.has(domain) ? [contact.email] : [contact.email, `@${domain}`];
@@ -376,7 +377,7 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     }
     for (const contact of firsts) {
       if (remaining <= 0 || budget <= 0) break;
-      if (stoppedHere.has(contact.email)) continue;
+      if (heldThisRun.has(contact.email)) continue;
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
       if (!(await send(contact, 1))) return finish();
     }
