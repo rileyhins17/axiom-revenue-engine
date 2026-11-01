@@ -21,6 +21,8 @@ import { isGenericRoleEmail } from "@/lib/contact-validation";
 
 export const FCC_CAMPAIGN_KEY = "fcc-march1-pack-v3-calmer";
 export const FCC_CAMPAIGN_NAME = "FCC March 1 pack";
+/** The one-off November 6 hot list (fcc_hot_list_nov6.csv). Its own key, so it never mixes with the March pack. */
+export const FCC_NOV6_CAMPAIGN_KEY = "fcc-nov6-hot";
 export const FCC_DAILY_SEND_CAP = 30;
 export const FCC_FOLLOW_UP_DELAY_DAYS = 3;
 export const FCC_MAX_FOLLOW_UPS = 1;
@@ -29,7 +31,7 @@ export const FCC_MAX_FOLLOW_UPS = 1;
  * task, Oct 28) replaced the calmer v3 for every first email from Oct 29. Contacts keep the v3 list
  * key; which copy a person got is in their first email's Message-ID ("<fcc-v4-..." for this one).
  */
-export const FCC_COPY_VERSION = "fcc-march1-pack-v4-question";
+export const FCC_COPY_VERSION = "fcc-nov6-v5";
 
 export type FccFilingRow = {
   business_name: string;
@@ -57,13 +59,18 @@ export type FccCampaignContact = {
   /** Company used in the email body. */
   company: string;
   /** Every filing this mailbox handles (one person can own several). */
-  filings: Array<{ company: string; rmdNumber: string; state: string; lastFilingDate: string; filingUrl: string }>;
+  filings: Array<{
+    company: string; rmdNumber: string; state: string; lastFilingDate: string; filingUrl: string;
+    /** November 6 hot list only: the per-contact sentence and the short company name. */
+    listingLine?: string; companyShort?: string;
+  }>;
   emailKind: FccEmailKind;
   /** Included in the default send list. Generic inboxes are held for review. */
   sendable: boolean;
   holdReason: string | null;
 };
 
+const GENERIC_HOLD_REASON = "Generic inbox (support@/noc@/info@ style). Check before sending.";
 const COMPLIANCE_HINTS = ["rmd", "fcc", "compliance", "regulatory", "stirshaken", "traceback"];
 const FCC_GENERIC_LOCALS = new Set([
   "support", "noc", "info", "hi", "hello", "work", "manager", "office", "admin", "voiceops",
@@ -195,10 +202,67 @@ export function buildFccCampaignContacts(rows: FccFilingRow[]): FccCampaignConta
       filings: [filing],
       emailKind,
       sendable,
-      holdReason: sendable ? null : "Generic inbox (support@/noc@/info@ style). Check before sending.",
+      holdReason: sendable ? null : GENERIC_HOLD_REASON,
     });
   }
   return [...byEmail.values()];
+}
+
+const NOV6_REQUIRED_COLUMNS = ["email", "first_name_display", "company_display", "company_short", "rmd_number", "listing_line", "email_type"];
+
+/**
+ * The November 6 hot list (fcc_hot_list_nov6.csv): one contact per mailbox, in file order. The
+ * per-contact sentence and short name are kept in the first filing's entry in filingsJson, so no
+ * migration is needed. A generic inbox is held when either classifyFccEmail or the file's
+ * email_type says so.
+ */
+export function buildFccNov6Contacts(csvText: string): FccCampaignContact[] {
+  const [header, ...body] = parseCsv(csvText.replace(/^﻿/, ""));
+  if (!header) return [];
+  const keys = header.map((h) => h.trim());
+  for (const key of NOV6_REQUIRED_COLUMNS) {
+    if (!keys.includes(key)) throw new Error(`Nov 6 CSV is missing the "${key}" column`);
+  }
+  const seen = new Set<string>();
+  const contacts: FccCampaignContact[] = [];
+  body.forEach((cells, index) => {
+    const record: Record<string, string> = {};
+    keys.forEach((key, i) => {
+      record[key] = (cells[i] ?? "").trim();
+    });
+    const rank = record.rank || String(index + 1);
+    const email = record.email.toLowerCase();
+    if (!isValidEmail(email)) throw new Error(`Nov 6 CSV rank ${rank} has no valid email`);
+    if (!record.first_name_display || !record.company_short || !record.listing_line) {
+      throw new Error(`Nov 6 CSV rank ${rank} is missing first_name_display, company_short or listing_line`);
+    }
+    if (seen.has(email)) return;
+    seen.add(email);
+    const kind = classifyFccEmail(email, record.first_name_display);
+    const emailKind: FccEmailKind = kind === "generic" || record.email_type === "generic" ? "generic" : kind;
+    const sendable = emailKind !== "generic";
+    contacts.push({
+      email,
+      firstName: record.first_name_display,
+      contactName: record.first_name_display,
+      title: record.title,
+      phone: "",
+      company: record.company_display,
+      filings: [{
+        company: record.company_display,
+        rmdNumber: record.rmd_number,
+        state: "",
+        lastFilingDate: record.signed,
+        filingUrl: record.filing_url,
+        listingLine: record.listing_line,
+        companyShort: record.company_short,
+      }],
+      emailKind,
+      sendable,
+      holdReason: sendable ? null : GENERIC_HOLD_REASON,
+    });
+  });
+  return contacts;
 }
 
 export type FccCampaignConfig = {
@@ -285,6 +349,31 @@ export function renderFccEmail(
     `Aidan\n${address} · Reply "stop" and I won't email you again.`,
   ].join("\n\n");
   return { subject: "Re: Your 2026 RMD recertification", bodyPlain, bodyHtml: toHtml(bodyPlain) };
+}
+
+/**
+ * The one-off November 6 email (NOV-6-EMAIL.md, Aidan's wording, word for word). It is a first
+ * email only: no follow-up is scheduled. `listing_line` and `company_short` come from the contact's
+ * first filing. The address follows the same placeholder rule as renderFccEmailV4.
+ */
+export function renderFccEmailNov6(
+  contact: Pick<FccCampaignContact, "firstName" | "filings">,
+  mailingAddress: string | null | undefined,
+): RenderedFccEmail {
+  const address = String(mailingAddress || "").trim() || ADDRESS_PLACEHOLDER;
+  const filing = contact.filings[0];
+  const listingLine = filing?.listingLine?.trim();
+  const companyShort = filing?.companyShort?.trim();
+  if (!listingLine || !companyShort) throw new Error("Nov 6 contact is missing its listing line or short company name");
+  const bodyPlain = [
+    `Hi ${contact.firstName},`,
+    `A quick heads-up in case this got buried. A telecom law firm, The CommLaw Group, reports the FCC is emailing notices to providers that missed the March 1 RMD recertification, giving them another chance. At least one notice sets a November 6 deadline. Dates may differ and they're easy to miss, so it's worth checking spam and whoever is listed as your RMD contact.`,
+    listingLine,
+    `If you want it off your plate, I can have the updated answers and a fresh mitigation plan ready within one business day. Your officer reviews them and files from your own login. It's a flat $450, half up front, and we never hold your login.`,
+    `Want me to start? A one-word reply is fine.`,
+    `Aidan Magee\nAxiom · axiominternational.ca/fcc-filings · ${address}\nWe're not a law firm and this isn't legal advice. Not useful? Reply "no thanks" and I won't follow up.`,
+  ].join("\n\n");
+  return { subject: `Did ${companyShort} get the FCC's RMD notice?`, bodyPlain, bodyHtml: toHtml(bodyPlain) };
 }
 
 const SMALL_WORDS = new Set(["a", "an", "and", "at", "for", "in", "of", "on", "or", "the", "to"]);

@@ -42,3 +42,33 @@ Code: `src/lib/fcc-campaign-tick.ts` (the minute-by-minute schedule and safety p
 - **Pause or resume:** the big button on the FCC screen (operations.getaxiom.ca/fcc). It only changes FCC sending. Resume works only while a go is recorded for the current copy key. Without the app, `pause-sql` does the same as Pause.
 - **Check:** `SELECT "status", COUNT(*) FROM "FccCampaignContact" GROUP BY "status";` Each run logs an `fcc_campaign` line in the Worker logs (what was sent, replies, bounces, and anything held back).
 - **A contact marked `failed`** hit a mail-server error and is waiting for a person. To try again, set its status back to `ready`.
+
+## November 6 hot list (one-off)
+
+A one-time first email to the hot list (`fcc_hot_list_nov6.csv`, outside this repo), ahead of the normal queue. Copy: `renderFccEmailNov6` in `src/lib/fcc-campaign.ts` (Aidan's NOV-6-EMAIL wording). Contacts are under campaign key `fcc-nov6-hot`, one first email each, no day-3 follow-up. The hot list shares the 60-a-day ceiling, and the normal queue waits until it is empty. Nothing is sent before the go.
+
+**Read this first.** Changing `FCC_COPY_VERSION` to `fcc-nov6-v5` locks the whole campaign, including the current March queue, until a new go names it. The go also releases the normal v4 first emails and follow-ups under that same version. Deploy the code only when you want that.
+
+1. **Build the SQL (locally, nothing sent).** Write it outside the repo:
+   ```
+   npx tsx scripts/fcc-campaign.ts import-nov6-sql <path>\fcc_hot_list_nov6.csv <path>\fcc_nov6_import.sql
+   ```
+   It prints the rows, how many are sendable, and how many are held (generic inboxes, by the address or the file's `email_type`). Expect 270 rows: 217 sendable, 53 held.
+2. **Load (no email goes out).**
+   ```
+   npx wrangler d1 execute axiom-ops-omniscient --remote --config wrangler.production.jsonc --file <path>\fcc_nov6_import.sql
+   ```
+   Re-running it never duplicates anyone.
+3. **Check overlap with the March pack before the go.** The hot list is not checked against people already emailed under the March key. Run this and decide with Aidan before the go:
+   ```
+   SELECT COUNT(*) FROM "FccCampaignContact" h JOIN "FccCampaignContact" m ON m."email" = h."email" AND m."campaignKey" = 'fcc-march1-pack-v3-calmer'
+     WHERE h."campaignKey" = 'fcc-nov6-hot' AND h."status" = 'ready' AND m."status" IN ('step1_sent','step2_sent','replied');
+   ```
+4. **Release the code** (merge, then the guarded release), so the Worker has `fcc-nov6-v5`.
+5. **Go (only after Aidan says go):**
+   ```
+   npx tsx scripts/fcc-campaign.ts go-sql Aidan > <path>\fcc-go.sql
+   npx wrangler d1 execute axiom-ops-omniscient --remote --config wrangler.production.jsonc --file <path>\fcc-go.sql
+   ```
+   Weekdays from 10:00 Toronto, the tick sends 30 then up to 30 more (from 12:30, only if today has 1 bounce or fewer). At 60 a day it takes Monday to Thursday, before the 6th.
+6. **Watch:** the same FCC screen and `fcc_campaign` log lines. Count the hot list with `SELECT "status", COUNT(*) FROM "FccCampaignContact" WHERE "campaignKey" = 'fcc-nov6-hot' GROUP BY "status";` (`step1_sent` = emailed, `held` = not sent). Pause with the FCC screen or `pause-sql`.

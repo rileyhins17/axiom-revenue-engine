@@ -3,7 +3,9 @@ import { test } from "node:test";
 
 import {
   FCC_DAILY_SEND_CAP,
+  FCC_NOV6_CAMPAIGN_KEY,
   buildFccCampaignContacts,
+  buildFccNov6Contacts,
   checkFccLiveSendGate,
   checkFccTestRecipient,
   classifyFccEmail,
@@ -14,6 +16,7 @@ import {
   parseFccFilingCsv,
   planFccSendSchedule,
   renderFccEmail,
+  renderFccEmailNov6,
   renderFccEmailV4,
 } from "@/lib/fcc-campaign";
 
@@ -145,6 +148,53 @@ test("renders Aidan's v2 email word for word, with the address and opt-out in bo
   assert.equal(fccCopyOfMessageId("<fcc-v4-abc-1@mail.example>"), "v4");
   assert.equal(fccCopyOfMessageId("<fcc-abc-1@mail.example>"), "v3");
   assert.equal(fccCopyOfMessageId(null), "v3");
+});
+
+const NOV6_HEADER =
+  "rank,email,first_name_display,company_display,company_short,company_possessive,rmd_number,listing_line,cohort,signed,title,email_type,batch,filing_url";
+
+test("renders the November 6 email word for word, as a first email with no follow-up step", () => {
+  assert.equal(FCC_NOV6_CAMPAIGN_KEY, "fcc-nov6-hot");
+  const listing = "Example Telecom's public listing (RMD0000001) still shows no 2026 recertification, and it looks like the portal may let you file it now.";
+  const contact = {
+    firstName: "Dana",
+    filings: [{ company: "Example Telecom LLC", rmdNumber: "RMD0000001", state: "", lastFilingDate: "2024-04-15", filingUrl: "https://example.test", companyShort: "Example Telecom", listingLine: listing }],
+  };
+  const email = renderFccEmailNov6(contact, "257 Example St, Kitchener, ON N2C 0A0, Canada");
+  assert.equal(email.subject, "Did Example Telecom get the FCC's RMD notice?");
+  assert.equal(email.bodyPlain, [
+    "Hi Dana,",
+    "A quick heads-up in case this got buried. A telecom law firm, The CommLaw Group, reports the FCC is emailing notices to providers that missed the March 1 RMD recertification, giving them another chance. At least one notice sets a November 6 deadline. Dates may differ and they're easy to miss, so it's worth checking spam and whoever is listed as your RMD contact.",
+    listing,
+    "If you want it off your plate, I can have the updated answers and a fresh mitigation plan ready within one business day. Your officer reviews them and files from your own login. It's a flat $450, half up front, and we never hold your login.",
+    "Want me to start? A one-word reply is fine.",
+    "Aidan Magee\nAxiom · axiominternational.ca/fcc-filings · 257 Example St, Kitchener, ON N2C 0A0, Canada\nWe're not a law firm and this isn't legal advice. Not useful? Reply \"no thanks\" and I won't follow up.",
+  ].join("\n\n"));
+  assert.match(renderFccEmailNov6(contact, null).bodyPlain, /\[MAILING ADDRESS GOES HERE\]/);
+  assert.throws(() => renderFccEmailNov6({ firstName: "Sam", filings: [{ company: "x", rmdNumber: "", state: "", lastFilingDate: "", filingUrl: "" }] }, null), /missing its listing line/);
+});
+
+test("builds the November 6 hot list in file order, holds generic inboxes, and keeps one row per mailbox", () => {
+  const contacts = buildFccNov6Contacts([
+    NOV6_HEADER,
+    '1,dana@dana-tel.example,Dana,Example Telecom LLC,Example Telecom,Example Telecom\'s,RMD0000001,"Example Telecom\'s public listing (RMD0000001) still shows no 2026 recertification.",A_older,2024-04-15,Owner,named,b2,https://x/1',
+    '2,support@estreet.example,There,Estreet Co,Estreet,Estreet\',RMD2,"Estreet\'s listing.",A_older,2024-01-01,Support,generic,b4,https://x/2',
+    '3,jane@fiber.example,Jane,"Fiber Co, Inc.",Fiber Co,Fiber Co\'s,RMD3,"Fiber Co\'s listing.",B_signed_2026,2026-02-01,CEO,named,b4,https://x/3',
+    "4,noc@contrast.example,Robert,Contrast LLC,Contrast,Contrast's,RMD4,Contrast's listing.,A_older,2024-01-01,CEO,named,b4,https://x/4",
+    "5,ops.lead@tower.example,Sam,Tower Co,Tower,Tower's,RMD5,Tower's listing.,A_older,2024-01-01,Ops,generic,b4,https://x/5",
+    "6,JANE@fiber.example,Jane,Fiber Co dup,Fiber Co,Fiber Co's,RMD6,Dup listing.,A_older,2024-01-01,CEO,named,b4,https://x/6",
+  ].join("\n"));
+
+  assert.deepEqual(contacts.map((c) => c.email), ["dana@dana-tel.example", "support@estreet.example", "jane@fiber.example", "noc@contrast.example", "ops.lead@tower.example"]);
+  assert.deepEqual(contacts.map((c) => c.sendable), [true, false, true, false, false]);
+  assert.equal(contacts[3].emailKind, "generic", "noc@ is generic even though the file says named");
+  assert.equal(contacts[4].emailKind, "generic", "the file's email_type holds a row the address alone would not");
+  assert.match(contacts[1].holdReason ?? "", /Generic inbox/);
+  assert.equal(contacts[0].filings[0].companyShort, "Example Telecom");
+  assert.equal(contacts[0].filings[0].listingLine, "Example Telecom's public listing (RMD0000001) still shows no 2026 recertification.");
+  assert.equal(contacts[0].firstName, "Dana");
+  assert.throws(() => buildFccNov6Contacts(NOV6_HEADER.replace(",listing_line", "") + "\n"), /missing the "listing_line" column/);
+  assert.throws(() => buildFccNov6Contacts([NOV6_HEADER, "7,a@b.example,Ann,Co,,Co's,RMD7,,A_older,2024-01-01,CEO,named,b4,u"].join("\n")), /rank 7 is missing/);
 });
 
 test("schedule never exceeds the daily cap and follow-ups land 3 days later", () => {

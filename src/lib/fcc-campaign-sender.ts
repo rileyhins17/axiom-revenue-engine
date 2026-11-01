@@ -10,10 +10,12 @@
  * Every email is claimed before it is sent, so a crash can never double-send.
  * First emails use the approved copy (FCC_COPY_VERSION); a follow-up uses the copy
  * of the person's own first email, so the 60 sent on the calmer v3 keep its follow-up.
+ * The November 6 hot list (FCC_NOV6_CAMPAIGN_KEY) goes first: one first email each, no follow-up.
+ * Everything else waits until the hot list has been sent or stopped.
  */
 import {
-  fccCopyOfMessageId, renderFccEmail, renderFccEmailV4, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_FOLLOW_UP_DELAY_DAYS,
-  type FccCampaignContact,
+  fccCopyOfMessageId, renderFccEmail, renderFccEmailNov6, renderFccEmailV4, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP,
+  FCC_FOLLOW_UP_DELAY_DAYS, FCC_NOV6_CAMPAIGN_KEY, type FccCampaignContact,
 } from "@/lib/fcc-campaign";
 import { PermanentEmailError, type EmailTransport } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
@@ -211,7 +213,11 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
     ORDER BY CASE c."emailKind" WHEN 'compliance' THEN 0 WHEN 'named' THEN 1 ELSE 2 END, c."createdAt", c."id" LIMIT 200`)
     .bind(FCC_CAMPAIGN_KEY).all<ContactRow>();
-  if (followUps.length === 0 && firsts.length === 0) return { status: "SKIPPED", reason: "nothing to send" };
+  const { results: hot } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
+    WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
+      AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
+    ORDER BY c."createdAt", c."id" LIMIT 1000`).bind(FCC_NOV6_CAMPAIGN_KEY).all<ContactRow>();
+  if (followUps.length === 0 && firsts.length === 0 && hot.length === 0) return { status: "SKIPPED", reason: "nothing to send" };
 
   const counts = { firstEmails: 0, followUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0 };
   const shared = await sharedCampaignDomains(db);
@@ -228,12 +234,19 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   };
 
   /** Claims, sends and records one email. Returns false when sending should stop for today. */
-  const send = async (contact: ContactRow, step: 1 | 2): Promise<boolean> => {
+  const send = async (contact: ContactRow, step: 1 | 2, hot = false): Promise<boolean> => {
     // Connect before claiming: a mailbox that refuses the login must not mark anyone as failed.
     transport ??= await config.transport!();
     const sendId = config.newId();
     const copy = step === 1 ? "v4" : fccCopyOfMessageId(contact.step1MessageId);
-    const messageId = copy === "v4" ? `<fcc-v4-${contact.id}-${step}@${fromDomain}>` : `<fcc-${contact.id}-${step}@${fromDomain}>`;
+    const messageId = hot ? `<fcc-nov6-${contact.id}-1@${fromDomain}>`
+      : copy === "v4" ? `<fcc-v4-${contact.id}-${step}@${fromDomain}>` : `<fcc-${contact.id}-${step}@${fromDomain}>`;
+    // Render before claiming, so a contact that cannot be rendered never takes a slot in today's cap.
+    let filings: FccCampaignContact["filings"] = [];
+    try { filings = JSON.parse(contact.filingsJson) as FccCampaignContact["filings"]; } catch { filings = []; }
+    const email = hot
+      ? renderFccEmailNov6({ firstName: contact.firstName, filings }, address)
+      : (copy === "v4" ? renderFccEmailV4 : renderFccEmail)({ firstName: contact.firstName, company: contact.company, filings: filings.length ? filings : [{} as never] }, step, address);
     // One statement, so two runs at once can never both pass the day's cap or the gap between emails.
     const claimedAt = now.toISOString();
     const gapSince = options.minGapMs ? new Date(now.getTime() - options.minGapMs).toISOString() : "9999-12-31";
@@ -249,10 +262,6 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     }
     remaining -= 1;
     budget -= 1;
-    let filings: FccCampaignContact["filings"] = [];
-    try { filings = JSON.parse(contact.filingsJson) as FccCampaignContact["filings"]; } catch { filings = []; }
-    const render = copy === "v4" ? renderFccEmailV4 : renderFccEmail;
-    const email = render({ firstName: contact.firstName, company: contact.company, filings: filings.length ? filings : [{} as never] }, step, address);
     const thread: Record<string, string> = step === 2 && contact.step1MessageId
       ? { "In-Reply-To": contact.step1MessageId, References: contact.step1MessageId }
       : {};
@@ -263,7 +272,12 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       });
       const sentAt = new Date().toISOString();
       await db.prepare(`UPDATE "FccCampaignSend" SET "status"='SENT', "finishedAt"=? WHERE "sendId"=?`).bind(sentAt, sendId).run();
-      if (step === 1) {
+      if (hot) {
+        // The hot list is one first email each: no day-3 follow-up is scheduled (step2DueAt stays NULL).
+        await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step1_sent', "step1SentAt"=?, "step1MessageId"=?, "step2DueAt"=NULL, "updatedAt"=? WHERE "id"=?`)
+          .bind(sentAt, messageId, sentAt, contact.id).run();
+        counts.firstEmails += 1;
+      } else if (step === 1) {
         await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step1_sent', "step1SentAt"=?, "step1MessageId"=?, "step2DueAt"=?, "updatedAt"=? WHERE "id"=?`)
           .bind(sentAt, messageId, addDays(day, FCC_FOLLOW_UP_DELAY_DAYS), sentAt, contact.id).run();
         counts.firstEmails += 1;
@@ -293,6 +307,12 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
 
   let followUpsHeldBack: string | null = null;
   try {
+    // The hot list goes first. When the cap or the gap runs out, this returns before any follow-up or first email.
+    for (const contact of hot) {
+      if (remaining <= 0 || budget <= 0) return finish();
+      if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
+      if (!(await send(contact, 1, true))) return finish();
+    }
     for (const contact of followUps) {
       if (remaining <= 0 || budget <= 0) break;
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
