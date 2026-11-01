@@ -176,3 +176,32 @@ test("the FCC inbox check searches All Mail from a day before the first email, f
     "A008 LOGOUT",
   ]);
 });
+
+test("UID FETCH reads accented text by its byte length and never marks mail read", async () => {
+  const body = "Oui, appelez-moi. Merci — Zoé";
+  const size = new TextEncoder().encode(body).length;
+  const server = fakeServer((tag, command) => {
+    if (command.startsWith("LOGIN")) return [`${tag} OK authenticated`];
+    if (command.startsWith("UID SEARCH")) return ["* SEARCH 41 42", `${tag} OK SEARCH completed`];
+    if (command.startsWith("UID FETCH")) {
+      return [
+        `* 7 FETCH (UID 41 BODY[TEXT]<0> {${size}}`, `${body})`,
+        `* 8 FETCH (BODY[HEADER.FIELDS ("FROM")] {21}`, `From: a@b.example\r\n\r\n UID 42)`,
+        `${tag} OK Success`,
+      ];
+    }
+    if (command === "LOGOUT") return ["* BYE", `${tag} OK bye`];
+    return [`${tag} BAD unknown command`];
+  });
+  const session = await openImap(server.stream, { username: "aidan@example.com", password: "app-password" });
+  assert.deepEqual(await session.uidSearch('SINCE 1-Nov-2026 NOT FROM "aidan@example.com"'), [41, 42]);
+  const fetched = await session.uidFetch([41, 42], "BODY.PEEK[TEXT]<0.4000>");
+  assert.deepEqual(fetched, [
+    { uid: 41, sections: { TEXT: body } },
+    { uid: 42, sections: { HEADER: "From: a@b.example\r\n\r\n" } },
+  ]);
+  assert.ok(server.lines.includes("A003 UID FETCH 41,42 (UID BODY.PEEK[TEXT]<0.4000>)"));
+  await assert.rejects(session.uidFetch([41], "BODY[TEXT]"), /BODY\.PEEK/);
+  await assert.rejects(session.uidFetch([41], "BODY.PEEK[TEXT] RFC822"), /BODY\.PEEK/);
+  await session.close();
+});

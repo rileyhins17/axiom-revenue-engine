@@ -13,7 +13,8 @@ export const SENDER_POSTAL_ADDRESS = "Axiom Web, 257 Kipling Ave, Kitchener, ON 
 export const HARD_DAILY_CAP = 10;
 
 export type EmailCandidate = { prospectId: string; name: string; city: string; niche: string; websiteUrl: string; reasons: string[]; email: string; sourceUrl: string };
-export type OutgoingEmail = { to: string; subject: string; text: string; headers: Record<string, string> };
+/** `html`, when given, goes beside `text` as the copy mail apps show; `text` stays for apps that can't. */
+export type OutgoingEmail = { to: string; subject: string; text: string; html?: string; headers: Record<string, string> };
 export type EmailTransport = { send(message: OutgoingEmail): Promise<void>; close(): Promise<void> };
 export type EmailRunConfig = {
   workerSwitch: boolean; fromName: string; fromAddress: string; baseUrl: string;

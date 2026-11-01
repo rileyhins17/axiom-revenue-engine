@@ -5,7 +5,7 @@
 import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_NOV6_CAMPAIGN_KEY, FCC_NOV6_LAST_SEND_DAY } from "@/lib/fcc-campaign";
 import { readFccNotes, type FccControlNote, type FccRunNote } from "@/lib/fcc-campaign-control";
 import { fccSentToday, torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
-import { FCC_SECOND_BATCH_MAX_BOUNCES, FCC_SEND_WINDOWS, fccBouncesToday, torontoMinute } from "@/lib/fcc-campaign-tick";
+import { FCC_SECOND_BATCH_MAX_BOUNCES, FCC_SEND_WINDOWS, fccBouncesToday, fccDailyMax, torontoMinute } from "@/lib/fcc-campaign-tick";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
 export type FccState = "live" | "paused" | "locked";
@@ -40,8 +40,8 @@ const clockTime = (minute: number) => {
   const mm = String(minute % 60).padStart(2, "0");
   return hour < 12 ? `${hour}:${mm} a.m.` : `${hour === 12 ? 12 : hour - 12}:${mm} p.m.`;
 };
-/** A March row the hot list owns: sendable there, and either the hot list is still open or it reached them. Binds the hot-list key, then today. */
-const ON_HOT_LIST = `EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1 AND (h."status" <> 'ready' OR ? <= '${FCC_NOV6_LAST_SEND_DAY}'))`;
+/** A March row the hot list owns: sendable there, and either the hot list is still open or it reached them (a claim counts). Binds the hot-list key, then today. */
+const ON_HOT_LIST = `EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1 AND (h."status" <> 'ready' OR ? <= '${FCC_NOV6_LAST_SEND_DAY}' OR EXISTS (SELECT 1 FROM "FccCampaignSend" hs WHERE hs."contactId" = h."id" AND hs."step" = 1 AND hs."status" IN ('CLAIMED','SENT'))))`;
 const toronto = (now: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", ...options }).format(now);
 
 /** The next weekday after today, as "Thursday, October 29". */
@@ -133,5 +133,105 @@ export async function fccScreen(db: ProspectDb, now = new Date()): Promise<FccSc
     batches,
     followUpsDue: Number(followUps?.due ?? 0), followUpsLater: Number(followUps?.later ?? 0), nextFollowUpDay: followUps?.nextDay ?? null,
     replies: replies.results, bounces: bounces.results, problems: problems.results,
+  };
+}
+
+export type FccInboxRef = { key: string; name: string };
+export type FccRateRow = { label: string; emailed: number; replies: number; rate: number | null; bounced: number };
+export type FccDayRow = { day: string; first: number; followUps: number; byInbox: Array<{ name: string; sent: number }> };
+export type FccInboxToday = { name: string; sentToday: number; dailyMax: number };
+export type FccStats = {
+  emailed: number;
+  followUpsSent: number;
+  replies: { real: number; automatic: number; saidNo: number; afterFollowUp: number };
+  replyRate: number | null;
+  bounced: number;
+  bounceRate: number | null;
+  stopped: number;
+  days: FccDayRow[];
+  byVersion: FccRateRow[];
+  byInbox: FccRateRow[];
+  today: FccInboxToday[];
+  /** New companies a weekday once follow-ups take their share, and how many weekdays the ready list lasts at that pace. */
+  newPerDay: number;
+  weekdaysLeft: number | null;
+};
+
+const VERSION_NAMES: Record<string, string> = { v3: "Calmer email (Oct 28)", v4: "Question email (Oct 29–Nov 1)", v5: "Question email, new signature" };
+const rate = (part: number, whole: number) => (whole > 0 ? part / whole : null);
+
+/**
+ * The campaign's results for the FCC screen. "Real" replies leave out
+ * out-of-office and other automatic replies; "said no" is a guess from the
+ * words of the reply (stop, no thanks, not interested, remove, unsubscribe).
+ * `inboxes` names each sending inbox; "" is the first inbox (Aidan's).
+ */
+export async function fccStats(db: ProspectDb, inboxes: FccInboxRef[], now = new Date()): Promise<FccStats> {
+  const day = torontoDay(now);
+  const name = (key: string) => inboxes.find((inbox) => inbox.key === key)?.name ?? (key || "First inbox");
+  const since = new Date(now.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const [groups, sends, setting] = await Promise.all([
+    db.prepare(`SELECT CASE WHEN "step1MessageId" LIKE '<fcc-v5-%' THEN 'v5' WHEN "step1MessageId" LIKE '<fcc-v4-%' THEN 'v4' ELSE 'v3' END AS version, COALESCE("senderAddress",'') AS inbox,
+        COUNT(*) AS emailed, SUM("step2SentAt" IS NOT NULL) AS followedUp,
+        SUM("status" = 'replied' AND lower(COALESCE("stoppedReason",'')) NOT LIKE '%automatic reply%') AS real,
+        SUM("status" = 'replied' AND lower(COALESCE("stoppedReason",'')) LIKE '%automatic reply%') AS automatic,
+        SUM("status" = 'replied' AND lower(COALESCE("stoppedReason",'')) NOT LIKE '%automatic reply%' AND (lower("stoppedReason") LIKE '%stop%'
+          OR lower("stoppedReason") LIKE '%no thank%' OR lower("stoppedReason") LIKE '%not interested%' OR lower("stoppedReason") LIKE '%remove%'
+          OR lower("stoppedReason") LIKE '%unsubscribe%')) AS saidNo,
+        SUM("status" = 'replied' AND "step2SentAt" IS NOT NULL) AS afterFollowUp,
+        SUM("status" = 'bounced') AS bounced, SUM("status" = 'suppressed') AS stopped
+      FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "step1SentAt" IS NOT NULL GROUP BY 1, 2`)
+      .bind(FCC_CAMPAIGN_KEY).all<{ version: string; inbox: string; emailed: number; followedUp: number; real: number; automatic: number; saidNo: number; afterFollowUp: number; bounced: number; stopped: number }>(),
+    db.prepare(`SELECT "sendDay" AS day, COALESCE("senderAddress",'') AS inbox, "step", COUNT(*) AS n FROM "FccCampaignSend"
+      WHERE "status" IN ('CLAIMED','SENT') AND "sendDay" >= ? GROUP BY 1, 2, 3`).bind(since).all<{ day: string; inbox: string; step: number; n: number }>(),
+    db.prepare(`SELECT "dailyCap" FROM "FccCampaignSetting" WHERE "id" = 1`).bind().first<{ dailyCap: number }>(),
+  ]);
+  const rows = groups.results.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, typeof value === "string" ? value : Number(value ?? 0)]))) as typeof groups.results;
+  const sum = (pick: (row: (typeof rows)[number]) => number, filter: (row: (typeof rows)[number]) => boolean = () => true) => rows.filter(filter).reduce((total, row) => total + pick(row), 0);
+  const emailed = sum((row) => row.emailed);
+  const real = sum((row) => row.real);
+  const bounced = sum((row) => row.bounced);
+  const group = (key: (row: (typeof rows)[number]) => string, label: (value: string) => string): FccRateRow[] =>
+    [...new Set(rows.map(key))].sort().map((value) => {
+      const mine = (row: (typeof rows)[number]) => key(row) === value;
+      const count = sum((row) => row.emailed, mine);
+      const replies = sum((row) => row.real, mine);
+      return { label: label(value), emailed: count, replies, rate: rate(replies, count), bounced: sum((row) => row.bounced, mine) };
+    });
+
+  const byDay = new Map<string, FccDayRow>();
+  for (const send of sends.results) {
+    const row = byDay.get(send.day) ?? { day: send.day, first: 0, followUps: 0, byInbox: [] };
+    const count = Number(send.n);
+    if (Number(send.step) === 1) row.first += count; else row.followUps += count;
+    const inboxRow = row.byInbox.find((entry) => entry.name === name(send.inbox));
+    if (inboxRow) inboxRow.sent += count; else row.byInbox.push({ name: name(send.inbox), sent: count });
+    byDay.set(send.day, row);
+  }
+
+  const keys = [...new Set(["", ...inboxes.map((inbox) => inbox.key), ...rows.map((row) => row.inbox)])];
+  const today = await Promise.all(keys.map(async (key) => {
+    const sender = { fromAddress: key, primary: key === "" };
+    return { name: name(key), sentToday: await fccSentToday(db, day, sender), dailyMax: await fccDailyMax(db, sender, setting?.dailyCap ?? 0, day) };
+  }));
+  // Every first email brings one follow-up three days later, so about half of each day's emails can go to new companies.
+  const newPerDay = Math.floor(today.reduce((total, inbox) => total + inbox.dailyMax, 0) / 2);
+  const ready = Number((await db.prepare(`SELECT COUNT(*) AS n FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "status" = 'ready' AND "sendable" = 1`)
+    .bind(FCC_CAMPAIGN_KEY).first<{ n: number }>())?.n ?? 0);
+
+  return {
+    emailed,
+    followUpsSent: sum((row) => row.followedUp),
+    replies: { real, automatic: sum((row) => row.automatic), saidNo: sum((row) => row.saidNo), afterFollowUp: sum((row) => row.afterFollowUp) },
+    replyRate: rate(real, emailed),
+    bounced,
+    bounceRate: rate(bounced, emailed),
+    stopped: sum((row) => row.stopped),
+    days: [...byDay.values()].sort((a, b) => b.day.localeCompare(a.day)).slice(0, 14),
+    byVersion: group((row) => row.version, (value) => VERSION_NAMES[value] ?? value),
+    byInbox: group((row) => row.inbox, name),
+    today,
+    newPerDay,
+    weekdaysLeft: newPerDay > 0 ? Math.ceil(ready / newPerDay) : null,
   };
 }

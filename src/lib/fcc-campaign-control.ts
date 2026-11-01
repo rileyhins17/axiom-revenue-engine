@@ -57,13 +57,48 @@ export async function resumeFcc(db: ProspectDb, by: string, now = new Date()): P
 
 const BOUNCE_SCAN_KEY = "fcc.bounceScan";
 
-/** How many bounce messages the sender had already matched to contacts on `day`. */
-export async function readFccBounceScan(db: ProspectDb) {
-  return get<{ day: string; count: number }>(db, BOUNCE_SCAN_KEY);
+/** How many bounce messages the sender had already matched to contacts on `day`, per inbox ("" is the first inbox). */
+export async function readFccBounceScan(db: ProspectDb, inbox = "") {
+  return get<{ day: string; count: number }>(db, inbox ? `${BOUNCE_SCAN_KEY}:${inbox}` : BOUNCE_SCAN_KEY);
 }
 
-export async function saveFccBounceScan(db: ProspectDb, day: string, count: number, now = new Date()) {
-  await put(db, BOUNCE_SCAN_KEY, { day, count }, now);
+export async function saveFccBounceScan(db: ProspectDb, day: string, count: number, now = new Date(), inbox = "") {
+  await put(db, inbox ? `${BOUNCE_SCAN_KEY}:${inbox}` : BOUNCE_SCAN_KEY, { day, count }, now);
+}
+
+const REPLY_CHECK_KEY = "fcc.replyCheck";
+const REPLY_TRY_KEY = "fcc.replyCheckTry";
+
+/** The last day the daily reply check finished, how many new replies it reported, and when each inbox was last read. */
+export type FccReplyCheckNote = { day: string; at: string; found: number; inboxes?: Record<string, string> };
+
+export async function readFccReplyCheck(db: ProspectDb) {
+  return get<FccReplyCheckNote>(db, REPLY_CHECK_KEY);
+}
+
+export async function saveFccReplyCheck(db: ProspectDb, note: FccReplyCheckNote, now = new Date()) {
+  await put(db, REPLY_CHECK_KEY, note, now);
+}
+
+/** Claims the reply-check attempt for `slot` (a day and an hour). False when that slot was already tried. */
+export async function claimFccReplyCheckTry(db: ProspectDb, slot: string, now = new Date()) {
+  const result = await db.prepare(`INSERT INTO "KvStore" ("key","value","updatedAt") VALUES (?,?,?)
+    ON CONFLICT("key") DO UPDATE SET "value" = excluded."value", "updatedAt" = excluded."updatedAt" WHERE "KvStore"."value" <> excluded."value"`)
+    .bind(REPLY_TRY_KEY, JSON.stringify(slot), now.toISOString()).run();
+  return changes(result) === 1;
+}
+
+const SIGNATURES_KEY = "fcc.signatures";
+
+/** Each inbox's signature title and cell ("" is the first inbox, otherwise the inbox's address). */
+export type FccSignatureSettings = Record<string, { title?: string | null; phone?: string | null }>;
+
+export async function readFccSignatures(db: ProspectDb) {
+  return (await get<FccSignatureSettings>(db, SIGNATURES_KEY)) ?? {};
+}
+
+export async function saveFccSignatures(db: ProspectDb, settings: FccSignatureSettings, now = new Date()) {
+  await put(db, SIGNATURES_KEY, settings, now);
 }
 
 /** The sender's latest note, shown on the FCC screen. */

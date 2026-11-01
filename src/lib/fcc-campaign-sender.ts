@@ -18,11 +18,17 @@
  * "Signed a 2026 RMD declaration": that stop is about the March wording, and the hot-list line is written for them.
  * Before each hot-list email it also reads the inbox for that address and for anyone already emailed at the company.
  * After FCC_NOV6_LAST_SEND_DAY the hot list closes and anyone it never reached rejoins the March queue.
+ *
+ * More than one inbox can send (Riley's was added Nov 1). Each inbox has its own
+ * daily count and gap between emails, and a follow-up always goes from the inbox
+ * that sent that person's first email, so it lands in the same thread.
+ * The hot list goes only from the first inbox: it's signed by Aidan, and replies to earlier emails are there.
  */
 import {
-  fccCopyOfMessageId, renderFccEmail, renderFccEmailNov6, renderFccEmailV4, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP,
+  fccCopyOfMessageId, renderFccEmail, renderFccEmailNov6, renderFccEmailV5, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP,
   FCC_FOLLOW_UP_DELAY_DAYS, FCC_NOV6_CAMPAIGN_KEY, FCC_NOV6_LAST_SEND_DAY, type FccCampaignContact,
 } from "@/lib/fcc-campaign";
+import { readFccSignatures } from "@/lib/fcc-campaign-control";
 import { PermanentEmailError, type EmailTransport } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { imapDate, imapQuote, type ImapSession } from "@/lib/revenue-engine/imap-client";
@@ -53,6 +59,10 @@ export type FccRunOptions = {
 
 export type FccSendConfig = {
   fromAddress: string;
+  /** Who signs the email. Defaults to Aidan Magee, whose inbox sent every FCC email before Nov 2. */
+  fromName?: string;
+  /** False for an added inbox. Rows of the first inbox carry no address (NULL); an added inbox's rows carry its own. */
+  primary?: boolean;
   mailingAddress: string | null | undefined;
   transport: (() => Promise<EmailTransport>) | null;
   mailbox: (() => Promise<FccMailbox>) | null;
@@ -69,10 +79,12 @@ export type FccRunResult =
 type ContactRow = {
   id: string; email: string; firstName: string; company: string; filingsJson: string;
   step1SentAt: string | null; step1MessageId: string | null;
+  /** A March row whose address is still ready on the closed hot list. */
+  backFromHotList?: number;
 };
 
 /** Mail services many unrelated people share; a reply from one of them says nothing about a company. */
-const SHARED_MAIL_DOMAINS = new Set([
+export const SHARED_MAIL_DOMAINS = new Set([
   "gmail.com", "googlemail.com", "yahoo.com", "ymail.com", "rocketmail.com", "hotmail.com", "outlook.com", "live.com",
   "msn.com", "aol.com", "icloud.com", "me.com", "mac.com", "proton.me", "protonmail.com", "gmx.com", "mail.com",
   "comcast.net", "att.net", "verizon.net", "sbcglobal.net", "bellsouth.net", "cox.net", "charter.net", "earthlink.net",
@@ -105,9 +117,12 @@ const GOOGLE_WARNINGS: Array<[criteria: string, reason: string]> = [
 /** A 5xx that is about Gmail or the sender (a limit, a block, a login), not about the one recipient. */
 const SENDER_PROBLEM = /\b5\.4\.5\b|\b5\.7\.\d+|limit|quota|blocked|spam|policy|auth|password|log ?in/i;
 
+/** The inbox a row belongs to: "" for the first inbox, otherwise the added inbox's address. Compare with COALESCE("senderAddress",''). */
+export const senderKey = (config: Pick<FccSendConfig, "fromAddress" | "primary">) => (config.primary === false ? config.fromAddress : "");
+
 export const torontoDay = (now: Date) => now.toLocaleDateString("en-CA", { timeZone: "America/Toronto" });
 export const torontoWeekday = (now: Date) => new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "America/Toronto" }).format(now);
-const domainOf = (email: string) => email.slice(email.lastIndexOf("@") + 1).toLowerCase();
+export const domainOf = (email: string) => email.slice(email.lastIndexOf("@") + 1).toLowerCase();
 const changes = (result: unknown) => {
   const r = result as { changes?: number; meta?: { changes?: number } };
   return r.meta?.changes ?? r.changes ?? 0;
@@ -163,15 +178,17 @@ export async function fccSetting(db: ProspectDb) {
     .first<{ enabled: number; dailyCap: number; approvedCopy: string | null; goBy: string | null }>();
 }
 
-export async function fccSentToday(db: ProspectDb, day: string) {
-  return Number((await db.prepare(`SELECT COUNT(*) AS n FROM "FccCampaignSend" WHERE "sendDay" = ? AND "status" IN ('CLAIMED','SENT')`)
-    .bind(day).first<{ n: number }>())?.n ?? 0);
+/** Emails claimed or sent on `day`: all inboxes, or only `sender`'s. */
+export async function fccSentToday(db: ProspectDb, day: string, sender?: Pick<FccSendConfig, "fromAddress" | "primary">) {
+  const mine = sender ? ` AND COALESCE("senderAddress",'') = ?` : "";
+  return Number((await db.prepare(`SELECT COUNT(*) AS n FROM "FccCampaignSend" WHERE "sendDay" = ? AND "status" IN ('CLAIMED','SENT')${mine}`)
+    .bind(...(sender ? [day, senderKey(sender)] : [day])).first<{ n: number }>())?.n ?? 0);
 }
 
-/** Domains used by more than one company in the campaign (e.g. a shared co-op host). */
-async function sharedCampaignDomains(db: ProspectDb) {
-  const { results } = await db.prepare(`SELECT "email","company" FROM "FccCampaignContact" WHERE "campaignKey" = ?`)
-    .bind(FCC_CAMPAIGN_KEY).all<{ email: string; company: string }>();
+/** Domains used by more than one company on either list (e.g. a shared co-op host). */
+export async function sharedCampaignDomains(db: ProspectDb) {
+  const { results } = await db.prepare(`SELECT "email","company" FROM "FccCampaignContact" WHERE "campaignKey" IN (?, ?)`)
+    .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY).all<{ email: string; company: string }>();
   const companies = new Map<string, Set<string>>();
   for (const row of results) {
     const domain = domainOf(row.email);
@@ -205,26 +222,35 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
 
   const day = torontoDay(now);
   const cap = options.cap ?? Math.min(FCC_DAILY_SEND_CAP, Math.max(0, setting.dailyCap));
-  let remaining = cap - await fccSentToday(db, day);
+  let remaining = cap - await fccSentToday(db, day, config);
+  const inbox = senderKey(config);
+  // Title and cell are optional extras: if they can't be read, the email still goes with name and title only.
+  const signatures = await readFccSignatures(db).catch(() => ({} as Awaited<ReturnType<typeof readFccSignatures>>));
+  const signer = { name: config.fromName?.trim() || "Aidan Magee", ...(signatures[inbox] ?? {}) };
   if (remaining <= 0) return { status: "SKIPPED", reason: "daily cap reached" };
   let budget = options.limit ?? Number.POSITIVE_INFINITY;
 
   const columns = `c."id", c."email", c."firstName", c."company", c."filingsJson", c."step1SentAt", c."step1MessageId"`;
   const hotOpen = day <= FCC_NOV6_LAST_SEND_DAY;
   // While the hot list is open it owns its people. Once it closes, only those it actually reached stay out of the March queue.
-  const notOnHotList = `NOT EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1 AND (? = 1 OR h."status" <> 'ready'))`;
+  // A claim counts as reaching them: the email may have gone even if a crash left their row ready.
+  const notOnHotList = `NOT EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1 AND (? = 1 OR h."status" <> 'ready' OR EXISTS (SELECT 1 FROM "FccCampaignSend" hs WHERE hs."contactId" = h."id" AND hs."step" = 1 AND hs."status" IN ('CLAIMED','SENT'))))`;
   const { results: followUps } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'step1_sent' AND c."step2DueAt" <= ? AND c."step1MessageId" IS NOT NULL
+      AND COALESCE(c."senderAddress",'') = ?
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 2 AND s."status" IN ('CLAIMED','SENT'))
       AND ${notOnHotList}
-    ORDER BY c."step2DueAt", c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, day, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
-  const { results: firsts } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
+    ORDER BY c."step2DueAt", c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, day, inbox, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
+  // An added inbox never takes anyone back from the hot list: replies to the earlier emails are in the first inbox, so only it can check.
+  const { results: firsts } = await db.prepare(`SELECT ${columns},
+      EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1) AS "backFromHotList"
+    FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
       AND ${notOnHotList}
     ORDER BY CASE c."emailKind" WHEN 'compliance' THEN 0 WHEN 'named' THEN 1 ELSE 2 END, c."createdAt", c."id" LIMIT 200`)
-    .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
-  const { results: hot } = hotOpen ? await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
+    .bind(FCC_NOV6_CAMPAIGN_KEY, FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, hotOpen || config.primary === false ? 1 : 0).all<ContactRow>();
+  const { results: hot } = hotOpen && config.primary !== false ? await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" m WHERE m."email" = c."email" AND m."campaignKey" = ? AND m."status" IN ('replied','bounced','suppressed','held','failed')
@@ -251,23 +277,25 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     // Connect before claiming: a mailbox that refuses the login must not mark anyone as failed.
     transport ??= await config.transport!();
     const sendId = config.newId();
-    const copy = step === 1 ? "v4" : fccCopyOfMessageId(contact.step1MessageId);
+    // A follow-up keeps its first email's version in its Message-ID, so results can be split by version.
+    const copy = step === 1 ? "v5" : fccCopyOfMessageId(contact.step1MessageId);
     const messageId = hot ? `<fcc-nov6-${contact.id}-1@${fromDomain}>`
-      : copy === "v4" ? `<fcc-v4-${contact.id}-${step}@${fromDomain}>` : `<fcc-${contact.id}-${step}@${fromDomain}>`;
+      : copy === "v3" ? `<fcc-${contact.id}-${step}@${fromDomain}>` : `<fcc-${copy}-${contact.id}-${step}@${fromDomain}>`;
     // Render before claiming, so a contact that cannot be rendered never takes a slot in today's cap.
     let filings: FccCampaignContact["filings"] = [];
     try { filings = JSON.parse(contact.filingsJson) as FccCampaignContact["filings"]; } catch { filings = []; }
-    const email = hot
-      ? renderFccEmailNov6({ firstName: contact.firstName, filings }, address)
-      : (copy === "v4" ? renderFccEmailV4 : renderFccEmail)({ firstName: contact.firstName, company: contact.company, filings: filings.length ? filings : [{} as never] }, step, address);
+    const recipient = { firstName: contact.firstName, company: contact.company, filings: filings.length ? filings : [{} as never] };
+    // v3 and the November 6 email are Aidan's own plain wording; v4 and v5 carry the sending founder's signature.
+    const email = hot ? renderFccEmailNov6({ firstName: contact.firstName, filings }, address)
+      : copy === "v3" ? renderFccEmail(recipient, step, address) : renderFccEmailV5(recipient, step, address, signer);
     // One statement, so two runs at once can never both pass the day's cap or the gap between emails.
     const claimedAt = now.toISOString();
     const gapSince = options.minGapMs ? new Date(now.getTime() - options.minGapMs).toISOString() : "9999-12-31";
-    const claim = await db.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","createdAt")
-      SELECT ?,?,?,?,?,?,'CLAIMED',?
-      WHERE (SELECT COUNT(*) FROM "FccCampaignSend" WHERE "sendDay" = ? AND "status" IN ('CLAIMED','SENT')) < ?
-        AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" WHERE "sendDay" = ? AND "createdAt" > ?)
-      ON CONFLICT DO NOTHING`).bind(sendId, contact.id, step, contact.email, day, messageId, claimedAt, day, cap, day, gapSince).run();
+    const claim = await db.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","createdAt","senderAddress")
+      SELECT ?,?,?,?,?,?,'CLAIMED',?,NULLIF(?,'')
+      WHERE (SELECT COUNT(*) FROM "FccCampaignSend" WHERE "sendDay" = ? AND "status" IN ('CLAIMED','SENT') AND COALESCE("senderAddress",'') = ?) < ?
+        AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" WHERE "sendDay" = ? AND "createdAt" > ? AND COALESCE("senderAddress",'') = ?)
+      ON CONFLICT DO NOTHING`).bind(sendId, contact.id, step, contact.email, day, messageId, claimedAt, inbox, day, inbox, cap, day, gapSince, inbox).run();
     if (changes(claim) !== 1) {
       const taken = await db.prepare(`SELECT 1 AS hit FROM "FccCampaignSend" WHERE "contactId" = ? AND "step" = ? AND "status" <> 'FAILED'`)
         .bind(contact.id, step).first<{ hit: number }>();
@@ -280,19 +308,19 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       : {};
     try {
       await transport.send({
-        to: contact.email, subject: email.subject, text: email.bodyPlain,
+        to: contact.email, subject: email.subject, text: email.bodyPlain, ...(hot || copy === "v3" ? {} : { html: email.bodyHtml }),
         headers: { "Message-ID": messageId, "List-Unsubscribe": `<mailto:${config.fromAddress}?subject=stop>`, ...thread },
       });
       const sentAt = new Date().toISOString();
       await db.prepare(`UPDATE "FccCampaignSend" SET "status"='SENT', "finishedAt"=? WHERE "sendId"=?`).bind(sentAt, sendId).run();
       if (hot) {
         // The hot list is one first email each: no day-3 follow-up is scheduled (step2DueAt stays NULL).
-        await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step1_sent', "step1SentAt"=?, "step1MessageId"=?, "step2DueAt"=NULL, "updatedAt"=? WHERE "id"=?`)
-          .bind(sentAt, messageId, sentAt, contact.id).run();
+        await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step1_sent', "step1SentAt"=?, "step1MessageId"=?, "step2DueAt"=NULL, "updatedAt"=?, "senderAddress"=NULLIF(?,'') WHERE "id"=?`)
+          .bind(sentAt, messageId, sentAt, inbox, contact.id).run();
         counts.firstEmails += 1;
       } else if (step === 1) {
-        await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step1_sent', "step1SentAt"=?, "step1MessageId"=?, "step2DueAt"=?, "updatedAt"=? WHERE "id"=?`)
-          .bind(sentAt, messageId, addDays(day, FCC_FOLLOW_UP_DELAY_DAYS), sentAt, contact.id).run();
+        await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step1_sent', "step1SentAt"=?, "step1MessageId"=?, "step2DueAt"=?, "updatedAt"=?, "senderAddress"=NULLIF(?,'') WHERE "id"=?`)
+          .bind(sentAt, messageId, addDays(day, FCC_FOLLOW_UP_DELAY_DAYS), sentAt, inbox, contact.id).run();
         counts.firstEmails += 1;
       } else {
         await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step2_sent', "step2SentAt"=?, "updatedAt"=? WHERE "id"=?`)
@@ -319,9 +347,45 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   };
 
   let followUpsHeldBack: string | null = null;
+  let inboxDown = false;
+  /**
+   * Before a first email to someone from the hot list. A reply may not be recorded yet, so read the inbox: for this
+   * address, and for anyone already emailed at the company on either list. A reply or bounce stops them. If the inbox
+   * can't be read, they wait; nobody else needs it. True when the email may go.
+   */
+  const inboxClear = async (contact: ContactRow) => {
+    const domain = domainOf(contact.email);
+    const ownDomain = !SHARED_MAIL_DOMAINS.has(domain) && !shared.has(domain);
+    const march = await db.prepare(`SELECT "id","status","step1SentAt","createdAt" FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "email" = ?`)
+      .bind(FCC_CAMPAIGN_KEY, contact.email).first<{ id: string; status: string; step1SentAt: string | null; createdAt: string }>();
+    const emailedAtCompany = ownDomain ? await db.prepare(`SELECT MIN("step1SentAt") AS since FROM "FccCampaignContact" WHERE "campaignKey" IN (?, ?) AND "email" LIKE ?`)
+      .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, `%@${domain}`).first<{ since: string | null }>() : null;
+    const since = [march && (march.step1SentAt ?? march.createdAt), emailedAtCompany?.since].filter(Boolean).sort()[0];
+    if (!since) return true;
+    if (inboxDown) return false;
+    let replied = false;
+    let bounced = false;
+    try {
+      mailbox ??= await config.mailbox!();
+      replied = await mailbox.hasMessagesFrom(ownDomain ? [contact.email, `@${domain}`] : [contact.email], since);
+      bounced = !replied && Boolean(march) && await mailbox.hasBounceFor(contact.email, since);
+    } catch (error) {
+      inboxDown = true;
+      followUpsHeldBack = `inbox check failed: ${(error instanceof Error ? error.message : String(error)).slice(0, 200)}`;
+      return false;
+    }
+    if (!replied && !bounced) return true;
+    // Their March row shows the same reply or bounce.
+    const status = replied ? "replied" : "bounced";
+    const reason = !replied ? "The March email bounced" : march?.step1SentAt ? "They wrote back to the March email" : "Someone at this company wrote back";
+    await stop(contact, status, reason);
+    if (march && march.id !== contact.id && (march.status === "ready" || march.status === "step1_sent")) await stop(march, status, reason);
+    if (bounced) await suppressBounce(contact.email);
+    counts[status] += 1;
+    return false;
+  };
   try {
     // The hot list goes first. When the cap or the gap runs out, this returns before any follow-up or first email.
-    let inboxDown = false;
     for (const contact of hot) {
       if (remaining <= 0 || budget <= 0) return finish();
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
@@ -335,39 +399,7 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
           .bind(FCC_CAMPAIGN_KEY, `%@${companyDomain}`).first<{ hit: number }>();
         if (stoppedAtCompany) { await stop(contact, "suppressed", "Someone else at this company replied, said stop or is on hold"); counts.suppressed += 1; continue; }
       }
-      // Replies to the March email are only recorded when its follow-up comes up, and the hot list goes first
-      // and has no follow-up, so read the inbox here: for this address, and for anyone already emailed at the
-      // company on either list. If the inbox can't be read, this person waits; nobody else needs it.
-      const march = await db.prepare(`SELECT "id","status","step1SentAt","createdAt" FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "email" = ?`)
-        .bind(FCC_CAMPAIGN_KEY, contact.email).first<{ id: string; status: string; step1SentAt: string | null; createdAt: string }>();
-      const emailedAtCompany = ownDomain ? await db.prepare(`SELECT MIN("step1SentAt") AS since FROM "FccCampaignContact" WHERE "campaignKey" IN (?, ?) AND "email" LIKE ?`)
-        .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, `%@${companyDomain}`).first<{ since: string | null }>() : null;
-      const since = [march && (march.step1SentAt ?? march.createdAt), emailedAtCompany?.since].filter(Boolean).sort()[0];
-      if (since) {
-        if (inboxDown) continue;
-        const patterns = ownDomain ? [contact.email, `@${companyDomain}`] : [contact.email];
-        let replied = false;
-        let bounced = false;
-        try {
-          mailbox ??= await config.mailbox!();
-          replied = await mailbox.hasMessagesFrom(patterns, since);
-          bounced = !replied && Boolean(march) && await mailbox.hasBounceFor(contact.email, since);
-        } catch (error) {
-          inboxDown = true;
-          followUpsHeldBack = `inbox check failed: ${(error instanceof Error ? error.message : String(error)).slice(0, 200)}`;
-          continue;
-        }
-        if (replied || bounced) {
-          // Their March row shows the same reply or bounce.
-          const status = replied ? "replied" : "bounced";
-          const reason = !replied ? "The March email bounced" : march ? "They wrote back to the March email" : "Someone else at this company wrote back";
-          await stop(contact, status, reason);
-          if (march && (march.status === "ready" || march.status === "step1_sent")) await stop(march, status, reason);
-          if (bounced) await suppressBounce(contact.email);
-          counts[status] += 1;
-          continue;
-        }
-      }
+      if (!(await inboxClear(contact))) continue;
       if (!(await send(contact, 1, true))) return finish();
     }
     for (const contact of followUps) {
@@ -398,6 +430,8 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     for (const contact of firsts) {
       if (remaining <= 0 || budget <= 0) break;
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
+      // Back from the closed hot list: they get the same check it would have run, even if it couldn't read the inbox last time.
+      if (contact.backFromHotList && !(await inboxClear(contact))) continue;
       if (!(await send(contact, 1))) return finish();
     }
     return finish();

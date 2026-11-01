@@ -30,8 +30,10 @@ export const FCC_FOLLOW_UP_DELAY_DAYS = 3;
 export const FCC_MAX_FOLLOW_UPS = 1;
 /**
  * The copy a founder's go must name (FccCampaignSetting.approvedCopy). Aidan's "v2" email (Notion
- * task, Oct 28) replaced the calmer v3 for every first email from Oct 29. Contacts keep the v3 list
- * key; which copy a person got is in their first email's Message-ID ("<fcc-v4-..." for this one).
+ * task, Oct 28) replaced the calmer v3 for every first email from Oct 29; v5 (Nov 1) keeps its words
+ * and adds the founders' signature with the site link and logo. fcc-nov6-v5 adds the November 6
+ * email to that, so the go recorded on the signature copy doesn't cover it. Contacts keep the v3 list key;
+ * which copy a person got is in their first email's Message-ID ("<fcc-v5-..." for this one).
  */
 export const FCC_COPY_VERSION = "fcc-nov6-v5";
 
@@ -329,6 +331,9 @@ function toHtml(plain: string) {
  * thread. A missing address renders a visible placeholder so test emails can't
  * pass for send-ready copy.
  */
+/** First name for a short sign-off ("Aidan" from "Aidan Magee"). */
+const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] || name.trim();
+
 export function renderFccEmail(
   contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">,
   step: 1 | 2,
@@ -403,8 +408,30 @@ export function companyPossessive(company: string) {
 }
 
 /** Which copy a person's first email used, read from its Message-ID. */
-export function fccCopyOfMessageId(messageId: string | null | undefined): "v3" | "v4" {
+export function fccCopyOfMessageId(messageId: string | null | undefined): "v3" | "v4" | "v5" {
+  if (messageId?.startsWith("<fcc-v5-")) return "v5";
   return messageId?.startsWith("<fcc-v4-") ? "v4" : "v3";
+}
+
+/** The words of Aidan's "v2" question email (both steps), without any sign-off. */
+function questionEmail(contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">, step: 1 | 2) {
+  const possessive = companyPossessive(companyShortName(contact.company));
+  const rmd = contact.filings.find((filing) => filing?.rmdNumber?.trim())?.rmdNumber.trim();
+  const listing = rmd ? `${possessive} listing (${rmd})` : `${possessive} listing`;
+  const subject = `Question about ${possessive} RMD listing`;
+  if (step === 1) {
+    return { subject, paragraphs: [
+      `Hi ${contact.firstName},`,
+      `I was going through the FCC's Robocall Mitigation Database and noticed ${listing} doesn't show a 2026 recertification yet. It was due March 1, and you're not alone: about 3,600 providers show the same thing.`,
+      `Is it already handled? If so, no need to reply.`,
+      `If not, I can send you a short list of what looks out of date on the listing, free. If you'd like help after that, I prepare the updates and a fresh mitigation plan, and your officer files it from your own login in about 15 minutes. It's a flat $450, and we never hold your login.`,
+      `Want me to send the list?`,
+    ] };
+  }
+  return { subject: `Re: ${subject}`, paragraphs: [
+    `Hi ${contact.firstName},`,
+    `Bumping this in case it got buried. ${listing} still shows no 2026 recertification. Want the free list? A one-word reply is fine.`,
+  ] };
 }
 
 /**
@@ -417,30 +444,79 @@ export function renderFccEmailV4(
   contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">,
   step: 1 | 2,
   mailingAddress: string | null | undefined,
+  signer = "Aidan Magee",
 ): RenderedFccEmail {
   const address = String(mailingAddress || "").trim() || ADDRESS_PLACEHOLDER;
-  const possessive = companyPossessive(companyShortName(contact.company));
-  const rmd = contact.filings.find((filing) => filing?.rmdNumber?.trim())?.rmdNumber.trim();
-  const listing = rmd ? `${possessive} listing (${rmd})` : `${possessive} listing`;
-  const subject = `Question about ${possessive} RMD listing`;
   const footer = `Axiom · axiominternational.ca/fcc-filings · ${address}\nNot useful? Reply "no thanks" and I won't follow up.`;
-  if (step === 1) {
-    const bodyPlain = [
-      `Hi ${contact.firstName},`,
-      `I was going through the FCC's Robocall Mitigation Database and noticed ${listing} doesn't show a 2026 recertification yet. It was due March 1, and you're not alone: about 3,600 providers show the same thing.`,
-      `Is it already handled? If so, no need to reply.`,
-      `If not, I can send you a short list of what looks out of date on the listing, free. If you'd like help after that, I prepare the updates and a fresh mitigation plan, and your officer files it from your own login in about 15 minutes. It's a flat $450, and we never hold your login.`,
-      `Want me to send the list?`,
-      `Aidan Magee\n${footer}`,
-    ].join("\n\n");
-    return { subject, bodyPlain, bodyHtml: toHtml(bodyPlain) };
-  }
-  const bodyPlain = [
-    `Hi ${contact.firstName},`,
-    `Bumping this in case it got buried. ${listing} still shows no 2026 recertification. Want the free list? A one-word reply is fine.`,
-    `Aidan\n${footer}`,
-  ].join("\n\n");
-  return { subject: `Re: ${subject}`, bodyPlain, bodyHtml: toHtml(bodyPlain) };
+  const { subject, paragraphs } = questionEmail(contact, step);
+  const bodyPlain = [...paragraphs, `${step === 1 ? signer : firstNameOf(signer)}\n${footer}`].join("\n\n");
+  return { subject, bodyPlain, bodyHtml: toHtml(bodyPlain) };
+}
+
+/** Who signs an email. Title and phone come from the founders' signature settings; both are optional. */
+export type FccSigner = { name: string; title?: string | null; phone?: string | null };
+/** The signature's link shows the plain domain and opens the FCC filings page (Riley, Nov 1). */
+export const FCC_SITE_LABEL = "axiominternational.ca";
+export const FCC_SITE_URL = "https://axiominternational.ca/fcc-filings/";
+export const FCC_LOGO_URL = "https://axiominternational.ca/brand/axiom-lockup-400.png";
+const FCC_OPT_OUT = `Not useful? Reply "no thanks" and I won't follow up.`;
+
+const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** "257 Kipling Ave, Kitchener, ON N2C 2B9, Canada" becomes "257 Kipling Ave," over "Kitchener, ON N2C 2B9, Canada". */
+function addressLines(address: string) {
+  const comma = address.indexOf(",");
+  return comma < 0 ? [address] : [address.slice(0, comma + 1), address.slice(comma + 1).trim()];
+}
+
+/**
+ * The founders' signature (Riley, Nov 1, after his manager's): name, title, mailing address, cell,
+ * the site link and the logo, then the opt-out line US law requires. Gmail shows the HTML; the
+ * plain-text copy is for mail apps that can't, so its link spells out the page.
+ */
+export function fccSignature(signer: FccSigner, mailingAddress: string | null | undefined) {
+  const address = String(mailingAddress || "").trim() || ADDRESS_PLACEHOLDER;
+  const title = signer.title?.trim() || "Co-founder";
+  const phone = signer.phone?.trim();
+  const plain = [signer.name, title, ...addressLines(address), ...(phone ? [`C: ${phone}`] : []), FCC_SITE_URL.replace(/^https:\/\/|\/$/g, "")].join("\n")
+    + `\n\n${FCC_OPT_OUT}`;
+  const line = (text: string, style = "") => `<div${style ? ` style="${style}"` : ""}>${escapeHtml(text)}</div>`;
+  const html = [
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.45;color:#1f1f1f"><tr><td>`,
+    line(signer.name, "font-size:15px;font-weight:bold"),
+    line(title, "font-weight:bold;margin-bottom:2px"),
+    ...addressLines(address).map((text) => line(text)),
+    `<div style="height:8px;line-height:8px">&nbsp;</div>`,
+    ...(phone ? [line(`C: ${phone}`)] : []),
+    `<div><a href="${FCC_SITE_URL}" style="color:#1a56c4">${FCC_SITE_LABEL}</a></div>`,
+    // The site's logo is white (made for its dark pages), so it sits on a dark tile to show on white email.
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px"><tr><td style="background:#101318;padding:9px 12px;border-radius:4px">`
+      + `<a href="${FCC_SITE_URL}"><img src="${FCC_LOGO_URL}" alt="Axiom International" width="140" height="45" style="display:block;border:0;width:140px;height:45px"></a>`
+      + `</td></tr></table>`,
+    `</td></tr></table>`,
+    `<p style="margin:14px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#777777">${escapeHtml(FCC_OPT_OUT)}</p>`,
+  ].join("\n");
+  return { plain, html };
+}
+
+/**
+ * Aidan's question email with the founders' new signature (v5, Nov 1). Same words as v4; the
+ * HTML copy adds the signature's link and logo. Follow-ups to v4 first emails use it too.
+ */
+export function renderFccEmailV5(
+  contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">,
+  step: 1 | 2,
+  mailingAddress: string | null | undefined,
+  signer: FccSigner = { name: "Aidan Magee" },
+): RenderedFccEmail {
+  const { subject, paragraphs } = questionEmail(contact, step);
+  const signature = fccSignature(signer, mailingAddress);
+  const body = paragraphs.map((text) => `<p style="margin:0 0 14px">${escapeHtml(text)}</p>`).join("\n");
+  return {
+    subject,
+    bodyPlain: [...paragraphs, signature.plain].join("\n\n"),
+    bodyHtml: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1f1f1f">\n${body}\n${signature.html}\n</div>`,
+  };
 }
 
 /**

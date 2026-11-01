@@ -7,7 +7,7 @@ import Database from "better-sqlite3";
 import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION } from "@/lib/fcc-campaign";
 import { pauseFcc, readFccNotes, resumeFcc } from "@/lib/fcc-campaign-control";
 import type { FccMailbox, FccSendConfig } from "@/lib/fcc-campaign-sender";
-import { FCC_GAP_MAX_MS, FCC_GAP_MIN_MS, gapAfter, runFccSendTick, torontoMinute, type FccTickResult } from "@/lib/fcc-campaign-tick";
+import { FCC_GAP_MAX_MS, FCC_GAP_MIN_MS, fccDailyMax, gapAfter, runFccSendTick, torontoMinute, type FccTickResult } from "@/lib/fcc-campaign-tick";
 import { PermanentEmailError, type OutgoingEmail } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { applyEngineSchema } from "@/lib/revenue-engine/test-support/engine-schema";
@@ -230,4 +230,48 @@ test("two runs at the same moment never send two emails at once", async () => {
   await Promise.all([a.tick(db, WED_10AM), b.tick(db, WED_10AM)]);
   assert.equal(a.sent.length + b.sent.length, 1);
   assert.equal((raw.prepare(`SELECT COUNT(*) AS n FROM "FccCampaignSend"`).get() as { n: number }).n, 1);
+});
+
+test("a second inbox starts at 15 a day beside the first inbox's 90, nobody gets two first emails, and each follow-up comes from the inbox that sent the first", async () => {
+  const { raw, db } = database();
+  addContacts(raw, 150);
+  const aidan = harness();
+  const riley = harness();
+  Object.assign(riley.config, { fromAddress: "riley@mail.example", fromName: "Riley Hinsperger", primary: false });
+  for (let at = WED_10AM; at < WED_10AM + 300 * MINUTE; at += MINUTE) {
+    await aidan.tick(db, at);
+    await riley.tick(db, at);
+  }
+  assert.equal(aidan.sent.length, 90);
+  assert.equal(riley.sent.length, 15, "an added inbox sends 15 a day in its first week");
+  assert.equal(new Set([...aidan.sent, ...riley.sent].map((send) => send.to)).size, 105, "nobody gets a first email from both inboxes");
+  const owners = raw.prepare(`SELECT COALESCE("senderAddress",'') AS inbox, COUNT(*) AS n FROM "FccCampaignContact" WHERE "status" = 'step1_sent' GROUP BY 1 ORDER BY 1`).all();
+  assert.deepEqual(owners, [{ inbox: "", n: 90 }, { inbox: "riley@mail.example", n: 15 }]);
+
+  // Monday Nov 2 (10:00 Toronto is 15:00 UTC in winter): the day-3 follow-ups go, each from its own inbox.
+  const MON_10AM = Date.parse("2026-11-02T15:00:00Z");
+  const before = { aidan: aidan.sent.length, riley: riley.sent.length };
+  for (let at = MON_10AM; at < MON_10AM + 300 * MINUTE; at += MINUTE) {
+    await aidan.tick(db, at);
+    await riley.tick(db, at);
+  }
+  const rileyFollowUps = riley.sent.slice(before.riley).map((send) => send.to);
+  const rileyFirsts = (raw.prepare(`SELECT "email" FROM "FccCampaignContact" WHERE "senderAddress" = 'riley@mail.example'`).all() as Array<{ email: string }>).map((row) => row.email);
+  assert.equal(rileyFollowUps.length, 15);
+  assert.deepEqual([...rileyFollowUps].sort(), [...rileyFirsts].sort(), "Riley's inbox follows up exactly the people it first emailed");
+  assert.ok(aidan.sent.slice(before.aidan).every((send) => !rileyFirsts.includes(send.to)), "Aidan's inbox never follows up Riley's people");
+  const steps = raw.prepare(`SELECT COALESCE("senderAddress",'') AS inbox, "step", COUNT(*) AS n FROM "FccCampaignSend" WHERE "sendDay" = '2026-11-02' GROUP BY 1, 2 ORDER BY 1, 2`).all();
+  assert.deepEqual(steps, [{ inbox: "", step: 2, n: 90 }, { inbox: "riley@mail.example", step: 2, n: 15 }]);
+});
+
+test("an added inbox ramps 15, then 30, then the full 90 a day", async () => {
+  const { raw, db } = database();
+  addContacts(raw, 1);
+  const sender = { fromAddress: "riley@mail.example", primary: false };
+  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-02"), 15, "before its first email");
+  raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","senderAddress") VALUES ('s1','c1',1,'a@b.example','2026-11-02','<m1>','SENT','riley@mail.example')`).run();
+  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-08"), 15);
+  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-09"), 30);
+  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-16"), 90);
+  assert.equal(await fccDailyMax(db, { fromAddress: "aidan@mail.example" }, 30, "2026-11-02"), 90, "the first inbox is never ramped");
 });

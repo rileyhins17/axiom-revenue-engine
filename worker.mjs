@@ -10,7 +10,7 @@ import { setCloudflareBindings } from "./src/lib/cloudflare";
 import { getCronTimeoutBudgets } from "./src/lib/cron-timeouts";
 import { clearServerEnvCache } from "./src/lib/env";
 import { runEngineEmailCron } from "./src/lib/revenue-engine/engine-email-worker";
-import { runFccCampaignCron } from "./src/lib/fcc-campaign-worker";
+import { runFccCampaignCron, runFccReplyCheckCron } from "./src/lib/fcc-campaign-worker";
 import { runCallerSyncTick } from "./src/lib/caller-v2/sync-tick";
 import { alertEmail, OWNER_ALERT_INBOXES, recordAndSelectAlerts, runHealthChecks } from "./src/lib/ops/health";
 import { placesKeyFromEnv, runDiscovery, SCHEDULED_REQUESTS_PER_RUN } from "./src/lib/revenue-engine/cloud-discovery";
@@ -175,6 +175,10 @@ const exportedWorker = {
       ctx.waitUntil(runHealthCron(env)
         .then((result) => console.log(JSON.stringify({ event: "health", ...result })))
         .catch((error) => console.error("[health] failure", error instanceof Error ? error.message : "unknown")));
+      // Once a day from 9:00 Toronto: read the FCC inbox for replies and tell both founders.
+      ctx.waitUntil(runFccReplyCheckCron(env, globalThis.__axiomSendLoginEmail)
+        .then((result) => console.log(JSON.stringify({ event: "fcc_reply_check", ...result })))
+        .catch((error) => console.error("[fcc-reply-check] failure:", error instanceof Error ? error.message : "unknown")));
       return;
     }
     if (controller?.cron === "* * * * *") {
