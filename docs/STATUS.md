@@ -5,6 +5,8 @@
 - **Approval gate:** releasing this changes `FCC_COPY_VERSION` to `fcc-march1-pack-v6-nov6`, which stops all FCC sending until a founder's go names it. Aidan said go on Nov 1. Release and go belong together.
 - **Volume:** unchanged at 60 per inbox. The Nov 1 meeting chose Riley's inbox now and 80 a day after a clean week.
 - **Checks:** FCC tests pass and typecheck clean on this branch; `verify` runs on the PR. Not run against live Cloudflare.
+- **Released (Riley's Claude, Nov 1, 21:01 UTC):** reviewed, merged as `7ea17f1` (fast-forward, PR #15) and live as Worker `554084d1-6d6c-46a9-990a-1ba62b3c5c5e` from the clean `rv` clone with `scripts/release-production.mjs`. No migration (still through 0087, 90 receipts); stops `01111` before and after; smoke test OK. Rollback target `4e497952`. Backup `backups/production/prod-export-20261101T205442Z.sql` (sha256 `323559af…0ccdb0`). Full suite 1,085 pass, 4 skipped, 0 fail; GitHub `verify` green. Aidan's go recorded 21:03:58 UTC (`approvedCopy` `fcc-march1-pack-v6-nov6`, `enabled` 1). Live counts: Nov 6 list 197 `ready`, 45 `held`; March list 1,720 `ready`, 570 `held`, 133 `step1_sent`, 24 `suppressed`, 3 `bounced`, 1 `replied`. First hot-list send Mon Nov 2, 10:00 Toronto, from the first inbox only.
+- **Known gap (stats only):** `fccStats` counts only the March key, so the FCC screen's reply-rate cards leave out the Nov 6 email (its replies still show in the reply list and the 9 am email). Fix with the next release.
 
 ## 2026-11-01 (Sun): daily reply check live (`829751b1`), then Riley's inbox, FCC stats and the new signature (`4e497952`); batch 4 loaded
 
