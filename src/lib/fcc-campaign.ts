@@ -397,7 +397,10 @@ export function fccSignature(signer: FccSigner, mailingAddress: string | null | 
     `<div style="height:8px;line-height:8px">&nbsp;</div>`,
     ...(phone ? [line(`C: ${phone}`)] : []),
     `<div><a href="${FCC_SITE_URL}" style="color:#1a56c4">${FCC_SITE_LABEL}</a></div>`,
-    `<div style="margin-top:8px"><a href="${FCC_SITE_URL}"><img src="${FCC_LOGO_URL}" alt="Axiom International" width="140" height="45" style="display:block;border:0;width:140px;height:45px"></a></div>`,
+    // The site's logo is white (made for its dark pages), so it sits on a dark tile to show on white email.
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px"><tr><td style="background:#101318;padding:9px 12px;border-radius:4px">`
+      + `<a href="${FCC_SITE_URL}"><img src="${FCC_LOGO_URL}" alt="Axiom International" width="140" height="45" style="display:block;border:0;width:140px;height:45px"></a>`
+      + `</td></tr></table>`,
     `</td></tr></table>`,
     `<p style="margin:14px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#777777">${escapeHtml(FCC_OPT_OUT)}</p>`,
   ].join("\n");
