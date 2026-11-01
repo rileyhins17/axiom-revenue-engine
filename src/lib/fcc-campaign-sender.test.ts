@@ -376,6 +376,25 @@ test("a held hot-list inbox is never sent, and a do-not-email contact on the hot
   assert.deepEqual(["held", "blocked", "ok"].map((id) => statusOf(raw, id)), ["held", "suppressed", "step1_sent"]);
 });
 
+test("the hot list skips anyone who already replied, bounced or was suppressed on the March pack", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "said-no@no-tel.example");
+  addContact(raw, "m2", "gone@gone-tel.example");
+  addContact(raw, "m3", "still-open@open-tel.example");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'replied' WHERE "id" = 'm1'`).run();
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'bounced' WHERE "id" = 'm2'`).run();
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1MessageId" = '<x>', "step1SentAt" = '2026-10-20T14:00:00Z', "step2DueAt" = '2026-12-01' WHERE "id" = 'm3'`).run();
+  addNov6Contact(raw, "h1", "said-no@no-tel.example");
+  addNov6Contact(raw, "h2", "gone@gone-tel.example");
+  addNov6Contact(raw, "h3", "still-open@open-tel.example");
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), MONDAY);
+  assert.deepEqual(t.sent.map((message) => message.to), ["still-open@open-tel.example"]);
+  assert.equal(statusOf(raw, "h1"), "ready");
+  assert.equal(statusOf(raw, "h2"), "ready");
+});
+
 test("the worker's weekday 10am schedule runs only the retired website batch; the FCC tick has its own schedule", async () => {
   const source = readFileSync(new URL("../../worker.mjs", import.meta.url), "utf8")
     .replace(/^import[\s\S]*?from\s+"[^"]+";\s*/gm, "")

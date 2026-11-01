@@ -216,7 +216,8 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   const { results: hot } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
-    ORDER BY c."createdAt", c."id" LIMIT 1000`).bind(FCC_NOV6_CAMPAIGN_KEY).all<ContactRow>();
+      AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" m WHERE m."email" = c."email" AND m."campaignKey" = ? AND m."status" IN ('replied','bounced','suppressed'))
+    ORDER BY c."createdAt", c."id" LIMIT 1000`).bind(FCC_NOV6_CAMPAIGN_KEY, FCC_CAMPAIGN_KEY).all<ContactRow>();
   if (followUps.length === 0 && firsts.length === 0 && hot.length === 0) return { status: "SKIPPED", reason: "nothing to send" };
 
   const counts = { firstEmails: 0, followUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0 };

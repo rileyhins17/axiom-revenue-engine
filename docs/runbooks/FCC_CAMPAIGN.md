@@ -53,16 +53,16 @@ A one-time first email to the hot list (`fcc_hot_list_nov6.csv`, outside this re
    ```
    npx tsx scripts/fcc-campaign.ts import-nov6-sql <path>\fcc_hot_list_nov6.csv <path>\fcc_nov6_import.sql
    ```
-   It prints the rows, how many are sendable, and how many are held (generic inboxes, by the address or the file's `email_type`). Expect 270 rows: 217 sendable, 53 held.
+   It prints the rows, how many are sendable, and how many are held (generic inboxes, by the address or the file's `email_type`). Expect 242 rows: 197 sendable, 45 held.
 2. **Load (no email goes out).**
    ```
    npx wrangler d1 execute axiom-ops-omniscient --remote --config wrangler.production.jsonc --file <path>\fcc_nov6_import.sql
    ```
    Re-running it never duplicates anyone.
-3. **Check overlap with the March pack before the go.** The hot list is not checked against people already emailed under the March key. Run this and decide with Aidan before the go:
+3. **Check overlap with the March pack before the go.** The sender skips anyone whose March contact has replied, bounced or been suppressed, but it still emails people who only got the March email, in a new thread. Run this to see how many, and decide with Aidan before the go:
    ```
    SELECT COUNT(*) FROM "FccCampaignContact" h JOIN "FccCampaignContact" m ON m."email" = h."email" AND m."campaignKey" = 'fcc-march1-pack-v3-calmer'
-     WHERE h."campaignKey" = 'fcc-nov6-hot' AND h."status" = 'ready' AND m."status" IN ('step1_sent','step2_sent','replied');
+     WHERE h."campaignKey" = 'fcc-nov6-hot' AND h."status" = 'ready' AND m."status" IN ('step1_sent','step2_sent');
    ```
 4. **Release the code** (merge, then the guarded release), so the Worker has `fcc-nov6-v5`.
 5. **Go (only after Aidan says go):**
