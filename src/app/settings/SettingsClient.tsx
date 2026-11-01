@@ -42,7 +42,7 @@ export function SettingsAccount({ userProfile }: { userProfile: UserProfile }) {
         <Avatar src={image} fallback={initial} size="xl" className="owner-avatar" />
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" disabled={picture.uploading} onClick={picture.choose}>
-            {picture.uploading ? "Saving…" : "Change profile picture"}
+            {picture.uploading ? "Savingâ€¦" : "Change profile picture"}
           </Button>
           {image ? (
             <Button type="button" variant="ghost" size="sm" disabled={picture.uploading} onClick={() => void picture.remove()}>
