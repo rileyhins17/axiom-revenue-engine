@@ -395,6 +395,45 @@ test("the hot list skips anyone who already replied, bounced or was suppressed o
   assert.equal(statusOf(raw, "h2"), "ready");
 });
 
+test("the hot list reads the inbox first for anyone emailed in March, and holds them if it can't", async () => {
+  const opened = (raw: Database.Database, id: string) =>
+    raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1MessageId" = '<x>', "step1SentAt" = '2026-10-20T14:00:00Z', "step2DueAt" = '2026-12-01' WHERE "id" = ?`).run(id);
+
+  // A reply that isn't recorded yet, and a bounce that isn't recorded yet: neither gets the hot-list email.
+  const first = database();
+  for (const [id, email] of [["m1", "wrote-back@back-tel.example"], ["m2", "bounced@gone-tel.example"], ["m3", "quiet@quiet-tel.example"]]) {
+    addContact(first.raw, id, email);
+    opened(first.raw, id);
+  }
+  addNov6Contact(first.raw, "h1", "wrote-back@back-tel.example");
+  addNov6Contact(first.raw, "h2", "bounced@gone-tel.example");
+  addNov6Contact(first.raw, "h3", "quiet@quiet-tel.example");
+  addNov6Contact(first.raw, "h4", "never-emailed@new-tel.example");
+  recordGo(first.raw);
+  const t1 = fakeTransport();
+  const m1 = fakeMailbox({ from: ["wrote-back@back-tel.example"], bounced: ["bounced@gone-tel.example"] });
+  const result = await runFccDailySend(first.db, config(t1.factory, m1.factory), MONDAY);
+  assert.deepEqual(t1.sent.map((message) => message.to), ["quiet@quiet-tel.example", "never-emailed@new-tel.example"]);
+  assert.equal(statusOf(first.raw, "h1"), "replied");
+  assert.equal(statusOf(first.raw, "h2"), "bounced");
+  assert.ok(result.status === "RAN" && result.replied === 1 && result.bounced === 1);
+  assert.ok(first.raw.prepare(`SELECT 1 FROM "EngineEmailSuppression" WHERE "email" = 'bounced@gone-tel.example'`).get(), "the bounce goes on the do-not-email list");
+
+  // The inbox can't be read: people emailed in March wait and stay ready, and nobody else is held up.
+  const second = database();
+  addContact(second.raw, "m1", "emailed@march-tel.example");
+  opened(second.raw, "m1");
+  addNov6Contact(second.raw, "h1", "emailed@march-tel.example");
+  addNov6Contact(second.raw, "h2", "never-emailed@new-tel.example");
+  recordGo(second.raw);
+  const t2 = fakeTransport();
+  const m2 = fakeMailbox({ broken: true });
+  const held = await runFccDailySend(second.db, config(t2.factory, m2.factory), MONDAY);
+  assert.deepEqual(t2.sent.map((message) => message.to), ["never-emailed@new-tel.example"]);
+  assert.equal(statusOf(second.raw, "h1"), "ready");
+  assert.ok(held.status === "RAN" && /inbox check failed/.test(held.followUpsHeldBack ?? ""));
+});
+
 test("the worker's weekday 10am schedule runs only the retired website batch; the FCC tick has its own schedule", async () => {
   const source = readFileSync(new URL("../../worker.mjs", import.meta.url), "utf8")
     .replace(/^import[\s\S]*?from\s+"[^"]+";\s*/gm, "")
