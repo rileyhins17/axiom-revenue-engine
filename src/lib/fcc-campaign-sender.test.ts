@@ -411,6 +411,22 @@ test("a hold or failure on someone's March row also stops their hot-list email",
   assert.deepEqual(["h1", "h2"].map((id) => statusOf(raw, id)), ["ready", "ready"], "their rows wait in case the hold is lifted");
 });
 
+test("a stop that only says they signed a 2026 declaration doesn't block the hot-list email written for them", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "signed@signed-tel.example");
+  addContact(raw, "m2", "also-signed@held-tel.example");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'suppressed', "stoppedReason" = 'Signed a 2026 RMD declaration (Jan-Feb), so a follow-up would wrongly say overdue' WHERE "id" = 'm1'`).run();
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'held', "holdReason" = 'Signed a 2026 RMD declaration (Jan-Feb), so they have most likely recertified' WHERE "id" = 'm2'`).run();
+  addNov6Contact(raw, "h1", "signed@signed-tel.example");
+  addNov6Contact(raw, "h2", "also-signed@held-tel.example");
+  addNov6Contact(raw, "h3", "colleague@signed-tel.example");
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), MONDAY);
+  assert.deepEqual(t.sent.map((message) => message.to).sort(), ["also-signed@held-tel.example", "colleague@signed-tel.example", "signed@signed-tel.example"]);
+  assert.equal(statusOf(raw, "m1"), "suppressed", "they still get no March follow-up");
+});
+
 test("a reply, stop or company hold at another mailbox stops the hot-list email, but a generic inbox hold or a shared host does not", async () => {
   const { raw, db } = database();
   addContact(raw, "m1", "boss@replied-tel.example");
