@@ -22,6 +22,7 @@
  * non-generic hold anywhere at a company stops it for that company's other mailboxes. The exception is
  * "Signed a 2026 RMD declaration": that stop is about the March wording, and the hot-list line is written for them.
  * After FCC_NOV6_LAST_SEND_DAY the hot list closes and anyone it never reached rejoins the March queue.
+ * Only the first inbox sends it: everyone emailed so far replied to that inbox, so that's where its inbox check must look.
  */
 import {
   fccCopyOfMessageId, renderFccEmail, renderFccEmailNov6, renderFccEmailV5, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_FOLLOW_UP_DELAY_DAYS,
@@ -246,7 +247,7 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       AND ${notOnHotList}
     ORDER BY CASE c."emailKind" WHEN 'compliance' THEN 0 WHEN 'named' THEN 1 ELSE 2 END, c."createdAt", c."id" LIMIT 200`)
     .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
-  const { results: hot } = hotOpen ? await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
+  const { results: hot } = hotOpen && config.primary !== false ? await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" m WHERE m."email" = c."email" AND m."campaignKey" = ? AND m."status" IN ('replied','bounced','suppressed','held','failed')
@@ -352,10 +353,10 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       // Someone else at this company replied, said stop, or was held for a reason about the company.
       const companyDomain = domainOf(contact.email);
       if (!SHARED_MAIL_DOMAINS.has(companyDomain) && !shared.has(companyDomain)) {
-        const stoppedAtCompany = await db.prepare(`SELECT 1 AS hit FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "email" LIKE ?
+        const stoppedAtCompany = await db.prepare(`SELECT 1 AS hit FROM "FccCampaignContact" WHERE "campaignKey" IN (?, ?) AND "email" LIKE ?
           AND ("status" IN ('replied','suppressed') OR ("status" = 'held' AND COALESCE("holdReason",'') NOT LIKE '%eneric inbox%'))
           AND COALESCE("holdReason",'') || COALESCE("stoppedReason",'') NOT LIKE '%Signed a 2026 RMD declaration%' LIMIT 1`)
-          .bind(FCC_CAMPAIGN_KEY, `%@${companyDomain}`).first<{ hit: number }>();
+          .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, `%@${companyDomain}`).first<{ hit: number }>();
         if (stoppedAtCompany) { await stop(contact, "suppressed", "Someone else at this company replied, said stop or is on hold"); counts.suppressed += 1; continue; }
       }
       // Replies to the March email are only recorded when its follow-up comes up, and the hot list goes

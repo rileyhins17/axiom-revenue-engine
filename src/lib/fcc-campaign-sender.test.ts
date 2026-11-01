@@ -452,6 +452,32 @@ test("a reply, stop or company hold at another mailbox stops the hot-list email,
   assert.deepEqual(["h1", "h2", "h3"].map((id) => statusOf(raw, id)), ["suppressed", "suppressed", "suppressed"]);
 });
 
+test("a stop on someone's hot-list row also stops the rest of that company's hot list", async () => {
+  const { raw, db } = database();
+  addNov6Contact(raw, "h1", "first@stopped-tel.example");
+  addNov6Contact(raw, "h2", "second@stopped-tel.example");
+  addNov6Contact(raw, "h3", "fine@fine-tel.example");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'suppressed', "stoppedReason" = 'Do not contact (Aidan)' WHERE "id" = 'h1'`).run();
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), MONDAY);
+  assert.deepEqual(t.sent.map((message) => message.to), ["fine@fine-tel.example"]);
+  assert.equal(statusOf(raw, "h2"), "suppressed");
+});
+
+test("only the first inbox sends the hot list, and an added inbox leaves its people alone", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "on-both@both-tel.example");
+  addContact(raw, "m2", "march-only@march-tel.example");
+  addNov6Contact(raw, "h1", "on-both@both-tel.example");
+  addNov6Contact(raw, "h2", "hot-only@hot-tel.example");
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory, { primary: false, fromAddress: "riley@mail.example", fromName: "Riley Hinsperger" }), MONDAY);
+  assert.deepEqual(t.sent.map((message) => message.to), ["march-only@march-tel.example"]);
+  assert.deepEqual(["h1", "h2", "m1"].map((id) => statusOf(raw, id)), ["ready", "ready", "ready"]);
+});
+
 test("the hot list closes after its last day, and anyone it never reached rejoins the March queue", async () => {
   const { raw, db } = database();
   addContact(raw, "m1", "reached@reached-tel.example");
