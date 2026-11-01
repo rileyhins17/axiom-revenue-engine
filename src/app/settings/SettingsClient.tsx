@@ -1,9 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, CircleHelp, Info, Mail, ShieldCheck, UserRound } from "lucide-react";
 
 import { EmergencyControlCard } from "@/components/emergency-control-card";
 import { Badge, Notice, Panel } from "@/components/owner/kit";
+import { useProfilePicture } from "@/components/profile-picture";
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { AVATAR_CHANGED_EVENT } from "@/hooks/use-avatar-upload";
 
 type EmergencyState = {
   status: "VERIFIED" | "UNAVAILABLE";
@@ -22,8 +27,32 @@ type UserProfile = {
 };
 
 export function SettingsAccount({ userProfile }: { userProfile: UserProfile }) {
+  const [image, setImage] = useState(userProfile.image);
+  const picture = useProfilePicture();
+  useEffect(() => {
+    const onChanged = (event: Event) => setImage((event as CustomEvent<string>).detail || null);
+    window.addEventListener(AVATAR_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(AVATAR_CHANGED_EVENT, onChanged);
+  }, []);
+  const initial = (userProfile.email || userProfile.name || "?").charAt(0);
+
   return (
     <Panel title="Your account" icon={UserRound}>
+      <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-[#efe9dc] pb-4">
+        <Avatar src={image} fallback={initial} size="xl" className="owner-avatar" />
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" disabled={picture.uploading} onClick={picture.choose}>
+            {picture.uploading ? "Saving…" : "Change profile picture"}
+          </Button>
+          {image ? (
+            <Button type="button" variant="ghost" size="sm" disabled={picture.uploading} onClick={() => void picture.remove()}>
+              Remove
+            </Button>
+          ) : null}
+        </div>
+        {picture.input}
+        {picture.error ? <p role="alert" className="w-full text-sm text-[#a1231b]">{picture.error}</p> : null}
+      </div>
       <dl aria-label="Your account" className="divide-y divide-[#efe9dc]">
         <AccountRow label="Name" value={userProfile.name || "Name not set"} />
         <AccountRow label="Email" value={userProfile.email} />
