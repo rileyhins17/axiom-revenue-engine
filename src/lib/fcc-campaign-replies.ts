@@ -10,7 +10,8 @@
  * - At most one attempt an hour until the day's check succeeds.
  * - The founders' email goes before anything is marked, so a failed email is
  *   retried next hour with the same replies, and nobody is reported twice.
- * - Replies the follow-up check found since the last run are reported too.
+ * - Replies the follow-up check found since the last run are reported too, and
+ *   so is new mail from someone a founder already stopped (status unchanged).
  * - Automatic replies (out of office) stop follow-ups, as they always have,
  *   and are labelled as automatic.
  */
@@ -50,7 +51,9 @@ export type FccReplyCheckResult =
   | { status: "SKIPPED"; reason: string }
   | { status: "RAN"; since: string | null; messages: number; found: number };
 
-type ContactRow = { id: string; email: string; firstName: string; company: string; status: string; step1SentAt: string; stoppedReason: string | null };
+type ContactRow = {
+  id: string; email: string; firstName: string; company: string; status: string; step1SentAt: string; stoppedReason: string | null; updatedAt: string;
+};
 type Reply = { contacts: ContactRow[]; message: FccInboxMessage | null; quote: string };
 
 const skip = (reason: string): FccReplyCheckResult => ({ status: "SKIPPED", reason });
@@ -66,10 +69,10 @@ export async function runFccReplyCheck(db: ProspectDb, config: FccReplyCheckConf
   if (last?.day === day) return skip("already checked today");
   if (!(await claimFccReplyCheckTry(db, `${day} ${Math.floor(minute / 60)}`, now))) return skip("already tried this hour");
 
-  // Everyone still being emailed, plus anyone the follow-up check stopped since the last run.
-  const { results: contacts } = await db.prepare(`SELECT "id","email","firstName","company","status","step1SentAt","stoppedReason"
+  // Everyone still being emailed, anyone the follow-up check stopped since the last run, and anyone a founder stopped.
+  const { results: contacts } = await db.prepare(`SELECT "id","email","firstName","company","status","step1SentAt","stoppedReason","updatedAt"
     FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "step1SentAt" IS NOT NULL
-      AND ("status" IN ('step1_sent','step2_sent') OR ("status" = 'replied' AND "updatedAt" > ?))`)
+      AND ("status" IN ('step1_sent','step2_sent','suppressed') OR ("status" = 'replied' AND "updatedAt" > ?))`)
     .bind(FCC_CAMPAIGN_KEY, last?.at ?? now.toISOString()).all<ContactRow>();
   if (contacts.length === 0) {
     await saveFccReplyCheck(db, { day, at: now.toISOString(), found: 0 }, now);
@@ -100,6 +103,8 @@ export async function runFccReplyCheck(db: ProspectDb, config: FccReplyCheckConf
       const from = message.from.toLowerCase();
       for (const contact of new Set([...(byEmail.get(from) ?? []), ...(byDomain.get(domainOf(from)) ?? [])])) {
         if (message.date && time(message) < Date.parse(contact.step1SentAt) - DAY_MS) continue;
+        // Someone already stopped: only mail that is new since they were stopped and since the last run.
+        if (contact.status === "suppressed" && (!message.date || time(message) <= Math.max(Date.parse(contact.updatedAt), last ? Date.parse(last.at) : 0))) continue;
         const seen = firstMessage.get(contact.id);
         if (!seen || (seen.automatic && !message.automatic)) firstMessage.set(contact.id, message);
       }
@@ -125,7 +130,7 @@ export async function runFccReplyCheck(db: ProspectDb, config: FccReplyCheckConf
     for (const reply of found) {
       if (!reply.message) continue;
       const reason = stoppedReason(reply);
-      for (const contact of reply.contacts.filter((row) => row.status !== "replied")) {
+      for (const contact of reply.contacts.filter((row) => row.status === "step1_sent" || row.status === "step2_sent")) {
         await db.prepare(`UPDATE "FccCampaignContact" SET "status" = 'replied', "stoppedReason" = ?, "updatedAt" = ?
           WHERE "id" = ? AND "status" IN ('step1_sent','step2_sent')`).bind(reason, at, contact.id).run();
       }
@@ -152,7 +157,7 @@ function founderMail(replies: Reply[], config: FccReplyCheckConfig): FccOwnerMai
     const message = reply.message;
     const from = message?.from ?? contact.email;
     const when = message?.date ? `, ${shortDay(message.date)}` : "";
-    const kind = message?.automatic ? " (automatic reply)" : "";
+    const kind = `${message?.automatic ? " (automatic reply)" : ""}${reply.contacts.every((row) => row.status === "suppressed") ? " (we had already stopped emailing them)" : ""}`;
     const quote = reply.quote || (message ? "(Open the email in Gmail to read it.)" : "(Found before a follow-up. Open Gmail to read it.)");
     return { title: `${index + 1}. ${contact.company} (${from})${when}${kind}`, quote };
   });

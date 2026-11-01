@@ -159,6 +159,24 @@ test("a reply the follow-up check found after the morning run is in the next mor
   assert.equal(contact(raw, "c1").stoppedReason, "They wrote back, so no follow-up", "the follow-up check's note is kept");
 });
 
+test("new mail from someone a founder stopped is reported, without changing why they were stopped", async () => {
+  const { raw, db } = database();
+  addContact(raw, "c1", "early@stopped.example", "Stopped Early");
+  addContact(raw, "c2", "later@stopped.example", "Stopped Later");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'suppressed', "stoppedReason" = 'Do not contact (Aidan)', "updatedAt" = '2026-10-29T12:00:00.000Z'`).run();
+  const h = harness([
+    message(1, "early@stopped.example", "2026-10-28T20:00:00.000Z"),
+    message(2, "later@stopped.example", "2026-10-30T20:00:00.000Z"),
+  ], { 2: "We already filed in January." });
+  const result = await runFccReplyCheck(db, h.config, new Date(MON_9AM));
+  assert.equal(result.status === "RAN" && result.found, 1, "the reply from before they were stopped is old news");
+  assert.match(h.mails[0]!.text, /Stopped Later \(later@stopped\.example\), Oct 30 \(we had already stopped emailing them\)\n {3}"We already filed in January\."/);
+  assert.equal(contact(raw, "c2").status, "suppressed");
+  assert.equal(contact(raw, "c2").stoppedReason, "Do not contact (Aidan)");
+  const nextDay = await runFccReplyCheck(db, h.config, new Date(MON_9AM + DAY));
+  assert.equal(nextDay.status === "RAN" && nextDay.found, 0, "and it is reported once");
+});
+
 test("no inbox, no check; an inbox that won't open is tried again next hour", async () => {
   const { raw, db } = database();
   addContact(raw, "c1", "jane@talktone.example", "Talktone");
