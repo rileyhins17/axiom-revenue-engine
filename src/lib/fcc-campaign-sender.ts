@@ -64,7 +64,7 @@ type ContactRow = {
 };
 
 /** Mail services many unrelated people share; a reply from one of them says nothing about a company. */
-const SHARED_MAIL_DOMAINS = new Set([
+export const SHARED_MAIL_DOMAINS = new Set([
   "gmail.com", "googlemail.com", "yahoo.com", "ymail.com", "rocketmail.com", "hotmail.com", "outlook.com", "live.com",
   "msn.com", "aol.com", "icloud.com", "me.com", "mac.com", "proton.me", "protonmail.com", "gmx.com", "mail.com",
   "comcast.net", "att.net", "verizon.net", "sbcglobal.net", "bellsouth.net", "cox.net", "charter.net", "earthlink.net",
@@ -99,7 +99,7 @@ const SENDER_PROBLEM = /\b5\.4\.5\b|\b5\.7\.\d+|limit|quota|blocked|spam|policy|
 
 export const torontoDay = (now: Date) => now.toLocaleDateString("en-CA", { timeZone: "America/Toronto" });
 export const torontoWeekday = (now: Date) => new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "America/Toronto" }).format(now);
-const domainOf = (email: string) => email.slice(email.lastIndexOf("@") + 1).toLowerCase();
+export const domainOf = (email: string) => email.slice(email.lastIndexOf("@") + 1).toLowerCase();
 const changes = (result: unknown) => {
   const r = result as { changes?: number; meta?: { changes?: number } };
   return r.meta?.changes ?? r.changes ?? 0;
@@ -161,7 +161,7 @@ export async function fccSentToday(db: ProspectDb, day: string) {
 }
 
 /** Domains used by more than one company in the campaign (e.g. a shared co-op host). */
-async function sharedCampaignDomains(db: ProspectDb) {
+export async function sharedCampaignDomains(db: ProspectDb) {
   const { results } = await db.prepare(`SELECT "email","company" FROM "FccCampaignContact" WHERE "campaignKey" = ?`)
     .bind(FCC_CAMPAIGN_KEY).all<{ email: string; company: string }>();
   const companies = new Map<string, Set<string>>();

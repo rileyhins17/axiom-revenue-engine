@@ -66,6 +66,28 @@ export async function saveFccBounceScan(db: ProspectDb, day: string, count: numb
   await put(db, BOUNCE_SCAN_KEY, { day, count }, now);
 }
 
+const REPLY_CHECK_KEY = "fcc.replyCheck";
+const REPLY_TRY_KEY = "fcc.replyCheckTry";
+
+/** The last day the daily reply check finished, and how many new replies it reported. */
+export type FccReplyCheckNote = { day: string; at: string; found: number };
+
+export async function readFccReplyCheck(db: ProspectDb) {
+  return get<FccReplyCheckNote>(db, REPLY_CHECK_KEY);
+}
+
+export async function saveFccReplyCheck(db: ProspectDb, note: FccReplyCheckNote, now = new Date()) {
+  await put(db, REPLY_CHECK_KEY, note, now);
+}
+
+/** Claims the reply-check attempt for `slot` (a day and an hour). False when that slot was already tried. */
+export async function claimFccReplyCheckTry(db: ProspectDb, slot: string, now = new Date()) {
+  const result = await db.prepare(`INSERT INTO "KvStore" ("key","value","updatedAt") VALUES (?,?,?)
+    ON CONFLICT("key") DO UPDATE SET "value" = excluded."value", "updatedAt" = excluded."updatedAt" WHERE "KvStore"."value" <> excluded."value"`)
+    .bind(REPLY_TRY_KEY, JSON.stringify(slot), now.toISOString()).run();
+  return changes(result) === 1;
+}
+
 /** The sender's latest note, shown on the FCC screen. */
 export async function noteFccRun(db: ProspectDb, note: string, now = new Date()) {
   await put(db, RUN_KEY, { note: note.slice(0, 300), at: now.toISOString() } satisfies FccRunNote, now);
