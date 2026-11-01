@@ -11,7 +11,8 @@
  * First emails use the approved copy (FCC_COPY_VERSION); a follow-up uses the copy
  * of the person's own first email, so the 60 sent on the calmer v3 keep its follow-up.
  * The November 6 hot list (FCC_NOV6_CAMPAIGN_KEY) goes first: one first email each, no follow-up.
- * Everything else waits until the hot list has been sent or stopped.
+ * Everything else waits until the hot list has been sent or stopped, and anyone on the hot list
+ * is out of the March queue for good: no March first email and no March follow-up.
  */
 import {
   fccCopyOfMessageId, renderFccEmail, renderFccEmailNov6, renderFccEmailV4, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP,
@@ -207,12 +208,14 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   const { results: followUps } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'step1_sent' AND c."step2DueAt" <= ? AND c."step1MessageId" IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 2 AND s."status" IN ('CLAIMED','SENT'))
-    ORDER BY c."step2DueAt", c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, day).all<ContactRow>();
+      AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1)
+    ORDER BY c."step2DueAt", c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, day, FCC_NOV6_CAMPAIGN_KEY).all<ContactRow>();
   const { results: firsts } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
+      AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1)
     ORDER BY CASE c."emailKind" WHEN 'compliance' THEN 0 WHEN 'named' THEN 1 ELSE 2 END, c."createdAt", c."id" LIMIT 200`)
-    .bind(FCC_CAMPAIGN_KEY).all<ContactRow>();
+    .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY).all<ContactRow>();
   const { results: hot } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
@@ -310,16 +313,15 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   try {
     // The hot list goes first. When the cap or the gap runs out, this returns before any follow-up or first email.
     let inboxDown = false;
-    const heldThisRun = new Set<string>();
     for (const contact of hot) {
       if (remaining <= 0 || budget <= 0) return finish();
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
       // Replies to the March email are only recorded when its follow-up comes up, and the hot list goes
-      // first, so read the inbox here. If the inbox can't be read, this person waits in both queues; nobody else needs it.
+      // first, so read the inbox here. If the inbox can't be read, this person waits; nobody else needs it.
       const march = await db.prepare(`SELECT "id","status","step1SentAt","createdAt" FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "email" = ?`)
         .bind(FCC_CAMPAIGN_KEY, contact.email).first<{ id: string; status: string; step1SentAt: string | null; createdAt: string }>();
       if (march) {
-        if (inboxDown) { heldThisRun.add(contact.email); continue; }
+        if (inboxDown) continue;
         const since = march.step1SentAt ?? march.createdAt;
         const domain = domainOf(contact.email);
         const patterns = SHARED_MAIL_DOMAINS.has(domain) || shared.has(domain) ? [contact.email] : [contact.email, `@${domain}`];
@@ -331,18 +333,16 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
           bounced = !replied && await mailbox.hasBounceFor(contact.email, since);
         } catch (error) {
           inboxDown = true;
-          heldThisRun.add(contact.email);
           followUpsHeldBack = `inbox check failed: ${(error instanceof Error ? error.message : String(error)).slice(0, 200)}`;
           continue;
         }
         if (replied || bounced) {
-          // Stop their March row as well, so the same run can't send them the March email or its follow-up.
+          // Their March row shows the same reply or bounce.
           const status = replied ? "replied" : "bounced";
           const reason = replied ? "They wrote back to the March email" : "The March email bounced";
           await stop(contact, status, reason);
           if (march.status === "ready" || march.status === "step1_sent") await stop(march, status, reason);
           if (bounced) await suppressBounce(contact.email);
-          heldThisRun.add(contact.email);
           counts[status] += 1;
           continue;
         }
@@ -351,7 +351,6 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     }
     for (const contact of followUps) {
       if (remaining <= 0 || budget <= 0) break;
-      if (heldThisRun.has(contact.email)) continue;
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
       const domain = domainOf(contact.email);
       const patterns = SHARED_MAIL_DOMAINS.has(domain) || shared.has(domain) ? [contact.email] : [contact.email, `@${domain}`];
@@ -377,7 +376,6 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     }
     for (const contact of firsts) {
       if (remaining <= 0 || budget <= 0) break;
-      if (heldThisRun.has(contact.email)) continue;
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
       if (!(await send(contact, 1))) return finish();
     }

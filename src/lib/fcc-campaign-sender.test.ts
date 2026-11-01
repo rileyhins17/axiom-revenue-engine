@@ -464,6 +464,31 @@ test("when the inbox can't be read, someone on both lists gets neither email tha
   assert.ok(result.status === "RAN" && /inbox check failed/.test(result.followUpsHeldBack ?? ""));
 });
 
+test("anyone on the hot list gets the November 6 email once and nothing from the March queue, then or later", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "not-yet-emailed@one-tel.example");
+  addContact(raw, "m2", "already-emailed@two-tel.example");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1MessageId" = '<x>', "step1SentAt" = '2026-10-20T14:00:00Z', "step2DueAt" = '2026-10-23' WHERE "id" = 'm2'`).run();
+  addContact(raw, "m3", "march-only@three-tel.example");
+  addContact(raw, "m4", "generic-on-both@four-tel.example");
+  addNov6Contact(raw, "h1", "not-yet-emailed@one-tel.example");
+  addNov6Contact(raw, "h2", "already-emailed@two-tel.example");
+  addNov6Contact(raw, "h4", "generic-on-both@four-tel.example", { sendable: false });
+  recordGo(raw);
+  const t = fakeTransport();
+  const m = fakeMailbox();
+  await runFccDailySend(db, config(t.factory, m.factory), MONDAY);
+  await runFccDailySend(db, config(t.factory, m.factory), TUESDAY);
+  await runFccDailySend(db, config(t.factory, m.factory), THURSDAY);
+  const to = (email: string) => t.sent.filter((message) => message.to === email);
+  assert.equal(to("not-yet-emailed@one-tel.example").length, 1);
+  assert.match(to("not-yet-emailed@one-tel.example")[0].headers["Message-ID"], /^<fcc-nov6-/);
+  assert.equal(to("already-emailed@two-tel.example").length, 1);
+  assert.match(to("already-emailed@two-tel.example")[0].headers["Message-ID"], /^<fcc-nov6-/);
+  assert.equal(to("march-only@three-tel.example")[0].headers["Message-ID"].startsWith("<fcc-v4-"), true, "the normal queue still goes");
+  assert.equal(to("generic-on-both@four-tel.example")[0].headers["Message-ID"].startsWith("<fcc-v4-"), true, "a held hot-list row leaves March alone");
+});
+
 test("the worker's weekday 10am schedule runs only the retired website batch; the FCC tick has its own schedule", async () => {
   const source = readFileSync(new URL("../../worker.mjs", import.meta.url), "utf8")
     .replace(/^import[\s\S]*?from\s+"[^"]+";\s*/gm, "")

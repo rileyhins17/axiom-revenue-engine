@@ -45,7 +45,7 @@ Code: `src/lib/fcc-campaign-tick.ts` (the minute-by-minute schedule and safety p
 
 ## November 6 hot list (one-off)
 
-A one-time first email to the hot list (`fcc_hot_list_nov6.csv`, outside this repo), ahead of the normal queue. Copy: `renderFccEmailNov6` in `src/lib/fcc-campaign.ts` (Aidan's NOV-6-EMAIL wording). Contacts are under campaign key `fcc-nov6-hot`, one first email each, no day-3 follow-up. The hot list shares the 60-a-day ceiling, and the normal queue waits until it is empty. Nothing is sent before the go.
+A one-time first email to the hot list (`fcc_hot_list_nov6.csv`, outside this repo), ahead of the normal queue. Copy: `renderFccEmailNov6` in `src/lib/fcc-campaign.ts` (Aidan's NOV-6-EMAIL wording). Contacts are under campaign key `fcc-nov6-hot`, one first email each, no day-3 follow-up. Anyone sendable on the hot list is out of the March queue for good: no March first email and no March follow-up. The hot list shares the 60-a-day ceiling, and the normal queue waits until it is empty. Nothing is sent before the go.
 
 **Read this first.** Changing `FCC_COPY_VERSION` to `fcc-nov6-v5` locks the whole campaign, including the current March queue, until a new go names it. The go also releases the normal v4 first emails and follow-ups under that same version. Deploy the code only when you want that.
 
