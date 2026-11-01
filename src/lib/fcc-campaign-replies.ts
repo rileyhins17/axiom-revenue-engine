@@ -7,6 +7,8 @@
  * Before this, a reply was only noticed right before that person's follow-up,
  * and never after the follow-up went out.
  *
+ * - Every sending inbox is read; each remembers when it was last read, so an inbox
+ *   that couldn't be opened one day is read from where it left off the next.
  * - At most one attempt an hour until the day's check succeeds.
  * - The founders' email goes before anything is marked, so a failed email is
  *   retried next hour with the same replies, and nobody is reported twice.
@@ -26,7 +28,8 @@ import { imapDate, imapQuote, type ImapSession } from "@/lib/revenue-engine/imap
 export const FCC_REPLY_CHECK_FROM_MINUTE = 9 * 60;
 const DAY_MS = 86_400_000;
 
-export type FccInboxMessage = { folder: string; uid: number; from: string; date: string | null; automatic: boolean };
+/** One message as an inbox reports it; the check adds which inbox it came to. */
+export type FccInboxMessage = { folder: string; uid: number; from: string; date: string | null; automatic: boolean; inbox?: string };
 
 /** What the reply check needs from the sending inbox. */
 export type FccReplyInbox = {
@@ -40,16 +43,16 @@ export type FccReplyInbox = {
 export type FccOwnerMail = { subject: string; text: string; html: string };
 
 export type FccReplyCheckConfig = {
-  fromAddress: string;
   screenUrl: string;
-  inbox: (() => Promise<FccReplyInbox>) | null;
+  /** Every sending inbox that can be read, the first inbox first. */
+  inboxes: Array<{ address: string; open: () => Promise<FccReplyInbox> }>;
   /** Emails both founders. Throws when it could not. */
   tellFounders: (mail: FccOwnerMail) => Promise<void>;
 };
 
 export type FccReplyCheckResult =
   | { status: "SKIPPED"; reason: string }
-  | { status: "RAN"; since: string | null; messages: number; found: number };
+  | { status: "RAN"; since: string | null; messages: number; found: number; unreadInboxes: string[] };
 
 type ContactRow = {
   id: string; email: string; firstName: string; company: string; status: string; step1SentAt: string; stoppedReason: string | null; updatedAt: string;
@@ -61,7 +64,7 @@ const shortDay = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "
 const escapeHtml = (text: string) => text.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]!);
 
 export async function runFccReplyCheck(db: ProspectDb, config: FccReplyCheckConfig, now = new Date()): Promise<FccReplyCheckResult> {
-  if (!config.inbox || !config.fromAddress) return skip("inbox not configured");
+  if (config.inboxes.length === 0) return skip("inbox not configured");
   const minute = torontoMinute(now);
   if (minute < FCC_REPLY_CHECK_FROM_MINUTE) return skip("before 9:00");
   const day = torontoDay(now);
@@ -75,17 +78,31 @@ export async function runFccReplyCheck(db: ProspectDb, config: FccReplyCheckConf
       AND ("status" IN ('step1_sent','step2_sent','suppressed') OR ("status" = 'replied' AND "updatedAt" > ?))`)
     .bind(FCC_CAMPAIGN_KEY, last?.at ?? now.toISOString()).all<ContactRow>();
   if (contacts.length === 0) {
-    await saveFccReplyCheck(db, { day, at: now.toISOString(), found: 0 }, now);
-    return { status: "RAN", since: null, messages: 0, found: 0 };
+    await saveFccReplyCheck(db, { day, at: now.toISOString(), found: 0, inboxes: last?.inboxes }, now);
+    return { status: "RAN", since: null, messages: 0, found: 0, unreadInboxes: [] };
   }
-  // Each run reads from a day before the last run, so every message is seen by some run.
+  // Each inbox is read from a day before it was last read, so every message is seen by some run.
   const earliest = contacts.reduce((min, contact) => (contact.step1SentAt < min ? contact.step1SentAt : min), contacts[0]!.step1SentAt);
-  const overlap = last ? new Date(Date.parse(last.at) - DAY_MS).toISOString() : earliest;
-  const since = overlap > earliest ? overlap : earliest;
+  const sinceFor = (address: string) => {
+    const lastRead = last?.inboxes?.[address] ?? (address === config.inboxes[0]!.address ? last?.at : undefined);
+    const overlap = lastRead ? new Date(Date.parse(lastRead) - DAY_MS).toISOString() : earliest;
+    return overlap > earliest ? overlap : earliest;
+  };
 
-  const inbox = await config.inbox();
+  const opened = new Map<string, FccReplyInbox>();
+  const unreadInboxes: string[] = [];
+  let firstError: unknown = null;
+  for (const { address, open } of config.inboxes) {
+    try { opened.set(address, await open()); } catch (error) { unreadInboxes.push(address); firstError ??= error; }
+  }
+  if (opened.size === 0) throw firstError;
   try {
-    const messages = await inbox.messagesSince(since, [config.fromAddress]);
+    const notFrom = config.inboxes.map((inbox) => inbox.address);
+    const messages: FccInboxMessage[] = [];
+    for (const [address, inbox] of opened) {
+      messages.push(...(await inbox.messagesSince(sinceFor(address), notFrom)).map((message) => ({ ...message, inbox: address })));
+    }
+    const since = [...opened.keys()].map(sinceFor).sort()[0]!;
     const shared = await sharedCampaignDomains(db);
     const byEmail = new Map<string, ContactRow[]>();
     const byDomain = new Map<string, ContactRow[]>();
@@ -115,13 +132,14 @@ export async function runFccReplyCheck(db: ProspectDb, config: FccReplyCheckConf
     for (const contact of contacts) {
       const message = firstMessage.get(contact.id) ?? null;
       if (!message && contact.status !== "replied") continue;
-      const key = message ? `${message.folder}:${message.uid}` : `contact:${contact.id}`;
+      const key = message ? `${message.inbox}:${message.folder}:${message.uid}` : `contact:${contact.id}`;
       const reply = replies.get(key) ?? { contacts: [], message, quote: "" };
       reply.contacts.push(contact);
       replies.set(key, reply);
     }
     for (const reply of replies.values()) {
-      if (reply.message) reply.quote = await inbox.replyText(reply.message).catch(() => "");
+      const inbox = reply.message ? opened.get(reply.message.inbox ?? "") : undefined;
+      if (reply.message && inbox) reply.quote = await inbox.replyText(reply.message).catch(() => "");
     }
 
     const found = [...replies.values()];
@@ -135,10 +153,11 @@ export async function runFccReplyCheck(db: ProspectDb, config: FccReplyCheckConf
           WHERE "id" = ? AND "status" IN ('step1_sent','step2_sent')`).bind(reason, at, contact.id).run();
       }
     }
-    await saveFccReplyCheck(db, { day, at, found: found.length }, now);
-    return { status: "RAN", since, messages: messages.length, found: found.length };
+    const inboxes = { ...(last?.inboxes ?? {}), ...Object.fromEntries([...opened.keys()].map((address) => [address, at])) };
+    await saveFccReplyCheck(db, { day, at, found: found.length, inboxes }, now);
+    return { status: "RAN", since, messages: messages.length, found: found.length, unreadInboxes };
   } finally {
-    await inbox.close().catch(() => undefined);
+    for (const inbox of opened.values()) await inbox.close().catch(() => undefined);
   }
 }
 
@@ -159,19 +178,20 @@ function founderMail(replies: Reply[], config: FccReplyCheckConfig): FccOwnerMai
     const when = message?.date ? `, ${shortDay(message.date)}` : "";
     const kind = `${message?.automatic ? " (automatic reply)" : ""}${reply.contacts.every((row) => row.status === "suppressed") ? " (we had already stopped emailing them)" : ""}`;
     const quote = reply.quote || (message ? "(Open the email in Gmail to read it.)" : "(Found before a follow-up. Open Gmail to read it.)");
-    return { title: `${index + 1}. ${contact.company} (${from})${when}${kind}`, quote };
+    const where = message?.inbox ? ` · came to ${message.inbox}` : "";
+    return { title: `${index + 1}. ${contact.company} (${from})${when}${kind}${where}`, quote };
   });
   const text = [
     `The daily inbox check found ${count} to the FCC emails.`,
     "",
     ...entries.flatMap((entry) => [entry.title, `   ${entry.quote.startsWith("(") ? entry.quote : `"${entry.quote}"`}`, ""]),
-    `No more emails go to ${replies.length === 1 ? "this person" : "these people"}. Answer from ${config.fromAddress}.`,
+    `No more emails go to ${replies.length === 1 ? "this person" : "these people"}. Answer each one from the inbox it came to.`,
     `Every reply is on the FCC screen: ${config.screenUrl}`,
   ].join("\n");
   const html = [
     `<p>The daily inbox check found <strong>${count}</strong> to the FCC emails.</p>`,
     ...entries.map((entry) => `<p><strong>${escapeHtml(entry.title)}</strong><br>${escapeHtml(entry.quote)}</p>`),
-    `<p>No more emails go to ${replies.length === 1 ? "this person" : "these people"}. Answer from ${escapeHtml(config.fromAddress)}.</p>`,
+    `<p>No more emails go to ${replies.length === 1 ? "this person" : "these people"}. Answer each one from the inbox it came to.</p>`,
     `<p><a href="${escapeHtml(config.screenUrl)}">Every reply is on the FCC screen</a></p>`,
   ].join("\n");
   return { subject: `FCC: ${count}`, text, html };

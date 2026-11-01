@@ -263,6 +263,9 @@ function toHtml(plain: string) {
  * thread. A missing address renders a visible placeholder so test emails can't
  * pass for send-ready copy.
  */
+/** First name for a short sign-off ("Aidan" from "Aidan Magee"). */
+const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] || name.trim();
+
 export function renderFccEmail(
   contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">,
   step: 1 | 2,
@@ -326,6 +329,7 @@ export function renderFccEmailV4(
   contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">,
   step: 1 | 2,
   mailingAddress: string | null | undefined,
+  signer = "Aidan Magee",
 ): RenderedFccEmail {
   const address = String(mailingAddress || "").trim() || ADDRESS_PLACEHOLDER;
   const possessive = companyPossessive(companyShortName(contact.company));
@@ -340,14 +344,14 @@ export function renderFccEmailV4(
       `Is it already handled? If so, no need to reply.`,
       `If not, I can send you a short list of what looks out of date on the listing, free. If you'd like help after that, I prepare the updates and a fresh mitigation plan, and your officer files it from your own login in about 15 minutes. It's a flat $450, and we never hold your login.`,
       `Want me to send the list?`,
-      `Aidan Magee\n${footer}`,
+      `${signer}\n${footer}`,
     ].join("\n\n");
     return { subject, bodyPlain, bodyHtml: toHtml(bodyPlain) };
   }
   const bodyPlain = [
     `Hi ${contact.firstName},`,
     `Bumping this in case it got buried. ${listing} still shows no 2026 recertification. Want the free list? A one-word reply is fine.`,
-    `Aidan\n${footer}`,
+    `${firstNameOf(signer)}\n${footer}`,
   ].join("\n\n");
   return { subject: `Re: ${subject}`, bodyPlain, bodyHtml: toHtml(bodyPlain) };
 }

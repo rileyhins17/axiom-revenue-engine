@@ -10,6 +10,10 @@
  * Every email is claimed before it is sent, so a crash can never double-send.
  * First emails use the approved copy (FCC_COPY_VERSION); a follow-up uses the copy
  * of the person's own first email, so the 60 sent on the calmer v3 keep its follow-up.
+ *
+ * More than one inbox can send (Riley's was added Nov 1). Each inbox has its own
+ * daily count and gap between emails, and a follow-up always goes from the inbox
+ * that sent that person's first email, so it lands in the same thread.
  */
 import {
   fccCopyOfMessageId, renderFccEmail, renderFccEmailV4, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_FOLLOW_UP_DELAY_DAYS,
@@ -45,6 +49,10 @@ export type FccRunOptions = {
 
 export type FccSendConfig = {
   fromAddress: string;
+  /** Who signs the email. Defaults to Aidan Magee, whose inbox sent every FCC email before Nov 2. */
+  fromName?: string;
+  /** False for an added inbox. Rows of the first inbox carry no address (NULL); an added inbox's rows carry its own. */
+  primary?: boolean;
   mailingAddress: string | null | undefined;
   transport: (() => Promise<EmailTransport>) | null;
   mailbox: (() => Promise<FccMailbox>) | null;
@@ -96,6 +104,9 @@ const GOOGLE_WARNINGS: Array<[criteria: string, reason: string]> = [
 
 /** A 5xx that is about Gmail or the sender (a limit, a block, a login), not about the one recipient. */
 const SENDER_PROBLEM = /\b5\.4\.5\b|\b5\.7\.\d+|limit|quota|blocked|spam|policy|auth|password|log ?in/i;
+
+/** The inbox a row belongs to: "" for the first inbox, otherwise the added inbox's address. Compare with COALESCE("senderAddress",''). */
+export const senderKey = (config: Pick<FccSendConfig, "fromAddress" | "primary">) => (config.primary === false ? config.fromAddress : "");
 
 export const torontoDay = (now: Date) => now.toLocaleDateString("en-CA", { timeZone: "America/Toronto" });
 export const torontoWeekday = (now: Date) => new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "America/Toronto" }).format(now);
@@ -155,9 +166,11 @@ export async function fccSetting(db: ProspectDb) {
     .first<{ enabled: number; dailyCap: number; approvedCopy: string | null; goBy: string | null }>();
 }
 
-export async function fccSentToday(db: ProspectDb, day: string) {
-  return Number((await db.prepare(`SELECT COUNT(*) AS n FROM "FccCampaignSend" WHERE "sendDay" = ? AND "status" IN ('CLAIMED','SENT')`)
-    .bind(day).first<{ n: number }>())?.n ?? 0);
+/** Emails claimed or sent on `day`: all inboxes, or only `sender`'s. */
+export async function fccSentToday(db: ProspectDb, day: string, sender?: Pick<FccSendConfig, "fromAddress" | "primary">) {
+  const mine = sender ? ` AND COALESCE("senderAddress",'') = ?` : "";
+  return Number((await db.prepare(`SELECT COUNT(*) AS n FROM "FccCampaignSend" WHERE "sendDay" = ? AND "status" IN ('CLAIMED','SENT')${mine}`)
+    .bind(...(sender ? [day, senderKey(sender)] : [day])).first<{ n: number }>())?.n ?? 0);
 }
 
 /** Domains used by more than one company in the campaign (e.g. a shared co-op host). */
@@ -197,15 +210,17 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
 
   const day = torontoDay(now);
   const cap = options.cap ?? Math.min(FCC_DAILY_SEND_CAP, Math.max(0, setting.dailyCap));
-  let remaining = cap - await fccSentToday(db, day);
+  let remaining = cap - await fccSentToday(db, day, config);
+  const inbox = senderKey(config);
   if (remaining <= 0) return { status: "SKIPPED", reason: "daily cap reached" };
   let budget = options.limit ?? Number.POSITIVE_INFINITY;
 
   const columns = `c."id", c."email", c."firstName", c."company", c."filingsJson", c."step1SentAt", c."step1MessageId"`;
   const { results: followUps } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'step1_sent' AND c."step2DueAt" <= ? AND c."step1MessageId" IS NOT NULL
+      AND COALESCE(c."senderAddress",'') = ?
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 2 AND s."status" IN ('CLAIMED','SENT'))
-    ORDER BY c."step2DueAt", c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, day).all<ContactRow>();
+    ORDER BY c."step2DueAt", c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, day, inbox).all<ContactRow>();
   const { results: firsts } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
@@ -237,11 +252,11 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     // One statement, so two runs at once can never both pass the day's cap or the gap between emails.
     const claimedAt = now.toISOString();
     const gapSince = options.minGapMs ? new Date(now.getTime() - options.minGapMs).toISOString() : "9999-12-31";
-    const claim = await db.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","createdAt")
-      SELECT ?,?,?,?,?,?,'CLAIMED',?
-      WHERE (SELECT COUNT(*) FROM "FccCampaignSend" WHERE "sendDay" = ? AND "status" IN ('CLAIMED','SENT')) < ?
-        AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" WHERE "sendDay" = ? AND "createdAt" > ?)
-      ON CONFLICT DO NOTHING`).bind(sendId, contact.id, step, contact.email, day, messageId, claimedAt, day, cap, day, gapSince).run();
+    const claim = await db.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","createdAt","senderAddress")
+      SELECT ?,?,?,?,?,?,'CLAIMED',?,NULLIF(?,'')
+      WHERE (SELECT COUNT(*) FROM "FccCampaignSend" WHERE "sendDay" = ? AND "status" IN ('CLAIMED','SENT') AND COALESCE("senderAddress",'') = ?) < ?
+        AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" WHERE "sendDay" = ? AND "createdAt" > ? AND COALESCE("senderAddress",'') = ?)
+      ON CONFLICT DO NOTHING`).bind(sendId, contact.id, step, contact.email, day, messageId, claimedAt, inbox, day, inbox, cap, day, gapSince, inbox).run();
     if (changes(claim) !== 1) {
       const taken = await db.prepare(`SELECT 1 AS hit FROM "FccCampaignSend" WHERE "contactId" = ? AND "step" = ? AND "status" <> 'FAILED'`)
         .bind(contact.id, step).first<{ hit: number }>();
@@ -251,8 +266,9 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     budget -= 1;
     let filings: FccCampaignContact["filings"] = [];
     try { filings = JSON.parse(contact.filingsJson) as FccCampaignContact["filings"]; } catch { filings = []; }
-    const render = copy === "v4" ? renderFccEmailV4 : renderFccEmail;
-    const email = render({ firstName: contact.firstName, company: contact.company, filings: filings.length ? filings : [{} as never] }, step, address);
+    const recipient = { firstName: contact.firstName, company: contact.company, filings: filings.length ? filings : [{} as never] };
+    // v3 is Aidan's own wording ("I'm Aidan Magee from Axiom"); only v4 is signed by whichever inbox sends it.
+    const email = copy === "v4" ? renderFccEmailV4(recipient, step, address, config.fromName) : renderFccEmail(recipient, step, address);
     const thread: Record<string, string> = step === 2 && contact.step1MessageId
       ? { "In-Reply-To": contact.step1MessageId, References: contact.step1MessageId }
       : {};
@@ -264,8 +280,8 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       const sentAt = new Date().toISOString();
       await db.prepare(`UPDATE "FccCampaignSend" SET "status"='SENT', "finishedAt"=? WHERE "sendId"=?`).bind(sentAt, sendId).run();
       if (step === 1) {
-        await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step1_sent', "step1SentAt"=?, "step1MessageId"=?, "step2DueAt"=?, "updatedAt"=? WHERE "id"=?`)
-          .bind(sentAt, messageId, addDays(day, FCC_FOLLOW_UP_DELAY_DAYS), sentAt, contact.id).run();
+        await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step1_sent', "step1SentAt"=?, "step1MessageId"=?, "step2DueAt"=?, "updatedAt"=?, "senderAddress"=NULLIF(?,'') WHERE "id"=?`)
+          .bind(sentAt, messageId, addDays(day, FCC_FOLLOW_UP_DELAY_DAYS), sentAt, inbox, contact.id).run();
         counts.firstEmails += 1;
       } else {
         await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step2_sent', "step2SentAt"=?, "updatedAt"=? WHERE "id"=?`)

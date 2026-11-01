@@ -37,6 +37,8 @@
     "ENGINE_SMTP_HOST": "smtp.zoho.com",
     "FCC_SENDER_ADDRESS": "aidanmageebusiness@gmail.com",
     "FCC_SENDER_NAME": "Aidan Magee",
+    "FCC_SENDER2_ADDRESS": "rileyhinspergerbusiness@gmail.com",
+    "FCC_SENDER2_NAME": "Riley Hinsperger",
     "FCC_SMTP_HOST": "smtp.gmail.com",
     "FCC_IMAP_HOST": "imap.gmail.com",
     "AI_MONTHLY_BUDGET_USD": "5",

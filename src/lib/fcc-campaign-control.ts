@@ -57,20 +57,20 @@ export async function resumeFcc(db: ProspectDb, by: string, now = new Date()): P
 
 const BOUNCE_SCAN_KEY = "fcc.bounceScan";
 
-/** How many bounce messages the sender had already matched to contacts on `day`. */
-export async function readFccBounceScan(db: ProspectDb) {
-  return get<{ day: string; count: number }>(db, BOUNCE_SCAN_KEY);
+/** How many bounce messages the sender had already matched to contacts on `day`, per inbox ("" is the first inbox). */
+export async function readFccBounceScan(db: ProspectDb, inbox = "") {
+  return get<{ day: string; count: number }>(db, inbox ? `${BOUNCE_SCAN_KEY}:${inbox}` : BOUNCE_SCAN_KEY);
 }
 
-export async function saveFccBounceScan(db: ProspectDb, day: string, count: number, now = new Date()) {
-  await put(db, BOUNCE_SCAN_KEY, { day, count }, now);
+export async function saveFccBounceScan(db: ProspectDb, day: string, count: number, now = new Date(), inbox = "") {
+  await put(db, inbox ? `${BOUNCE_SCAN_KEY}:${inbox}` : BOUNCE_SCAN_KEY, { day, count }, now);
 }
 
 const REPLY_CHECK_KEY = "fcc.replyCheck";
 const REPLY_TRY_KEY = "fcc.replyCheckTry";
 
-/** The last day the daily reply check finished, and how many new replies it reported. */
-export type FccReplyCheckNote = { day: string; at: string; found: number };
+/** The last day the daily reply check finished, how many new replies it reported, and when each inbox was last read. */
+export type FccReplyCheckNote = { day: string; at: string; found: number; inboxes?: Record<string, string> };
 
 export async function readFccReplyCheck(db: ProspectDb) {
   return get<FccReplyCheckNote>(db, REPLY_CHECK_KEY);

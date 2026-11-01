@@ -44,22 +44,25 @@ function addContact(raw: Database.Database, id: string, email: string, company: 
 const contact = (raw: Database.Database, id: string) =>
   raw.prepare(`SELECT "status","stoppedReason" FROM "FccCampaignContact" WHERE "id" = ?`).get(id) as { status: string; stoppedReason: string | null };
 
+function fakeInbox(messages: FccInboxMessage[], quotes: Record<number, string>, onOpen: () => void, error?: Error) {
+  return async () => {
+    if (error) throw error;
+    onOpen();
+    return {
+      async messagesSince(sinceIso: string) { return messages.filter((message) => !message.date || message.date.slice(0, 10) >= new Date(Date.parse(sinceIso) - DAY).toISOString().slice(0, 10)); },
+      async replyText(message: FccInboxMessage) { return quotes[message.uid] ?? ""; },
+      async close() {},
+    };
+  };
+}
+
 function harness(inboxMessages: FccInboxMessage[], quotes: Record<number, string> = {}, options: { failMail?: number; inboxError?: Error } = {}) {
   const mails: FccOwnerMail[] = [];
   let failures = options.failMail ?? 0;
   let logins = 0;
   const config: FccReplyCheckConfig = {
-    fromAddress: "aidan@gmail.example",
     screenUrl: "https://ops.example/fcc",
-    inbox: async () => {
-      if (options.inboxError) throw options.inboxError;
-      logins += 1;
-      return {
-        async messagesSince(sinceIso) { return inboxMessages.filter((message) => !message.date || message.date.slice(0, 10) >= new Date(Date.parse(sinceIso) - DAY).toISOString().slice(0, 10)); },
-        async replyText(message) { return quotes[message.uid] ?? ""; },
-        async close() {},
-      };
-    },
+    inboxes: [{ address: "aidan@gmail.example", open: fakeInbox(inboxMessages, quotes, () => { logins += 1; }, options.inboxError) }],
     async tellFounders(mail) {
       if (failures > 0) { failures -= 1; throw new Error("mail down"); }
       mails.push(mail);
@@ -77,14 +80,14 @@ test("a reply stops that person's emails and both founders hear about it once, w
   const h = harness([message(7, "jane@talktone.example", "2026-10-30T15:00:00.000Z")], { 7: "Yes, please call me at 555-0100." });
 
   const first = await runFccReplyCheck(db, h.config, new Date(MON_9AM));
-  assert.deepEqual(first, { status: "RAN", since: SENT_WED, messages: 1, found: 1 });
+  assert.deepEqual(first, { status: "RAN", since: SENT_WED, messages: 1, found: 1, unreadInboxes: [] });
   assert.equal(contact(raw, "c1").status, "replied");
   assert.match(contact(raw, "c1").stoppedReason!, /^They wrote back Oct 30, so no more emails: "Yes, please call me at 555-0100\."$/);
   assert.equal(contact(raw, "c2").status, "step1_sent");
   assert.equal(h.mails.length, 1);
   assert.equal(h.mails[0]!.subject, "FCC: 1 new reply");
-  assert.match(h.mails[0]!.text, /1\. Talktone \(jane@talktone\.example\), Oct 30\n {3}"Yes, please call me at 555-0100\."/);
-  assert.match(h.mails[0]!.text, /Answer from aidan@gmail\.example/);
+  assert.match(h.mails[0]!.text, /1\. Talktone \(jane@talktone\.example\), Oct 30 · came to aidan@gmail\.example\n {3}"Yes, please call me at 555-0100\."/);
+  assert.match(h.mails[0]!.text, /Answer each one from the inbox it came to/);
 
   assert.deepEqual(await runFccReplyCheck(db, h.config, new Date(MON_9AM + 15 * 60_000)), { status: "SKIPPED", reason: "already checked today" });
   const nextDay = await runFccReplyCheck(db, h.config, new Date(MON_9AM + DAY));
@@ -170,7 +173,7 @@ test("new mail from someone a founder stopped is reported, without changing why 
   ], { 2: "We already filed in January." });
   const result = await runFccReplyCheck(db, h.config, new Date(MON_9AM));
   assert.equal(result.status === "RAN" && result.found, 1, "the reply from before they were stopped is old news");
-  assert.match(h.mails[0]!.text, /Stopped Later \(later@stopped\.example\), Oct 30 \(we had already stopped emailing them\)\n {3}"We already filed in January\."/);
+  assert.match(h.mails[0]!.text, /Stopped Later \(later@stopped\.example\), Oct 30 \(we had already stopped emailing them\).*\n {3}"We already filed in January\."/);
   assert.equal(contact(raw, "c2").status, "suppressed");
   assert.equal(contact(raw, "c2").stoppedReason, "Do not contact (Aidan)");
   const nextDay = await runFccReplyCheck(db, h.config, new Date(MON_9AM + DAY));
@@ -181,11 +184,40 @@ test("no inbox, no check; an inbox that won't open is tried again next hour", as
   const { raw, db } = database();
   addContact(raw, "c1", "jane@talktone.example", "Talktone");
   const off = harness([]);
-  assert.deepEqual(await runFccReplyCheck(db, { ...off.config, inbox: null }, new Date(MON_9AM)), { status: "SKIPPED", reason: "inbox not configured" });
+  assert.deepEqual(await runFccReplyCheck(db, { ...off.config, inboxes: [] }, new Date(MON_9AM)), { status: "SKIPPED", reason: "inbox not configured" });
   const broken = harness([], {}, { inboxError: new Error("IMAP NO login refused") });
   await assert.rejects(runFccReplyCheck(db, broken.config, new Date(MON_9AM)), /login refused/);
   const fixed = harness([]);
   assert.equal((await runFccReplyCheck(db, fixed.config, new Date(MON_9AM + HOUR))).status, "RAN");
+});
+
+test("both inboxes are read; one that won't open is read from where it left off the next day", async () => {
+  const { raw, db } = database();
+  addContact(raw, "c1", "jane@talktone.example", "Talktone");
+  addContact(raw, "c2", "max@acme.example", "Acme Wireless");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "senderAddress" = 'riley@gmail.example' WHERE "id" = 'c2'`).run();
+  const mails: FccOwnerMail[] = [];
+  let rileyDown = true;
+  const rileyMessages = [message(4, "max@acme.example", "2026-11-01T18:00:00.000Z")];
+  const config: FccReplyCheckConfig = {
+    screenUrl: "https://ops.example/fcc",
+    inboxes: [
+      { address: "aidan@gmail.example", open: fakeInbox([message(3, "jane@talktone.example", "2026-10-30T15:00:00.000Z")], { 3: "Call me." }, () => {}) },
+      { address: "riley@gmail.example", open: async () => { if (rileyDown) throw new Error("IMAP NO login refused"); return fakeInbox(rileyMessages, { 4: "How much?" }, () => {})(); } },
+    ],
+    async tellFounders(mail) { mails.push(mail); },
+  };
+  const monday = await runFccReplyCheck(db, config, new Date(MON_9AM));
+  assert.equal(monday.status === "RAN" && monday.found, 1);
+  assert.deepEqual(monday.status === "RAN" && monday.unreadInboxes, ["riley@gmail.example"]);
+  assert.match(mails[0]!.text, /Talktone .* came to aidan@gmail\.example/);
+  assert.equal(contact(raw, "c2").status, "step1_sent");
+
+  rileyDown = false;
+  const tuesday = await runFccReplyCheck(db, config, new Date(MON_9AM + DAY));
+  assert.equal(tuesday.status === "RAN" && tuesday.found, 1, "Sunday's reply in Riley's inbox is still found on Tuesday");
+  assert.match(mails[1]!.text, /Acme Wireless \(max@acme\.example\), Nov 1 · came to riley@gmail\.example\n {3}"How much\?"/);
+  assert.equal(contact(raw, "c2").status, "replied");
 });
 
 test("the quote is what they wrote, not our email under it", () => {
