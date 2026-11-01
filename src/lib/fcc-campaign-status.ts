@@ -116,8 +116,9 @@ export async function fccScreen(db: ProspectDb, now = new Date()): Promise<FccSc
     loadedAt: row.createdAt, total: Number(row.total), ready: Number(row.ready), held: Number(row.held), emailed: Number(row.emailed), stopped: Number(row.stopped),
   }));
   if (hotList?.createdAt) {
+    // After its last day the hot list sends nothing more: its leftovers stay in the total, but aren't ready here.
     batches.unshift({
-      name: "November 6 list", loadedAt: hotList.createdAt, total: Number(hotList.total), ready: Number(hotList.ready), held: Number(hotList.held),
+      name: "November 6 list", loadedAt: hotList.createdAt, total: Number(hotList.total), ready: day <= FCC_NOV6_LAST_SEND_DAY ? Number(hotList.ready) : 0, held: Number(hotList.held),
       emailed: Number(hotList.emailed), stopped: Number(hotList.stopped),
     });
   }

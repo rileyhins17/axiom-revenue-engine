@@ -62,6 +62,23 @@ test("the FCC screen shows the November 6 list as one batch and leaves its peopl
   assert.deepEqual(screen.replies.map((person) => person.email), ["said-no@e.example"], "one row per address");
 });
 
+test("after its last day the November 6 list shows nothing ready, and someone on both lists counts once, on March", async () => {
+  const { raw, db } = database();
+  add(raw, FCC_CAMPAIGN_KEY, "on-both@b.example", "ready", "2026-10-26T23:24:30.000Z");
+  add(raw, FCC_NOV6_CAMPAIGN_KEY, "on-both@b.example", "ready", "2026-11-01T20:00:00.000Z");
+  add(raw, FCC_NOV6_CAMPAIGN_KEY, "hot-only@c.example", "ready", "2026-11-01T20:00:00.001Z");
+
+  const lastDay = await fccScreen(db, new Date("2026-11-05T15:00:00Z"));
+  assert.equal(lastDay.batches[0].ready, 2);
+  assert.equal(lastDay.ready, 2);
+
+  const closed = await fccScreen(db, new Date("2026-11-06T15:00:00Z"));
+  assert.equal(closed.batches[0].ready, 0);
+  assert.equal(closed.batches[0].total, 2, "the list's own total stays");
+  assert.equal(closed.batches[1].ready, 1);
+  assert.equal(closed.ready, 1, "hot-only@c.example has nothing left to send");
+});
+
 test("before the list is loaded, the FCC screen shows only the March batches", async () => {
   const { raw, db } = database();
   add(raw, FCC_CAMPAIGN_KEY, "march-only@a.example", "ready", "2026-10-26T23:24:30.000Z");

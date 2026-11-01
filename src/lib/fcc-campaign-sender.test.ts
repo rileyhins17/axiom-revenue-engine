@@ -78,11 +78,13 @@ function fakeTransport(fail?: (message: OutgoingEmail) => Error | null) {
 
 function fakeMailbox(state: { from?: string[]; bounced?: string[]; broken?: boolean } = {}) {
   const searches: string[][] = [];
+  const searchedSince: string[] = [];
   const factory = async (): Promise<FccMailbox> => {
     if (state.broken) throw new Error("IMAP NO [AUTHENTICATIONFAILED] Invalid credentials");
     return {
-      async hasMessagesFrom(patterns) {
+      async hasMessagesFrom(patterns, since) {
         searches.push(patterns);
+        searchedSince.push(since);
         return patterns.some((pattern) => (state.from ?? []).some((sender) => pattern.startsWith("@") ? sender.endsWith(pattern) : sender === pattern));
       },
       async hasBounceFor(email) { return (state.bounced ?? []).includes(email); },
@@ -92,7 +94,7 @@ function fakeMailbox(state: { from?: string[]; bounced?: string[]; broken?: bool
       async close() {},
     };
   };
-  return { searches, factory };
+  return { searches, searchedSince, factory };
 }
 
 let ids = 0;
@@ -539,6 +541,67 @@ test("when the inbox can't be read, someone on both lists gets neither email tha
   assert.deepEqual(t.sent.map((message) => message.to), ["march-only@three-tel.example"]);
   for (const id of ["h1", "h2", "m1", "m2"]) assert.equal(statusOf(raw, id), "ready");
   assert.ok(result.status === "RAN" && /inbox check failed/.test(result.followUpsHeldBack ?? ""));
+});
+
+test("a reply at another mailbox that isn't recorded yet stops the hot-list email, and an unreadable inbox holds it", async () => {
+  const opened = (raw: Database.Database, id: string) =>
+    raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1MessageId" = '<x>', "step1SentAt" = '2026-10-20T14:00:00Z', "step2DueAt" = '2026-12-01' WHERE "id" = ?`).run(id);
+  const load = () => {
+    const { raw, db } = database();
+    addContact(raw, "m1", "alice@back-tel.example");
+    addContact(raw, "m2", "alex@quiet-tel.example");
+    addContact(raw, "m3", "friend@gmail.com");
+    for (const id of ["m1", "m2", "m3"]) opened(raw, id);
+    addNov6Contact(raw, "h1", "bob@back-tel.example");
+    addNov6Contact(raw, "h2", "pat@quiet-tel.example");
+    addNov6Contact(raw, "h3", "someone@gmail.com");
+    addNov6Contact(raw, "h4", "new@new-tel.example");
+    recordGo(raw);
+    return { raw, db };
+  };
+
+  const first = load();
+  const t1 = fakeTransport();
+  const m1 = fakeMailbox({ from: ["alice@back-tel.example", "friend@gmail.com"] });
+  const result = await runFccDailySend(first.db, config(t1.factory, m1.factory), MONDAY);
+  assert.deepEqual(t1.sent.map((message) => message.to), ["pat@quiet-tel.example", "someone@gmail.com", "new@new-tel.example"], "a shared mail service says nothing about a company");
+  assert.equal(statusOf(first.raw, "h1"), "replied");
+  assert.equal(statusOf(first.raw, "m1"), "step1_sent", "her own row is recorded when her follow-up comes up");
+  assert.ok(result.status === "RAN" && result.replied === 1);
+  assert.deepEqual(m1.searches[0], ["bob@back-tel.example", "@back-tel.example"]);
+  assert.equal(m1.searchedSince[0], "2026-10-20T14:00:00Z");
+
+  const second = load();
+  const t2 = fakeTransport();
+  const held = await runFccDailySend(second.db, config(t2.factory, fakeMailbox({ broken: true }).factory), MONDAY);
+  assert.deepEqual(t2.sent.map((message) => message.to), ["someone@gmail.com", "new@new-tel.example"]);
+  assert.deepEqual(["h1", "h2"].map((id) => statusOf(second.raw, id)), ["ready", "ready"]);
+  assert.ok(held.status === "RAN" && /inbox check failed/.test(held.followUpsHeldBack ?? ""));
+});
+
+test("the inbox check goes back to the company's earliest email, even when this address has its own later March row", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "alice@back-tel.example", { company: "Back Telephone" });
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1MessageId" = '<x>', "step1SentAt" = '2026-10-20T14:00:00Z', "step2DueAt" = '2026-12-01' WHERE "id" = 'm1'`).run();
+  addContact(raw, "m2", "bob@back-tel.example", { company: "Back Telephone" });
+  addNov6Contact(raw, "h1", "bob@back-tel.example");
+  recordGo(raw);
+  const m = fakeMailbox();
+  await runFccDailySend(db, config(fakeTransport().factory, m.factory), MONDAY);
+  assert.equal(m.searchedSince[0], "2026-10-20T14:00:00Z");
+});
+
+test("a reply to the hot-list email itself stops it for that company's other mailboxes", async () => {
+  const { raw, db } = database();
+  addNov6Contact(raw, "h1", "bob@tel.example");
+  addNov6Contact(raw, "h2", "carol@tel.example");
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), MONDAY, { limit: 1 });
+  assert.deepEqual(t.sent.map((message) => message.to), ["bob@tel.example"]);
+  await runFccDailySend(db, config(t.factory, fakeMailbox({ from: ["bob@tel.example"] }).factory), TUESDAY);
+  assert.equal(t.sent.length, 1, "carol gets nothing");
+  assert.equal(statusOf(raw, "h2"), "replied");
 });
 
 test("anyone on the hot list gets the November 6 email once and nothing from the March queue, then or later", async () => {

@@ -16,6 +16,7 @@
  * A hold or stop on someone's March row also stops their hot-list email, and a reply, stop or
  * non-generic hold anywhere at a company stops it for that company's other mailboxes. The exception is
  * "Signed a 2026 RMD declaration": that stop is about the March wording, and the hot-list line is written for them.
+ * Before each hot-list email it also reads the inbox for that address and for anyone already emailed at the company.
  * After FCC_NOV6_LAST_SEND_DAY the hot list closes and anyone it never reached rejoins the March queue.
  */
 import {
@@ -326,28 +327,31 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
       // Someone else at this company replied, said stop, or was held for a reason about the company.
       const companyDomain = domainOf(contact.email);
-      if (!SHARED_MAIL_DOMAINS.has(companyDomain) && !shared.has(companyDomain)) {
+      const ownDomain = !SHARED_MAIL_DOMAINS.has(companyDomain) && !shared.has(companyDomain);
+      if (ownDomain) {
         const stoppedAtCompany = await db.prepare(`SELECT 1 AS hit FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "email" LIKE ?
           AND ("status" IN ('replied','suppressed') OR ("status" = 'held' AND COALESCE("holdReason",'') NOT LIKE '%eneric inbox%'))
           AND COALESCE("holdReason",'') || COALESCE("stoppedReason",'') NOT LIKE '%Signed a 2026 RMD declaration%' LIMIT 1`)
           .bind(FCC_CAMPAIGN_KEY, `%@${companyDomain}`).first<{ hit: number }>();
         if (stoppedAtCompany) { await stop(contact, "suppressed", "Someone else at this company replied, said stop or is on hold"); counts.suppressed += 1; continue; }
       }
-      // Replies to the March email are only recorded when its follow-up comes up, and the hot list goes
-      // first, so read the inbox here. If the inbox can't be read, this person waits; nobody else needs it.
+      // Replies to the March email are only recorded when its follow-up comes up, and the hot list goes first
+      // and has no follow-up, so read the inbox here: for this address, and for anyone already emailed at the
+      // company on either list. If the inbox can't be read, this person waits; nobody else needs it.
       const march = await db.prepare(`SELECT "id","status","step1SentAt","createdAt" FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "email" = ?`)
         .bind(FCC_CAMPAIGN_KEY, contact.email).first<{ id: string; status: string; step1SentAt: string | null; createdAt: string }>();
-      if (march) {
+      const emailedAtCompany = ownDomain ? await db.prepare(`SELECT MIN("step1SentAt") AS since FROM "FccCampaignContact" WHERE "campaignKey" IN (?, ?) AND "email" LIKE ?`)
+        .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, `%@${companyDomain}`).first<{ since: string | null }>() : null;
+      const since = [march && (march.step1SentAt ?? march.createdAt), emailedAtCompany?.since].filter(Boolean).sort()[0];
+      if (since) {
         if (inboxDown) continue;
-        const since = march.step1SentAt ?? march.createdAt;
-        const domain = domainOf(contact.email);
-        const patterns = SHARED_MAIL_DOMAINS.has(domain) || shared.has(domain) ? [contact.email] : [contact.email, `@${domain}`];
+        const patterns = ownDomain ? [contact.email, `@${companyDomain}`] : [contact.email];
         let replied = false;
         let bounced = false;
         try {
           mailbox ??= await config.mailbox!();
           replied = await mailbox.hasMessagesFrom(patterns, since);
-          bounced = !replied && await mailbox.hasBounceFor(contact.email, since);
+          bounced = !replied && Boolean(march) && await mailbox.hasBounceFor(contact.email, since);
         } catch (error) {
           inboxDown = true;
           followUpsHeldBack = `inbox check failed: ${(error instanceof Error ? error.message : String(error)).slice(0, 200)}`;
@@ -356,9 +360,9 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
         if (replied || bounced) {
           // Their March row shows the same reply or bounce.
           const status = replied ? "replied" : "bounced";
-          const reason = replied ? "They wrote back to the March email" : "The March email bounced";
+          const reason = !replied ? "The March email bounced" : march ? "They wrote back to the March email" : "Someone else at this company wrote back";
           await stop(contact, status, reason);
-          if (march.status === "ready" || march.status === "step1_sent") await stop(march, status, reason);
+          if (march && (march.status === "ready" || march.status === "step1_sent")) await stop(march, status, reason);
           if (bounced) await suppressBounce(contact.email);
           counts[status] += 1;
           continue;
