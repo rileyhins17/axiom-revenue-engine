@@ -42,7 +42,7 @@ const [FIRST, SECOND] = FCC_SEND_WINDOWS;
  * send counts: it may have gone out before a crash). Binds the hot-list key, then today.
  */
 const ON_HOT_LIST = `EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1 AND (h."status" <> 'ready' OR ? <= '${FCC_NOV6_LAST_SEND_DAY}'
-  OR EXISTS (SELECT 1 FROM "FccCampaignSend" hs WHERE hs."contactId" = h."id" AND hs."step" = 1 AND hs."status" IN ('CLAIMED','SENT'))))`;
+  OR EXISTS (SELECT 1 FROM "FccCampaignSend" hs WHERE hs."contactId" = h."id" AND hs."step" = 1 AND hs."status" <> 'FAILED')))`;
 const toronto = (now: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", ...options }).format(now);
 
 /** The next weekday after today, as "Thursday, October 29". */
@@ -102,7 +102,7 @@ export async function fccScreen(db: ProspectDb, now = new Date()): Promise<FccSc
         SELECT ${FCC_DAY7_DUE_SQL} AS due FROM "FccCampaignContact" c
         ${FCC_DAY7_JOIN_SQL}
         WHERE c."campaignKey" = ? AND c."status" = 'step2_sent'
-          AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 3 AND s."status" IN ('CLAIMED','SENT'))
+          AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 3 AND s."status" <> 'FAILED')
           AND NOT ${ON_HOT_LIST})`)
       .bind(day, day, day, FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, day).first<{ due: number | null; later: number | null; nextDay: string | null }>(),
     // One row per address: a reply or bounce on someone on both lists stops both of their rows.
