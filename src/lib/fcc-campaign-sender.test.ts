@@ -744,14 +744,14 @@ test("the day-7 follow-up skips anyone who replied, bounced or is on the do-not-
   company("hot-replied-co-2", "boss@hotreply-tel.example", { status: "replied", key: FCC_NOV6_CAMPAIGN_KEY });
   emailed("generic-co", "pat@generic-tel.example");
   company("generic-co-2", "support@generic-tel.example", { status: "held", holdReason: "Generic inbox (support@/noc@/info@ style). Check before sending." });
-  emailed("gmail", "owner@gmail.com");
+  emailed("gmail", "owner123@gmail.com");
   addContact(raw, "gmail-2", "someone.else@gmail.com");
   raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'replied' WHERE "id" = 'gmail-2'`).run();
   recordGo(raw);
   const t = fakeTransport();
   const m = fakeMailbox({ from: ["wrote@wrote-tel.example", "boss@colleague-tel.example"], bounced: ["bounce@bounce-tel.example"] });
   const result = await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-11-09T15:00:00Z"));
-  assert.deepEqual(t.sent.map((message) => message.to).sort(), ["owner@gmail.com", "ok@ok-tel.example", "pat@generic-tel.example"].sort(),
+  assert.deepEqual(t.sent.map((message) => message.to).sort(), ["owner123@gmail.com", "ok@ok-tel.example", "pat@generic-tel.example"].sort(),
     "a generic-inbox hold or a shared mail service says nothing about the company");
   assert.ok(result.status === "RAN" && result.day7FollowUps === 3 && result.replied === 2 && result.bounced === 1 && result.suppressed === 5);
   assert.deepEqual(["wrote", "colleague-wrote", "bounce", "dnc", "stopped-co", "held-co", "bounced-co", "hot-replied-co"].map((id) => statusOf(raw, id)),
