@@ -1,3 +1,13 @@
+## 2026-11-02 (Mon): both inboxes climb to equal volume, and Riley's helps finish the Nov 6 list (on `day7-release`, not released)
+
+- **Why:** Aidan, Nov 2: most volume without causing issues, equal from both inboxes. Monday sent 38 by 11:15 (Aidan 30, Riley 8) because 2 bounces stopped Aidan's second batch. At that pace the Nov 6 list can't finish by Thu: 202 left (166 plus the 36 extras) against 180 at a perfect 60 a day.
+- **Volume:** an added inbox now sends 15, 30, 45, then the full 60, counted in days it actually sent, so a paused day doesn't move it up. This replaces 15 for a week, 30 for a week. Riley's: Mon 15, Tue 30, Wed 45, Thu 60. The ramp suits an old, already-used Gmail only; a new domain needs weeks.
+- **Nov 6 list:** Riley's inbox can now send it, signed by Riley, but only people at companies no other inbox has emailed. Its inbox check reads only its own mail, so a reply to Aidan's inbox would be invisible to it. It also leaves anyone held for a reason other than a signed 2026 declaration, and their company, because a held row can mean a hand-sent email the engine never recorded. Aidan's inbox still sends all of those. Matching ignores capitals: the list has 13 mixed-case addresses. This also keeps Riley's extra volume off the flag-off March list until the Nov 6 decision on it.
+- **Not changed, on purpose:** the second batch still needs 1 bounce or fewer and 3 still pause. Gmail's own help lists many undeliverable emails as a cause of being blocked from sending, so the fix for bounces is a clean list, not a looser rule. 60 a day per inbox and the Nov 9 check for 80 are unchanged.
+- **Dry run** (test, from the end of Nov 2, no replies, bounces or stops): Nov 6 list Tue 60 + 30, Wed 60 + 45, Thu 7, all 202 reached once. Aidan's day-3 follow-ups Thu 53, Fri 60, Mon 20; day-7 from Mon Nov 9. Riley's day-3 Thu 15, day-7 from Tue Nov 10. Totals 90, 105, 120, 120.
+- **Depends on:** the list check before Tue 10:00. With 2 of 29 bouncing on the Nov 6 list, a morning of 30 loses its second batch more often than not, whatever this code does.
+- **Needs:** Riley's yes (it's his inbox and he answers its replies), then this goes out with the day-7 release. No copy, migration or `FCC_COPY_VERSION` change beyond that release's own.
+
 ## 2026-11-01 (Sun, night): FCC day-7 follow-up, two-subject test and stats fix ready to release (PR #16, on `bef84cb`)
 
 - **Why:** Aidan approved the day-7 text Oct 29; on Nov 1 he kept "I'll close this out after this one" and chose no day-14 email. The subject test and the Nov 1 stats gap ship with it.

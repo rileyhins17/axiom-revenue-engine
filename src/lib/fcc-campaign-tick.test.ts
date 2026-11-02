@@ -7,7 +7,7 @@ import Database from "better-sqlite3";
 import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION } from "@/lib/fcc-campaign";
 import { pauseFcc, readFccNotes, resumeFcc } from "@/lib/fcc-campaign-control";
 import type { FccMailbox, FccSendConfig } from "@/lib/fcc-campaign-sender";
-import { FCC_GAP_MAX_MS, FCC_GAP_MIN_MS, fccDailyMax, gapAfter, runFccSendTick, torontoMinute, type FccTickResult } from "@/lib/fcc-campaign-tick";
+import { FCC_GAP_MAX_MS, FCC_GAP_MIN_MS, FCC_PAUSE_BOUNCES, FCC_SECOND_BATCH_MAX_BOUNCES, fccDailyMax, gapAfter, runFccSendTick, torontoMinute, type FccTickResult } from "@/lib/fcc-campaign-tick";
 import { PermanentEmailError, type OutgoingEmail } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { applyEngineSchema } from "@/lib/revenue-engine/test-support/engine-schema";
@@ -250,27 +250,46 @@ test("a second inbox starts at 15 a day beside the first inbox's 60, nobody gets
   // Monday Nov 2 (10:00 Toronto is 15:00 UTC in winter): the day-3 follow-ups go, each from its own inbox.
   const MON_10AM = Date.parse("2026-11-02T15:00:00Z");
   const before = { aidan: aidan.sent.length, riley: riley.sent.length };
+  const rileyFirsts = (raw.prepare(`SELECT "email" FROM "FccCampaignContact" WHERE "senderAddress" = 'riley@mail.example'`).all() as Array<{ email: string }>).map((row) => row.email);
   for (let at = MON_10AM; at < MON_10AM + 270 * MINUTE; at += MINUTE) {
     await aidan.tick(db, at);
     await riley.tick(db, at);
   }
-  const rileyFollowUps = riley.sent.slice(before.riley).map((send) => send.to);
-  const rileyFirsts = (raw.prepare(`SELECT "email" FROM "FccCampaignContact" WHERE "senderAddress" = 'riley@mail.example'`).all() as Array<{ email: string }>).map((row) => row.email);
+  const rileySteps = (raw.prepare(`SELECT "email", "step" FROM "FccCampaignSend" WHERE "senderAddress" = 'riley@mail.example' AND "sendDay" = '2026-11-02'`).all() as Array<{ email: string; step: number }>);
+  const rileyFollowUps = rileySteps.filter((send) => send.step === 2).map((send) => send.email);
+  assert.equal(riley.sent.length - before.riley, 30, "its second day of sending allows 30");
   assert.equal(rileyFollowUps.length, 15);
   assert.deepEqual([...rileyFollowUps].sort(), [...rileyFirsts].sort(), "Riley's inbox follows up exactly the people it first emailed");
   assert.ok(aidan.sent.slice(before.aidan).every((send) => !rileyFirsts.includes(send.to)), "Aidan's inbox never follows up Riley's people");
   const steps = raw.prepare(`SELECT COALESCE("senderAddress",'') AS inbox, "step", COUNT(*) AS n FROM "FccCampaignSend" WHERE "sendDay" = '2026-11-02' GROUP BY 1, 2 ORDER BY 1, 2`).all();
-  assert.deepEqual(steps, [{ inbox: "", step: 2, n: 60 }, { inbox: "riley@mail.example", step: 2, n: 15 }]);
+  assert.deepEqual(steps, [{ inbox: "", step: 2, n: 60 }, { inbox: "riley@mail.example", step: 1, n: 15 }, { inbox: "riley@mail.example", step: 2, n: 15 }]);
 });
 
-test("an added inbox ramps 15, then 30, then the full 60 a day", async () => {
+test("an added inbox ramps 15, 30, 45, then the full 60 a day, counted in days it actually sent", async () => {
   const { raw, db } = database();
-  addContacts(raw, 1);
+  addContacts(raw, 5);
   const sender = { fromAddress: "riley@mail.example", primary: false };
+  let contact = 0;
+  const sentOn = (day: string, status = "SENT") => raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","senderAddress") VALUES (?,?,1,?,?,?,?,'riley@mail.example')`)
+    .run(`s-${day}-${status}`, `c${++contact}`, `${day}-${status}@b.example`, day, `<${day}-${status}>`, status);
   assert.equal(await fccDailyMax(db, sender, 30, "2026-11-02"), 15, "before its first email");
-  raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","senderAddress") VALUES ('s1','c1',1,'a@b.example','2026-11-02','<m1>','SENT','riley@mail.example')`).run();
-  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-08"), 15);
-  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-09"), 30);
-  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-16"), 60);
+  sentOn("2026-11-02");
+  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-02"), 15, "the rest of its first day");
+  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-03"), 30);
+  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-20"), 30, "days it was paused or idle don't move it up");
+  sentOn("2026-11-03", "FAILED");
+  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-04"), 30, "a day when nothing went out doesn't count");
+  sentOn("2026-11-03");
+  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-04"), 45);
+  sentOn("2026-11-04");
+  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-05"), 60, "equal to the first inbox from its fourth day");
+  sentOn("2026-11-05");
+  assert.equal(await fccDailyMax(db, sender, 30, "2026-11-30"), 60);
+  assert.equal(await fccDailyMax(db, sender, 0, "2026-11-30"), 0, "the daily cap setting still rules");
   assert.equal(await fccDailyMax(db, { fromAddress: "aidan@mail.example" }, 30, "2026-11-02"), 60, "the first inbox is never ramped");
+});
+
+test("the second batch still needs 1 bounce or fewer, and 3 still pause: raising an inbox's volume loosens neither", () => {
+  assert.equal(FCC_SECOND_BATCH_MAX_BOUNCES, 1);
+  assert.equal(FCC_PAUSE_BOUNCES, 3);
 });

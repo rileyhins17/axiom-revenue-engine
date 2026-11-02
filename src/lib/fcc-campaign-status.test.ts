@@ -59,8 +59,8 @@ test("the FCC stats count real replies, guess the no's, and split by email versi
   assert.deepEqual(stats.byVersion.map((row) => [row.label, row.emailed, row.replies]), [["Calmer email (Oct 28)", 1, 1], ["Question email (Oct 29–Nov 1)", 5, 1]]);
   assert.deepEqual(stats.byInbox.map((row) => [row.label, row.emailed, row.replies]), [["Aidan", 5, 2], ["Riley", 1, 0]]);
   assert.deepEqual(stats.days[0], { day: "2026-11-02", first: 0, followUps: 2, byInbox: [{ name: "Aidan", sent: 1 }, { name: "Riley", sent: 1 }] });
-  assert.deepEqual(stats.today, [{ name: "Aidan", sentToday: 1, dailyMax: 60 }, { name: "Riley", sentToday: 1, dailyMax: 15 }]);
-  assert.equal(stats.newPerDay, 25, "a third of 75: each new company also takes a day-3 and a day-7 email");
+  assert.deepEqual(stats.today, [{ name: "Aidan", sentToday: 1, dailyMax: 60 }, { name: "Riley", sentToday: 1, dailyMax: 30 }], "Riley's second day of sending");
+  assert.equal(stats.newPerDay, 30, "a third of 90: each new company also takes a day-3 and a day-7 email");
   assert.equal(stats.weekdaysLeft, 1, "1 ready company");
 });
 

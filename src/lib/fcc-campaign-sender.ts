@@ -22,7 +22,8 @@
  * non-generic hold anywhere at a company stops it for that company's other mailboxes. The exception is
  * "Signed a 2026 RMD declaration": that stop is about the March wording, and the hot-list line is written for them.
  * After FCC_NOV6_LAST_SEND_DAY the hot list closes and anyone it never reached rejoins the March queue.
- * Only the first inbox sends it: everyone emailed so far replied to that inbox, so that's where its inbox check must look.
+ * The first inbox can send all of it. An added inbox sends only people at companies no other inbox has been in touch with
+ * (hotRowsForAddedInbox): its inbox check reads only its own mail, so a reply that went elsewhere would be invisible to it.
  *
  * The day-7 follow-up (from v7) is the third and last March email: in the same thread, from the same
  * inbox, about 7 days after the first email and at least 4 after the day-3 one. It goes after the
@@ -226,6 +227,32 @@ export async function sharedCampaignDomains(db: ProspectDb) {
   return new Set([...companies].filter(([, names]) => names.size > 1).map(([domain]) => domain));
 }
 
+/**
+ * The hot-list rows an added inbox may send. Its inbox check can't see a reply that went to another inbox, so it leaves
+ * anyone another inbox has emailed, and everyone else at that company. It also leaves anyone held for any reason but a
+ * signed 2026 declaration, and their company: a held row can mean a hand-sent email the engine never recorded.
+ * The first inbox still sends those. Shared hosts and free mail say nothing about a company, so only the person counts there.
+ */
+async function hotRowsForAddedInbox(db: ProspectDb, rows: ContactRow[], inbox: string, shared: Set<string>) {
+  if (rows.length === 0) return rows;
+  const { results } = await db.prepare(`SELECT "email","status","holdReason","senderAddress","step1SentAt" FROM "FccCampaignContact" WHERE "campaignKey" IN (?, ?)`)
+    .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY).all<{ email: string; status: string; holdReason: string | null; senderAddress: string | null; step1SentAt: string | null }>();
+  const people = new Set<string>();
+  const companies = new Set<string>();
+  for (const row of results) {
+    const emailedElsewhere = Boolean(row.step1SentAt) && (row.senderAddress ?? "") !== inbox;
+    const held = row.status === "held" && !(row.holdReason ?? "").includes("Signed a 2026 RMD declaration");
+    if (emailedElsewhere || held) {
+      people.add(row.email.toLowerCase());
+      companies.add(domainOf(row.email));
+    }
+  }
+  return rows.filter((row) => {
+    const domain = domainOf(row.email);
+    return !people.has(row.email.toLowerCase()) && (SHARED_MAIL_DOMAINS.has(domain) || shared.has(domain) || !companies.has(domain));
+  });
+}
+
 async function isSuppressed(db: ProspectDb, email: string) {
   return Boolean(await db.prepare(`SELECT 1 AS hit FROM "EngineEmailSuppression" WHERE "email" = ? OR "email" = ?`)
     .bind(email, `@${domainOf(email)}`).first<{ hit: number }>());
@@ -285,16 +312,17 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       AND ${notOnHotList}
     ORDER BY CASE c."emailKind" WHEN 'compliance' THEN 0 WHEN 'named' THEN 1 ELSE 2 END, c."createdAt", c."id" LIMIT 200`)
     .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
-  const { results: hot } = hotOpen && config.primary !== false ? await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
+  const { results: hotRows } = hotOpen ? await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" <> 'FAILED')
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" m WHERE m."email" = c."email" AND m."campaignKey" = ? AND m."status" IN ('replied','bounced','suppressed','held','failed')
         AND COALESCE(m."holdReason",'') || COALESCE(m."stoppedReason",'') NOT LIKE '%Signed a 2026 RMD declaration%')
     ORDER BY c."createdAt", c."id" LIMIT 1000`).bind(FCC_NOV6_CAMPAIGN_KEY, FCC_CAMPAIGN_KEY).all<ContactRow>() : { results: [] as ContactRow[] };
+  const shared = await sharedCampaignDomains(db);
+  const hot = config.primary === false ? await hotRowsForAddedInbox(db, hotRows, inbox, shared) : hotRows;
   if (followUps.length === 0 && day7s.length === 0 && firsts.length === 0 && hot.length === 0) return { status: "SKIPPED", reason: "nothing to send" };
 
   const counts = { firstEmails: 0, followUps: 0, day7FollowUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0 };
-  const shared = await sharedCampaignDomains(db);
   const fromDomain = domainOf(config.fromAddress);
   let transport: EmailTransport | null = null;
   let mailbox: FccMailbox | null = null;
