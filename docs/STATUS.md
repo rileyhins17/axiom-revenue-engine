@@ -1,3 +1,12 @@
+## 2026-11-02 (Mon, afternoon): FCC day-7, subject test and owner profile picture live (`6809a70e`)
+
+- **Released (Riley's Claude, Nov 2, ~19:43 UTC; Riley that morning: "Yes, release tonight"):** `2eab3aa` (PR #16 at `902ac56`, plus branch `owner-profile-picture` merged on top) live as Worker `6809a70e-7b39-409b-a55e-c3145a819e4e` from the clean `rv` clone with `scripts/release-production.mjs`, after the day's last send (17:42 UTC). Migration `0088_fcc_day7_follow_up.sql`: receipts 90 → 91, stops `01111` before and after, `FccCampaignSend` 218 rows before and after; smoke test OK. Time Travel bookmark `000043f3-00000250-00005117-e7e127f3c6ab74904194e7af62c48f0a`. Rollback target `34eb415d`. Backup `backups/production/prod-export-20261102T194242Z.sql` (sha256 `f9f3c060…3e3ba4`). Full suite on `2eab3aa`: 1,107 pass, 4 skipped, 0 fail; typecheck clean.
+- **Go:** Riley, 19:43:43 UTC (`approvedCopy` `fcc-march1-pack-v7-day7`, `enabled` 1). From Tue Nov 3, 10:00 Toronto, new first emails from both inboxes split between the two subjects. First day-7 emails expected Mon Nov 9 (see the Nov 1 night entry).
+- **Owner profile picture:** owners can change their picture from the header menu, the phone "More" sheet and Settings (JPEG, PNG or WebP, up to 200 KB, checked by `validateProfileImage` on the server).
+- **Nov 6 list:** Aidan's 36 extra contacts loaded after the release (all `ready`; none were on either list). Held today: Intelligent Network and Communication Systems (recertified Nov 1, so the email's line would be wrong) and AspenView Network Solutions (domain doesn't exist, Aidan's Claude). Now 278 rows: 202 `ready`, 27 `step1_sent`, 2 `bounced`, 47 `held`.
+- **Today's sends (v6, before the release):** Aidan's inbox 30 Nov 6 emails, 0 failed; 2 bounced (Apex Telecom, Flix Sourcing), so its 12:30 batch didn't run. Riley's inbox 15 first emails (8 from 10:00, 7 from 12:30), 0 failed.
+- **Watch:** 202 left on the Nov 6 list and at most 60 a day Tue–Thu (180), fewer on a day with 2+ morning bounces. Anyone not reached by Thu Nov 5 rejoins the March queue.
+
 ## 2026-11-01 (Sun, night): FCC day-7 follow-up, two-subject test and stats fix ready to release (PR #16, on `bef84cb`)
 
 - **Why:** Aidan approved the day-7 text Oct 29; on Nov 1 he kept "I'll close this out after this one" and chose no day-14 email. The subject test and the Nov 1 stats gap ship with it.
