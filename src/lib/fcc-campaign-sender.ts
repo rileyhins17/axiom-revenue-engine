@@ -23,10 +23,17 @@
  * "Signed a 2026 RMD declaration": that stop is about the March wording, and the hot-list line is written for them.
  * After FCC_NOV6_LAST_SEND_DAY the hot list closes and anyone it never reached rejoins the March queue.
  * Only the first inbox sends it: everyone emailed so far replied to that inbox, so that's where its inbox check must look.
+ *
+ * The day-7 follow-up (from v7) is the third and last March email: in the same thread, from the same
+ * inbox, about 7 days after the first email and at least 4 after the day-3 one. It goes after the
+ * day-3 follow-ups and before new first emails, inside the same daily count, with the day-3 checks
+ * plus one more: nobody else at the company replied, was stopped, bounced or is held. Never to the
+ * hot list. New first emails split between two subjects (fccSubjectTestCopy).
  */
 import {
-  fccCopyOfMessageId, renderFccEmail, renderFccEmailNov6, renderFccEmailV5, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_FOLLOW_UP_DELAY_DAYS,
-  FCC_NOV6_CAMPAIGN_KEY, FCC_NOV6_LAST_SEND_DAY, type FccCampaignContact,
+  fccCopyOfMessageId, fccSubjectTestCopy, renderFccEmail, renderFccEmailDay7, renderFccEmailNov6, renderFccEmailV5, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION,
+  FCC_DAILY_SEND_CAP, FCC_DAY7_AFTER_FIRST_DAYS, FCC_DAY7_AFTER_FOLLOW_UP_DAYS, FCC_FOLLOW_UP_DELAY_DAYS, FCC_NOV6_CAMPAIGN_KEY, FCC_NOV6_LAST_SEND_DAY,
+  type FccCampaignContact, type FccCopy,
 } from "@/lib/fcc-campaign";
 import { readFccSignatures } from "@/lib/fcc-campaign-control";
 import { PermanentEmailError, type EmailTransport } from "@/lib/revenue-engine/engine-email";
@@ -75,14 +82,26 @@ export type FccSendConfig = {
 export type FccRunResult =
   | { status: "SKIPPED"; reason: string }
   | {
-    status: "RAN"; firstEmails: number; followUps: number; replied: number; bounced: number; suppressed: number; failed: number;
+    /** followUps counts day-3 follow-ups; day7FollowUps the day-7 ones. */
+    status: "RAN"; firstEmails: number; followUps: number; day7FollowUps: number; replied: number; bounced: number; suppressed: number; failed: number;
     remainingToday: number; followUpsHeldBack: string | null;
   };
 
 type ContactRow = {
   id: string; email: string; firstName: string; company: string; filingsJson: string;
   step1SentAt: string | null; step1MessageId: string | null;
+  /** Day-7 rows only: the day-3 follow-up's Message-ID, so the last email threads under both. */
+  step2MessageId?: string | null;
 };
+
+/**
+ * The Toronto day a contact's day-7 follow-up falls due, from their step-1 (`s1`) and step-2 (`s2`)
+ * FccCampaignSend rows: 7 days after the first email and at least 4 after the day-3 one.
+ */
+export const FCC_DAY7_DUE_SQL = `max(date(s1."sendDay", '+${FCC_DAY7_AFTER_FIRST_DAYS} days'), date(s2."sendDay", '+${FCC_DAY7_AFTER_FOLLOW_UP_DAYS} days'))`;
+/** Joins a contact `c` to the step-1 and step-2 send rows FCC_DAY7_DUE_SQL reads. */
+export const FCC_DAY7_JOIN_SQL = `JOIN "FccCampaignSend" s1 ON s1."contactId" = c."id" AND s1."step" = 1 AND s1."status" <> 'FAILED'
+    JOIN "FccCampaignSend" s2 ON s2."contactId" = c."id" AND s2."step" = 2 AND s2."status" <> 'FAILED'`;
 
 /** Mail services many unrelated people share; a reply from one of them says nothing about a company. */
 export const SHARED_MAIL_DOMAINS = new Set([
@@ -186,7 +205,11 @@ export async function fccSentToday(db: ProspectDb, day: string, sender?: Pick<Fc
     .bind(...(sender ? [day, senderKey(sender)] : [day])).first<{ n: number }>())?.n ?? 0);
 }
 
-/** Domains used by more than one company in the campaign (e.g. a shared co-op host). */
+/**
+ * Domains used by more than one company in the campaign (e.g. a shared co-op host). The March list
+ * only: the November 6 list spells some company names differently, so adding it would make one
+ * company look like two and switch off its company-wide stops.
+ */
 export async function sharedCampaignDomains(db: ProspectDb) {
   const { results } = await db.prepare(`SELECT "email","company" FROM "FccCampaignContact" WHERE "campaignKey" = ?`)
     .bind(FCC_CAMPAIGN_KEY).all<{ email: string; company: string }>();
@@ -214,7 +237,7 @@ export function fccClosedGate(setting: Awaited<ReturnType<typeof fccSetting>>, c
   return null;
 }
 
-/** Due follow-ups first, then new first emails, up to the day's cap (or `options.limit`). Safe to re-run. */
+/** Due follow-ups first (day 3, then day 7), then new first emails, up to the day's cap (or `options.limit`). Safe to re-run. */
 export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now = new Date(), options: FccRunOptions = {}): Promise<FccRunResult> {
   const setting = await fccSetting(db);
   const closed = fccClosedGate(setting, config, now);
@@ -233,14 +256,24 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
 
   const columns = `c."id", c."email", c."firstName", c."company", c."filingsJson", c."step1SentAt", c."step1MessageId"`;
   const hotOpen = day <= FCC_NOV6_LAST_SEND_DAY;
-  // While the hot list is open it owns its people. Once it closes, only those it actually reached stay out of the March queue.
-  const notOnHotList = `NOT EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1 AND (? = 1 OR h."status" <> 'ready'))`;
+  // While the hot list is open it owns its people. Once it closes, only those it reached stay out of the March queue,
+  // counting a hot-list email claimed just before a crash: it may have gone out.
+  const notOnHotList = `NOT EXISTS (SELECT 1 FROM "FccCampaignContact" h WHERE h."campaignKey" = ? AND h."email" = c."email" AND h."sendable" = 1 AND (? = 1 OR h."status" <> 'ready'
+    OR EXISTS (SELECT 1 FROM "FccCampaignSend" hs WHERE hs."contactId" = h."id" AND hs."step" = 1 AND hs."status" IN ('CLAIMED','SENT'))))`;
   const { results: followUps } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'step1_sent' AND c."step2DueAt" <= ? AND c."step1MessageId" IS NOT NULL
       AND COALESCE(c."senderAddress",'') = ?
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 2 AND s."status" IN ('CLAIMED','SENT'))
       AND ${notOnHotList}
     ORDER BY c."step2DueAt", c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, day, inbox, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
+  // The day-7 follow-up: anyone who got the first email and the day-3 one (any copy) from this inbox, once it's due.
+  const { results: day7s } = await db.prepare(`SELECT ${columns}, s2."messageId" AS "step2MessageId" FROM "FccCampaignContact" c
+    ${FCC_DAY7_JOIN_SQL}
+    WHERE c."campaignKey" = ? AND c."status" = 'step2_sent' AND c."step1MessageId" IS NOT NULL AND c."step1SentAt" IS NOT NULL
+      AND COALESCE(c."senderAddress",'') = ? AND ${FCC_DAY7_DUE_SQL} <= ?
+      AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 3 AND s."status" IN ('CLAIMED','SENT'))
+      AND ${notOnHotList}
+    ORDER BY ${FCC_DAY7_DUE_SQL}, c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, inbox, day, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
   const { results: firsts } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
@@ -253,13 +286,14 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" m WHERE m."email" = c."email" AND m."campaignKey" = ? AND m."status" IN ('replied','bounced','suppressed','held','failed')
         AND COALESCE(m."holdReason",'') || COALESCE(m."stoppedReason",'') NOT LIKE '%Signed a 2026 RMD declaration%')
     ORDER BY c."createdAt", c."id" LIMIT 1000`).bind(FCC_NOV6_CAMPAIGN_KEY, FCC_CAMPAIGN_KEY).all<ContactRow>() : { results: [] as ContactRow[] };
-  if (followUps.length === 0 && firsts.length === 0 && hot.length === 0) return { status: "SKIPPED", reason: "nothing to send" };
+  if (followUps.length === 0 && day7s.length === 0 && firsts.length === 0 && hot.length === 0) return { status: "SKIPPED", reason: "nothing to send" };
 
-  const counts = { firstEmails: 0, followUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0 };
+  const counts = { firstEmails: 0, followUps: 0, day7FollowUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0 };
   const shared = await sharedCampaignDomains(db);
   const fromDomain = domainOf(config.fromAddress);
   let transport: EmailTransport | null = null;
   let mailbox: FccMailbox | null = null;
+  let followUpsHeldBack: string | null = null;
 
   const stop = async (contact: Pick<ContactRow, "id">, status: "replied" | "bounced" | "suppressed" | "failed", reason: string) => {
     await db.prepare(`UPDATE "FccCampaignContact" SET "status" = ?, "stoppedReason" = ?, "updatedAt" = ? WHERE "id" = ?`)
@@ -270,21 +304,28 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   };
 
   /** Claims, sends and records one email. Returns false when sending should stop for today. */
-  const send = async (contact: ContactRow, step: 1 | 2, hot = false): Promise<boolean> => {
+  const send = async (contact: ContactRow, step: 1 | 2 | 3, hot = false): Promise<boolean> => {
+    // Every email carries its first email's copy in its Message-ID, so results can be split by version and each
+    // follow-up answers under the subject its first email used. New first emails split between two subjects.
+    const copy: FccCopy = hot ? "nov6" : step === 1 ? fccSubjectTestCopy(contact.id) : fccCopyOfMessageId(contact.step1MessageId);
+    if (copy === "nov6" && !hot) {
+      // Only the November 6 email itself carries this mark, and it has no follow-up.
+      await stop(contact, "suppressed", "The November 6 email has no follow-up");
+      counts.suppressed += 1;
+      return true;
+    }
     // Connect before claiming: a mailbox that refuses the login must not mark anyone as failed.
     transport ??= await config.transport!();
     const sendId = config.newId();
-    // A follow-up keeps its first email's version in its Message-ID, so results can be split by version.
-    const copy = step === 1 ? "v5" : fccCopyOfMessageId(contact.step1MessageId);
-    const messageId = hot ? `<fcc-nov6-${contact.id}-1@${fromDomain}>`
-      : copy === "v3" ? `<fcc-${contact.id}-${step}@${fromDomain}>` : `<fcc-${copy}-${contact.id}-${step}@${fromDomain}>`;
+    const messageId = copy === "v3" ? `<fcc-${contact.id}-${step}@${fromDomain}>` : `<fcc-${copy}-${contact.id}-${step}@${fromDomain}>`;
     // Render before claiming, so a contact that cannot be rendered never takes a slot in today's cap.
     let filings: FccCampaignContact["filings"] = [];
     try { filings = JSON.parse(contact.filingsJson) as FccCampaignContact["filings"]; } catch { filings = []; }
     const recipient = { firstName: contact.firstName, company: contact.company, filings: filings.length ? filings : [{} as never] };
-    // v3 is Aidan's own wording ("I'm Aidan Magee from Axiom"); v4, v5 and the hot list carry the sending founder's signature.
-    const email = hot ? renderFccEmailNov6({ firstName: contact.firstName, filings }, address, signer)
-      : copy === "v3" ? renderFccEmail(recipient, step, address) : renderFccEmailV5(recipient, step, address, signer);
+    // v3 is Aidan's own wording ("I'm Aidan Magee from Axiom"); everything since carries the sending founder's name.
+    const email = copy === "nov6" ? renderFccEmailNov6({ firstName: contact.firstName, filings }, address, signer)
+      : step === 3 ? renderFccEmailDay7(recipient, copy, address, signer.name)
+      : copy === "v3" ? renderFccEmail(recipient, step, address) : renderFccEmailV5(recipient, step, address, signer, copy);
     // One statement, so two runs at once can never both pass the day's cap or the gap between emails.
     const claimedAt = now.toISOString();
     const gapSince = options.minGapMs ? new Date(now.getTime() - options.minGapMs).toISOString() : "9999-12-31";
@@ -300,9 +341,11 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     }
     remaining -= 1;
     budget -= 1;
-    const thread: Record<string, string> = step === 2 && contact.step1MessageId
-      ? { "In-Reply-To": contact.step1MessageId, References: contact.step1MessageId }
-      : {};
+    // A follow-up answers the first email; the day-7 one answers the day-3 one and names both, so every mail app threads it.
+    const thread: Record<string, string> = step === 1 || !contact.step1MessageId ? {}
+      : step === 3 && contact.step2MessageId
+        ? { "In-Reply-To": contact.step2MessageId, References: `${contact.step1MessageId} ${contact.step2MessageId}` }
+        : { "In-Reply-To": contact.step1MessageId, References: contact.step1MessageId };
     try {
       await transport.send({
         to: contact.email, subject: email.subject, text: email.bodyPlain, ...(copy === "v3" ? {} : { html: email.bodyHtml }),
@@ -319,10 +362,14 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
         await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step1_sent', "step1SentAt"=?, "step1MessageId"=?, "step2DueAt"=?, "updatedAt"=?, "senderAddress"=NULLIF(?,'') WHERE "id"=?`)
           .bind(sentAt, messageId, addDays(day, FCC_FOLLOW_UP_DELAY_DAYS), sentAt, inbox, contact.id).run();
         counts.firstEmails += 1;
-      } else {
+      } else if (step === 2) {
         await db.prepare(`UPDATE "FccCampaignContact" SET "status"='step2_sent', "step2SentAt"=?, "updatedAt"=? WHERE "id"=?`)
           .bind(sentAt, sentAt, contact.id).run();
         counts.followUps += 1;
+      } else {
+        // The day-7 email is the last. Its send row records it; the contact stays step2_sent, so the daily reply check keeps reading for an answer.
+        await db.prepare(`UPDATE "FccCampaignContact" SET "updatedAt"=? WHERE "id"=?`).bind(sentAt, contact.id).run();
+        counts.day7FollowUps += 1;
       }
       return true;
     } catch (error) {
@@ -343,7 +390,51 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     }
   };
 
-  let followUpsHeldBack: string | null = null;
+  /**
+   * The checks before a follow-up: the do-not-email list; for the day-7 one, anyone else at the company who replied,
+   * was stopped, bounced or is held; then the inbox, for a reply from the company or a bounce since the first email.
+   */
+  const followUpCheck = async (contact: ContactRow, step: 2 | 3): Promise<"send" | "stopped" | "inbox down"> => {
+    if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; return "stopped"; }
+    const domain = domainOf(contact.email);
+    const companyDomain = !SHARED_MAIL_DOMAINS.has(domain) && !shared.has(domain);
+    if (step === 3 && companyDomain) {
+      // A hold for a generic inbox says nothing about the company.
+      const colleague = await db.prepare(`SELECT 1 AS hit FROM "FccCampaignContact" WHERE "campaignKey" IN (?, ?) AND "email" LIKE ? AND "email" <> ?
+        AND ("status" IN ('replied','suppressed','bounced') OR ("status" = 'held' AND COALESCE("holdReason",'') NOT LIKE '%eneric inbox%')) LIMIT 1`)
+        .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, `%@${domain}`, contact.email).first<{ hit: number }>();
+      if (colleague) {
+        await stop(contact, "suppressed", "Someone else at this company replied, was stopped, bounced or is on hold, so no day-7 email");
+        counts.suppressed += 1;
+        return "stopped";
+      }
+    }
+    const patterns = companyDomain ? [contact.email, `@${domain}`] : [contact.email];
+    let replied = false;
+    let bounced = false;
+    try {
+      mailbox ??= await config.mailbox!();
+      replied = await mailbox.hasMessagesFrom(patterns, contact.step1SentAt!);
+      bounced = !replied && await mailbox.hasBounceFor(contact.email, contact.step1SentAt!);
+    } catch (error) {
+      // Without a working inbox check nobody gets a follow-up this run; first emails still go out.
+      followUpsHeldBack = `inbox check failed: ${(error instanceof Error ? error.message : String(error)).slice(0, 200)}`;
+      return "inbox down";
+    }
+    if (replied) {
+      await stop(contact, "replied", step === 2 ? "They wrote back, so no follow-up" : "They wrote back, so no day-7 email");
+      counts.replied += 1;
+      return "stopped";
+    }
+    if (bounced) {
+      await stop(contact, "bounced", step === 2 ? "The first email bounced" : "An earlier email bounced");
+      await suppressBounce(contact.email);
+      counts.bounced += 1;
+      return "stopped";
+    }
+    return "send";
+  };
+
   try {
     // The hot list goes first. When the cap or the gap runs out, this returns before any follow-up or first email.
     let inboxDown = false;
@@ -394,28 +485,16 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     }
     for (const contact of followUps) {
       if (remaining <= 0 || budget <= 0) break;
-      if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
-      const domain = domainOf(contact.email);
-      const patterns = SHARED_MAIL_DOMAINS.has(domain) || shared.has(domain) ? [contact.email] : [contact.email, `@${domain}`];
-      let replied = false;
-      let bounced = false;
-      try {
-        mailbox ??= await config.mailbox!();
-        replied = await mailbox.hasMessagesFrom(patterns, contact.step1SentAt!);
-        bounced = !replied && await mailbox.hasBounceFor(contact.email, contact.step1SentAt!);
-      } catch (error) {
-        // Without a working inbox check nobody gets a follow-up today; first emails still go out.
-        followUpsHeldBack = `inbox check failed: ${(error instanceof Error ? error.message : String(error)).slice(0, 200)}`;
-        break;
-      }
-      if (replied) { await stop(contact, "replied", "They wrote back, so no follow-up"); counts.replied += 1; continue; }
-      if (bounced) {
-        await stop(contact, "bounced", "The first email bounced");
-        await suppressBounce(contact.email);
-        counts.bounced += 1;
-        continue;
-      }
-      if (!(await send(contact, 2))) return finish();
+      const check = await followUpCheck(contact, 2);
+      if (check === "inbox down") break;
+      if (check === "send" && !(await send(contact, 2))) return finish();
+    }
+    // Day-7 follow-ups come after the day-3 ones, and only while the inbox can be read.
+    for (const contact of followUpsHeldBack ? [] : day7s) {
+      if (remaining <= 0 || budget <= 0) break;
+      const check = await followUpCheck(contact, 3);
+      if (check === "inbox down") break;
+      if (check === "send" && !(await send(contact, 3))) return finish();
     }
     for (const contact of firsts) {
       if (remaining <= 0 || budget <= 0) break;

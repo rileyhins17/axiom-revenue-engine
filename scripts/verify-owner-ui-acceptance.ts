@@ -225,8 +225,8 @@ async function applyMigrations(database: SqliteDatabase) {
   const migrations = (await readdir(migrationsDirectory))
     .filter((name) => /^\d{4}_.+\.sql$/.test(name))
     .sort((left, right) => left.localeCompare(right));
-  assert(migrations.at(-1)?.startsWith("0087_"),
-    "The owner fixture must apply every migration through 0087_fcc_second_sender.");
+  assert(migrations.at(-1)?.startsWith("0088_"),
+    "The owner fixture must apply every migration through 0088_fcc_day7_follow_up.");
   database.pragma("foreign_keys = ON");
   for (const migration of migrations) {
     database.exec(await readFile(join(migrationsDirectory, migration), "utf8"));

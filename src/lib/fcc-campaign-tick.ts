@@ -6,7 +6,7 @@
  *
  * - First batch: up to the daily cap (30) from 10:00 Toronto time.
  * - Second batch: up to 30 more from 12:30, only when today has 1 bounce or fewer.
- *   So 60 a day is the ceiling.
+ *   So 60 a day is the ceiling, follow-ups (day 3 and day 7) included.
  * - Each inbox runs its own tick with its own count, gap and bounces. An added
  *   inbox starts slowly (FCC_NEW_INBOX_RAMP) so Google doesn't flag it.
  * - Pause everything (a founder must press Resume) on a Google warning in the
@@ -175,8 +175,8 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
     const sent = await fccSentToday(db, day, config);
     await noteFccRun(db, label + (result.status === "SKIPPED"
       ? `Nothing to send: ${result.reason}.`
-      : result.firstEmails + result.followUps > 0
-        ? `Sent email ${sent} of today's ${cap} (${result.followUps > 0 ? "a follow-up" : "a first email"}).`
+      : result.firstEmails + result.followUps + result.day7FollowUps > 0
+        ? `Sent email ${sent} of today's ${cap} (${result.day7FollowUps > 0 ? "a day-7 follow-up" : result.followUps > 0 ? "a follow-up" : "a first email"}).`
         : `Checked ${result.replied + result.bounced + result.suppressed} contacts; nothing sent this minute.`), sendAt);
     return result;
   } finally {

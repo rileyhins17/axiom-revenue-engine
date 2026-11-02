@@ -4,8 +4,9 @@ import test from "node:test";
 
 import Database from "better-sqlite3";
 
-import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_NOV6_CAMPAIGN_KEY } from "@/lib/fcc-campaign";
+import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_NOV6_CAMPAIGN_KEY, fccSubjectTestCopy, renderFccEmailDay7 } from "@/lib/fcc-campaign";
 import { runFccDailySend, type FccMailbox, type FccSendConfig } from "@/lib/fcc-campaign-sender";
+import { fccDailyMax } from "@/lib/fcc-campaign-tick";
 import { PermanentEmailError, type OutgoingEmail } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { applyEngineSchema } from "@/lib/revenue-engine/test-support/engine-schema";
@@ -132,7 +133,7 @@ test("sends at most 30 a day, named contacts first, never held inboxes, and neve
   const m = fakeMailbox();
 
   const result = await runFccDailySend(db, config(t.factory, m.factory), MONDAY);
-  assert.deepEqual(result, { status: "RAN", firstEmails: 30, followUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0, remainingToday: 0, followUpsHeldBack: null });
+  assert.deepEqual(result, { status: "RAN", firstEmails: 30, followUps: 0, day7FollowUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0, remainingToday: 0, followUpsHeldBack: null });
   assert.equal(t.sent.length, 30);
   assert.equal(new Set(t.sent.map((m) => m.to)).size, 30);
   assert.ok(t.sent.every((message) => message.to.startsWith("person")), "named contacts go before unclear ones");
@@ -141,7 +142,7 @@ test("sends at most 30 a day, named contacts first, never held inboxes, and neve
     "the signature link shows the plain domain and opens the FCC page");
   assert.equal(statusOf(raw, "held"), "held");
   const first = raw.prepare(`SELECT "status","step2DueAt","step1MessageId" FROM "FccCampaignContact" WHERE "id" = 'n1'`).get() as Record<string, string>;
-  assert.deepEqual(first, { status: "step1_sent", step2DueAt: "2026-10-29", step1MessageId: "<fcc-v5-n1-1@mail.example>" });
+  assert.deepEqual(first, { status: "step1_sent", step2DueAt: "2026-10-29", step1MessageId: `<fcc-${fccSubjectTestCopy("n1")}-n1-1@mail.example>` });
 
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-10-26T18:00:00Z")), { status: "SKIPPED", reason: "daily cap reached" });
   const tuesday = await runFccDailySend(db, config(t.factory, m.factory), TUESDAY);
@@ -160,7 +161,7 @@ test("follow-ups go out 3 days later in the same thread, before any new first em
   await runFccDailySend(db, config(t.factory, m.factory), MONDAY);
   assert.equal(t.sent.length, 10);
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-10-28T14:00:00Z")), {
-    status: "RAN", firstEmails: 2, followUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0, remainingToday: 8, followUpsHeldBack: null,
+    status: "RAN", firstEmails: 2, followUps: 0, day7FollowUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0, remainingToday: 8, followUpsHeldBack: null,
   });
 
   const thursday = await runFccDailySend(db, config(t.factory, m.factory), THURSDAY);
@@ -170,7 +171,7 @@ test("follow-ups go out 3 days later in the same thread, before any new first em
   for (const message of followUps) {
     const original = t.sent.find((sent) => sent.to === message.to && !sent.subject.startsWith("Re:"))!;
     assert.equal(message.subject, `Re: ${original.subject}`);
-    assert.match(message.subject, /^Re: Question about .+ RMD listing$/);
+    assert.match(message.subject, /^Re: (Question about .+ RMD listing|.+ FCC listing)$/);
     assert.match(message.text, /^Hi Jane,\n\nBumping this in case it got buried\./);
     assert.equal(message.headers["In-Reply-To"], original.headers["Message-ID"]);
     assert.equal(message.headers.References, original.headers["Message-ID"]);
@@ -182,10 +183,14 @@ test("follow-ups go out 3 days later in the same thread, before any new first em
   assert.equal(saturdayDue.status, "SKIPPED");
   const nextMonday = await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-11-02T15:00:00Z"));
   assert.equal(nextMonday.status === "RAN" && nextMonday.followUps, 2, "a follow-up due on the weekend goes on Monday");
-  assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-11-03T15:00:00Z")), { status: "SKIPPED", reason: "nothing to send" });
+  assert.equal(nextMonday.status === "RAN" && nextMonday.day7FollowUps, 8, "Monday's day-7 follow-ups wait behind the day-3 ones, inside the cap");
+  const tuesday = await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-11-03T15:00:00Z"));
+  assert.equal(tuesday.status === "RAN" && tuesday.day7FollowUps, 2);
+  assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-11-04T15:00:00Z")), { status: "SKIPPED", reason: "nothing to send" },
+    "Wednesday's two first emails got their day-3 on Monday, so their day-7 waits until Friday");
 });
 
-test("people who got the calmer v3 first email get its follow-up; everyone new gets Aidan's v2", async () => {
+test("people who got the calmer v3 first email get its follow-up; everyone new gets Aidan's v2 under one of the two test subjects", async () => {
   const { raw, db } = database();
   addContact(raw, "old", "pat@old-tel.example");
   raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1SentAt" = '2026-10-28T15:00:00Z',
@@ -203,9 +208,10 @@ test("people who got the calmer v3 first email get its follow-up; everyone new g
   assert.equal(followUp.headers["In-Reply-To"], "<fcc-old-1@mail.example>");
   assert.equal(followUp.headers["Message-ID"], "<fcc-old-2@mail.example>");
   assert.equal(first.to, "lee@new-tel.example");
-  assert.equal(first.subject, "Question about Talktone's RMD listing");
+  const copy = fccSubjectTestCopy("new");
+  assert.equal(first.subject, copy === "v7a" ? "Question about Talktone's RMD listing" : "Talktone's FCC listing");
   assert.match(first.text, /noticed Talktone's listing \(RMD-new\) doesn't show a 2026 recertification yet/);
-  assert.equal(first.headers["Message-ID"], "<fcc-v5-new-1@mail.example>");
+  assert.equal(first.headers["Message-ID"], `<fcc-${copy}-new-1@mail.example>`);
 });
 
 test("anyone at the company writing back stops the follow-up; shared mail services don't", async () => {
@@ -240,7 +246,7 @@ test("bounces and the do-not-email list stop sending for good", async () => {
   recordGo(raw);
   const t = fakeTransport((message) => message.to === "nobody@gone.example" ? new PermanentEmailError("SMTP 550 no such user") : null);
   const monday = await runFccDailySend(db, config(t.factory, fakeMailbox().factory), MONDAY);
-  assert.deepEqual(monday, { status: "RAN", firstEmails: 2, followUps: 0, replied: 0, bounced: 1, suppressed: 1, failed: 0, remainingToday: 27, followUpsHeldBack: null });
+  assert.deepEqual(monday, { status: "RAN", firstEmails: 2, followUps: 0, day7FollowUps: 0, replied: 0, bounced: 1, suppressed: 1, failed: 0, remainingToday: 27, followUpsHeldBack: null });
   assert.deepEqual(["bad", "later", "fine", "blocked"].map((id) => statusOf(raw, id)), ["bounced", "step1_sent", "step1_sent", "suppressed"]);
 
   const thursday = await runFccDailySend(db, config(t.factory, fakeMailbox({ bounced: ["later@bounces.example"] }).factory), THURSDAY);
@@ -264,7 +270,7 @@ test("provider trouble stops the day, and an email claimed before a crash is nev
   let calls = 0;
   const t = fakeTransport(() => (++calls === 2 ? new Error("SMTP 421 try again later") : null));
   const result = await runFccDailySend(db, config(t.factory, fakeMailbox().factory), MONDAY);
-  assert.deepEqual(result, { status: "RAN", firstEmails: 1, followUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 1, remainingToday: 27, followUpsHeldBack: null });
+  assert.deepEqual(result, { status: "RAN", firstEmails: 1, followUps: 0, day7FollowUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 1, remainingToday: 27, followUpsHeldBack: null });
   assert.deepEqual(t.sent.map((message) => message.to), ["c2@co-c2.example"]);
   assert.deepEqual(["c1", "c2", "c3", "c4"].map((id) => statusOf(raw, id)), ["ready", "step1_sent", "failed", "ready"]);
   assert.equal((raw.prepare(`SELECT "detail" FROM "FccCampaignSend" WHERE "contactId" = 'c3'`).get() as { detail: string }).detail, "SMTP 421 try again later");
@@ -326,7 +332,7 @@ test("the November 6 hot list goes first, one first email each, and no follow-up
   const m = fakeMailbox();
 
   const thursday = await runFccDailySend(db, config(t.factory, m.factory), THURSDAY, { cap: 4 });
-  assert.deepEqual(thursday, { status: "RAN", firstEmails: 3, followUps: 1, replied: 0, bounced: 0, suppressed: 0, failed: 0, remainingToday: 0, followUpsHeldBack: null });
+  assert.deepEqual(thursday, { status: "RAN", firstEmails: 3, followUps: 1, day7FollowUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0, remainingToday: 0, followUpsHeldBack: null });
   assert.deepEqual(t.sent.map((message) => message.to), ["h1@h1-tel.example", "h2@h2-tel.example", "h3@h3-tel.example", "due@due-tel.example"]);
   assert.equal(t.sent[0].subject, "Did h1 Telephone get the FCC's RMD notice?");
   assert.equal(t.sent[0].headers["Message-ID"], "<fcc-nov6-h1-1@mail.example>");
@@ -352,7 +358,7 @@ test("the hot list counts toward the same 30 a day and goes before any normal fi
   const m = fakeMailbox();
 
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), MONDAY), {
-    status: "RAN", firstEmails: 30, followUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0, remainingToday: 0, followUpsHeldBack: null,
+    status: "RAN", firstEmails: 30, followUps: 0, day7FollowUps: 0, replied: 0, bounced: 0, suppressed: 0, failed: 0, remainingToday: 0, followUpsHeldBack: null,
   });
   assert.ok(t.sent.every((message) => message.headers["Message-ID"].startsWith("<fcc-nov6-")), "only hot-list emails on the first day");
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-10-26T18:00:00Z")), { status: "SKIPPED", reason: "daily cap reached" });
@@ -360,7 +366,7 @@ test("the hot list counts toward the same 30 a day and goes before any normal fi
   const tuesday = await runFccDailySend(db, config(t.factory, m.factory), TUESDAY);
   assert.equal(tuesday.status === "RAN" && tuesday.firstEmails, 10);
   assert.ok(t.sent.slice(30, 35).every((message) => message.headers["Message-ID"].startsWith("<fcc-nov6-")), "the last five hot contacts go first on Tuesday");
-  assert.ok(t.sent.slice(35).every((message) => message.headers["Message-ID"].startsWith("<fcc-v5-")), "then the normal first emails");
+  assert.ok(t.sent.slice(35).every((message) => /^<fcc-v7[ab]-/.test(message.headers["Message-ID"])), "then the normal first emails");
   assert.equal(new Set(t.sent.map((message) => message.to)).size, 40, "nobody is emailed twice");
 });
 
@@ -373,7 +379,7 @@ test("a held hot-list inbox is never sent, and a do-not-email contact on the hot
   recordGo(raw);
   const t = fakeTransport();
   const result = await runFccDailySend(db, config(t.factory, fakeMailbox().factory), MONDAY);
-  assert.deepEqual(result, { status: "RAN", firstEmails: 1, followUps: 0, replied: 0, bounced: 0, suppressed: 1, failed: 0, remainingToday: 29, followUpsHeldBack: null });
+  assert.deepEqual(result, { status: "RAN", firstEmails: 1, followUps: 0, day7FollowUps: 0, replied: 0, bounced: 0, suppressed: 1, failed: 0, remainingToday: 29, followUpsHeldBack: null });
   assert.deepEqual(t.sent.map((message) => message.to), ["ok@ok-tel.example"]);
   assert.deepEqual(["held", "blocked", "ok"].map((id) => statusOf(raw, id)), ["held", "suppressed", "step1_sent"]);
 });
@@ -601,8 +607,320 @@ test("anyone on the hot list gets the November 6 email once and nothing from the
   assert.match(to("not-yet-emailed@one-tel.example")[0].headers["Message-ID"], /^<fcc-nov6-/);
   assert.equal(to("already-emailed@two-tel.example").length, 1);
   assert.match(to("already-emailed@two-tel.example")[0].headers["Message-ID"], /^<fcc-nov6-/);
-  assert.equal(to("march-only@three-tel.example")[0].headers["Message-ID"].startsWith("<fcc-v5-"), true, "the normal queue still goes");
-  assert.equal(to("generic-on-both@four-tel.example")[0].headers["Message-ID"].startsWith("<fcc-v5-"), true, "a held hot-list row leaves March alone");
+  assert.match(to("march-only@three-tel.example")[0].headers["Message-ID"], /^<fcc-v7[ab]-/, "the normal queue still goes");
+  assert.match(to("generic-on-both@four-tel.example")[0].headers["Message-ID"], /^<fcc-v7[ab]-/, "a held hot-list row leaves March alone");
+});
+
+/**
+ * A March contact who already got the first email on `firstDay` and the day-3 follow-up on `secondDay`, as the sender
+ * records them: the contact row plus a SENT send row for each step. `inbox` is the second inbox's address (null: the first).
+ */
+function addFollowedUp(raw: Database.Database, id: string, email: string, options: { firstDay: string; secondDay: string; copy?: "v3" | "v4" | "v5" | "v7a" | "v7b"; inbox?: string; company?: string }) {
+  addContact(raw, id, email, { company: options.company });
+  const mark = options.copy === "v3" ? "" : `${options.copy ?? "v5"}-`;
+  const [first, second] = [1, 2].map((step) => `<fcc-${mark}${id}-${step}@mail.example>`);
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step2_sent', "step1SentAt" = ?, "step1MessageId" = ?, "step2DueAt" = ?, "step2SentAt" = ?, "senderAddress" = ? WHERE "id" = ?`)
+    .run(`${options.firstDay}T15:00:00.000Z`, first, options.firstDay, `${options.secondDay}T15:00:00.000Z`, options.inbox ?? null, id);
+  const send = raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","createdAt","senderAddress") VALUES (?,?,?,?,?,?,'SENT',?,?)`);
+  send.run(`${id}-1`, id, 1, email, options.firstDay, first, `${options.firstDay}T15:00:00.000Z`, options.inbox ?? null);
+  send.run(`${id}-2`, id, 2, email, options.secondDay, second, `${options.secondDay}T15:00:00.000Z`, options.inbox ?? null);
+}
+
+const day7Rows = (raw: Database.Database) =>
+  raw.prepare(`SELECT "contactId", "sendDay", "status", COALESCE("senderAddress",'') AS inbox FROM "FccCampaignSend" WHERE "step" = 3 ORDER BY "contactId"`).all();
+
+test("the day-7 follow-up goes 7 days after the first email, in its thread, from its inbox, in Aidan's words, and only once", async () => {
+  const { raw, db } = database();
+  addContact(raw, "c1", "pat@crocker-tel.example", { company: "Crocker Communications" });
+  recordGo(raw);
+  const t = fakeTransport();
+  const m = fakeMailbox();
+  const riley = config(t.factory, m.factory, { primary: false, fromAddress: "riley@mail.example", fromName: "Riley Hinsperger" });
+  await runFccDailySend(db, riley, MONDAY);
+  await runFccDailySend(db, riley, THURSDAY);
+  assert.equal(t.sent.length, 2);
+  assert.deepEqual(await runFccDailySend(db, riley, new Date("2026-10-30T14:00:00Z")), { status: "SKIPPED", reason: "nothing to send" }, "not before day 7");
+
+  const monday = await runFccDailySend(db, riley, new Date("2026-11-02T15:00:00Z"));
+  assert.deepEqual(monday, { status: "RAN", firstEmails: 0, followUps: 0, day7FollowUps: 1, replied: 0, bounced: 0, suppressed: 0, failed: 0, remainingToday: 29, followUpsHeldBack: null });
+  const [first, second, last] = t.sent;
+  assert.equal(last.to, "pat@crocker-tel.example");
+  assert.equal(last.subject, `Re: ${first.subject}`);
+  assert.equal(last.headers["In-Reply-To"], second.headers["Message-ID"], "it answers the day-3 follow-up");
+  assert.equal(last.headers.References, `${first.headers["Message-ID"]} ${second.headers["Message-ID"]}`, "and names the whole thread");
+  assert.equal(last.headers["Message-ID"], first.headers["Message-ID"].replace("-1@", "-3@"), "its first email's copy stays in the Message-ID");
+  const copy = fccSubjectTestCopy("c1");
+  assert.equal(last.text, renderFccEmailDay7({ firstName: "Jane", company: "Crocker Communications", filings: [{ rmdNumber: "RMD-c1" }] as never }, copy, ADDRESS, "Riley Hinsperger").bodyPlain);
+  assert.match(last.text, /^Hi Jane,\n\nI'll close this out after this one\. For context on why I reached out:/);
+  assert.match(last.text, /\n\nCrocker Communications' listing \(RMD-c1\) still shows no 2026 recertification\. If you'd like the free list/);
+  assert.ok(last.text.endsWith(`Riley Hinsperger\nAxiom · axiominternational.ca · ${ADDRESS}\nNot useful? Reply "no thanks" and I won't contact you again.`), "the sending inbox's founder signs");
+  assert.ok(last.html?.includes("I'll close this out after this one."), "an HTML part, like the rest of the thread");
+  assert.deepEqual(day7Rows(raw), [{ contactId: "c1", sendDay: "2026-11-02", status: "SENT", inbox: "riley@mail.example" }]);
+  assert.equal(statusOf(raw, "c1"), "step2_sent", "they stay listed, so the daily reply check keeps reading for an answer");
+
+  assert.deepEqual(await runFccDailySend(db, riley, new Date("2026-11-03T15:00:00Z")), { status: "SKIPPED", reason: "nothing to send" }, "no fourth email, ever");
+  assert.deepEqual(await runFccDailySend(db, riley, new Date("2026-11-16T15:00:00Z")), { status: "SKIPPED", reason: "nothing to send" }, "no day-14 email");
+  assert.equal(t.sent.length, 3);
+});
+
+test("a late day-3 follow-up pushes the day-7 one to 4 days after it", async () => {
+  const { raw, db } = database();
+  addFollowedUp(raw, "late", "late@late-tel.example", { firstDay: "2026-10-28", secondDay: "2026-11-05" });
+  addFollowedUp(raw, "prompt", "prompt@prompt-tel.example", { firstDay: "2026-10-26", secondDay: "2026-10-29" });
+  recordGo(raw);
+  const t = fakeTransport();
+  const wednesday = await runFccDailySend(db, config(t.factory, fakeMailbox().factory), new Date("2026-11-04T15:00:00Z"));
+  assert.equal(wednesday.status === "RAN" && wednesday.day7FollowUps, 1);
+  assert.deepEqual(t.sent.map((message) => message.to), ["prompt@prompt-tel.example"]);
+  for (const day of ["2026-11-05", "2026-11-06"]) {
+    assert.deepEqual(await runFccDailySend(db, config(t.factory, fakeMailbox().factory), new Date(`${day}T15:00:00Z`)), { status: "SKIPPED", reason: "nothing to send" },
+      `${day}: 7 days after its first email, but not 4 after its day-3 follow-up`);
+  }
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), new Date("2026-11-09T15:00:00Z"));
+  assert.deepEqual(day7Rows(raw), [
+    { contactId: "late", sendDay: "2026-11-09", status: "SENT", inbox: "" },
+    { contactId: "prompt", sendDay: "2026-11-04", status: "SENT", inbox: "" },
+  ]);
+});
+
+test("people first emailed on the calmer v3 get the day-7 email as plain text, under its subject, signed by Aidan", async () => {
+  const { raw, db } = database();
+  addFollowedUp(raw, "old", "pat@old-tel.example", { firstDay: "2026-10-28", secondDay: "2026-11-02", copy: "v3", company: "Talktone, Inc." });
+  addFollowedUp(raw, "q", "lee@q-tel.example", { firstDay: "2026-10-29", secondDay: "2026-11-02", copy: "v4", company: "Crocker Communications" });
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), new Date("2026-11-06T15:00:00Z"));
+  const [old, question] = t.sent;
+  assert.equal(old.subject, "Re: Your 2026 RMD recertification");
+  assert.equal(old.html, undefined, "the v3 thread stays plain text");
+  assert.equal(old.headers["Message-ID"], "<fcc-old-3@mail.example>");
+  assert.equal(old.headers["In-Reply-To"], "<fcc-old-2@mail.example>");
+  assert.match(old.text, /\n\nTalktone's listing \(RMD-old\) still shows no 2026 recertification\./);
+  assert.match(old.text, /\n\nAidan Magee\nAxiom · axiominternational\.ca · /);
+  assert.equal(question.subject, "Re: Question about Crocker Communications' RMD listing");
+  assert.equal(question.headers["Message-ID"], "<fcc-v4-q-3@mail.example>");
+});
+
+test("the day-7 follow-up never goes to anyone on the November 6 list", async () => {
+  const { raw, db } = database();
+  addFollowedUp(raw, "march", "march@march-tel.example", { firstDay: "2026-10-28", secondDay: "2026-11-02" });
+  addFollowedUp(raw, "both", "both@both-tel.example", { firstDay: "2026-10-28", secondDay: "2026-11-02" });
+  addNov6Contact(raw, "hboth", "both@both-tel.example");
+  addNov6Contact(raw, "hot", "hot@hot-tel.example");
+  for (const id of ["hboth", "hot"]) {
+    raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1SentAt" = '2026-11-03T15:00:00Z', "step1MessageId" = ? WHERE "id" = ?`).run(`<fcc-nov6-${id}-1@mail.example>`, id);
+    raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status") SELECT ?, "id", 1, "email", '2026-11-03', "step1MessageId", 'SENT' FROM "FccCampaignContact" WHERE "id" = ?`).run(`${id}-1`, id);
+  }
+  recordGo(raw);
+  const t = fakeTransport();
+  for (const day of ["2026-11-09", "2026-11-10", "2026-11-16"]) await runFccDailySend(db, config(t.factory, fakeMailbox().factory), new Date(`${day}T15:00:00Z`));
+  assert.deepEqual(t.sent.map((message) => message.to), ["march@march-tel.example"]);
+  assert.ok(!t.sent.some((message) => message.headers["Message-ID"].startsWith("<fcc-nov6-")));
+});
+
+test("the day-7 follow-up skips anyone who replied, bounced or is on the do-not-email list, and any company where someone else replied, was stopped, bounced or is held", async () => {
+  const { raw, db } = database();
+  const due = { firstDay: "2026-10-28", secondDay: "2026-11-02" };
+  // Each company's rows share its name, as they do on the real list (two names on one domain mean a shared host).
+  const company = (id: string, email: string, extra: { status?: string; holdReason?: string; key?: string } = {}) => {
+    if (extra.key === FCC_NOV6_CAMPAIGN_KEY) addNov6Contact(raw, id, email); else addContact(raw, id, email, { company: `${email.split("@")[1]} Co` });
+    raw.prepare(`UPDATE "FccCampaignContact" SET "company" = ?, "status" = COALESCE(?, "status"), "holdReason" = ? WHERE "id" = ?`)
+      .run(`${email.split("@")[1]} Co`, extra.status ?? null, extra.holdReason ?? null, id);
+  };
+  const emailed = (id: string, email: string) => addFollowedUp(raw, id, email, { ...due, company: `${email.split("@")[1]} Co` });
+  emailed("ok", "ok@ok-tel.example");
+  emailed("wrote", "wrote@wrote-tel.example");
+  emailed("colleague-wrote", "pat@colleague-tel.example");
+  emailed("bounce", "bounce@bounce-tel.example");
+  emailed("dnc", "anyone@dnc-tel.example");
+  raw.prepare(`INSERT INTO "EngineEmailSuppression" ("email","reason") VALUES ('@dnc-tel.example','DO_NOT_CONTACT')`).run();
+  emailed("stopped-co", "pat@stopped-tel.example");
+  company("stopped-co-2", "boss@stopped-tel.example", { status: "suppressed" });
+  emailed("held-co", "pat@held-tel.example");
+  company("held-co-2", "boss@held-tel.example", { status: "held", holdReason: "Their FCC filing reports an investigation" });
+  emailed("bounced-co", "pat@bounced-tel.example");
+  company("bounced-co-2", "old@bounced-tel.example", { status: "bounced" });
+  emailed("hot-replied-co", "pat@hotreply-tel.example");
+  company("hot-replied-co-2", "boss@hotreply-tel.example", { status: "replied", key: FCC_NOV6_CAMPAIGN_KEY });
+  emailed("generic-co", "pat@generic-tel.example");
+  company("generic-co-2", "support@generic-tel.example", { status: "held", holdReason: "Generic inbox (support@/noc@/info@ style). Check before sending." });
+  emailed("gmail", "owner@gmail.com");
+  addContact(raw, "gmail-2", "someone.else@gmail.com");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'replied' WHERE "id" = 'gmail-2'`).run();
+  recordGo(raw);
+  const t = fakeTransport();
+  const m = fakeMailbox({ from: ["wrote@wrote-tel.example", "boss@colleague-tel.example"], bounced: ["bounce@bounce-tel.example"] });
+  const result = await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-11-09T15:00:00Z"));
+  assert.deepEqual(t.sent.map((message) => message.to).sort(), ["owner@gmail.com", "ok@ok-tel.example", "pat@generic-tel.example"].sort(),
+    "a generic-inbox hold or a shared mail service says nothing about the company");
+  assert.ok(result.status === "RAN" && result.day7FollowUps === 3 && result.replied === 2 && result.bounced === 1 && result.suppressed === 5);
+  assert.deepEqual(["wrote", "colleague-wrote", "bounce", "dnc", "stopped-co", "held-co", "bounced-co", "hot-replied-co"].map((id) => statusOf(raw, id)),
+    ["replied", "replied", "bounced", "suppressed", "suppressed", "suppressed", "suppressed", "suppressed"]);
+  assert.match((raw.prepare(`SELECT "stoppedReason" FROM "FccCampaignContact" WHERE "id" = 'held-co'`).get() as { stoppedReason: string }).stoppedReason, /Someone else at this company/);
+  assert.ok(raw.prepare(`SELECT 1 FROM "EngineEmailSuppression" WHERE "email" = 'bounce@bounce-tel.example'`).get(), "the bounce goes on the do-not-email list");
+});
+
+test("a broken inbox check holds back the day-7 follow-ups; a claimed day-7 email is never sent again", async () => {
+  const { raw, db } = database();
+  addFollowedUp(raw, "a", "a@a-tel.example", { firstDay: "2026-10-28", secondDay: "2026-11-02" });
+  addFollowedUp(raw, "b", "b@b-tel.example", { firstDay: "2026-10-28", secondDay: "2026-11-02" });
+  addContact(raw, "new", "new@new-tel.example");
+  raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status") VALUES ('crashed','b',3,'b@b-tel.example','2026-11-06','<fcc-v5-b-3@mail.example>','CLAIMED')`).run();
+  recordGo(raw);
+  const broken = fakeTransport();
+  const held = await runFccDailySend(db, config(broken.factory, fakeMailbox({ broken: true }).factory), new Date("2026-11-09T15:00:00Z"));
+  assert.ok(held.status === "RAN" && /inbox check failed/.test(held.followUpsHeldBack ?? ""));
+  assert.deepEqual(broken.sent.map((message) => message.to), ["new@new-tel.example"], "first emails still go");
+  assert.equal(statusOf(raw, "a"), "step2_sent");
+
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), new Date("2026-11-10T15:00:00Z"));
+  assert.deepEqual(t.sent.map((message) => message.to), ["a@a-tel.example"], "b's claim may have gone out before a crash");
+});
+
+test("each inbox sends its own people's day-7 emails, inside its own daily limit and before its new first emails", async () => {
+  const { raw, db } = database();
+  addFollowedUp(raw, "r1", "r1@r1-tel.example", { firstDay: "2026-11-02", secondDay: "2026-11-05", inbox: "riley@mail.example" });
+  addFollowedUp(raw, "a1", "a1@a1-tel.example", { firstDay: "2026-11-02", secondDay: "2026-11-05" });
+  addContact(raw, "fresh", "fresh@fresh-tel.example");
+  recordGo(raw);
+  const monday = new Date("2026-11-09T15:00:00Z");
+  const r = fakeTransport();
+  const riley = config(r.factory, fakeMailbox().factory, { primary: false, fromAddress: "riley@mail.example", fromName: "Riley Hinsperger" });
+  assert.deepEqual(await runFccDailySend(db, riley, monday, { cap: 1 }), {
+    status: "RAN", firstEmails: 0, followUps: 0, day7FollowUps: 1, replied: 0, bounced: 0, suppressed: 0, failed: 0, remainingToday: 0, followUpsHeldBack: null,
+  });
+  assert.deepEqual(r.sent.map((message) => message.to), ["r1@r1-tel.example"]);
+  assert.match(r.sent[0]!.text, /\n\nRiley Hinsperger\nAxiom · /);
+  assert.deepEqual(await runFccDailySend(db, riley, monday, { cap: 1 }), { status: "SKIPPED", reason: "daily cap reached" }, "the day-7 email counts toward the day");
+  const a = fakeTransport();
+  await runFccDailySend(db, config(a.factory, fakeMailbox().factory), monday, { cap: 1 });
+  assert.deepEqual(a.sent.map((message) => message.to), ["a1@a1-tel.example"], "Aidan's inbox sends only its own day-7 email");
+  assert.deepEqual(day7Rows(raw), [
+    { contactId: "a1", sendDay: "2026-11-09", status: "SENT", inbox: "" },
+    { contactId: "r1", sendDay: "2026-11-09", status: "SENT", inbox: "riley@mail.example" },
+  ]);
+  assert.equal(statusOf(raw, "fresh"), "ready", "first emails wait behind the day's follow-ups");
+});
+
+test("new first emails from both inboxes split between the two test subjects by contact id; follow-ups answer under the same subject", async () => {
+  const { raw, db } = database();
+  for (let i = 1; i <= 40; i += 1) addContact(raw, `s${i}`, `p${i}@s${i}-tel.example`, { company: `Company ${i}, LLC` });
+  addNov6Contact(raw, "hot", "hot@hot-tel.example");
+  recordGo(raw);
+  const t = fakeTransport();
+  const r = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), new Date("2026-11-02T15:00:00Z"), { cap: 21 });
+  await runFccDailySend(db, config(r.factory, fakeMailbox().factory, { primary: false, fromAddress: "riley@mail.example" }), new Date("2026-11-02T15:00:00Z"), { cap: 20 });
+  assert.equal(t.sent[0]!.subject, "Did hot Telephone get the FCC's RMD notice?", "the November 6 email keeps its own subject");
+  assert.match(t.sent[0]!.headers["Message-ID"], /^<fcc-nov6-hot-1@/);
+  const firsts = [...t.sent.slice(1), ...r.sent];
+  assert.equal(firsts.length, 40);
+  for (const message of firsts) {
+    const id = /^<fcc-(v7[ab])-(s\d+)-1@/.exec(message.headers["Message-ID"]);
+    assert.ok(id, message.headers["Message-ID"]);
+    assert.equal(id[1], fccSubjectTestCopy(id[2]!), "the contact id picks the subject");
+    const n = id[2]!.slice(1);
+    assert.equal(message.subject, id[1] === "v7a" ? `Question about Company ${n}'s RMD listing` : `Company ${n}'s FCC listing`);
+  }
+  const listing = firsts.filter((message) => message.headers["Message-ID"].startsWith("<fcc-v7b-")).length;
+  assert.ok(listing > 10 && listing < 30, `${listing} of 40 got the listing subject`);
+  for (const sent of [t.sent.slice(1), r.sent]) assert.ok(new Set(sent.map((message) => message.headers["Message-ID"].slice(0, 9))).size === 2, "each inbox sends both subjects");
+
+  const before = { t: t.sent.length, r: r.sent.length };
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), new Date("2026-11-05T15:00:00Z"));
+  await runFccDailySend(db, config(r.factory, fakeMailbox().factory, { primary: false, fromAddress: "riley@mail.example" }), new Date("2026-11-05T15:00:00Z"));
+  const followUps = [...t.sent.slice(before.t), ...r.sent.slice(before.r)];
+  assert.equal(followUps.length, 40);
+  for (const message of followUps) {
+    const original = firsts.find((first) => first.to === message.to)!;
+    assert.equal(message.subject, `Re: ${original.subject}`);
+    assert.equal(message.headers["Message-ID"], original.headers["Message-ID"].replace("-1@", "-2@"));
+  }
+});
+
+test("a hot-list email claimed just before a crash keeps that person out of the March queue after the list closes", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "claimed@claimed-tel.example");
+  addContact(raw, "m2", "other@other-tel.example");
+  addNov6Contact(raw, "h1", "claimed@claimed-tel.example");
+  raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status") VALUES ('crashed','h1',1,'claimed@claimed-tel.example','2026-11-05','<fcc-nov6-h1-1@mail.example>','CLAIMED')`).run();
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), new Date("2026-11-06T15:00:00Z"));
+  assert.deepEqual(t.sent.map((message) => message.to), ["other@other-tel.example"]);
+  assert.deepEqual(["h1", "m1"].map((id) => statusOf(raw, id)), ["ready", "ready"]);
+});
+
+/**
+ * Two weeks of sending from the Nov 1 counts (docs/STATUS.md): 133 people first emailed from Aidan's inbox Oct 28–30
+ * waiting for their day-3 follow-up, 197 on the November 6 list (Aidan's inbox sends it first, Mon–Thu), and Riley's
+ * inbox starting Mon Nov 2 at 15 a day. Each inbox sends its full day (fccDailyMax) every weekday.
+ */
+async function simulateFccWeeks(raw: Database.Database, db: ProspectDb, days: string[]) {
+  const march = [["2026-10-28", 60, "v3"], ["2026-10-29", 53, "v4"], ["2026-10-30", 20, "v4"]] as const;
+  for (const [day, count, copy] of march) {
+    for (let i = 0; i < count; i += 1) {
+      const id = `m-${day}-${i}`;
+      addContact(raw, id, `${id}@${id}.example`);
+      const messageId = copy === "v3" ? `<fcc-${id}-1@mail.example>` : `<fcc-${copy}-${id}-1@mail.example>`;
+      const due = new Date(`${day}T12:00:00Z`);
+      due.setUTCDate(due.getUTCDate() + 3);
+      raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1SentAt" = ?, "step1MessageId" = ?, "step2DueAt" = ? WHERE "id" = ?`)
+        .run(`${day}T15:00:00.000Z`, messageId, due.toISOString().slice(0, 10), id);
+      raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","createdAt") VALUES (?,?,1,?,?,?,'SENT',?)`)
+        .run(`${id}-1`, id, `${id}@${id}.example`, day, messageId, `${day}T15:00:00.000Z`);
+    }
+  }
+  for (let i = 0; i < 197; i += 1) addNov6Contact(raw, `h${i}`, `h${i}@h${i}-tel.example`);
+  for (let i = 0; i < 400; i += 1) addContact(raw, `r${i}`, `r${i}@r${i}-tel.example`);
+  recordGo(raw);
+  const aidan = config(fakeTransport().factory, fakeMailbox().factory);
+  const riley = config(fakeTransport().factory, fakeMailbox().factory, { primary: false, fromAddress: "riley@mail.example", fromName: "Riley Hinsperger" });
+  const limits: Record<string, number> = {};
+  for (const day of days) {
+    for (const inbox of [aidan, riley]) {
+      const cap = await fccDailyMax(db, inbox, 30, day);
+      limits[`${day} ${inbox.primary === false ? "riley" : "aidan"}`] = cap;
+      await runFccDailySend(db, inbox, new Date(`${day}T15:00:00Z`), { cap });
+    }
+  }
+  const sends = raw.prepare(`SELECT s."sendDay" AS day, CASE WHEN s."senderAddress" IS NULL THEN 'aidan' ELSE 'riley' END AS inbox,
+      CASE WHEN c."campaignKey" = ? THEN 'nov6' WHEN s."step" = 1 THEN 'first' WHEN s."step" = 2 THEN 'day3' ELSE 'day7' END AS kind, COUNT(*) AS n
+    FROM "FccCampaignSend" s JOIN "FccCampaignContact" c ON c."id" = s."contactId" WHERE s."status" = 'SENT' AND s."sendDay" >= ? GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`)
+    .all(FCC_NOV6_CAMPAIGN_KEY, days[0]) as Array<{ day: string; inbox: string; kind: string; n: number }>;
+  return { sends, limits };
+}
+
+const WEEKDAYS = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13"];
+
+test("dry run from the Nov 1 counts: the first day-7 emails go Mon Nov 9 from both inboxes, never early and never to the November 6 list", async () => {
+  const { raw, db } = database();
+  const { sends, limits } = await simulateFccWeeks(raw, db, WEEKDAYS);
+  const count = (day: string, inbox: string, kind: string) => sends.find((row) => row.day === day && row.inbox === inbox && row.kind === kind)?.n ?? 0;
+  const firstDay7 = (inbox: string) => sends.find((row) => row.inbox === inbox && row.kind === "day7")?.day;
+  assert.equal(firstDay7("aidan"), "2026-11-09");
+  assert.equal(firstDay7("riley"), "2026-11-09");
+  // Aidan's inbox: the November 6 list Mon–Thu, so the day-3 follow-ups start Thursday and the day-7 ones 4 days later.
+  assert.deepEqual(["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05"].map((day) => count(day, "aidan", "nov6")), [60, 60, 60, 17]);
+  assert.deepEqual(["2026-11-05", "2026-11-06", "2026-11-09"].map((day) => count(day, "aidan", "day3")), [43, 60, 30]);
+  assert.equal(count("2026-11-09", "aidan", "day7"), 30, "Thursday's 43 fall due Monday; the last day-3 follow-ups go first");
+  // Riley's inbox: 15 first emails Mon–Wed, their day-3 follow-ups Thu–Mon, and Monday's people get the day-7 email on Nov 9.
+  assert.deepEqual(["2026-11-02", "2026-11-03", "2026-11-04"].map((day) => count(day, "riley", "first")), [15, 15, 15]);
+  assert.deepEqual(["2026-11-09"].map((day) => [count(day, "riley", "day3"), count(day, "riley", "day7")]), [[15, 15]]);
+
+  for (const row of raw.prepare(`SELECT s3."sendDay" AS d7, s1."sendDay" AS d1, s2."sendDay" AS d2, c."campaignKey" AS key FROM "FccCampaignSend" s3
+      JOIN "FccCampaignContact" c ON c."id" = s3."contactId"
+      JOIN "FccCampaignSend" s1 ON s1."contactId" = s3."contactId" AND s1."step" = 1
+      JOIN "FccCampaignSend" s2 ON s2."contactId" = s3."contactId" AND s2."step" = 2 WHERE s3."step" = 3`).all() as Array<{ d7: string; d1: string; d2: string; key: string }>) {
+    assert.equal(row.key, FCC_CAMPAIGN_KEY);
+    assert.ok(Date.parse(row.d7) - Date.parse(row.d1) >= 7 * 86_400_000 && Date.parse(row.d7) - Date.parse(row.d2) >= 4 * 86_400_000, JSON.stringify(row));
+  }
+  for (const [key, limit] of Object.entries(limits)) {
+    const [day, inbox] = key.split(" ");
+    const total = sends.filter((row) => row.day === day && row.inbox === inbox).reduce((sum, row) => sum + row.n, 0);
+    assert.ok(total <= limit, `${key}: ${total} sent, limit ${limit}`);
+  }
 });
 
 test("the worker's weekday 10am schedule runs only the retired website batch; the FCC tick has its own schedule", async () => {

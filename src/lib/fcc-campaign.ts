@@ -27,14 +27,21 @@ export const FCC_NOV6_CAMPAIGN_KEY = "fcc-nov6-hot";
 export const FCC_NOV6_LAST_SEND_DAY = "2026-11-05";
 export const FCC_DAILY_SEND_CAP = 30;
 export const FCC_FOLLOW_UP_DELAY_DAYS = 3;
-export const FCC_MAX_FOLLOW_UPS = 1;
+/** The day-3 follow-up and the day-7 one. Nothing comes after the day-7 email (Aidan, Nov 1: no day-14 email). */
+export const FCC_MAX_FOLLOW_UPS = 2;
+/** The day-7 follow-up goes this many days after the first email... */
+export const FCC_DAY7_AFTER_FIRST_DAYS = 7;
+/** ...and at least this many after the day-3 one, which runs late when the inbox is busy (the Nov 6 list went first Nov 2–5). */
+export const FCC_DAY7_AFTER_FOLLOW_UP_DAYS = 4;
 /**
  * The copy a founder's go must name (FccCampaignSetting.approvedCopy). Aidan's "v2" email (Notion
  * task, Oct 28) replaced the calmer v3 for every first email from Oct 29; v5 (Nov 1) keeps its words
- * and adds the founders' signature with the site link and logo. Contacts keep the v3 list key;
- * which copy a person got is in their first email's Message-ID ("<fcc-v5-..." for this one).
+ * and adds the founders' signature with the site link and logo; v6 added the one-off November 6
+ * email; v7 adds the day-7 follow-up (Aidan's text, approved Oct 29) and a test of two subjects on
+ * new first emails. Contacts keep the v3 list key; which copy a person got is in their first
+ * email's Message-ID ("<fcc-v7a-..." or "<fcc-v7b-..." from v7).
  */
-export const FCC_COPY_VERSION = "fcc-march1-pack-v6-nov6";
+export const FCC_COPY_VERSION = "fcc-march1-pack-v7-day7";
 
 export type FccFilingRow = {
   business_name: string;
@@ -412,18 +419,57 @@ export function companyPossessive(company: string) {
   return /s$/i.test(name) ? `${name}'` : `${name}'s`;
 }
 
+/**
+ * Each copy's mark in its Message-ID ("<fcc-v5-<contact>-1@..."); a first email without one is the calmer v3.
+ * v7a and v7b are the subject test: the same email as v5, under the question subject (v7a) or
+ * "<company>'s FCC listing" (v7b). nov6 is the one-off November 6 email.
+ */
+const COPY_MARKS = ["v4", "v5", "v7a", "v7b", "nov6"] as const;
+export type FccCopy = "v3" | (typeof COPY_MARKS)[number];
+
 /** Which copy a person's first email used, read from its Message-ID. */
-export function fccCopyOfMessageId(messageId: string | null | undefined): "v3" | "v4" | "v5" {
-  if (messageId?.startsWith("<fcc-v5-")) return "v5";
-  return messageId?.startsWith("<fcc-v4-") ? "v4" : "v3";
+export function fccCopyOfMessageId(messageId: string | null | undefined): FccCopy {
+  return COPY_MARKS.find((mark) => messageId?.startsWith(`<fcc-${mark}-`)) ?? "v3";
+}
+
+/** fccCopyOfMessageId in SQL, over a column holding a first email's Message-ID. */
+export function fccCopySql(column: string) {
+  return `CASE ${COPY_MARKS.map((mark) => `WHEN ${column} LIKE '<fcc-${mark}-%' THEN '${mark}'`).join(" ")} ELSE 'v3' END`;
+}
+
+/**
+ * The subject test on new first emails, from both inboxes: half keep the question subject (v7a),
+ * half get "<company>'s FCC listing" (v7b). Fixed by contact id, so a person keeps their subject
+ * however many times they are looked at, and their follow-ups reply under it.
+ */
+export function fccSubjectTestCopy(contactId: string): "v7a" | "v7b" {
+  let hash = 2166136261;
+  for (const char of contactId) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  // Murmur3's finisher spreads every character over every bit before one bit picks the subject.
+  hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
+  hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35);
+  return ((hash ^ (hash >>> 16)) & 1) === 0 ? "v7a" : "v7b";
+}
+
+/** "Talktone's listing (RMD0001234)", or without the number when the filing has none. */
+function listingName(contact: Pick<FccCampaignContact, "company" | "filings">) {
+  const possessive = companyPossessive(companyShortName(contact.company));
+  const rmd = contact.filings.find((filing) => filing?.rmdNumber?.trim())?.rmdNumber.trim();
+  return rmd ? `${possessive} listing (${rmd})` : `${possessive} listing`;
+}
+
+/** The subject of a person's first email, which every follow-up answers with "Re: ". */
+export function fccFirstEmailSubject(contact: Pick<FccCampaignContact, "company">, copy: FccCopy) {
+  const possessive = companyPossessive(companyShortName(contact.company));
+  if (copy === "v3") return "Your 2026 RMD recertification";
+  if (copy === "nov6") throw new Error("The November 6 email has no follow-up");
+  return copy === "v7b" ? `${possessive} FCC listing` : `Question about ${possessive} RMD listing`;
 }
 
 /** The words of Aidan's "v2" question email (both steps), without any sign-off. */
-function questionEmail(contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">, step: 1 | 2) {
-  const possessive = companyPossessive(companyShortName(contact.company));
-  const rmd = contact.filings.find((filing) => filing?.rmdNumber?.trim())?.rmdNumber.trim();
-  const listing = rmd ? `${possessive} listing (${rmd})` : `${possessive} listing`;
-  const subject = `Question about ${possessive} RMD listing`;
+function questionEmail(contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">, step: 1 | 2, copy: FccCopy = "v5") {
+  const listing = listingName(contact);
+  const subject = fccFirstEmailSubject(contact, copy);
   if (step === 1) {
     return { subject, paragraphs: [
       `Hi ${contact.firstName},`,
@@ -507,20 +553,50 @@ export function fccSignature(signer: FccSigner, mailingAddress: string | null | 
 /**
  * Aidan's question email with the founders' new signature (v5, Nov 1). Same words as v4; the
  * HTML copy adds the signature's link and logo. Follow-ups to v4 first emails use it too.
+ * `copy` only picks the subject: v7b, half of the subject test, names the listing instead.
  */
 export function renderFccEmailV5(
   contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">,
   step: 1 | 2,
   mailingAddress: string | null | undefined,
   signer: FccSigner = { name: "Aidan Magee" },
+  copy: Exclude<FccCopy, "v3" | "nov6"> = "v5",
 ): RenderedFccEmail {
-  const { subject, paragraphs } = questionEmail(contact, step);
+  const { subject, paragraphs } = questionEmail(contact, step, copy);
   const signature = fccSignature(signer, mailingAddress);
   const body = paragraphs.map((text) => `<p style="margin:0 0 14px">${escapeHtml(text)}</p>`).join("\n");
   return {
     subject,
     bodyPlain: [...paragraphs, signature.plain].join("\n\n"),
     bodyHtml: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1f1f1f">\n${body}\n${signature.html}\n</div>`,
+  };
+}
+
+/**
+ * The day-7 follow-up, the third and last email (Aidan's text, approved Oct 29, word for word; on
+ * Nov 1 he kept "I'll close this out after this one" and chose no day-14 email). It answers the
+ * first email in its thread, whichever copy that was, with the first email's merge fields. The
+ * signer is the founder whose inbox sent the first email; the address is the campaign's mailing
+ * address (FCC_CAMPAIGN_MAILING_ADDRESS), never written into code.
+ */
+export function renderFccEmailDay7(
+  contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">,
+  copy: FccCopy,
+  mailingAddress: string | null | undefined,
+  signerName = "Aidan Magee",
+): RenderedFccEmail {
+  const address = String(mailingAddress || "").trim() || ADDRESS_PLACEHOLDER;
+  const paragraphs = [
+    `Hi ${contact.firstName},`,
+    `I'll close this out after this one. For context on why I reached out: in September the FCC removed 14 providers from the Robocall Mitigation Database because their listings were missing required information, and other carriers had two business days to stop taking their calls. Fixing a listing is usually quick once the information is ready, and that's the part I help with.`,
+    `${listingName(contact)} still shows no 2026 recertification. If you'd like the free list of what looks out of date, just reply and I'll send it the same day.`,
+  ];
+  const footer = [signerName.trim() || "Aidan Magee", `Axiom · axiominternational.ca · ${address}`, `Not useful? Reply "no thanks" and I won't contact you again.`];
+  const html = [...paragraphs.map((text) => `<p style="margin:0 0 14px">${escapeHtml(text)}</p>`), `<p style="margin:0 0 14px">${footer.map(escapeHtml).join("<br>\n")}</p>`];
+  return {
+    subject: `Re: ${fccFirstEmailSubject(contact, copy)}`,
+    bodyPlain: [...paragraphs, footer.join("\n")].join("\n\n"),
+    bodyHtml: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1f1f1f">\n${html.join("\n")}\n</div>`,
   };
 }
 

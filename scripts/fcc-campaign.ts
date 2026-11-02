@@ -12,7 +12,8 @@
  *
  * - prepare: dedupes to one row per mailbox, flags generic inboxes, writes the
  *   import file, a held-for-review file and the 30/day send plan.
- * - preview: writes step 1 + step 2 as .eml files you can open in any mail app.
+ * - preview: writes the first email under both test subjects, its day-3 follow-up and the day-7
+ *   one as .eml files you can open in any mail app.
  * - test-send: sends step 1 and step 2 for the first contact to YOUR mailbox
  *   only (needs GMAIL_ACCESS_TOKEN and GMAIL_SENDER_EMAIL). Refuses any other
  *   recipient.
@@ -47,6 +48,7 @@ import {
   checkFccTestRecipient,
   parseFccFilingCsv,
   planFccSendSchedule,
+  renderFccEmailDay7,
   renderFccEmailV5,
   type FccCampaignContact,
 } from "../src/lib/fcc-campaign";
@@ -137,13 +139,21 @@ function preview(csvPath: string, outDir: string) {
   mkdirSync(outDir, { recursive: true });
   const contacts = load(csvPath).filter((c) => c.sendable);
   const samples = [contacts[0], contacts.find((c) => c.filings.length > 1)].filter(Boolean) as FccCampaignContact[];
+  let written = 0;
   for (const [index, contact] of samples.entries()) {
-    for (const step of [1, 2] as const) {
-      const email = renderFccEmailV5(contact, step, mailingAddress);
-      writeFileSync(join(outDir, `preview_${index + 1}_step${step}.eml`), eml(contact.email, email.subject, email.bodyPlain));
+    // Both subjects of the test (v7a keeps the question, v7b names the listing), then the day-7 follow-up.
+    for (const copy of ["v7a", "v7b"] as const) {
+      for (const step of [1, 2] as const) {
+        const email = renderFccEmailV5(contact, step, mailingAddress, undefined, copy);
+        writeFileSync(join(outDir, `preview_${index + 1}_${copy}_step${step}.eml`), eml(contact.email, email.subject, email.bodyPlain));
+        written += 1;
+      }
+      const day7 = renderFccEmailDay7(contact, copy, mailingAddress);
+      writeFileSync(join(outDir, `preview_${index + 1}_${copy}_day7.eml`), eml(contact.email, day7.subject, day7.bodyPlain));
+      written += 1;
     }
   }
-  console.log(`Wrote ${samples.length * 2} previews to ${outDir}`);
+  console.log(`Wrote ${written} previews to ${outDir}`);
 }
 
 async function testSend(csvPath: string, to: string) {

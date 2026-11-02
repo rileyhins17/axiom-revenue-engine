@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import Database from "better-sqlite3";
+
 import {
   FCC_DAILY_SEND_CAP,
   FCC_NOV6_CAMPAIGN_KEY,
@@ -13,9 +15,13 @@ import {
   companyShortName,
   deriveFirstName,
   fccCopyOfMessageId,
+  fccCopySql,
+  fccFirstEmailSubject,
+  fccSubjectTestCopy,
   parseFccFilingCsv,
   planFccSendSchedule,
   renderFccEmail,
+  renderFccEmailDay7,
   renderFccEmailNov6,
   renderFccEmailV4,
   renderFccEmailV5,
@@ -249,4 +255,66 @@ test("schedule never exceeds the daily cap and follow-ups land 3 days later", ()
     assert.equal(gap, 3);
   }
   assert.equal(plan.filter((p) => p.step === 1).length, 83);
+});
+
+test("renders Aidan's day-7 follow-up word for word, with the first email's merge fields and the sending inbox's founder", () => {
+  const address = "257 Example St, Kitchener, ON N2C 0A0, Canada";
+  const contact = { firstName: "Jane", company: "Crocker Communications, LLC", filings: [{ rmdNumber: "RMD0001234" }] as never };
+  const email = renderFccEmailDay7(contact, "v7a", address, "Riley Hinsperger");
+  assert.equal(email.subject, "Re: Question about Crocker Communications' RMD listing");
+  assert.equal(email.bodyPlain, [
+    "Hi Jane,",
+    "I'll close this out after this one. For context on why I reached out: in September the FCC removed 14 providers from the Robocall Mitigation Database because their listings were missing required information, and other carriers had two business days to stop taking their calls. Fixing a listing is usually quick once the information is ready, and that's the part I help with.",
+    "Crocker Communications' listing (RMD0001234) still shows no 2026 recertification. If you'd like the free list of what looks out of date, just reply and I'll send it the same day.",
+    `Riley Hinsperger\nAxiom · axiominternational.ca · ${address}\nNot useful? Reply "no thanks" and I won't contact you again.`,
+  ].join("\n\n"));
+  assert.match(email.bodyHtml, /<p style="margin:0 0 14px">I'll close this out after this one\./);
+  assert.match(email.bodyHtml, /Riley Hinsperger<br>\nAxiom · axiominternational\.ca · 257 Example St, Kitchener, ON N2C 0A0, Canada<br>\nNot useful\? Reply &quot;no thanks&quot; and I won't contact you again\./);
+  assert.doesNotMatch(email.bodyPlain, /https?:|www\./, "no links in the text");
+
+  // The subject answers whichever first email the person got.
+  assert.equal(renderFccEmailDay7(contact, "v5", address).subject, "Re: Question about Crocker Communications' RMD listing");
+  assert.equal(renderFccEmailDay7(contact, "v4", address).subject, "Re: Question about Crocker Communications' RMD listing");
+  assert.equal(renderFccEmailDay7(contact, "v7b", address).subject, "Re: Crocker Communications' FCC listing");
+  assert.equal(renderFccEmailDay7(contact, "v3", address).subject, "Re: Your 2026 RMD recertification");
+  assert.match(renderFccEmailDay7(contact, "v3", address).bodyPlain, /\n\nAidan Magee\nAxiom · /, "Aidan signs when no one else is named");
+  assert.throws(() => renderFccEmailDay7(contact, "nov6", address), /no follow-up/);
+
+  // A filing with no RMD number drops the brackets; a missing address shows the placeholder.
+  const noRmd = renderFccEmailDay7({ firstName: "there", company: "Talktone, Inc.", filings: [{}] as never }, "v7a", null);
+  assert.match(noRmd.bodyPlain, /^Hi there,\n\n/);
+  assert.match(noRmd.bodyPlain, /\n\nTalktone's listing still shows no 2026 recertification\./);
+  assert.match(noRmd.bodyPlain, /\[MAILING ADDRESS GOES HERE\]/);
+});
+
+test("the subject test: half of new first emails keep the question subject, half name the FCC listing, fixed by contact id", () => {
+  const address = "257 Example St, Kitchener, ON N2C 0A0, Canada";
+  const contact = { firstName: "Jane", company: "Talktone, Inc.", filings: [{ rmdNumber: "RMD0009999" }] as never };
+  const question = renderFccEmailV5(contact, 1, address, { name: "Aidan Magee" }, "v7a");
+  const listing = renderFccEmailV5(contact, 1, address, { name: "Aidan Magee" }, "v7b");
+  assert.equal(question.subject, "Question about Talktone's RMD listing", "today's subject");
+  assert.equal(listing.subject, "Talktone's FCC listing", "the same short name the body uses");
+  assert.equal(listing.bodyPlain, question.bodyPlain, "only the subject differs");
+  assert.equal(listing.bodyHtml, question.bodyHtml);
+  assert.equal(renderFccEmailV5(contact, 2, address, { name: "Aidan Magee" }, "v7b").subject, "Re: Talktone's FCC listing");
+  assert.equal(fccFirstEmailSubject({ company: "Crocker Communications" }, "v7b"), "Crocker Communications' FCC listing");
+
+  const uuids = Array.from({ length: 2000 }, () => crypto.randomUUID());
+  const b = uuids.filter((id) => fccSubjectTestCopy(id) === "v7b").length;
+  assert.ok(b > 900 && b < 1100, `${b} of 2000 got the listing subject`);
+  const short = Array.from({ length: 200 }, (_, i) => `c${i}`).filter((id) => fccSubjectTestCopy(id) === "v7b").length;
+  assert.ok(short > 80 && short < 120, `${short} of 200 short ids got the listing subject`);
+  for (const id of uuids.slice(0, 50)) assert.equal(fccSubjectTestCopy(id), fccSubjectTestCopy(id), "the same contact always gets the same subject");
+});
+
+test("every copy is read back from its Message-ID, the November 6 email included, and the SQL agrees", () => {
+  const ids: Array<[string | null, string]> = [
+    ["<fcc-3f2a9c1e-0b7d-4e2a-9c51-1a2b3c4d5e6f-1@gmail.com>", "v3"], ["<fcc-v4-abc-1@gmail.com>", "v4"], ["<fcc-v5-abc-1@gmail.com>", "v5"],
+    ["<fcc-v7a-abc-1@gmail.com>", "v7a"], ["<fcc-v7b-abc-1@gmail.com>", "v7b"], ["<fcc-nov6-abc-1@gmail.com>", "nov6"], [null, "v3"],
+  ];
+  const sqlite = new Database(":memory:");
+  for (const [id, copy] of ids) {
+    assert.equal(fccCopyOfMessageId(id), copy, String(id));
+    assert.deepEqual(sqlite.prepare(`SELECT ${fccCopySql('"m"')} AS copy FROM (SELECT ? AS "m")`).get(id), { copy }, `SQL: ${id}`);
+  }
 });

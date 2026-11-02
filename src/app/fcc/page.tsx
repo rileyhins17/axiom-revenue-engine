@@ -106,7 +106,10 @@ export default async function FccPage() {
       <StatCard icon={MailCheck} label="Sent all time" value={data.sentAllTime.first + data.sentAllTime.followUps} detail={`${data.sentAllTime.first} first, ${data.sentAllTime.followUps} follow-up`} />
       <StatCard icon={Inbox} label="Ready to send" value={data.ready} detail="Waiting for a first email" />
       <StatCard icon={Lock} label="Held" value={data.held} detail="Generic inboxes and holds" />
-      <StatCard icon={Reply} label="Follow-ups due" value={data.followUpsDue} detail={data.followUpsLater && data.nextFollowUpDay ? `${data.followUpsLater} more from ${day(data.nextFollowUpDay)}` : "None scheduled yet"} />
+      <StatCard icon={Reply} label="Follow-ups due" value={data.followUpsDue} detail={[
+        data.day7Due ? `${data.day7Due} of them day-7` : "",
+        data.followUpsLater && data.nextFollowUpDay ? `${data.followUpsLater} more from ${day(data.nextFollowUpDay)}` : data.followUpsDue ? "" : "None scheduled yet",
+      ].filter(Boolean).join(" · ")} />
       <StatCard icon={MailX} label="Bounced today" value={data.bouncesToday} detail="1 or fewer by noon: the second batch goes" />
     </div>
 
@@ -158,7 +161,8 @@ export default async function FccPage() {
       <ul className="owner-list text-sm text-[#3b3a36]">
         <li>Weekdays from 10 a.m.: {data.batchSize} emails, one every 1 to 3 minutes.</li>
         <li>From 12:30: up to {data.batchSize} more, only if 1 or fewer bounced in the morning. {cap} a day at most.</li>
-        <li>One follow-up 3 days later, from the same inbox in the same thread. Anyone who replies or bounces gets nothing more.</li>
+        <li>Two follow-ups, from the same inbox in the same thread: one 3 days after the first email, and a last one about 7 days after it (at least 4 days after the first follow-up). Anyone who replies or bounces gets nothing more, and the last one skips any company where someone else replied, was stopped, bounced or is on hold.</li>
+        <li>New first emails test two subjects, half each: &ldquo;Question about &hellip;&rsquo;s RMD listing&rdquo; and &ldquo;&hellip;&rsquo;s FCC listing&rdquo;. What&rsquo;s working shows replies for each.</li>
         <li>Each inbox keeps its own count. A new inbox starts at 15 a day, then 30 in its second week, then the full amount.</li>
         <li>Every morning from 9, the inboxes are checked for replies, and both founders get an email saying who replied and what they said.</li>
         <li>It pauses itself on a Google warning, Gmail refusing a send, or 3 bounces in a day.</li>
