@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { CircleUserRound, LogOutIcon, MoreHorizontal, UserIcon } from "lucide-react";
+import { CircleUserRound, ImageIcon, LogOutIcon, MoreHorizontal, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -16,6 +16,8 @@ import { isPublicPath } from "@/lib/public-paths";
 import { cn } from "@/lib/utils";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar } from "@/components/ui/avatar";
+import { useProfilePicture } from "@/components/profile-picture";
+import { AVATAR_CHANGED_EVENT } from "@/hooks/use-avatar-upload";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   DropdownMenu,
@@ -48,6 +50,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // A new picture saved from the menu, the phone More sheet or Settings shows everywhere at once.
+  useEffect(() => {
+    const onChanged = (event: Event) => {
+      const image = (event as CustomEvent<string>).detail || null;
+      setSession((current) => (current ? { ...current, user: { ...current.user, image } } : current));
+    };
+    window.addEventListener(AVATAR_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(AVATAR_CHANGED_EVENT, onChanged);
+  }, []);
+
+  const picture = useProfilePicture();
+
   if (isPublicPath(pathname)) {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
@@ -72,6 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       className="owner-app-shell min-h-svh bg-[#f5f4ef] text-[#202c26]"
       style={{ "--sidebar-width": "15rem" } as CSSProperties}
     >
+      {picture.input}
       <a
         href="#main-content"
         className="owner-skip-link sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:border focus:px-3 focus:py-2 focus:text-sm focus:font-semibold"
@@ -134,6 +149,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <UserIcon />
                   Profile & Settings
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => picture.choose()}>
+                  <ImageIcon />
+                  Change profile picture
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
@@ -154,7 +173,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div data-owner-content className="owner-page-content min-w-0 flex-1 px-4 py-6 pb-28 sm:px-6 sm:py-8 md:px-9 md:py-9">{children}</div>
         </HotkeyProvider>
 
-        <MobileTabBar pathname={pathname} email={sessionEmail} onSignOut={async () => { await authClient.signOut(); router.push("/sign-in"); }} />
+        <MobileTabBar pathname={pathname} email={sessionEmail} onChangePicture={picture.choose} onSignOut={async () => { await authClient.signOut(); router.push("/sign-in"); }} />
       </main>
     </SidebarProvider>
     </CallerActivationProvider>
@@ -168,7 +187,7 @@ const PRIMARY_URLS = ["/dashboard", "/fcc"];
  * Phone navigation (the home-screen app on iPhone): thumb-sized tabs and a More sheet,
  * clear of the home indicator.
  */
-function MobileTabBar({ pathname, email, onSignOut }: { pathname: string | null; email: string; onSignOut: () => Promise<void> }) {
+function MobileTabBar({ pathname, email, onChangePicture, onSignOut }: { pathname: string | null; email: string; onChangePicture: () => void; onSignOut: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const primary = APP_NAV_ITEMS.filter((item) => PRIMARY_URLS.includes(item.url));
   const more = APP_NAV_ITEMS.filter((item) => !PRIMARY_URLS.includes(item.url));
@@ -217,6 +236,12 @@ function MobileTabBar({ pathname, email, onSignOut }: { pathname: string | null;
                   </li>
                 );
               })}
+              <li>
+                <button type="button" onClick={() => { setOpen(false); onChangePicture(); }} className="owner-more-item w-full text-left">
+                  <ImageIcon className="size-5" aria-hidden="true" />
+                  <span className="font-semibold">Change profile picture</span>
+                </button>
+              </li>
               <li>
                 <button type="button" onClick={() => { setOpen(false); void onSignOut(); }} className="owner-more-item w-full text-left">
                   <LogOutIcon className="size-5" aria-hidden="true" />

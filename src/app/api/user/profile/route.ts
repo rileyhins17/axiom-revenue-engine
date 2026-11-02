@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/session";
 import { getPrisma } from "@/lib/prisma";
-
-const MAX_IMAGE_BYTES = 200_000;
+import { validateProfileImage } from "@/lib/profile-image";
 
 export async function PATCH(request: Request) {
   const authResult = await requireApiSession(request);
@@ -30,25 +29,9 @@ export async function PATCH(request: Request) {
     if (image === null) {
       data.image = null;
     } else if (typeof image === "string") {
-      if (!image.startsWith("data:image/")) {
-        return NextResponse.json(
-          { error: "Image must be a data URI (data:image/...)" },
-          { status: 400 }
-        );
-      }
-      const base64Part = image.split(",")[1];
-      if (!base64Part) {
-        return NextResponse.json(
-          { error: "Invalid data URI format" },
-          { status: 400 }
-        );
-      }
-      const sizeBytes = Math.ceil((base64Part.length * 3) / 4);
-      if (sizeBytes > MAX_IMAGE_BYTES) {
-        return NextResponse.json(
-          { error: `Image must be under ${MAX_IMAGE_BYTES / 1000}KB` },
-          { status: 400 }
-        );
+      const problem = validateProfileImage(image);
+      if (problem) {
+        return NextResponse.json({ error: problem }, { status: 400 });
       }
       data.image = image;
     }

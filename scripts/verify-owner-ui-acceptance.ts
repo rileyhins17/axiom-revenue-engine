@@ -586,6 +586,12 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     const desktopWidth = await assertResponsive(page, "desktop Today");
     await page.screenshot({ path: join(outputDirectory, "today-desktop.png"), fullPage: true });
 
+    stage = "desktop profile picture option";
+    await page.getByRole("button", { name: "Open account menu" }).click();
+    await page.getByRole("menuitem", { name: "Change profile picture" }).waitFor();
+    await page.screenshot({ path: join(outputDirectory, "profile-picture-desktop.png") });
+    await page.keyboard.press("Escape");
+
     stage = "desktop fcc";
     await page.goto("/fcc", { waitUntil: "load" });
     await page.getByRole("heading", { level: 1, name: "FCC emails" }).waitFor();
@@ -788,6 +794,12 @@ async function runBrowserAcceptance(baseUrl: string, outputDirectory: string) {
     const mobileWidth = await assertResponsive(page, "mobile Today");
     await page.screenshot({ path: join(outputDirectory, "today-mobile.png"), fullPage: true });
 
+    stage = "mobile profile picture option";
+    await page.getByRole("button", { name: "More" }).click();
+    await page.getByRole("button", { name: "Change profile picture" }).waitFor();
+    await page.screenshot({ path: join(outputDirectory, "profile-picture-mobile.png") });
+    await page.keyboard.press("Escape");
+
     await page.goto("/fcc", { waitUntil: "load" });
     await page.getByRole("heading", { level: 1, name: "FCC emails" }).waitFor();
     await assertNav(page, "mobile FCC");
@@ -854,7 +866,7 @@ async function run() {
     server = startNextServer(baseUrl, databasePath, serverLogs);
     await waitForServer(baseUrl, server);
     result = await runBrowserAcceptance(baseUrl, outputDirectory);
-    for (const name of ["today-desktop.png", "today-mobile.png", "prospects-desktop.png", "prospects-mobile.png", "call-queue-mobile.png", "call-queue-mobile-end.png"]) {
+    for (const name of ["today-desktop.png", "today-mobile.png", "prospects-desktop.png", "prospects-mobile.png", "call-queue-mobile.png", "call-queue-mobile-end.png", "profile-picture-desktop.png", "profile-picture-mobile.png"]) {
       await copyIfExists(join(outputDirectory, name), join(OUTPUT_ROOT, name));
     }
     success = true;
