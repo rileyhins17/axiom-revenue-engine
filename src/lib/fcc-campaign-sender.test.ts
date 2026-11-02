@@ -471,7 +471,11 @@ test("a stop on someone's hot-list row also stops the rest of that company's hot
   assert.equal(statusOf(raw, "h2"), "suppressed");
 });
 
-test("only the first inbox sends the hot list, and an added inbox leaves its people alone", async () => {
+const RILEY = { primary: false, fromAddress: "riley@mail.example", fromName: "Riley Hinsperger" };
+const emailedFromAidan = (raw: Database.Database, id: string) =>
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1SentAt" = '2026-10-28T15:00:00.000Z', "step1MessageId" = ?, "step2DueAt" = '2026-12-01' WHERE "id" = ?`).run(`<fcc-${id}-1@mail.example>`, id);
+
+test("an added inbox sends hot-list people no inbox has been in touch with, before anything else, signed by its own founder", async () => {
   const { raw, db } = database();
   addContact(raw, "m1", "on-both@both-tel.example");
   addContact(raw, "m2", "march-only@march-tel.example");
@@ -479,9 +483,84 @@ test("only the first inbox sends the hot list, and an added inbox leaves its peo
   addNov6Contact(raw, "h2", "hot-only@hot-tel.example");
   recordGo(raw);
   const t = fakeTransport();
-  await runFccDailySend(db, config(t.factory, fakeMailbox().factory, { primary: false, fromAddress: "riley@mail.example", fromName: "Riley Hinsperger" }), MONDAY);
-  assert.deepEqual(t.sent.map((message) => message.to), ["march-only@march-tel.example"]);
-  assert.deepEqual(["h1", "h2", "m1"].map((id) => statusOf(raw, id)), ["ready", "ready", "ready"]);
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory, RILEY), MONDAY);
+  assert.deepEqual(t.sent.map((message) => message.to), ["on-both@both-tel.example", "hot-only@hot-tel.example", "march-only@march-tel.example"]);
+  assert.match(t.sent[0]!.headers["Message-ID"], /^<fcc-nov6-/);
+  assert.match(t.sent[0]!.text, /\n\nRiley Hinsperger\n/);
+  assert.equal(t.sent[0]!.headers["List-Unsubscribe"], "<mailto:riley@mail.example?subject=stop>");
+  const rows = raw.prepare(`SELECT "senderAddress" AS inbox, "step2DueAt" AS due FROM "FccCampaignContact" WHERE "id" IN ('h1','h2')`).all();
+  assert.deepEqual(rows, [{ inbox: "riley@mail.example", due: null }, { inbox: "riley@mail.example", due: null }], "a reply is looked for in Riley's inbox, and there is no follow-up");
+  assert.equal(statusOf(raw, "m1"), "ready", "their March row stays out of the queue, as when the first inbox sends it");
+});
+
+test("an added inbox leaves anyone another inbox emailed, their company, and hand-sent holds to the first inbox", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "Mixed.Case@emailed-tel.example");
+  emailedFromAidan(raw, "m1");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'suppressed', "stoppedReason" = 'Signed a 2026 RMD declaration (Jan-Feb)' WHERE "id" = 'm1'`).run();
+  addNov6Contact(raw, "h1", "mixed.case@emailed-tel.example");
+  addContact(raw, "m2", "boss@colleague-tel.example");
+  emailedFromAidan(raw, "m2");
+  addNov6Contact(raw, "h2", "other@colleague-tel.example");
+  addNov6Contact(raw, "h3", "owner@handsent-tel.example");
+  addNov6Contact(raw, "g1", "legal@handsent-tel.example", { sendable: false });
+  addContact(raw, "m3", "free@gmail.com");
+  emailedFromAidan(raw, "m3");
+  addNov6Contact(raw, "h4", "stranger@gmail.com");
+  addNov6Contact(raw, "h5", "free@gmail.com");
+  addNov6Contact(raw, "h6", "fresh@fresh-tel.example");
+  recordGo(raw);
+  const riley = fakeTransport();
+  await runFccDailySend(db, config(riley.factory, fakeMailbox().factory, RILEY), MONDAY);
+  assert.deepEqual(riley.sent.map((message) => message.to), ["stranger@gmail.com", "fresh@fresh-tel.example"], "free mail says nothing about a company, only the person");
+  assert.deepEqual(["h1", "h2", "h3", "h5"].map((id) => statusOf(raw, id)), ["ready", "ready", "ready", "ready"], "left waiting, not stopped");
+
+  const aidan = fakeTransport();
+  await runFccDailySend(db, config(aidan.factory, fakeMailbox().factory), MONDAY);
+  const fromAidan = aidan.sent.map((message) => message.to);
+  for (const email of ["mixed.case@emailed-tel.example", "other@colleague-tel.example", "owner@handsent-tel.example", "free@gmail.com"]) assert.ok(fromAidan.includes(email), `Aidan's inbox still sends ${email}`);
+  assert.ok(!fromAidan.includes("fresh@fresh-tel.example"), "nobody gets it from both inboxes");
+});
+
+test("a signed-2026 hold never emailed doesn't keep a person from an added inbox, because the hot-list line is written for them", async () => {
+  const { raw, db } = database();
+  addContact(raw, "m1", "signed@signed-tel.example");
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'held', "holdReason" = 'Signed a 2026 RMD declaration (Jan-Feb), so they have most likely recertified' WHERE "id" = 'm1'`).run();
+  addNov6Contact(raw, "h1", "signed@signed-tel.example");
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory, RILEY), MONDAY);
+  assert.deepEqual(t.sent.map((message) => message.to), ["signed@signed-tel.example"]);
+});
+
+test("an added inbox's own check stops a hot-list email when the company wrote to that inbox", async () => {
+  const { raw, db } = database();
+  addNov6Contact(raw, "h1", "owner@replied-tel.example");
+  addNov6Contact(raw, "h2", "owner@bounced-tel.example");
+  addNov6Contact(raw, "h3", "owner@fine-tel.example");
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox({ from: ["boss@replied-tel.example"], bounced: ["owner@bounced-tel.example"] }).factory, RILEY), MONDAY);
+  assert.deepEqual(t.sent.map((message) => message.to), ["owner@fine-tel.example"]);
+  assert.deepEqual(["h1", "h2"].map((id) => statusOf(raw, id)), ["replied", "bounced"]);
+});
+
+test("both inboxes on the hot list at once: one claim per person, whoever gets there first", async () => {
+  const { raw, db } = database();
+  for (let i = 0; i < 12; i += 1) addNov6Contact(raw, `h${i}`, `h${i}@h${i}-tel.example`);
+  recordGo(raw);
+  const aidan = fakeTransport();
+  const riley = fakeTransport();
+  for (let run = 0; run < 7; run += 1) {
+    await Promise.all([
+      runFccDailySend(db, config(aidan.factory, fakeMailbox().factory), MONDAY, { limit: 1 }),
+      runFccDailySend(db, config(riley.factory, fakeMailbox().factory, RILEY), MONDAY, { limit: 1 }),
+    ]);
+  }
+  const everyone = [...aidan.sent, ...riley.sent].map((message) => message.to);
+  assert.equal(everyone.length, 12);
+  assert.equal(new Set(everyone).size, 12, "nobody gets two");
+  assert.ok(aidan.sent.length > 0 && riley.sent.length > 0, "both inboxes took some");
 });
 
 test("the hot list closes after its last day, and anyone it never reached rejoins the March queue", async () => {
@@ -853,9 +932,10 @@ test("a hot-list email claimed just before a crash keeps that person out of the 
 });
 
 /**
- * Two weeks of sending from the Nov 1 counts (docs/STATUS.md): 133 people first emailed from Aidan's inbox Oct 28–30
- * waiting for their day-3 follow-up, 197 on the November 6 list (Aidan's inbox sends it first, Mon–Thu), and Riley's
- * inbox starting Mon Nov 2 at 15 a day. Each inbox sends its full day (fccDailyMax) every weekday.
+ * Two weeks of sending from the end of Mon Nov 2 (docs/STATUS.md): 133 people first emailed from Aidan's inbox Oct 28–30
+ * waiting for their day-3 follow-up, Riley's 15 March first emails from Monday, and 202 on the November 6 list still to
+ * go (the 166 left plus the 36 extras). 12 of the 202 were emailed from Aidan's inbox in March, so only it may send them.
+ * Each inbox sends its full day (fccDailyMax) every weekday, with no replies, bounces or stops.
  */
 async function simulateFccWeeks(raw: Database.Database, db: ProspectDb, days: string[]) {
   const march = [["2026-10-28", 60, "v3"], ["2026-10-29", 53, "v4"], ["2026-10-30", 20, "v4"]] as const;
@@ -872,11 +952,28 @@ async function simulateFccWeeks(raw: Database.Database, db: ProspectDb, days: st
         .run(`${id}-1`, id, `${id}@${id}.example`, day, messageId, `${day}T15:00:00.000Z`);
     }
   }
-  for (let i = 0; i < 197; i += 1) addNov6Contact(raw, `h${i}`, `h${i}@h${i}-tel.example`);
+  for (let i = 0; i < 12; i += 1) {
+    const email = `signed${i}@signed${i}-tel.example`;
+    addContact(raw, `s${i}`, email);
+    raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'suppressed', "stoppedReason" = 'Signed a 2026 RMD declaration (Jan-Feb)', "step1SentAt" = '2026-10-29T15:00:00.000Z', "step1MessageId" = ? WHERE "id" = ?`).run(`<fcc-s${i}-1@mail.example>`, `s${i}`);
+    addNov6Contact(raw, `hs${i}`, email);
+  }
+  for (let i = 0; i < 190; i += 1) {
+    const email = `h${i}@h${i}-tel.example`;
+    if (i < 140) addContact(raw, `hm${i}`, email);
+    addNov6Contact(raw, `h${i}`, email);
+  }
   for (let i = 0; i < 400; i += 1) addContact(raw, `r${i}`, `r${i}@r${i}-tel.example`);
+  for (let i = 0; i < 15; i += 1) {
+    const id = `r${i}`;
+    const messageId = `<fcc-v5-${id}-1@mail.example>`;
+    raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent', "step1SentAt" = '2026-11-02T15:00:00.000Z', "step1MessageId" = ?, "step2DueAt" = '2026-11-05', "senderAddress" = 'riley@mail.example' WHERE "id" = ?`).run(messageId, id);
+    raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","createdAt","senderAddress") VALUES (?,?,1,?,'2026-11-02',?,'SENT','2026-11-02T15:00:00.000Z','riley@mail.example')`)
+      .run(`${id}-1`, id, `${id}@${id}-tel.example`, messageId);
+  }
   recordGo(raw);
   const aidan = config(fakeTransport().factory, fakeMailbox().factory);
-  const riley = config(fakeTransport().factory, fakeMailbox().factory, { primary: false, fromAddress: "riley@mail.example", fromName: "Riley Hinsperger" });
+  const riley = config(fakeTransport().factory, fakeMailbox().factory, RILEY);
   const limits: Record<string, number> = {};
   for (const day of days) {
     for (const inbox of [aidan, riley]) {
@@ -892,22 +989,31 @@ async function simulateFccWeeks(raw: Database.Database, db: ProspectDb, days: st
   return { sends, limits };
 }
 
-const WEEKDAYS = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13"];
+const WEEKDAYS = ["2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13"];
 
-test("dry run from the Nov 1 counts: the first day-7 emails go Mon Nov 9 from both inboxes, never early and never to the November 6 list", async () => {
+test("dry run from the end of Nov 2: the November 6 list is done Thursday, both inboxes are equal from Thursday, and day-7 emails start the next week", async () => {
   const { raw, db } = database();
   const { sends, limits } = await simulateFccWeeks(raw, db, WEEKDAYS);
   const count = (day: string, inbox: string, kind: string) => sends.find((row) => row.day === day && row.inbox === inbox && row.kind === kind)?.n ?? 0;
   const firstDay7 = (inbox: string) => sends.find((row) => row.inbox === inbox && row.kind === "day7")?.day;
   assert.equal(firstDay7("aidan"), "2026-11-09");
-  assert.equal(firstDay7("riley"), "2026-11-09");
-  // Aidan's inbox: the November 6 list Mon–Thu, so the day-3 follow-ups start Thursday and the day-7 ones 4 days later.
-  assert.deepEqual(["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05"].map((day) => count(day, "aidan", "nov6")), [60, 60, 60, 17]);
-  assert.deepEqual(["2026-11-05", "2026-11-06", "2026-11-09"].map((day) => count(day, "aidan", "day3")), [43, 60, 30]);
-  assert.equal(count("2026-11-09", "aidan", "day7"), 30, "Thursday's 43 fall due Monday; the last day-3 follow-ups go first");
-  // Riley's inbox: 15 first emails Mon–Wed, their day-3 follow-ups Thu–Mon, and Monday's people get the day-7 email on Nov 9.
-  assert.deepEqual(["2026-11-02", "2026-11-03", "2026-11-04"].map((day) => count(day, "riley", "first")), [15, 15, 15]);
-  assert.deepEqual(["2026-11-09"].map((day) => [count(day, "riley", "day3"), count(day, "riley", "day7")]), [[15, 15]]);
+  assert.equal(firstDay7("riley"), "2026-11-10", "Riley's Monday goes to the day-3 follow-ups of Thursday's and Friday's first emails");
+  // Limits: Riley's inbox climbs to equal Aidan's.
+  assert.deepEqual(WEEKDAYS.slice(0, 4).map((day) => [limits[`${day} aidan`], limits[`${day} riley`]]), [[60, 30], [60, 45], [60, 60], [60, 60]]);
+  // The November 6 list: everyone reached once, by Thursday, its last day.
+  const nov6 = (inbox: string) => WEEKDAYS.map((day) => count(day, inbox, "nov6"));
+  assert.deepEqual(nov6("aidan"), [60, 60, 7, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(nov6("riley"), [30, 45, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal((raw.prepare(`SELECT COUNT(*) AS n FROM "FccCampaignContact" WHERE "campaignKey" = ? AND "status" = 'ready'`).get(FCC_NOV6_CAMPAIGN_KEY) as { n: number }).n, 0);
+  assert.equal((raw.prepare(`SELECT COUNT(DISTINCT "contactId") AS people, COUNT(*) AS emails FROM "FccCampaignSend" s WHERE s."contactId" LIKE 'h%' AND s."sendDay" >= '2026-11-03'`).get() as { people: number; emails: number }).people, 202);
+  assert.equal((raw.prepare(`SELECT COUNT(*) AS n FROM "FccCampaignSend" WHERE "contactId" LIKE 'hs%' AND "senderAddress" IS NOT NULL`).get() as { n: number }).n, 0, "only Aidan's inbox sends people it emailed in March");
+  assert.equal((raw.prepare(`SELECT COUNT(*) AS n FROM "FccCampaignSend" WHERE "contactId" LIKE 'hm%'`).get() as { n: number }).n, 0, "their March rows stay out of the queue");
+  // Aidan's follow-ups start Thursday, with the room the list leaves. Riley's Monday people get theirs Thursday too.
+  assert.deepEqual(["2026-11-05", "2026-11-06", "2026-11-09"].map((day) => count(day, "aidan", "day3")), [53, 60, 20]);
+  assert.equal(count("2026-11-09", "aidan", "day7"), 40, "Thursday's 53 fall due Monday; the last day-3 follow-ups go first");
+  assert.equal(count("2026-11-05", "riley", "day3"), 15);
+  assert.equal(count("2026-11-05", "riley", "first"), 45, "Riley's inbox fills its 60 from the March queue");
+  assert.deepEqual(["2026-11-09", "2026-11-10"].map((day) => [count(day, "riley", "day3"), count(day, "riley", "day7")]), [[60, 0], [45, 15]]);
 
   for (const row of raw.prepare(`SELECT s3."sendDay" AS d7, s1."sendDay" AS d1, s2."sendDay" AS d2, c."campaignKey" AS key FROM "FccCampaignSend" s3
       JOIN "FccCampaignContact" c ON c."id" = s3."contactId"

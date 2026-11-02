@@ -34,8 +34,11 @@ export const FCC_SECOND_BATCH_MAX_BOUNCES = 1;
 /** This many bounces in a day pauses the campaign. */
 export const FCC_PAUSE_BOUNCES = 3;
 export const FCC_AUTO_PAUSE_BY = "the automatic safety check";
-/** An added inbox's daily emails in its first and second week of sending; from week 3 it sends as many as the first inbox. */
-export const FCC_NEW_INBOX_RAMP = [15, 30] as const;
+/**
+ * An added inbox's daily emails on its first, second and third day of sending; from the fourth it sends as many as the
+ * first inbox (Aidan, Nov 2: equal volume). Fast because Riley's Gmail is an old, already-used account: a new domain needs weeks.
+ */
+export const FCC_NEW_INBOX_RAMP = [15, 30, 45] as const;
 
 const TICK_MS = 60_000;
 const JITTER_MS = 15_000;
@@ -67,14 +70,13 @@ export async function fccBouncesToday(db: ProspectDb, day: string, sender?: Pick
     .bind(...(sender ? [day, senderKey(sender)] : [day])).first<{ n: number }>())?.n ?? 0);
 }
 
-/** Most emails `sender` may send on `day`: both batches for the first inbox; the ramp for an added one, counted from its first day. */
+/** Most emails `sender` may send on `day`: both batches for the first inbox; the ramp for an added one, counted in days it has already sent, so a paused day doesn't move it up. */
 export async function fccDailyMax(db: ProspectDb, sender: Pick<FccSendConfig, "fromAddress" | "primary">, dailyCap: number, day: string) {
   const full = Math.min(FCC_DAILY_SEND_CAP, Math.max(0, dailyCap)) * FCC_SEND_WINDOWS.length;
   if (sender.primary !== false) return full;
-  const first = await db.prepare(`SELECT MIN("sendDay") AS day FROM "FccCampaignSend" WHERE "senderAddress" = ? AND "status" IN ('CLAIMED','SENT')`)
-    .bind(sender.fromAddress).first<{ day: string | null }>();
-  const days = first?.day ? Math.round((Date.parse(`${day}T12:00:00Z`) - Date.parse(`${first.day}T12:00:00Z`)) / 86_400_000) : 0;
-  return Math.min(full, FCC_NEW_INBOX_RAMP[Math.floor(days / 7)] ?? full);
+  const earlier = await db.prepare(`SELECT COUNT(DISTINCT "sendDay") AS days FROM "FccCampaignSend" WHERE "senderAddress" = ? AND "sendDay" < ? AND "status" IN ('CLAIMED','SENT')`)
+    .bind(sender.fromAddress, day).first<{ days: number }>();
+  return Math.min(full, FCC_NEW_INBOX_RAMP[Number(earlier?.days ?? 0)] ?? full);
 }
 
 export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now = new Date(), options: FccTickOptions = {}): Promise<FccTickResult> {
