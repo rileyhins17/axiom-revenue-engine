@@ -268,7 +268,7 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   const { results: followUps } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'step1_sent' AND c."step2DueAt" <= ? AND c."step1MessageId" IS NOT NULL
       AND COALESCE(c."senderAddress",'') = ?
-      AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 2 AND s."status" IN ('CLAIMED','SENT'))
+      AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 2 AND s."status" <> 'FAILED')
       AND ${notOnHotList}
     ORDER BY c."step2DueAt", c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, day, inbox, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
   // The day-7 follow-up: anyone who got the first email and the day-3 one (any copy) from this inbox, once it's due.
@@ -281,13 +281,13 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     ORDER BY ${FCC_DAY7_DUE_SQL}, c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, inbox, day, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
   const { results: firsts } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
-      AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
+      AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" <> 'FAILED')
       AND ${notOnHotList}
     ORDER BY CASE c."emailKind" WHEN 'compliance' THEN 0 WHEN 'named' THEN 1 ELSE 2 END, c."createdAt", c."id" LIMIT 200`)
     .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
   const { results: hot } = hotOpen && config.primary !== false ? await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
-      AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" IN ('CLAIMED','SENT'))
+      AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" <> 'FAILED')
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" m WHERE m."email" = c."email" AND m."campaignKey" = ? AND m."status" IN ('replied','bounced','suppressed','held','failed')
         AND COALESCE(m."holdReason",'') || COALESCE(m."stoppedReason",'') NOT LIKE '%Signed a 2026 RMD declaration%')
     ORDER BY c."createdAt", c."id" LIMIT 1000`).bind(FCC_NOV6_CAMPAIGN_KEY, FCC_CAMPAIGN_KEY).all<ContactRow>() : { results: [] as ContactRow[] };
