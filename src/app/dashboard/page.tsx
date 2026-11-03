@@ -41,6 +41,8 @@ export default async function TodayPage() {
   } catch {
     fcc = null;
   }
+  // Out-of-office and other automatic replies need no answer; the reply check saves them as "sent an automatic reply".
+  const toAnswer = (fcc?.replies ?? []).filter((person) => !/automatic reply/i.test(person.note ?? ""));
 
   return <OwnerPage>
     <PageHeader eyebrow={date} title={`${greeting}, ${firstName}.`} />
@@ -77,9 +79,9 @@ export default async function TodayPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Latest replies" icon={Reply} count={fcc.replies.length}
-          description="Answer each one within 2 hours with the saved replies in Gmail.">
-          {fcc.replies.length ? <ul className="owner-list">{fcc.replies.slice(0, 3).map((person) => <li key={`${person.email}-${person.at}`}>
+        <Panel title="Latest replies" icon={Reply} count={toAnswer.length}
+          description="Answer each one within 2 hours with the saved replies in Gmail. Out-of-office and other automatic replies are left out.">
+          {toAnswer.length ? <ul className="owner-list">{toAnswer.slice(0, 3).map((person) => <li key={`${person.email}-${person.at}`}>
             <p className="text-sm font-semibold">{person.company}</p>
             <p className="owner-meta">{when(person.at)}</p>
             {person.note ? <p className="mt-1 line-clamp-3 text-sm text-[#3b3a36]">{person.note}</p> : null}

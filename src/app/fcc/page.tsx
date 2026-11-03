@@ -89,7 +89,6 @@ export default async function FccPage() {
         {data.state === "locked"
           ? <Empty>Locked until a founder gives the go on this email.</Empty>
           : owner ? <FccPauseButton state={data.state} /> : <Empty>Only Riley or Aidan can pause or resume FCC emails.</Empty>}
-        <p className="owner-meta mt-3">This is the only stop for FCC emails. It takes effect before the next email goes.</p>
       </Panel>
     </div>
 

@@ -95,8 +95,10 @@ const BASE = "https://operations.getaxiom.ca";
 const probes = [
   ["/sign-in", (r) => r.status === 200],
   ["/api/health", (r, body) => r.status === 200 && body.includes('"ok":true')],
-  // Signed out, the FCC screen must send people to sign in, never show the campaign.
-  ["/fcc", (r) => r.status === 307 && (r.headers.get("location") ?? "").includes("/sign-in")],
+  // Signed out, the FCC screen must send people to sign in and show none of the campaign. A screen with a
+  // loading state streams as a 200 that redirects inside the page; one without answers 307.
+  ["/fcc", (r, body) => !/Ready to send|Pause FCC emails|Next send/.test(body)
+    && (r.status === 307 ? (r.headers.get("location") ?? "").includes("/sign-in") : r.status === 200 && body.includes("/sign-in"))],
 ];
 const failures = [];
 for (const [pathName, ok] of probes) {

@@ -16,8 +16,9 @@ const Command = z.object({ action: z.enum(["pause", "resume"]) }).strict();
 export async function POST(request: Request) {
   const auth = await requireApiSession(request);
   if ("response" in auth) return auth.response;
-  const actor = auth.session.user.email ?? "";
-  if (!ownerForAccount(actor)) return json({ error: "Only Riley or Aidan can pause or resume FCC emails." }, 403);
+  // The saved note names the founder ("Riley"), as the screens and the health email show it.
+  const owner = ownerForAccount(auth.session.user.email ?? "");
+  if (!owner) return json({ error: "Only Riley or Aidan can pause or resume FCC emails." }, 403);
   const origin = request.headers.get("origin");
   if (!origin || new URL(origin).host !== new URL(request.url).host) return json({ error: "Open this from the Axiom workspace." }, 403);
   const parsed = Command.safeParse(await request.json().catch(() => null));
@@ -25,10 +26,10 @@ export async function POST(request: Request) {
   const db = getDatabase() as unknown as ProspectDb;
   try {
     if (parsed.data.action === "pause") {
-      await pauseFcc(db, "Paused from the FCC screen", actor);
+      await pauseFcc(db, "Paused from the FCC screen", owner.name);
       return json({ state: "paused" });
     }
-    const result = await resumeFcc(db, actor);
+    const result = await resumeFcc(db, owner.name);
     if (result === "LOCKED") return json({ error: "Locked: a founder has to give the go on this email first." }, 409);
     return json({ state: "live" });
   } catch {
