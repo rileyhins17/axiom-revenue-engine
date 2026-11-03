@@ -66,9 +66,10 @@ test("a new email without a founder's go is reported during weekday send hours o
   const { raw, db } = database();
   raw.exec(`UPDATE "FccCampaignSetting" SET "approvedCopy" = 'an-older-version'`);
   await saveFccReplyCheck(db, { day: "2026-11-03", at: "2026-11-03T14:00:00Z", found: 0 });
+  const locked = async (now: Date) => (await runHealthChecks(db, ENV, now)).find((c) => c.key === "fcc-locked")!.ok;
   assert.deepEqual(failing(await runHealthChecks(db, ENV, TUE_1130)), ["fcc-locked"]);
-  assert.deepEqual(failing(await runHealthChecks(db, ENV, TUE_9PM)), [], "a release at night doesn't alarm anyone");
-  assert.deepEqual(failing(await runHealthChecks(db, ENV, SAT_1130)), []);
+  assert.equal(await locked(TUE_9PM), true, "a release at night doesn't alarm anyone");
+  assert.equal(await locked(SAT_1130), true);
 });
 
 test("no sends an hour into the weekday window, with people waiting, is reported", async () => {

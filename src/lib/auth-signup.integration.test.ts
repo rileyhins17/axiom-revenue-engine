@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { readFileSync } from "node:fs";
+
 import { getAuth } from "./auth";
 import { clearServerEnvCache } from "./env";
+import { getLocalDatabase } from "./local-sqlite";
 
 test("the production auth handler rejects an allow-listed first signup before creating a session", async () => {
   const previous = new Map<string, string | undefined>();
@@ -21,6 +24,12 @@ test("the production auth handler rejects an allow-listed first signup before cr
     process.env[key] = value;
   }
   clearServerEnvCache();
+  // The sign-up check counts attempts first, in the table migration 0001 creates on D1.
+  const ddl = readFileSync(new URL("../../migrations/0001_cloudflare_auth_security.sql", import.meta.url), "utf8");
+  const rateLimitTable = ddl.match(/CREATE TABLE "RateLimitWindow"[\s\S]*?\);/)![0];
+  const local = getLocalDatabase() as unknown as { prepare(sql: string): { run(): Promise<unknown> } };
+  await local.prepare(rateLimitTable).run();
+  await local.prepare(`CREATE UNIQUE INDEX "RateLimitWindow_key_key" ON "RateLimitWindow"("key")`).run();
 
   try {
     const response = await getAuth().handler(new Request("https://revenue.getaxiom.ca/api/auth/sign-up/email", {

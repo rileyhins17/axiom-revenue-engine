@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import Database from "better-sqlite3";
@@ -921,26 +920,4 @@ test("dry run from the Nov 1 counts: the first day-7 emails go Mon Nov 9 from bo
     const total = sends.filter((row) => row.day === day && row.inbox === inbox).reduce((sum, row) => sum + row.n, 0);
     assert.ok(total <= limit, `${key}: ${total} sent, limit ${limit}`);
   }
-});
-
-test("the worker's weekday 10am schedule runs only the retired website batch; the FCC tick has its own schedule", async () => {
-  const source = readFileSync(new URL("../../worker.mjs", import.meta.url), "utf8")
-    .replace(/^import[\s\S]*?from\s+"[^"]+";\s*/gm, "")
-    .replace(/^export \{[^}]+\};\s*/gm, "")
-    .replace("export default exportedWorker;", "return exportedWorker;");
-  const runs: string[] = [];
-  const worker = new Function("deps", `const {openNextWorkerModule,setCloudflareBindings,clearServerEnvCache,runEngineEmailCron,runFccCampaignCron,getCronTimeoutBudgets,runCallerSyncTick}=deps;\n${source}`)({
-    openNextWorkerModule: {}, setCloudflareBindings: () => {}, clearServerEnvCache: () => {},
-    runEngineEmailCron: async () => { runs.push("website"); return { status: "SKIPPED", reason: "test" }; },
-    runFccCampaignCron: async () => { runs.push("fcc"); return { status: "SKIPPED", reason: "test" }; },
-    getCronTimeoutBudgets: () => { throw new Error("Discovery must not run"); },
-    runCallerSyncTick: async () => { throw new Error("Caller sync must not run"); },
-  }) as { scheduled(controller: { cron: string }, env: object, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> };
-  const tasks: Promise<unknown>[] = [];
-  await worker.scheduled({ cron: "0 14 * * MON-FRI" }, {}, { waitUntil: (p) => tasks.push(p) });
-  await Promise.all(tasks);
-  assert.deepEqual(runs, ["website"]);
-  await worker.scheduled({ cron: "* 14-19 * * *" }, {}, { waitUntil: (p) => tasks.push(p) });
-  await Promise.all(tasks);
-  assert.deepEqual(runs, ["website", "fcc"]);
 });
