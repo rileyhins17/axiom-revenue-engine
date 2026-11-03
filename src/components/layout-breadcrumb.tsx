@@ -1,67 +1,24 @@
 "use client";
 
-import { Building2, MessageSquareText, User } from "lucide-react";
 import { usePathname } from "next/navigation";
 
-import { ARCHIVED_PAGE_NAMES, getNavItemForPath } from "@/lib/navigation";
+import { getNavItemForPath } from "@/lib/navigation";
 
 export function LayoutBreadcrumb() {
-  const pathname = usePathname();
-  const route = getNavItemForPath(pathname);
-
-  if (pathname === "/leads/m2/identity") {
-    return (
-      <div className="owner-breadcrumb flex min-w-0 items-center gap-3 text-sm">
-        <div className="owner-breadcrumb-icon grid size-8 shrink-0 place-items-center rounded-lg">
-          <Building2 className="size-3.5" aria-hidden="true" />
-        </div>
-        <span className="truncate font-semibold tracking-tight">Review businesses</span>
-      </div>
-    );
-  }
-
-  if (pathname === "/leads/m2") {
-    return (
-      <div className="owner-breadcrumb flex min-w-0 items-center gap-3 text-sm">
-        <div className="owner-breadcrumb-icon grid size-8 shrink-0 place-items-center rounded-lg">
-          <Building2 className="size-3.5" aria-hidden="true" />
-        </div>
-        <span className="truncate font-semibold tracking-tight">Business review</span>
-      </div>
-    );
-  }
-
-  if (pathname?.match(/^\/lead\/\d+/)) {
-    return (
-      <div className="owner-breadcrumb flex items-center gap-2.5 text-sm">
-        <div className="owner-breadcrumb-icon grid size-8 place-items-center rounded-lg">
-          <MessageSquareText className="size-3.5" />
-        </div>
-        <span className="font-semibold tracking-tight">Business record</span>
-        <span className="text-[#9aa49e]">›</span>
-        <span className="flex items-center gap-1.5 text-[#68766e]">
-          <User className="size-3.5" />
-          Record
-        </span>
-      </div>
-    );
-  }
+  const route = getNavItemForPath(usePathname());
 
   if (route) {
     const Icon = route.icon;
-    const archived = pathname ? ARCHIVED_PAGE_NAMES[pathname] : undefined;
     return (
       <div className="owner-breadcrumb flex min-w-0 items-center gap-2.5 text-sm">
         <Icon className="size-4 shrink-0 text-[#8a6420]" aria-hidden="true" />
         <div className="flex min-w-0 items-baseline gap-2">
           <span className="truncate font-semibold tracking-tight">{route.label}</span>
-          {archived
-            ? <><span className="text-[#8a857a]" aria-hidden="true">›</span><span className="truncate font-medium text-[#3b3a36]">{archived}</span></>
-            : <span className="hidden truncate text-xs text-[#5c584f] md:inline">{route.description}</span>}
+          <span className="hidden truncate text-xs text-[#5c584f] md:inline">{route.description}</span>
         </div>
       </div>
     );
   }
 
-  return <span className="owner-breadcrumb text-sm font-semibold tracking-tight">Axiom Web</span>;
+  return <span className="owner-breadcrumb text-sm font-semibold tracking-tight">Axiom</span>;
 }

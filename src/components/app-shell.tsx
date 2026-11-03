@@ -6,11 +6,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
-import { CallerActivationProvider } from "@/components/prospects/caller-launch";
 import { AppSidebar } from "@/components/app-sidebar";
 import { LayoutBreadcrumb } from "@/components/layout-breadcrumb";
-import { SearchTrigger } from "@/components/system/search-trigger";
-import { HotkeyProvider } from "@/components/system/hotkey-provider";
 import { APP_NAV_ITEMS, getNavItemForPath } from "@/lib/navigation";
 import { isPublicPath } from "@/lib/public-paths";
 import { cn } from "@/lib/utils";
@@ -81,7 +78,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   })();
 
   return (
-    <CallerActivationProvider identity={session?.user?.email??null}>
     <SidebarProvider
       className="owner-app-shell min-h-svh bg-[#f5f4ef] text-[#202c26]"
       style={{ "--sidebar-width": "15rem" } as CSSProperties}
@@ -106,7 +102,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="min-w-0 flex-1">
               <div className="hidden md:block"><LayoutBreadcrumb /></div>
             </div>
-            <div className="owner-search-trigger"><SearchTrigger /></div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -169,18 +164,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <HotkeyProvider>
-          <div data-owner-content className="owner-page-content min-w-0 flex-1 px-4 py-6 pb-28 sm:px-6 sm:py-8 md:px-9 md:py-9">{children}</div>
-        </HotkeyProvider>
+        <div data-owner-content className="owner-page-content min-w-0 flex-1 px-4 py-6 pb-28 sm:px-6 sm:py-8 md:px-9 md:py-9">{children}</div>
 
         <MobileTabBar pathname={pathname} email={sessionEmail} onChangePicture={picture.choose} onSignOut={async () => { await authClient.signOut(); router.push("/sign-in"); }} />
       </main>
     </SidebarProvider>
-    </CallerActivationProvider>
   );
 }
 
-/** The places used all day; everything else (including the archive) lives under More. */
+/** The places used all day; Settings and the account actions live under More. */
 const PRIMARY_URLS = ["/dashboard", "/fcc"];
 
 /**
@@ -191,7 +183,6 @@ function MobileTabBar({ pathname, email, onChangePicture, onSignOut }: { pathnam
   const [open, setOpen] = useState(false);
   const primary = APP_NAV_ITEMS.filter((item) => PRIMARY_URLS.includes(item.url));
   const more = APP_NAV_ITEMS.filter((item) => !PRIMARY_URLS.includes(item.url));
-  // Archived screens count as Archive, which lives under More.
   const current = getNavItemForPath(pathname)?.url;
   const moreActive = more.some((item) => item.url === current);
 
@@ -202,7 +193,7 @@ function MobileTabBar({ pathname, email, onChangePicture, onSignOut }: { pathnam
           const active = item.url === current;
           const Icon = item.icon;
           return (
-            <Link key={item.url} href={item.url} prefetch aria-current={active ? "page" : undefined}
+            <Link key={item.url} href={item.url} aria-current={active ? "page" : undefined}
               className={cn("owner-mobile-nav-item", active ? "is-active" : "")}>
               <Icon className="size-[22px]" aria-hidden="true" />
               <span>{item.label}</span>

@@ -1,21 +1,18 @@
+import { readFccReplyCheck } from "@/lib/fcc-campaign-control";
+import { torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
+import { fccScreen } from "@/lib/fcc-campaign-status";
+import { FCC_SEND_WINDOWS, torontoMinute } from "@/lib/fcc-campaign-tick";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
-import { torontoMidnight } from "@/lib/prospect-format";
 
 /**
  * Self-check that runs every 15 minutes on the live Worker. Read-only: it never
  * changes business data or switches, it only tells Riley and Aidan when something
- * is wrong, in plain words, and when it is fixed again.
+ * is wrong with FCC sending, in plain words, and when it is fixed again.
  */
 export type HealthCheck = { key: string; ok: boolean; problem: string; fix: string };
 export type HealthEnv = Record<string, unknown>;
 
-const DELIVERED = "('delivered','synced','completed','received','accepted')";
-const hoursAgo = (now: Date, hours: number) => new Date(now.getTime() - hours * 3_600_000).toISOString();
-
-async function count(db: ProspectDb, sql: string, ...binds: unknown[]) {
-  const row = await db.prepare(sql).bind(...binds).first<{ n: number }>();
-  return Number(row?.n ?? 0);
-}
+const when = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 
 export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new Date()): Promise<HealthCheck[]> {
   const checks: HealthCheck[] = [];
@@ -23,59 +20,47 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
 
   let dbOk = true;
   try { await db.prepare("SELECT 1 AS n").bind().first(); } catch { dbOk = false; }
-  add("database", dbOk, "The app can't reach its database, so lists and call logging won't load.", "Usually Cloudflare fixes this itself within minutes. If it lasts over an hour, ask Claude to check the Cloudflare D1 status.");
+  add("database", dbOk, "The app can't reach its database, so no FCC emails can go out and the FCC screen won't load.", "Usually Cloudflare fixes this itself within minutes. If it lasts over an hour, ask Claude to check the Cloudflare D1 status.");
   if (!dbOk) return checks;
-
-  const safe = async <T,>(work: () => Promise<T>, fallback: T) => { try { return await work(); } catch { return fallback; } };
-
-  const stops = await safe(async () => (await db.prepare(`SELECT enabled||globalPaused||emergencyPaused||intakePaused||followUpsPaused AS s FROM OutreachAutomationSetting LIMIT 1`).bind().first<{ s: string }>())?.s ?? null, null);
-  add("safety-switches", stops === null || stops === "01111", "The old automatic outreach switches were changed from their safe OFF position.", "Nobody should turn these on. Ask Claude to review what changed and switch them back off.");
 
   add("login-email", Boolean(env.LOGIN_EMAIL), "Sign-in codes can't be emailed, so nobody can log in.", "Ask Claude to restore the LOGIN_EMAIL email binding and redeploy.");
 
-  if (env.CALLER_V2_ENABLED !== undefined) {
-    add("caller-enabled", env.CALLER_V2_ENABLED === "true", "Connected calling is switched off, so the Caller extension can't start new calls.", "If nobody meant to turn it off, ask Claude to set CALLER_V2_ENABLED back to true.");
-  }
+  let fcc: Awaited<ReturnType<typeof fccScreen>> | null = null;
+  try { fcc = await fccScreen(db, now); } catch { fcc = null; }
+  add("fcc-screen", fcc !== null, "The FCC numbers can't be read, so the FCC screen and these checks are blind.", "Ask Claude to check the Worker logs for the FCC status queries.");
+  if (!fcc) return checks;
 
-  const stuck = await safe(() => count(db, `SELECT COUNT(*) AS n FROM CallerProjection WHERE status NOT IN ${DELIVERED} AND nextAttemptAt < ?`, hoursAgo(now, 2)), 0);
-  add("caller-sync", stuck === 0, `${stuck} saved call${stuck === 1 ? " hasn't" : "s haven't"} reached Orbit for over 2 hours.`, "The calls are safe in the engine. Open Settings and press Retry on the Caller sync, or ask Claude to check the Orbit link.");
-  const stuckStops = await safe(() => count(db, `SELECT COUNT(*) AS n FROM CallerStopDelivery WHERE status NOT IN ${DELIVERED} AND nextAttemptAt < ?`, hoursAgo(now, 1)), 0);
-  add("do-not-contact-sync", stuckStops === 0, `${stuckStops} "do not contact" request${stuckStops === 1 ? " hasn't" : "s haven't"} reached Orbit for over an hour.`, "Important: don't call those businesses from Orbit. Ask Claude to check the Orbit link.");
+  const weekday = !["Sat", "Sun"].includes(torontoWeekday(now));
+  const minute = torontoMinute(now);
+  const [first] = FCC_SEND_WINDOWS;
 
-  const failedEmails = await safe(() => count(db, `SELECT COUNT(*) AS n FROM EngineEmailSend WHERE status = 'FAILED' AND createdAt >= ?`, hoursAgo(now, 24)), 0);
-  add("email-sending", failedEmails === 0, `${failedEmails} automatic email${failedEmails === 1 ? "" : "s"} failed to send in the last day.`, "Check the Zoho mailbox is still active, or turn automatic email off on the Email page and ask Claude.");
+  // The sender pauses itself on a Google warning, a refused send or 3 bounces in a day, and until now nobody heard.
+  const paused = fcc.state === "paused";
+  const control = fcc.control?.action === "paused" ? fcc.control : null;
+  add("fcc-paused", !paused,
+    `FCC emails are paused${control ? `: ${control.reason ?? "no reason saved"} (${control.by}, ${when(control.at)})` : ""}. Nothing sends until someone presses Resume.`,
+    "Read the reason on the FCC screen. Once it's sorted, press Resume there (it only reopens an email you've both approved).");
 
-  // The weekday 7am lead search and the Google key behind it. Checked from 8:30 on
-  // weekdays, so a schedule that stopped or a key Google rejects shows up that morning.
-  const local = new Date(now.toLocaleString("en-US", { timeZone: "America/Toronto" }));
-  const afterMorningRun = local.getDay() >= 1 && local.getDay() <= 5 && local.getHours() * 60 + local.getMinutes() >= 8 * 60 + 30;
-  const leadSearch = await safe(async () => ({
-    ranToday: !afterMorningRun || await count(db, `SELECT COUNT(*) AS n FROM "DiscoveryRun" WHERE "trigger" = 'SCHEDULE' AND "startedAt" >= ?`, torontoMidnight(now)) > 0,
-    rejected: await count(db, `SELECT COUNT(*) AS n FROM (SELECT "stopReason" FROM "DiscoveryRun" WHERE "startedAt" >= ? ORDER BY "startedAt" DESC LIMIT 1)
-      WHERE "stopReason" LIKE '%key isn''t set up%' OR "stopReason" LIKE 'Google returned an error (4%'`, hoursAgo(now, 24)) > 0,
-  }), { ranToday: true, rejected: false });
-  add("lead-search", leadSearch.ranToday && !leadSearch.rejected,
-    leadSearch.rejected ? "Google turned down the last lead search, so no new businesses are being found." : "This morning's automatic lead search didn't run, so no new businesses were added today.",
-    leadSearch.rejected ? "Ask Claude to check the Google Places key on the Worker (ENGINE_PLACES_KEY or GOOGLE_PLACES_API_KEY)." : "Press \"Find new leads now\" on Today, then ask Claude to check the Worker's 7am schedule.");
+  // A new email version stops all sending until a founder's go names it. Only judged in weekday send hours.
+  const sendHours = weekday && minute >= 9 * 60 && minute < 16 * 60;
+  add("fcc-locked", !(sendHours && fcc.state === "locked"),
+    "FCC emails are locked: the current email has no founder's go yet, so nothing is sending today.",
+    "If you've both read and approved the new email, ask Claude to record the go. If not, it stays locked on purpose.");
 
-  // The cloud website check (axiom-site-check Worker) runs every 10 minutes on weekdays.
-  // Only judged 8:00-19:00 while businesses are waiting, so a quiet queue is never a fault.
-  const businessHours = local.getDay() >= 1 && local.getDay() <= 5 && local.getHours() >= 8 && local.getHours() < 19;
-  const siteCheck = await safe(async () => {
-    if (!businessHours || await count(db, `SELECT COUNT(*) AS n FROM "DiscoveryHeld" WHERE "status" = 'WAITING'`) === 0) return { stalled: false, failing: false };
-    const recent = await db.prepare(`SELECT COUNT(*) AS runs, COALESCE(SUM("checked"),0) AS checked, COALESCE(SUM("failed"),0) AS failed FROM "SiteCheckRun" WHERE "startedAt" >= ?`)
-      .bind(hoursAgo(now, 1)).first<{ runs: number; checked: number; failed: number }>();
-    const lastThree = await db.prepare(`SELECT COALESCE(SUM("checked"),0) AS checked, COALESCE(SUM("failed"),0) AS failed FROM "SiteCheckRun" WHERE "startedAt" >= ?`)
-      .bind(hoursAgo(now, 3)).first<{ checked: number; failed: number }>();
-    return { stalled: Number(recent?.runs ?? 0) === 0, failing: Number(lastThree?.checked ?? 0) === 0 && Number(lastThree?.failed ?? 0) >= 6 };
-  }, { stalled: false, failing: false });
-  add("website-check", !siteCheck.stalled && !siteCheck.failing,
-    siteCheck.failing ? "The website check can't open any websites right now, so businesses with a site aren't being graded." : "The website check hasn't run in the last hour, so businesses with a site aren't reaching the call list.",
-    "Calling is not affected. Ask Claude to check the axiom-site-check Worker (Cloudflare Browser Run) and its SITE_CHECK_ENABLED setting.");
+  // Live, with people waiting, and nothing out an hour after the first window opened: something is stuck.
+  const sentToday = fcc.sentToday.first + fcc.sentToday.followUps;
+  const waiting = fcc.ready + fcc.followUpsDue;
+  const stalled = weekday && fcc.state === "live" && fcc.batchSize > 0 && waiting > 0 && minute >= first.start + 60 && minute < 16 * 60 && sentToday === 0;
+  add("fcc-sending", !stalled,
+    `No FCC emails have gone out today, though sending is live and ${waiting} ${waiting === 1 ? "is" : "are"} waiting.`,
+    `Look at "Last check" on the FCC screen for the reason, then ask Claude to read the Worker logs.`);
 
-  const budget = Number(env.AI_MONTHLY_BUDGET_USD ?? 5) || 5;
-  const spent = await safe(async () => Number((await db.prepare(`SELECT COALESCE(SUM("costMicroUsd"),0) AS n FROM "AiUsage" WHERE "month" = ?`).bind(now.toISOString().slice(0, 7)).first<{ n: number }>())?.n ?? 0) / 1_000_000, 0);
-  add("ai-budget", spent < budget * 0.9, `AI has used US$${spent.toFixed(2)} of its US$${budget.toFixed(2)} monthly budget. AI briefs and Ask AI stop at the limit.`, "It resets on the 1st. Nothing to do unless you want a higher cap.");
+  // The 9 a.m. reply check emails both founders who wrote back. If it hasn't finished by 10:30, replies sit unseen.
+  const replyCheck = await readFccReplyCheck(db).catch(() => null);
+  const replyCheckLate = minute >= 10 * 60 + 30 && replyCheck?.day !== torontoDay(now);
+  add("fcc-reply-check", !replyCheckLate,
+    "Today's 9 a.m. reply check hasn't finished, so replies may be waiting in the inboxes unseen.",
+    "Check both Gmail inboxes yourself today, then ask Claude to look at the reply check (an inbox's app password may have changed).");
 
   return checks;
 }
@@ -104,16 +89,28 @@ export async function recordAndSelectAlerts(db: ProspectDb, checks: HealthCheck[
   return { newProblems, reminders, fixed };
 }
 
+/** What each check says once it's fine again. */
+const FIXED: Record<string, string> = {
+  database: "The database is reachable again.",
+  "login-email": "Sign-in codes can be emailed again.",
+  "fcc-screen": "The FCC numbers can be read again.",
+  "fcc-paused": "FCC emails are no longer paused.",
+  "fcc-locked": "The new FCC email has a founder's go, so sending can start.",
+  "fcc-sending": "FCC emails are going out again.",
+  "fcc-reply-check": "Today's reply check has finished.",
+};
+const fixedText = (check: HealthCheck) => FIXED[check.key] ?? `${check.key.replace(/-/g, " ")} is working again.`;
+
 export function alertEmail(alerts: Awaited<ReturnType<typeof recordAndSelectAlerts>>) {
   const broken = [...alerts.newProblems, ...alerts.reminders];
   if (!broken.length && !alerts.fixed.length) return null;
   const subject = broken.length
-    ? `⚠️ Axiom engine: ${broken.length === 1 ? broken[0]!.problem.split(".")[0] : `${broken.length} things need attention`}`
-    : `✅ Axiom engine: fixed (${alerts.fixed.length === 1 ? alerts.fixed[0]!.key.replace(/-/g, " ") : `${alerts.fixed.length} issues`})`;
+    ? `⚠️ Axiom engine: ${broken.length === 1 ? broken[0]!.problem.split(/[.:]/)[0] : `${broken.length} things need attention`}`
+    : `✅ Axiom engine: ${alerts.fixed.length === 1 ? fixedText(alerts.fixed[0]!).replace(/\.$/, "") : `${alerts.fixed.length} issues fixed`}`;
   const lines: string[] = [];
   if (alerts.newProblems.length) lines.push("Something just went wrong:", ...alerts.newProblems.flatMap((c) => [`• ${c.problem}`, `  What to do: ${c.fix}`]), "");
   if (alerts.reminders.length) lines.push("Still not fixed (daily reminder):", ...alerts.reminders.flatMap((c) => [`• ${c.problem}`, `  What to do: ${c.fix}`]), "");
-  if (alerts.fixed.length) lines.push("Fixed now, no action needed:", ...alerts.fixed.map((c) => `• ${c.key.replace(/-/g, " ")} is working again.`), "");
+  if (alerts.fixed.length) lines.push("Fixed now, no action needed:", ...alerts.fixed.map((c) => `• ${fixedText(c)}`), "");
   lines.push("This is an automatic check that runs every 15 minutes on operations.getaxiom.ca. You'll only hear from it when something changes.");
   const text = lines.join("\n");
   const html = `<!doctype html><html><body style="margin:0;background:#f7f5ef;font-family:Inter,Segoe UI,Arial,sans-serif;color:#0a0a0a"><div style="max-width:560px;margin:24px auto;background:#fffdf8;border:1px solid #e6e1d6;border-radius:14px;overflow:hidden"><div style="background:#0a0a0a;color:#f2f0ea;padding:16px 22px;font-size:12px;letter-spacing:.24em;font-weight:700">AXIOM · HEALTH</div><pre style="white-space:pre-wrap;font-family:inherit;font-size:14px;line-height:1.55;margin:0;padding:20px 22px">${text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!)}</pre></div></body></html>`;

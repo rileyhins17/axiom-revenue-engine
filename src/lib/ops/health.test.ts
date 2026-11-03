@@ -4,95 +4,96 @@ import test from "node:test";
 
 import Database from "better-sqlite3";
 
+import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION } from "@/lib/fcc-campaign";
+import { pauseFcc, resumeFcc, saveFccReplyCheck } from "@/lib/fcc-campaign-control";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
+import { applyEngineSchema } from "@/lib/revenue-engine/test-support/engine-schema";
 
 import { alertEmail, recordAndSelectAlerts, runHealthChecks } from "./health";
 
+// Tue Nov 3 2026 (EST, UTC-5).
+const TUE_8AM = new Date("2026-11-03T13:00:00Z");
+const TUE_1130 = new Date("2026-11-03T16:30:00Z");
+const TUE_9PM = new Date("2026-11-04T02:00:00Z");
+const SAT_1130 = new Date("2026-11-07T16:30:00Z");
+const ENV = { LOGIN_EMAIL: {} };
+
 function database() {
   const raw = new Database(":memory:");
-  raw.exec(readFileSync("migrations/0080_health_alerts.sql", "utf8"));
-  raw.exec(`CREATE TABLE OutreachAutomationSetting (enabled INT, globalPaused INT, emergencyPaused INT, intakePaused INT, followUpsPaused INT);
-    INSERT INTO OutreachAutomationSetting VALUES (0,1,1,1,1);
-    CREATE TABLE CallerProjection (status TEXT, nextAttemptAt TEXT);
-    CREATE TABLE CallerStopDelivery (status TEXT, nextAttemptAt TEXT);
-    CREATE TABLE EngineEmailSend (status TEXT, createdAt TEXT);
-    CREATE TABLE AiUsage (month TEXT, costMicroUsd INT);`);
+  applyEngineSchema(raw);
+  raw.exec(readFileSync("migrations/0037_kv_store.sql", "utf8"));
   const db: ProspectDb = { prepare(sql) { const s = raw.prepare(sql); return { bind: (...v: unknown[]) => ({
     all: async <T,>() => ({ results: s.all(...v) as T[] }), first: async <T,>() => (s.get(...v) as T | undefined) ?? null, run: async () => s.run(...v),
   }) }; } };
+  // Live, with a founder's go on the current email, one company ready and today's reply check done.
+  raw.prepare(`UPDATE "FccCampaignSetting" SET "enabled" = 1, "approvedCopy" = ?, "goBy" = 'Aidan', "goAt" = '2026-11-01T21:03:00Z' WHERE "id" = 1`).run(FCC_COPY_VERSION);
+  raw.prepare(`INSERT INTO "FccCampaignContact" ("id","campaignKey","email","firstName","company","filingsJson","emailKind","sendable","status","createdAt","updatedAt")
+    VALUES ('c1',?,'jo@x.example','Jo','Co','[]','named',1,'ready','2026-10-26T00:00:00Z','2026-10-26T00:00:00Z')`).run(FCC_CAMPAIGN_KEY);
   return { raw, db };
 }
-const ENV = { LOGIN_EMAIL: {}, CALLER_V2_ENABLED: "true", AI_MONTHLY_BUDGET_USD: "5" };
-const NOW = new Date("2026-09-25T20:00:00Z");
+const failing = (checks: Awaited<ReturnType<typeof runHealthChecks>>) => checks.filter((c) => !c.ok).map((c) => c.key).sort();
+const sendOne = (raw: Database.Database, day: string) => raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status") VALUES ('s1','c1',1,'jo@x.example',?,'<m1>','SENT')`).run(day);
 
-test("a healthy system reports no problems and sends no email", async () => {
-  const { db } = database();
-  const checks = await runHealthChecks(db, ENV, NOW);
-  assert.equal(checks.every((c) => c.ok), true, JSON.stringify(checks.filter((c) => !c.ok)));
-  assert.equal(alertEmail(await recordAndSelectAlerts(db, checks, NOW)), null);
+test("a live campaign that sent today and checked its replies reports no problems and sends no email", async () => {
+  const { raw, db } = database();
+  sendOne(raw, "2026-11-03");
+  await saveFccReplyCheck(db, { day: "2026-11-03", at: "2026-11-03T14:00:00Z", found: 0 });
+  const checks = await runHealthChecks(db, ENV, TUE_1130);
+  assert.deepEqual(failing(checks), []);
+  assert.equal(alertEmail(await recordAndSelectAlerts(db, checks, TUE_1130)), null);
 });
 
-test("problems email once, remind daily, and announce the fix", async () => {
+test("a pause emails both founders once with the reason, reminds daily, and says when it's fixed", async () => {
   const { raw, db } = database();
-  raw.exec(`INSERT INTO CallerProjection VALUES ('pending','2026-09-25T10:00:00Z'); UPDATE OutreachAutomationSetting SET enabled=1;`);
-  const broken = await runHealthChecks(db, { ...ENV, CALLER_V2_ENABLED: "false" }, NOW);
-  assert.deepEqual(broken.filter((c) => !c.ok).map((c) => c.key).sort(), ["caller-enabled", "caller-sync", "safety-switches"]);
-  const first = alertEmail(await recordAndSelectAlerts(db, broken, NOW));
-  assert.match(first!.subject, /3 things need attention/);
-  assert.match(first!.text, /What to do:/);
-  assert.equal(alertEmail(await recordAndSelectAlerts(db, broken, new Date(NOW.getTime() + 15 * 60_000))), null, "no repeat email 15 minutes later");
-  const nextDay = alertEmail(await recordAndSelectAlerts(db, broken, new Date(NOW.getTime() + 25 * 3_600_000)));
-  assert.match(nextDay!.text, /Still not fixed/);
-  raw.exec(`DELETE FROM CallerProjection; UPDATE OutreachAutomationSetting SET enabled=0;`);
-  const fixed = alertEmail(await recordAndSelectAlerts(db, await runHealthChecks(db, ENV, NOW), new Date(NOW.getTime() + 26 * 3_600_000)));
-  assert.match(fixed!.subject, /fixed/);
-  assert.match(fixed!.text, /working again/);
+  sendOne(raw, "2026-11-03");
+  await saveFccReplyCheck(db, { day: "2026-11-03", at: "2026-11-03T14:00:00Z", found: 0 });
+  await pauseFcc(db, "3 bounces today", "the automatic check", TUE_8AM);
+  const paused = await runHealthChecks(db, ENV, TUE_1130);
+  assert.deepEqual(failing(paused), ["fcc-paused"]);
+  const first = alertEmail(await recordAndSelectAlerts(db, paused, TUE_1130));
+  assert.match(first!.subject, /FCC emails are paused/);
+  assert.match(first!.text, /3 bounces today \(the automatic check/);
+  assert.match(first!.text, /press Resume/);
+  assert.equal(alertEmail(await recordAndSelectAlerts(db, paused, new Date(TUE_1130.getTime() + 15 * 60_000))), null, "no repeat 15 minutes later");
+  assert.match(alertEmail(await recordAndSelectAlerts(db, paused, new Date(TUE_1130.getTime() + 25 * 3_600_000)))!.text, /Still not fixed/);
+  assert.equal(await resumeFcc(db, "Riley", TUE_1130), "RESUMED");
+  const fixed = alertEmail(await recordAndSelectAlerts(db, await runHealthChecks(db, ENV, TUE_1130), new Date(TUE_1130.getTime() + 26 * 3_600_000)));
+  assert.match(fixed!.subject, /FCC emails are no longer paused/);
+  assert.match(fixed!.text, /Fixed now/);
 });
 
-test("missing sign-in email and a near-empty AI budget are reported", async () => {
+test("a new email without a founder's go is reported during weekday send hours only", async () => {
   const { raw, db } = database();
-  raw.exec(`INSERT INTO AiUsage VALUES ('2026-09', 4700000)`);
-  const checks = await runHealthChecks(db, { CALLER_V2_ENABLED: "true" }, NOW);
-  assert.deepEqual(checks.filter((c) => !c.ok).map((c) => c.key).sort(), ["ai-budget", "login-email"]);
+  raw.exec(`UPDATE "FccCampaignSetting" SET "approvedCopy" = 'an-older-version'`);
+  await saveFccReplyCheck(db, { day: "2026-11-03", at: "2026-11-03T14:00:00Z", found: 0 });
+  assert.deepEqual(failing(await runHealthChecks(db, ENV, TUE_1130)), ["fcc-locked"]);
+  assert.deepEqual(failing(await runHealthChecks(db, ENV, TUE_9PM)), [], "a release at night doesn't alarm anyone");
+  assert.deepEqual(failing(await runHealthChecks(db, ENV, SAT_1130)), []);
 });
 
-test("the morning lead search is checked on weekdays after 8:30, and a key Google refuses is reported", async () => {
+test("no sends an hour into the weekday window, with people waiting, is reported", async () => {
   const { raw, db } = database();
-  raw.exec(readFileSync("migrations/0081_cloud_discovery.sql", "utf8"));
-  const leadSearch = async (now: Date) => (await runHealthChecks(db, ENV, now)).find((c) => c.key === "lead-search")!;
-  const friday4pm = new Date("2026-09-25T20:00:00Z");
-  assert.equal((await leadSearch(friday4pm)).ok, false, "no run this morning");
-  assert.match((await leadSearch(friday4pm)).problem, /didn't run/);
-  assert.equal((await leadSearch(new Date("2026-09-25T12:00:00Z"))).ok, true, "before 8:30 it is too early to tell");
-  assert.equal((await leadSearch(new Date("2026-09-26T20:00:00Z"))).ok, true, "weekends have no scheduled search");
-  raw.exec(`INSERT INTO "DiscoveryRun" ("runId","trigger","startedAt","requests","added") VALUES ('r1','SCHEDULE','2026-09-25T11:00:05Z',30,7)`);
-  assert.equal((await leadSearch(friday4pm)).ok, true);
-  raw.exec(`INSERT INTO "DiscoveryRun" ("runId","trigger","actor","startedAt","requests","stopReason") VALUES ('r2','OWNER','AIDAN','2026-09-25T15:00:00Z',1,'Google returned an error (403).')`);
-  const refused = await leadSearch(friday4pm);
-  assert.equal(refused.ok, false);
-  assert.match(refused.problem, /Google turned down/);
-  raw.exec(`INSERT INTO "DiscoveryRun" ("runId","trigger","actor","startedAt","requests","stopReason") VALUES ('r3','OWNER','AIDAN','2026-09-25T16:00:00Z',1,'Google''s daily search limit was reached; it continues tomorrow.')`);
-  assert.equal((await leadSearch(friday4pm)).ok, true, "the daily limit is expected, not a fault");
+  await saveFccReplyCheck(db, { day: "2026-11-03", at: "2026-11-03T14:00:00Z", found: 0 });
+  const stalled = (await runHealthChecks(db, ENV, TUE_1130)).find((c) => c.key === "fcc-sending")!;
+  assert.equal(stalled.ok, false);
+  assert.match(stalled.problem, /No FCC emails have gone out today.*1 is waiting/);
+  assert.equal((await runHealthChecks(db, ENV, new Date("2026-11-03T15:30:00Z"))).find((c) => c.key === "fcc-sending")!.ok, true, "10:30 is too early to tell");
+  assert.equal((await runHealthChecks(db, ENV, SAT_1130)).find((c) => c.key === "fcc-sending")!.ok, true, "weekends don't send");
+  sendOne(raw, "2026-11-03");
+  assert.equal((await runHealthChecks(db, ENV, TUE_1130)).find((c) => c.key === "fcc-sending")!.ok, true);
 });
 
-test("the website check is flagged only when businesses wait during weekday hours and it stopped or can't open sites", async () => {
+test("a reply check that hasn't finished by 10:30 is reported", async () => {
   const { raw, db } = database();
-  raw.exec(readFileSync("migrations/0081_cloud_discovery.sql", "utf8"));
-  raw.exec(`CREATE TABLE "EngineProspect" ("prospectId" TEXT)`);
-  raw.exec(readFileSync("migrations/0084_site_check.sql", "utf8"));
-  const siteCheck = async (now: Date) => (await runHealthChecks(db, ENV, now)).find((c) => c.key === "website-check")!;
-  const friday2pm = new Date("2026-09-25T18:00:00Z");
-  assert.equal((await siteCheck(friday2pm)).ok, true, "nothing waiting, nothing to judge");
-  raw.exec(`INSERT INTO "DiscoveryHeld" ("placeId","name","city","niche","websiteUrl","firstSeenAt") VALUES ('p1','Held','GUELPH','HVAC','https://held.example/','2026-09-25')`);
-  assert.equal((await siteCheck(friday2pm)).ok, false, "waiting and no run in the last hour");
-  assert.match((await siteCheck(friday2pm)).problem, /hasn't run/);
-  assert.equal((await siteCheck(new Date("2026-09-26T18:00:00Z"))).ok, true, "weekends are not judged");
-  assert.equal((await siteCheck(new Date("2026-09-25T23:30:00Z"))).ok, true, "evenings are not judged");
-  raw.exec(`INSERT INTO "SiteCheckRun" ("runId","startedAt","checked","failed") VALUES ('r1','2026-09-25T17:50:00Z',4,0)`);
-  assert.equal((await siteCheck(friday2pm)).ok, true);
-  raw.exec(`INSERT INTO "SiteCheckRun" ("runId","startedAt","checked","failed") VALUES ('r2','2026-09-25T15:40:00Z',0,6),('r3','2026-09-25T16:50:00Z',0,6)`);
-  raw.exec(`UPDATE "SiteCheckRun" SET "checked"=0,"failed"=6 WHERE "runId"='r1'`);
-  const failing = await siteCheck(friday2pm);
-  assert.equal(failing.ok, false);
-  assert.match(failing.problem, /can't open any websites/);
+  sendOne(raw, "2026-11-03");
+  await saveFccReplyCheck(db, { day: "2026-11-02", at: "2026-11-02T14:00:00Z", found: 0 });
+  assert.deepEqual(failing(await runHealthChecks(db, ENV, TUE_1130)), ["fcc-reply-check"]);
+  assert.deepEqual(failing(await runHealthChecks(db, ENV, new Date("2026-11-03T14:30:00Z"))), [], "9:30 is before it's late");
+});
+
+test("a missing sign-in email binding is reported", async () => {
+  const { raw, db } = database();
+  sendOne(raw, "2026-11-03");
+  await saveFccReplyCheck(db, { day: "2026-11-03", at: "2026-11-03T14:00:00Z", found: 0 });
+  assert.deepEqual(failing(await runHealthChecks(db, {}, TUE_1130)), ["login-email"]);
 });

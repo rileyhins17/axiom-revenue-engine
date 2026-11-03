@@ -26,17 +26,16 @@ if (createHash("sha256").update(readFileSync(backup)).digest("hex") !== expected
 
 const config = JSON.parse(readFileSync(path.join(repo, "wrangler.production.jsonc"), "utf8").replace(/^\s*\/\/.*$/gm, ""));
 if (config.name !== WORKER || config.account_id !== ACCOUNT || config.d1_databases?.[0]?.database_id !== DATABASE_ID) stop("config target mismatch");
-if (config.vars?.AUTONOMOUS_SEND_ENABLED !== "false" || config.vars?.AUTONOMOUS_QUEUE_ENABLED !== "false" || config.vars?.AUTONOMOUS_INTAKE_ENABLED !== "false" || config.vars?.ENGINE_EMAIL_ENABLED !== "false") stop("automation must stay off");
-// Allowed schedules: the gated weekday email batch (sends nothing while ENGINE_EMAIL_ENABLED is "false"),
-// the read-only health check, the capped weekday lead search, and the FCC send tick (sends nothing until a
-// founder's go for the current copy; it keeps its own Toronto send windows and weekdays).
-// Weekdays are named: Cloudflare's 1 is Sunday.
-if (!["", "0 14 * * MON-FRI|*/15 * * * *|0 11 * * MON-FRI|* 14-19 * * *"].includes((config.triggers?.crons ?? []).join("|"))) stop("unexpected cron schedule");
+// The retired website campaign's switches may linger on the Worker (keep_vars), but the file must never turn one on.
+if (["AUTONOMOUS_SEND_ENABLED", "AUTONOMOUS_QUEUE_ENABLED", "AUTONOMOUS_INTAKE_ENABLED", "ENGINE_EMAIL_ENABLED"].some((key) => key in (config.vars ?? {}) && config.vars[key] !== "false")) stop("automation must stay off");
+// Allowed schedules: the read-only health check (with the daily FCC reply check) and the FCC send tick,
+// which sends nothing until a founder's go for the current copy and keeps its own Toronto send windows.
+if ((config.triggers?.crons ?? []).join("|") !== "*/15 * * * *|* 14-19 * * *") stop("unexpected cron schedule");
 
 const wrangler = (args, cwd = repo, input) => spawnSync(process.execPath, [path.join(cwd, "node_modules", "wrangler", "bin", "wrangler.js"), ...args, "--config", path.join(repo, "wrangler.production.jsonc")], { cwd, encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024, env: process.env });
-// Live settings guard: keep_vars preserves Worker-only settings (such as the Orbit
-// link), and any setting whose live value differs from this file stops the release,
-// so nobody's manual change is silently overwritten.
+// Live settings guard: keep_vars preserves Worker-only settings, and any setting whose
+// live value differs from this file stops the release, so nobody's manual change is
+// silently overwritten.
 if (config.keep_vars !== true) stop("wrangler.production.jsonc must set keep_vars: true");
 const liveDeployments = JSON.parse(wrangler(["deployments", "list", "--json"]).stdout || "[]");
 const current = [...liveDeployments].sort((a, b) => String(a.created_on).localeCompare(String(b.created_on))).at(-1);
@@ -96,7 +95,8 @@ const BASE = "https://operations.getaxiom.ca";
 const probes = [
   ["/sign-in", (r) => r.status === 200],
   ["/api/health", (r, body) => r.status === 200 && body.includes('"ok":true')],
-  ["/api/caller/leads", (r) => r.status === 401],
+  // Signed out, the FCC screen must send people to sign in, never show the campaign.
+  ["/fcc", (r) => r.status === 307 && (r.headers.get("location") ?? "").includes("/sign-in")],
 ];
 const failures = [];
 for (const [pathName, ok] of probes) {
@@ -116,4 +116,4 @@ if (failures.length) {
   console.error(rollback.status === 0 ? "ROLLED BACK. Live is back on the previous version." : "ROLLBACK FAILED - roll back manually: wrangler rollback " + previousVersion);
   process.exit(1);
 }
-console.log("smoke test: sign-in, health and Caller API all OK");
+console.log("smoke test: sign-in, health and the signed-out FCC redirect all OK");

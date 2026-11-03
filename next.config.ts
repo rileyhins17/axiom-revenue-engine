@@ -19,6 +19,12 @@ if (
 const nextConfig: NextConfig = {
   typedRoutes: true,
 
+  // The old website campaign's screens are gone. Old bookmarks and home-screen links land on Today.
+  async redirects() {
+    return ["/archive", "/ask", "/automation", "/call", "/clients", "/email", "/leads", "/prospects", "/vault", "/walk-ins", "/unsubscribe"]
+      .flatMap((source) => [{ source, destination: "/dashboard", permanent: false }, { source: `${source}/:path*`, destination: "/dashboard", permanent: false }]);
+  },
+
   // Next's file tracer can otherwise copy ignored local research and SQLite
   // checkpoints into the deployable server bundle when routes use fs.
   outputFileTracingExcludes: {
@@ -34,17 +40,13 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Keep native / heavy server-only packages out of the webpack bundle.
-  serverExternalPackages: [
-    "playwright",
-    "@cloudflare/playwright",
-    "better-sqlite3",
-  ],
+  // Keep the native SQLite driver (local development and tests only) out of the server bundle.
+  serverExternalPackages: ["better-sqlite3"],
 
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.externals = config.externals || [];
-      config.externals.push("playwright", "@cloudflare/playwright", "better-sqlite3");
+      config.externals.push("better-sqlite3");
     }
 
     return config;

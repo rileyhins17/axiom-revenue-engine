@@ -4,23 +4,17 @@
  * Cloudflare secret store; local values belong in ignored environment files.
  */
 interface CloudflareEnv {
-  AGENT_SHARED_SECRET?: string;
   BETTER_AUTH_SECRET?: string;
-  DEEPSEEK_API_KEY?: string;
-  GMAIL_CLIENT_ID?: string;
-  GMAIL_CLIENT_SECRET?: string;
-  MCP_API_TOKEN?: string;
-  OPENAI_API_KEY?: string;
+  FCC_CAMPAIGN_MAILING_ADDRESS?: string;
+  FCC_SMTP_PASSWORD?: string;
+  FCC_SMTP_PASSWORD_2?: string;
 }
 
 declare namespace Cloudflare {
   interface Env {
-    AGENT_SHARED_SECRET?: string;
     BETTER_AUTH_SECRET?: string;
-    DEEPSEEK_API_KEY?: string;
-    GMAIL_CLIENT_ID?: string;
-    GMAIL_CLIENT_SECRET?: string;
-    MCP_API_TOKEN?: string;
-    OPENAI_API_KEY?: string;
+    FCC_CAMPAIGN_MAILING_ADDRESS?: string;
+    FCC_SMTP_PASSWORD?: string;
+    FCC_SMTP_PASSWORD_2?: string;
   }
 }

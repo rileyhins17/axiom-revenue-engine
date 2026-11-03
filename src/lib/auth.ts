@@ -5,10 +5,9 @@ import { admin, emailOTP } from "better-auth/plugins";
 
 import { writeAuditEvent } from "@/lib/audit";
 import { assertOperatorSignupAllowed } from "@/lib/auth-signup-policy";
-import { getClientIp, getCloudflareBindings } from "@/lib/cloudflare";
+import { getClientIp, getCloudflareBindings, getDatabase } from "@/lib/cloudflare";
 import { getAllowedEmails, getServerEnv, getTrustedOrigins, isAdminEmail } from "@/lib/env";
 import { ensureLocalDatabaseDirectory, getLocalDatabasePath } from "@/lib/local-sqlite";
-import { getPrisma } from "@/lib/prisma";
 import { assertRateLimit } from "@/lib/rate-limit";
 import { deliverLoginEmail, LOGIN_CODE_TTL_SECONDS, loginEmail, ownerForAccount } from "@/lib/owner-login";
 
@@ -137,10 +136,8 @@ export function getAuth() {
           const promotedToAdmin = isAdminEmail(session.user.email);
 
           if (promotedToAdmin) {
-            await getPrisma().user.update({
-              where: { id: session.user.id },
-              data: { role: "admin" },
-            });
+            await getDatabase().prepare(`UPDATE "User" SET "role" = 'admin', "updatedAt" = ? WHERE "id" = ?`)
+              .bind(new Date().toISOString(), session.user.id).run();
           }
 
           await writeAuditEvent({

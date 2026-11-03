@@ -2,80 +2,14 @@ import { z } from "zod";
 
 import { getCloudflareBindings } from "@/lib/cloudflare";
 
-/**
- * Parse boolean environment values without JavaScript's truthiness trap
- * (`Boolean("false") === true`). Missing values remain undefined so the
- * schema can apply its safe default; invalid values throw and stop startup
- * rather than silently enabling autonomous work.
- */
-export function parseEnvironmentBoolean(value: unknown): boolean | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value === "boolean") return value;
-  if (value === 1 || value === "1") return true;
-  if (value === 0 || value === "0") return false;
-
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "true" || normalized === "on") return true;
-    if (normalized === "false" || normalized === "off") return false;
-  }
-
-  throw new Error(`Invalid boolean environment value: ${String(value)}`);
-}
-
-function environmentBoolean(defaultValue: boolean) {
-  return z.preprocess((value, context) => {
-    try {
-      return parseEnvironmentBoolean(value);
-    } catch (error) {
-      context.addIssue({
-        code: "custom",
-        message: error instanceof Error ? error.message : "Invalid boolean environment value",
-      });
-      return z.NEVER;
-    }
-  }, z.boolean().default(defaultValue));
-}
-
 const envSchema = z.object({
   APP_BASE_URL: z.string().url().default("http://localhost:3000"),
   AUTH_ALLOWED_EMAILS: z.string().default(""),
   AUTH_ADMIN_EMAILS: z.string().default(""),
   AUTH_ALLOWED_ORIGINS: z.string().default(""),
-  CLOUD_SCRAPE_ENABLED: environmentBoolean(false),
-  CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: environmentBoolean(false),
-  CLOUD_SCRAPE_TIMEOUT_MS: z.coerce.number().int().positive().default(840000),
-  CLOUD_SCRAPE_WORKER_NAME: z.string().trim().min(1).default("cloudflare-browser"),
-  AGENT_SHARED_SECRET: z.string().optional(),
-  MCP_API_TOKEN: z.string().optional(),
   BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be at least 32 characters long"),
-  OPENAI_API_KEY: z.string().optional(),
-  OPENAI_API_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
-  OPENAI_EXTRACTION_MODEL: z.string().default("gpt-5.4-nano-2026-03-17"),
-  OPENAI_DRAFT_MODEL: z.string().default("gpt-5.4-mini-2026-03-17"),
-  DEEPSEEK_API_KEY: z.string().optional(),
-  GMAIL_CLIENT_ID: z.string().optional(),
-  GMAIL_CLIENT_SECRET: z.string().optional(),
-  OUTREACH_DAILY_SEND_LIMIT: z.coerce.number().int().nonnegative().default(50),
-  OUTREACH_SEND_DELAY_MS: z.coerce.number().int().nonnegative().default(3000),
   RATE_LIMIT_MAX_AUTH: z.coerce.number().int().positive().default(10),
-  RATE_LIMIT_MAX_EXPORT: z.coerce.number().int().positive().default(20),
-  RATE_LIMIT_MAX_SCRAPE: z.coerce.number().int().nonnegative().default(3),
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(900),
-  SCRAPE_CONCURRENCY_LIMIT: z.coerce.number().int().positive().default(1),
-  SCRAPE_TIMEOUT_MS: z.coerce.number().int().positive().default(1800000),
-  WORKER_HEARTBEAT_STALE_MS: z.coerce.number().int().positive().default(60000),
-  // Master kill switches for autonomous operation. Missing configuration must
-  // never start work: every phase defaults off until an approved rollout.
-  AUTONOMOUS_INTAKE_ENABLED: environmentBoolean(false),
-  AUTONOMOUS_QUEUE_ENABLED: environmentBoolean(false),
-  AUTONOMOUS_SEND_ENABLED: environmentBoolean(false),
-  AUTONOMOUS_DAILY_LEAD_INTAKE_CAP: z.coerce.number().int().nonnegative().default(0),
-  AUTONOMOUS_MAX_SENDS_PER_DAY: z.coerce.number().int().nonnegative().default(0),
-  AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY: z.coerce.number().int().nonnegative().default(0),
-  // Cooldown so we don't email two contacts at the same business / domain
-  // within N days. Reputation guard.
-  AUTONOMOUS_DOMAIN_COOLDOWN_DAYS: z.coerce.number().int().nonnegative().default(14),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
@@ -83,9 +17,8 @@ export type AppEnv = z.infer<typeof envSchema>;
 let cachedEnv: AppEnv | null = null;
 
 /**
- * Clear the module-level env cache. Called from the Worker cron entrypoint
- * on every scheduled() invocation so deploy-time env-var changes actually
- * take effect on the next tick instead of being shadowed by a stale parse.
+ * Clear the module-level env cache. Called by the Worker on every request and
+ * scheduled run, so a changed setting takes effect at once.
  */
 export function clearServerEnvCache() {
   cachedEnv = null;
@@ -100,36 +33,9 @@ export function getServerEnv(): AppEnv {
     AUTH_ALLOWED_EMAILS: bindings?.AUTH_ALLOWED_EMAILS ?? process.env.AUTH_ALLOWED_EMAILS,
     AUTH_ADMIN_EMAILS: bindings?.AUTH_ADMIN_EMAILS ?? process.env.AUTH_ADMIN_EMAILS,
     AUTH_ALLOWED_ORIGINS: bindings?.AUTH_ALLOWED_ORIGINS ?? process.env.AUTH_ALLOWED_ORIGINS,
-    CLOUD_SCRAPE_ENABLED: bindings?.CLOUD_SCRAPE_ENABLED ?? process.env.CLOUD_SCRAPE_ENABLED,
-    CLOUD_SCRAPE_DETAIL_PAGES_ENABLED: bindings?.CLOUD_SCRAPE_DETAIL_PAGES_ENABLED ?? process.env.CLOUD_SCRAPE_DETAIL_PAGES_ENABLED,
-    CLOUD_SCRAPE_TIMEOUT_MS: bindings?.CLOUD_SCRAPE_TIMEOUT_MS ?? process.env.CLOUD_SCRAPE_TIMEOUT_MS,
-    CLOUD_SCRAPE_WORKER_NAME: bindings?.CLOUD_SCRAPE_WORKER_NAME ?? process.env.CLOUD_SCRAPE_WORKER_NAME,
-    AGENT_SHARED_SECRET: bindings?.AGENT_SHARED_SECRET ?? process.env.AGENT_SHARED_SECRET,
-    MCP_API_TOKEN: bindings?.MCP_API_TOKEN ?? process.env.MCP_API_TOKEN,
     BETTER_AUTH_SECRET: bindings?.BETTER_AUTH_SECRET ?? process.env.BETTER_AUTH_SECRET,
-    OPENAI_API_KEY: bindings?.OPENAI_API_KEY ?? process.env.OPENAI_API_KEY,
-    OPENAI_API_BASE_URL: bindings?.OPENAI_API_BASE_URL ?? process.env.OPENAI_API_BASE_URL,
-    OPENAI_EXTRACTION_MODEL: bindings?.OPENAI_EXTRACTION_MODEL ?? process.env.OPENAI_EXTRACTION_MODEL,
-    OPENAI_DRAFT_MODEL: bindings?.OPENAI_DRAFT_MODEL ?? process.env.OPENAI_DRAFT_MODEL,
-    DEEPSEEK_API_KEY: bindings?.DEEPSEEK_API_KEY ?? process.env.DEEPSEEK_API_KEY,
-    GMAIL_CLIENT_ID: bindings?.GMAIL_CLIENT_ID ?? process.env.GMAIL_CLIENT_ID,
-    GMAIL_CLIENT_SECRET: bindings?.GMAIL_CLIENT_SECRET ?? process.env.GMAIL_CLIENT_SECRET,
-    OUTREACH_DAILY_SEND_LIMIT: bindings?.OUTREACH_DAILY_SEND_LIMIT ?? process.env.OUTREACH_DAILY_SEND_LIMIT,
-    OUTREACH_SEND_DELAY_MS: bindings?.OUTREACH_SEND_DELAY_MS ?? process.env.OUTREACH_SEND_DELAY_MS,
     RATE_LIMIT_MAX_AUTH: bindings?.RATE_LIMIT_MAX_AUTH ?? process.env.RATE_LIMIT_MAX_AUTH,
-    RATE_LIMIT_MAX_EXPORT: bindings?.RATE_LIMIT_MAX_EXPORT ?? process.env.RATE_LIMIT_MAX_EXPORT,
-    RATE_LIMIT_MAX_SCRAPE: bindings?.RATE_LIMIT_MAX_SCRAPE ?? process.env.RATE_LIMIT_MAX_SCRAPE,
     RATE_LIMIT_WINDOW_SECONDS: bindings?.RATE_LIMIT_WINDOW_SECONDS ?? process.env.RATE_LIMIT_WINDOW_SECONDS,
-    SCRAPE_CONCURRENCY_LIMIT: bindings?.SCRAPE_CONCURRENCY_LIMIT ?? process.env.SCRAPE_CONCURRENCY_LIMIT,
-    SCRAPE_TIMEOUT_MS: bindings?.SCRAPE_TIMEOUT_MS ?? process.env.SCRAPE_TIMEOUT_MS,
-    WORKER_HEARTBEAT_STALE_MS: bindings?.WORKER_HEARTBEAT_STALE_MS ?? process.env.WORKER_HEARTBEAT_STALE_MS,
-    AUTONOMOUS_INTAKE_ENABLED: bindings?.AUTONOMOUS_INTAKE_ENABLED ?? process.env.AUTONOMOUS_INTAKE_ENABLED,
-    AUTONOMOUS_QUEUE_ENABLED: bindings?.AUTONOMOUS_QUEUE_ENABLED ?? process.env.AUTONOMOUS_QUEUE_ENABLED,
-    AUTONOMOUS_SEND_ENABLED: bindings?.AUTONOMOUS_SEND_ENABLED ?? process.env.AUTONOMOUS_SEND_ENABLED,
-    AUTONOMOUS_DAILY_LEAD_INTAKE_CAP: bindings?.AUTONOMOUS_DAILY_LEAD_INTAKE_CAP ?? process.env.AUTONOMOUS_DAILY_LEAD_INTAKE_CAP,
-    AUTONOMOUS_MAX_SENDS_PER_DAY: bindings?.AUTONOMOUS_MAX_SENDS_PER_DAY ?? process.env.AUTONOMOUS_MAX_SENDS_PER_DAY,
-    AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY: bindings?.AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY ?? process.env.AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY,
-    AUTONOMOUS_DOMAIN_COOLDOWN_DAYS: bindings?.AUTONOMOUS_DOMAIN_COOLDOWN_DAYS ?? process.env.AUTONOMOUS_DOMAIN_COOLDOWN_DAYS,
   });
 
   return cachedEnv;

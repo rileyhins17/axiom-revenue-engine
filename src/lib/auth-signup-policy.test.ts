@@ -60,7 +60,7 @@ test("non-canonical fixture flag values do not enable signup", () => {
 
 test("the synthetic signup flag is absent from Cloudflare production configuration", async () => {
   const productionConfiguration = await Promise.all([
-    readFile(new URL("../../wrangler.jsonc", import.meta.url), "utf8"),
+    readFile(new URL("../../wrangler.production.jsonc", import.meta.url), "utf8"),
     readFile(new URL("./env.ts", import.meta.url), "utf8"),
     readFile(new URL("../../cloudflare-secrets.d.ts", import.meta.url), "utf8"),
   ]);

@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import openNextWorkerModule, {
   BucketCachePurge,
   DOQueueHandler,
@@ -7,20 +9,22 @@ import openNextWorkerModule, {
 import { EmailMessage } from "cloudflare:email";
 
 import { setCloudflareBindings } from "./src/lib/cloudflare";
-import { getCronTimeoutBudgets } from "./src/lib/cron-timeouts";
 import { clearServerEnvCache } from "./src/lib/env";
-import { runEngineEmailCron } from "./src/lib/revenue-engine/engine-email-worker";
 import { runFccCampaignCron, runFccReplyCheckCron } from "./src/lib/fcc-campaign-worker";
-import { runCallerSyncTick } from "./src/lib/caller-v2/sync-tick";
 import { alertEmail, OWNER_ALERT_INBOXES, recordAndSelectAlerts, runHealthChecks } from "./src/lib/ops/health";
-import { placesKeyFromEnv, runDiscovery, SCHEDULED_REQUESTS_PER_RUN } from "./src/lib/revenue-engine/cloud-discovery";
 
-// Cloudflare numbers weekdays from 1 = Sunday, so "1-5" meant Sunday to Thursday.
-// Schedules use day names; each also matches its numeric form in case Cloudflare
-// reports it that way, so a schedule can never fall through to the wrong handler.
-const cronIs = (cron, names) => typeof cron === "string" && names.includes(cron.trim().toUpperCase());
-// Weekdays 7am Toronto (EDT): find new businesses on the server, within the free Google cap.
-const DISCOVERY_CRON = ["0 11 * * MON-FRI", "0 11 * * 2-6"];
+// Sign-in (better-auth) sets up three request stores the first time it is used, by
+// awaiting one shared `import("node:async_hooks")` started inside that request. When
+// that request was cut off (the browser cancels page preloads all the time), the shared
+// setup never finished, and every later sign-in check on that copy of the Worker waited
+// forever: Today, FCC, Settings and /api/auth/get-session hung for up to 100 minutes and
+// Next showed "This page couldn't load". Creating the stores here, at startup, means
+// better-auth finds them ready and never waits on anything a request started.
+const BETTER_AUTH_GLOBAL = Symbol.for("better-auth:global");
+const authGlobal = (globalThis[BETTER_AUTH_GLOBAL] ??= { version: "1.6.29", epoch: 1, context: {} });
+authGlobal.context.requestStateAsyncStorage ??= new AsyncLocalStorage();
+authGlobal.context.endpointContextAsyncStorage ??= new AsyncLocalStorage();
+authGlobal.context.adapterAsyncStorage ??= new AsyncLocalStorage();
 
 const HEALTH_CRON = "*/15 * * * *";
 async function runHealthCron(env) {
@@ -34,96 +38,11 @@ async function runHealthCron(env) {
 }
 
 const worker = openNextWorkerModule;
-// Weekdays 10:00 Toronto (EDT): the retired website first-touch batch, which
-// refuses to send while its own switches are off.
-const ENGINE_EMAIL_CRON = ["0 14 * * MON-FRI", "0 14 * * 2-6"];
 // Every minute, 14:00-19:59 UTC (10:00 Toronto in both EDT and EST): one FCC send
 // tick. The tick itself keeps Toronto send windows, weekdays and the 1-3 minute gap.
 const FCC_TICK_CRON = "* 14-19 * * *";
 
 export { BucketCachePurge, DOQueueHandler, DOShardedTagCache };
-
-// Each fetch invocation gets its own 30s CPU budget on Workers Standard. The
-// cron handler used to run scheduler + pipeline + intake + scrape in
-// a single invocation and consistently hit the CPU cap, killing sends. Now the
-// cron handler only fires fetch() calls into the same worker — each runs in a
-// fresh invocation with its own CPU budget. Cron itself uses near-zero CPU.
-const INTERNAL_CRON_PATH = "/api/internal/cron-tick";
-const APP_BASE_URL_FALLBACK = "https://revenue.getaxiom.ca";
-
-async function dispatchInternalTask(env, task, options = {}) {
-  const base = (env.APP_BASE_URL || APP_BASE_URL_FALLBACK).replace(/\/$/, "");
-  const url = `${base}${INTERNAL_CRON_PATH}?task=${encodeURIComponent(task)}`;
-  const token = env.MCP_API_TOKEN || "";
-  if (!token) {
-    console.warn(`[cron:${task}] MCP_API_TOKEN not set; cannot dispatch internal task`);
-    return;
-  }
-
-  const startedAt = Date.now();
-  let timeoutId;
-  const timeoutMs = options.timeoutMs ?? 90_000;
-  const controller = new AbortController();
-  const timeout = new Promise((resolve) => {
-    timeoutId = setTimeout(() => {
-      controller.abort();
-      resolve("timeout");
-    }, timeoutMs);
-  });
-
-  try {
-    const service = env.WORKER_SELF_REFERENCE;
-    if (!service || typeof service.fetch !== "function") {
-      console.warn(`[cron:${task}] WORKER_SELF_REFERENCE not configured; cannot dispatch internal task`);
-      return;
-    }
-    const fetchPromise = service.fetch(url, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    });
-    const response = await Promise.race([fetchPromise, timeout]);
-    if (response === "timeout") {
-      console.warn(`[cron:${task}] dispatch timed out after ${timeoutMs}ms`);
-      return;
-    }
-    const status = response.status;
-    const body = await response.text().catch(() => "");
-    console.log(`[cron:${task}] dispatched status=${status} durationMs=${Date.now() - startedAt} body=${body.slice(0, 200)}`);
-  } catch (error) {
-    console.error(`[cron:${task}] dispatch error:`, error);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
-}
-
-async function runCronTasks(env) {
-  const now = new Date();
-  const minuteOfHour = now.getUTCMinutes();
-  const isExplicitlyEnabled = (value) => value === true || value === "true" || value === "1";
-  const tasks = [];
-  const timeoutBudgets = getCronTimeoutBudgets(env);
-
-  if (isExplicitlyEnabled(env.AUTONOMOUS_QUEUE_ENABLED) || isExplicitlyEnabled(env.AUTONOMOUS_SEND_ENABLED)) {
-    tasks.push("scheduler");
-  }
-  if (isExplicitlyEnabled(env.AUTONOMOUS_QUEUE_ENABLED)) {
-    tasks.push("pipeline");
-  }
-
-  const slot = minuteOfHour % 15;
-  if (slot === 0 && isExplicitlyEnabled(env.AUTONOMOUS_INTAKE_ENABLED)) tasks.push("intake");
-  else if (slot === 5 && isExplicitlyEnabled(env.CLOUD_SCRAPE_ENABLED)) tasks.push("scrape");
-
-  if (tasks.length === 0) {
-    console.log(JSON.stringify({ event: "cron_skipped", reason: "all_phase_switches_off" }));
-    return;
-  }
-  // Dispatch in parallel — each is its own fetch invocation with its own CPU.
-  await Promise.allSettled(
-    tasks.map((task) => dispatchInternalTask(env, task, { timeoutMs: timeoutBudgets[task] })),
-  );
-}
 
 const LOGIN_FROM = "login@getaxiom.ca";
 
@@ -153,46 +72,55 @@ function installLoginEmail(env) {
     : undefined;
 }
 
+// A screen that hasn't answered in 20 seconds is stuck, not slow: every page here renders
+// in well under 2. Answer instead of leaving the browser waiting, so the app can try again.
+// Only reads are cut off; a pause, resume or sign-in always runs to the end.
+const PAGE_TIMEOUT_MS = 20_000;
+
+function stuckResponse(request) {
+  const headers = { "Cache-Control": "no-store", "Retry-After": "1" };
+  // Next's router reloads the page when a screen's data comes back as plain text.
+  if (request.headers.get("rsc") === "1") return new Response("Timed out, try again", { status: 503, headers: { ...headers, "Content-Type": "text/plain" } });
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="2"><title>Loading again</title></head>`
+    + `<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f4ef;color:#202c26;font:15px/1.5 Inter,Segoe UI,Arial,sans-serif">`
+    + `<p>That took too long. Loading it again…</p></body></html>`;
+  return new Response(html, { status: 503, headers: { ...headers, "Content-Type": "text/html; charset=utf-8" } });
+}
+
+async function answerInTime(request, env, ctx) {
+  const handled = worker.fetch(request, env, ctx);
+  if (request.method !== "GET" && request.method !== "HEAD") return handled;
+  let timer;
+  const late = new Promise((resolve) => { timer = setTimeout(() => resolve(null), PAGE_TIMEOUT_MS); });
+  try {
+    const response = await Promise.race([handled, late]);
+    if (response) return response;
+    console.error(JSON.stringify({ event: "page_timeout", path: new URL(request.url).pathname, rsc: request.headers.get("rsc") === "1" }));
+    return stuckResponse(request);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const exportedWorker = {
   async fetch(request, env, ctx) {
     clearServerEnvCache();
     setCloudflareBindings(env);
     installLoginEmail(env);
-    return worker.fetch(request, env, ctx);
+    return answerInTime(request, env, ctx);
   },
   async scheduled(controller, env, ctx) {
     clearServerEnvCache();
     setCloudflareBindings(env);
-    if (cronIs(controller?.cron, DISCOVERY_CRON)) {
-      const apiKey = placesKeyFromEnv(env);
-      ctx.waitUntil(runDiscovery(env.DB, { apiKey, trigger: "SCHEDULE", maxRequests: SCHEDULED_REQUESTS_PER_RUN })
-        .then((result) => console.log(JSON.stringify({ event: "discovery", ...result })))
-        .catch((error) => console.error("[discovery] failure", error instanceof Error ? error.message : "unknown")));
-      return;
-    }
     if (controller?.cron === HEALTH_CRON) {
       installLoginEmail(env);
       ctx.waitUntil(runHealthCron(env)
         .then((result) => console.log(JSON.stringify({ event: "health", ...result })))
         .catch((error) => console.error("[health] failure", error instanceof Error ? error.message : "unknown")));
-      // Once a day from 9:00 Toronto: read the FCC inbox for replies and tell both founders.
+      // Once a day from 9:00 Toronto: read the FCC inboxes for replies and tell both founders.
       ctx.waitUntil(runFccReplyCheckCron(env, globalThis.__axiomSendLoginEmail)
         .then((result) => console.log(JSON.stringify({ event: "fcc_reply_check", ...result })))
         .catch((error) => console.error("[fcc-reply-check] failure:", error instanceof Error ? error.message : "unknown")));
-      return;
-    }
-    if (controller?.cron === "* * * * *") {
-      ctx.waitUntil(runCallerSyncTick(env.DB, env)
-        .then((result) => console.log(JSON.stringify({ event: "caller_sync", ...result })))
-        .catch(() => { console.error("[caller-sync] failure"); throw new Error("CALLER_SYNC_FAILED"); }));
-      return;
-    }
-    if (cronIs(controller?.cron, ENGINE_EMAIL_CRON)) {
-      ctx.waitUntil(
-        runEngineEmailCron(env)
-          .then((result) => console.log(JSON.stringify({ event: "engine_email", ...result })))
-          .catch((error) => console.error("[engine-email] failure:", error instanceof Error ? error.message : "unknown")),
-      );
       return;
     }
     if (controller?.cron === FCC_TICK_CRON) {
@@ -203,11 +131,7 @@ const exportedWorker = {
       );
       return;
     }
-    ctx.waitUntil(
-      runCronTasks(env).catch((error) => {
-        console.error("[cron] outer failure:", error);
-      }),
-    );
+    console.warn(JSON.stringify({ event: "cron_unknown", cron: controller?.cron ?? null }));
   },
 };
 

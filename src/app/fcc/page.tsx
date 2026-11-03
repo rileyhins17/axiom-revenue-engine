@@ -6,11 +6,13 @@ import {
 
 import { FccPauseButton } from "@/components/fcc/fcc-pause-button";
 import { Badge, Empty, Notice, OwnerPage, PageHeader, Panel, StatCard, type Tone } from "@/components/owner/kit";
-import { getCloudflareBindings, getDatabase } from "@/lib/cloudflare";
-import { fccScreen, fccStats, type FccInboxRef, type FccPerson, type FccRateRow, type FccScreen, type FccStats } from "@/lib/fcc-campaign-status";
+import { getDatabase } from "@/lib/cloudflare";
+import { fccScreen, fccStats, type FccPerson, type FccRateRow, type FccScreen, type FccStats } from "@/lib/fcc-campaign-status";
+import { sendingInboxes } from "@/lib/fcc-screen-inboxes";
+import { ownerForAccount } from "@/lib/owner-login";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
-import { getM2OwnerIdentityActor } from "@/lib/revenue-engine/m2-owner-identity-actor";
 import { requireSession } from "@/lib/session";
+import { withTimeout } from "@/lib/timeout";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "FCC | Axiom Revenue Engine" };
@@ -21,16 +23,6 @@ const day = (value: string) => Number.isNaN(Date.parse(value)) ? value
   : new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", weekday: "short", month: "short", day: "numeric" }).format(new Date(value));
 
 const pct = (value: number | null) => (value === null ? "None yet" : `${(value * 100).toFixed(1)}%`);
-
-/** The sending inboxes by first name: the first inbox is "", an added one is its address. */
-function sendingInboxes(): FccInboxRef[] {
-  const env = getCloudflareBindings() ?? {};
-  const text = (key: string) => (typeof env[key] === "string" ? (env[key] as string).trim() : "");
-  const first = (name: string, fallback: string) => name.split(/\s+/)[0] || fallback;
-  const inboxes: FccInboxRef[] = [{ key: "", name: first(text("FCC_SENDER_NAME"), "Aidan") }];
-  if (text("FCC_SENDER2_ADDRESS")) inboxes.push({ key: text("FCC_SENDER2_ADDRESS"), name: first(text("FCC_SENDER2_NAME"), "Riley") });
-  return inboxes;
-}
 
 function RateRows({ rows }: { rows: FccRateRow[] }) {
   return <>{rows.map((row) => <tr key={row.label}>
@@ -64,14 +56,14 @@ export default async function FccPage() {
   const inboxes = sendingInboxes();
   try {
     const db = getDatabase() as unknown as ProspectDb;
-    [data, stats] = await Promise.all([fccScreen(db), fccStats(db, inboxes)]);
+    [data, stats] = await withTimeout(Promise.all([fccScreen(db), fccStats(db, inboxes)]), 12_000, "fcc-numbers");
   } catch {
     return <OwnerPage>
       <PageHeader eyebrow="Campaign" title="FCC emails" />
       <Notice tone="warning" icon={AlertTriangle} title="The FCC numbers couldn't be loaded." role="status">Refresh in a minute.</Notice>
     </OwnerPage>;
   }
-  const owner = Boolean(getM2OwnerIdentityActor(session.user.email ?? ""));
+  const owner = Boolean(ownerForAccount(session.user.email ?? ""));
   const state = STATES[data.state];
   const sentToday = data.sentToday.first + data.sentToday.followUps;
   const cap = data.batchSize * 2;
@@ -97,7 +89,7 @@ export default async function FccPage() {
         {data.state === "locked"
           ? <Empty>Locked until a founder gives the go on this email.</Empty>
           : owner ? <FccPauseButton state={data.state} /> : <Empty>Only Riley or Aidan can pause or resume FCC emails.</Empty>}
-        <p className="owner-meta mt-3">This is the only FCC stop. The emergency stop in Settings is for the old website outreach.</p>
+        <p className="owner-meta mt-3">This is the only stop for FCC emails. It takes effect before the next email goes.</p>
       </Panel>
     </div>
 

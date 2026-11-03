@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { getDatabase } from "@/lib/cloudflare";
 import { requireApiSession } from "@/lib/session";
-import { getPrisma } from "@/lib/prisma";
 import { validateProfileImage } from "@/lib/profile-image";
 
 export async function PATCH(request: Request) {
@@ -44,10 +44,12 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const updated = await getPrisma().user.update({
-    where: { id: session.user.id },
-    data,
-  });
+  const fields = Object.keys(data);
+  const updated = await getDatabase()
+    .prepare(`UPDATE "User" SET ${fields.map((field) => `"${field}" = ?`).join(", ")}, "updatedAt" = ? WHERE "id" = ? RETURNING "id","name","email","image","role"`)
+    .bind(...fields.map((field) => data[field]), new Date().toISOString(), session.user.id)
+    .first<{ id: string; name: string; email: string; image: string | null; role: string | null }>();
+  if (!updated) return NextResponse.json({ error: "Account not found" }, { status: 404 });
 
   return NextResponse.json({
     id: updated.id,

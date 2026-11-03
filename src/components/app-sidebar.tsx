@@ -19,13 +19,12 @@ import { cn } from "@/lib/utils";
 
 export function AppSidebar() {
   const pathname = usePathname();
-  // Archived screens (call queue, walk-ins...) light up Archive.
   const current = getNavItemForPath(pathname)?.url;
 
   return (
     <Sidebar className="owner-sidebar owner-app-shell">
       <SidebarHeader className="owner-sidebar-brand">
-        <Link href="/dashboard" aria-label="Axiom Web home" className="owner-brand">
+        <Link href="/dashboard" aria-label="Axiom home" className="owner-brand">
           <span className="min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset, no optimizer on Workers */}
             <img src="/axiom-logo.webp" alt="Axiom" width={148} height={40} className="owner-brand-logo" />
@@ -48,7 +47,6 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild isActive={isActive}>
                       <Link
                         href={item.url}
-                        prefetch
                         data-active={isActive ? "true" : "false"}
                         aria-current={isActive ? "page" : undefined}
                         title={`${item.title} — ${item.description}`}
@@ -71,7 +69,6 @@ export function AppSidebar() {
 
       <SidebarFooter className="owner-sidebar-footer">
         <span>Private owner workspace</span>
-        <span className="ml-auto">KW</span>
       </SidebarFooter>
     </Sidebar>
   );
