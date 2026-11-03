@@ -4,7 +4,8 @@ on:
   pull_request:
   push:
     branches:
-      - main
+      # The live branch; main is months behind.
+      - codex/revenue-engine-production
 
 permissions:
   contents: read
