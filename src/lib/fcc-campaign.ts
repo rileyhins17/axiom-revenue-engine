@@ -38,10 +38,11 @@ export const FCC_DAY7_AFTER_FOLLOW_UP_DAYS = 4;
  * task, Oct 28) replaced the calmer v3 for every first email from Oct 29; v5 (Nov 1) keeps its words
  * and adds the founders' signature with the site link and logo; v6 added the one-off November 6
  * email; v7 adds the day-7 follow-up (Aidan's text, approved Oct 29) and a test of two subjects on
- * new first emails. Contacts keep the v3 list key; which copy a person got is in their first
- * email's Message-ID ("<fcc-v7a-..." or "<fcc-v7b-..." from v7).
+ * new first emails; v8 (Aidan, Nov 3) gives first emails an honest version for companies whose
+ * Recertify button looks closed. Contacts keep the v3 list key; which copy a person got is in their
+ * first email's Message-ID ("<fcc-v7a-..." or "<fcc-v8a-..." from v7).
  */
-export const FCC_COPY_VERSION = "fcc-march1-pack-v7-day7";
+export const FCC_COPY_VERSION = "fcc-march1-pack-v8-flag-off";
 
 export type FccFilingRow = {
   business_name: string;
@@ -422,9 +423,10 @@ export function companyPossessive(company: string) {
 /**
  * Each copy's mark in its Message-ID ("<fcc-v5-<contact>-1@..."); a first email without one is the calmer v3.
  * v7a and v7b are the subject test: the same email as v5, under the question subject (v7a) or
- * "<company>'s FCC listing" (v7b). nov6 is the one-off November 6 email.
+ * "<company>'s FCC listing" (v7b). v8a and v8b are the flag-off email under the same two subjects.
+ * nov6 is the one-off November 6 email.
  */
-const COPY_MARKS = ["v4", "v5", "v7a", "v7b", "nov6"] as const;
+const COPY_MARKS = ["v4", "v5", "v7a", "v7b", "v8a", "v8b", "nov6"] as const;
 export type FccCopy = "v3" | (typeof COPY_MARKS)[number];
 
 /** Which copy a person's first email used, read from its Message-ID. */
@@ -451,6 +453,11 @@ export function fccSubjectTestCopy(contactId: string): "v7a" | "v7b" {
   return ((hash ^ (hash >>> 16)) & 1) === 0 ? "v7a" : "v7b";
 }
 
+/** The flag-off email stays in the subject test: each contact gets the subject fccSubjectTestCopy picks for them. */
+export function fccFlagOffCopy(contactId: string): "v8a" | "v8b" {
+  return fccSubjectTestCopy(contactId) === "v7a" ? "v8a" : "v8b";
+}
+
 /** "Talktone's listing (RMD0001234)", or without the number when the filing has none. */
 function listingName(contact: Pick<FccCampaignContact, "company" | "filings">) {
   const possessive = companyPossessive(companyShortName(contact.company));
@@ -463,13 +470,24 @@ export function fccFirstEmailSubject(contact: Pick<FccCampaignContact, "company"
   const possessive = companyPossessive(companyShortName(contact.company));
   if (copy === "v3") return "Your 2026 RMD recertification";
   if (copy === "nov6") throw new Error("The November 6 email has no follow-up");
-  return copy === "v7b" ? `${possessive} FCC listing` : `Question about ${possessive} RMD listing`;
+  return copy === "v7b" || copy === "v8b" ? `${possessive} FCC listing` : `Question about ${possessive} RMD listing`;
 }
 
 /** The words of Aidan's "v2" question email (both steps), without any sign-off. */
 function questionEmail(contact: Pick<FccCampaignContact, "firstName" | "company" | "filings">, step: 1 | 2, copy: FccCopy = "v5") {
   const listing = listingName(contact);
   const subject = fccFirstEmailSubject(contact, copy);
+  if (step === 1 && (copy === "v8a" || copy === "v8b")) {
+    // For a company whose Recertify button looks closed: no "15 minutes" and no price, because we won't take money while it's closed.
+    return { subject, paragraphs: [
+      `Hi ${contact.firstName},`,
+      `I was going through the FCC's Robocall Mitigation Database and noticed ${listing} doesn't show a 2026 recertification. It was due March 1, and about 3,600 providers show the same thing.`,
+      `It looks like the portal may not be open for your listing right now, so there may be nothing you can file today. But a telecom law firm, The CommLaw Group, reports the FCC has started emailing second-chance notices to some providers. Have you had one? If so, forward it and I'll tell you what it asks for, free.`,
+      `If not, I can send you a short list of what looks out of date, free, so it's ready if the portal opens, or for March 1, 2027.`,
+      `Want the list? A one-word reply is fine.`,
+      `We're not a law firm and this isn't legal advice.`,
+    ] };
+  }
   if (step === 1) {
     return { subject, paragraphs: [
       `Hi ${contact.firstName},`,
