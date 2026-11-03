@@ -1,83 +1,45 @@
-# Private owner and business context
+# Owner context
 
-This file is private repository context. Do not publish it, copy it to issues, or
-include it in public logs.
+What the engine is for and who decides what. This repository is public, so there are
+no personal details, contact lists or prices beyond what the emails themselves say.
 
-## People and operating reality
+## The business
 
-- Riley Hinsperger and Aidan Magee operate Axiom Web in Kitchener–Waterloo.
-- Riley is the primary product owner and works 42.5 hours each week at Pakfab.
-- The system must be low maintenance, explain decisions in plain language, and
-  require about 30 minutes of weekly owner review plus urgent reply alerts.
-- Riley does not need framework detail in the owner path. Show current status,
-  what changed, why it matters, and the one decision/action required.
-- Riley and Aidan retain authority over offers, claims, campaign approval,
-  autonomy, budget increases, and production cutover.
+- Axiom ([axiominternational.ca](https://axiominternational.ca/fcc-filings/)) helps US
+  voice providers with their listing in the FCC's Robocall Mitigation Database. Every
+  listing must be recertified by March 1 each year, and about 3,600 providers show no
+  2026 recertification.
+- The first email offers a free short list of what looks out of date on the listing.
+  Paid help after that is a flat price, stated in the email: Axiom prepares the updates
+  and a fresh mitigation plan, and the provider's own officer files them from their own
+  FCC login. Axiom never holds a login, isn't a law firm and gives no legal advice.
+- When a listing's Recertify button looks closed, the first email offers only the free
+  list, with no price (copy v8, Nov 3).
 
-## Business truth
+## The engine's job
 
-- Business brand: **Axiom Web**.
-- Internal product: **Axiom Revenue Engine**.
-- Public domain: `getaxiom.ca`.
-- Current offer: conversion-focused websites/rebuilds, managed hosting, and
-  ongoing support for established local service businesses.
-- Public pricing checked 2026-09-20 at https://getaxiom.ca/pricing/: Local Launch
-  Special from C$900 (one page, up to six sections), Local Business Website from
-  C$1,200 (up to three pages), Expanded Website from C$1,500 (up to five pages),
-  and Custom quoted work. Standard packages include first-year basic hosting;
-  basic hosting afterward starts at C$120/year. These are published starting
-  offers, not guarantees for arbitrary scope. Verify again and obtain owner
-  approval before campaign copy. The older C$150–C$200/month and C$3,500 starting
-  assumptions are superseded for planning.
-- Portfolio concepts are not customer case studies. Never imply otherwise.
-- Do not use the stale name “Axiom Infrastructure” in new material.
+Send the FCC emails from the founders' Gmail inboxes, follow up in the same thread, find
+replies and bounces, stop itself when something looks wrong, tell both founders, and show
+what happened. Nothing else. Calls, lead search, the website campaign and AI drafting
+were removed on 2026-11-03 ([ADR 0064](adr/0064-fcc-only-engine.md)).
 
-## Initial market and quality standard
+## Who decides
 
-- Launch area: Kitchener, Waterloo, and Cambridge.
-- Initial niches: roofing, HVAC, and landscaping.
-- Prefer established independent operators with provable website/conversion
-  weaknesses. Exclude national chains, lead-generation shells, and businesses
-  whose websites are already effective.
-- Reachability does not equal qualification. A strong business without email is
-  still a strong phone, form, social, or research task.
-- The system must find better leads and better evidence, not repeatedly scrape
-  the same places or produce generic templates.
+- Riley and Aidan are the only users and the only people who decide the email wording
+  (each new version needs a founder's go), which contacts are loaded, how many go out
+  each day, pausing and resuming, and releases.
+- Claude sessions build, test and release through `scripts/release-production.mjs`.
+  They never change who gets emailed, what it says, how many go out, or the pause
+  without a founder's word, and they never send an email or message on a founder's
+  behalf.
+- A founder answers each reply within 2 hours, using the saved replies in Gmail.
 
-## Budget and communications
+## What good looks like
 
-- Runtime ceiling: **C$50/month**, excluding the existing ChatGPT/Codex plan.
-- Target the first pilot around two named identities: `riley@getaxiom.ca` and
-  `aidan@getaxiom.ca`. Public DNS currently shows Cloudflare Email Routing at
-  the root (MX/SPF) and a published Resend verification token, but DNS does not
-  prove active forwarding destinations, a Resend account/key, sender
-  verification, complete DKIM, or send readiness. Treat these addresses as
-  planned sender/routing identities, not proof of paid mailbox capacity.
-- The zero-paid-mailbox inbound target is Cloudflare forwarding to each owner's
-  existing verified destination inbox. Forwarding cannot send from the custom
-  domain. The [current Resend acceptable-use policy](https://resend.com/legal/acceptable-use)
-  bans unsolicited cold outreach and requires explicit opt-in; [Cloudflare Email
-  Service](https://developers.cloudflare.com/email-service/reference/faq/) says
-  outbound sending is for transactional mail. Neither is an approved cold
-  first-touch route. Resend may be evaluated for permitted opted-in replies or
-  transactional messages only after its account, sender, webhook, legal, and
-  suppression gates pass. No such route is connected or verified now. Until a
-  provider-permitted, lawful zero-paid-mailbox first-touch route is proven,
-  owner-led manual calls and other separately governed tasks are the acquisition
-  path. Do not build a mailbox farm or buy Workspace seats; paid mailboxes and
-  Workspace are out of scope unless Riley explicitly reverses that decision.
-- Riley confirmed on 2026-09-20 that no OpenAI API keys are available. OpenAI
-  source/model configuration is not a provisioned service. Jev, OpenAI, mailbox,
-  source and verification account readiness must be recorded separately from code.
-- The 30-minute weekly review target excludes initial calibration, actual sales
-  conversations/proposals, and client delivery. The proposed initial outbound
-  experiment is 5–10 total first touches/week, only after separate authorization;
-  the existing 50/week limit is a ceiling, not a target or current permission.
-- Use concise, calm, owner-friendly language. Avoid unexplained jargon, vanity
-  metrics, and “healthy” claims that are not backed by real checks.
-
-## Owner success test
-
-Riley can identify the next lead in 10 seconds, understand why in 15 seconds,
-approve/reject/correct outreach in 30 seconds, stop all sending in 5 seconds, and
-complete the weekly review in 30 minutes from desktop or mobile.
+- Every weekday the emails go out on time. If anything stops them, both founders get an
+  email within 15 minutes saying what happened and what to do.
+- The Today screen answers three questions in 10 seconds: did today's emails go, who
+  replied, and what's next.
+- The engine costs nothing beyond the existing Cloudflare plan.
+- Plain words everywhere: no unexplained jargon, and no "healthy" claim without a real
+  check behind it.
