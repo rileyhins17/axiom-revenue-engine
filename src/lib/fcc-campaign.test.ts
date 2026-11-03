@@ -15,6 +15,7 @@ import {
   companyShortName,
   deriveFirstName,
   fccCopyOfMessageId,
+  fccFlagOffCopy,
   fccCopySql,
   fccFirstEmailSubject,
   fccSubjectTestCopy,
@@ -307,10 +308,40 @@ test("the subject test: half of new first emails keep the question subject, half
   for (const id of uuids.slice(0, 50)) assert.equal(fccSubjectTestCopy(id), fccSubjectTestCopy(id), "the same contact always gets the same subject");
 });
 
+test("the flag-off email: says the portal may be closed, states no price, and keeps the subject test", () => {
+  const address = "257 Example St, Kitchener, ON N2C 0A0, Canada";
+  const contact = { firstName: "Jane", company: "Talktone, Inc.", filings: [{ rmdNumber: "RMD0009999" }] as never };
+  const question = renderFccEmailV5(contact, 1, address, { name: "Riley Hinsperger" }, "v8a");
+  const listing = renderFccEmailV5(contact, 1, address, { name: "Riley Hinsperger" }, "v8b");
+  assert.equal(question.subject, "Question about Talktone's RMD listing");
+  assert.equal(listing.subject, "Talktone's FCC listing");
+  assert.equal(listing.bodyPlain, question.bodyPlain, "only the subject differs");
+  assert.match(question.bodyPlain, /^Hi Jane,\n\nI was going through the FCC's Robocall Mitigation Database and noticed Talktone's listing \(RMD0009999\) doesn't show a 2026 recertification\. It was due March 1/);
+  assert.match(question.bodyPlain, /It looks like the portal may not be open for your listing right now/);
+  assert.match(question.bodyPlain, /The CommLaw Group, reports the FCC has started emailing second-chance notices to some providers/);
+  assert.match(question.bodyPlain, /free, so it's ready if the portal opens, or for March 1, 2027\./);
+  assert.match(question.bodyPlain, /We're not a law firm and this isn't legal advice\./);
+  assert.match(question.bodyPlain, /Riley Hinsperger\nCo-founder/, "signed by the sending founder");
+  assert.match(question.bodyPlain, /Reply "no thanks" and I won't follow up\./);
+  assert.match(question.bodyPlain, /257 Example St,/, "the mailing address US law requires");
+  for (const email of [question.bodyPlain, question.bodyHtml]) {
+    assert.doesNotMatch(email, /15 minutes|\$450|own login/, "nothing they can't do today, and no price while we can't take money");
+  }
+  assert.match(renderFccEmailV5(contact, 1, address, { name: "Aidan Magee" }, "v7a").bodyPlain, /in about 15 minutes/, "the regular email is unchanged");
+
+  const followUp = renderFccEmailV5(contact, 2, address, { name: "Riley Hinsperger" }, "v8b");
+  assert.equal(followUp.subject, "Re: Talktone's FCC listing", "the day-3 follow-up answers under the first email's subject");
+  assert.doesNotMatch(followUp.bodyPlain, /15 minutes|\$450/);
+  assert.equal(renderFccEmailDay7(contact, "v8a", address).subject, "Re: Question about Talktone's RMD listing");
+
+  const ids = Array.from({ length: 200 }, (_, i) => `c${i}`);
+  for (const id of ids) assert.equal(fccFlagOffCopy(id), fccSubjectTestCopy(id) === "v7a" ? "v8a" : "v8b", "a contact's subject doesn't change with the words");
+});
+
 test("every copy is read back from its Message-ID, the November 6 email included, and the SQL agrees", () => {
   const ids: Array<[string | null, string]> = [
     ["<fcc-3f2a9c1e-0b7d-4e2a-9c51-1a2b3c4d5e6f-1@gmail.com>", "v3"], ["<fcc-v4-abc-1@gmail.com>", "v4"], ["<fcc-v5-abc-1@gmail.com>", "v5"],
-    ["<fcc-v7a-abc-1@gmail.com>", "v7a"], ["<fcc-v7b-abc-1@gmail.com>", "v7b"], ["<fcc-nov6-abc-1@gmail.com>", "nov6"], [null, "v3"],
+    ["<fcc-v7a-abc-1@gmail.com>", "v7a"], ["<fcc-v7b-abc-1@gmail.com>", "v7b"], ["<fcc-v8a-abc-1@gmail.com>", "v8a"], ["<fcc-v8b-abc-1@gmail.com>", "v8b"], ["<fcc-nov6-abc-1@gmail.com>", "nov6"], [null, "v3"],
   ];
   const sqlite = new Database(":memory:");
   for (const [id, copy] of ids) {

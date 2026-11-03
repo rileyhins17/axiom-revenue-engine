@@ -3,7 +3,7 @@ import test from "node:test";
 
 import Database from "better-sqlite3";
 
-import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_NOV6_CAMPAIGN_KEY, fccSubjectTestCopy, renderFccEmailDay7 } from "@/lib/fcc-campaign";
+import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_NOV6_CAMPAIGN_KEY, fccFlagOffCopy, fccSubjectTestCopy, renderFccEmailDay7 } from "@/lib/fcc-campaign";
 import { runFccDailySend, type FccMailbox, type FccSendConfig } from "@/lib/fcc-campaign-sender";
 import { fccDailyMax } from "@/lib/fcc-campaign-tick";
 import { PermanentEmailError, type OutgoingEmail } from "@/lib/revenue-engine/engine-email";
@@ -141,7 +141,7 @@ test("sends at most 30 a day, named contacts first, never held inboxes, and neve
     "the signature link shows the plain domain and opens the FCC page");
   assert.equal(statusOf(raw, "held"), "held");
   const first = raw.prepare(`SELECT "status","step2DueAt","step1MessageId" FROM "FccCampaignContact" WHERE "id" = 'n1'`).get() as Record<string, string>;
-  assert.deepEqual(first, { status: "step1_sent", step2DueAt: "2026-10-29", step1MessageId: `<fcc-${fccSubjectTestCopy("n1")}-n1-1@mail.example>` });
+  assert.deepEqual(first, { status: "step1_sent", step2DueAt: "2026-10-29", step1MessageId: `<fcc-${fccFlagOffCopy("n1")}-n1-1@mail.example>` });
 
   assert.deepEqual(await runFccDailySend(db, config(t.factory, m.factory), new Date("2026-10-26T18:00:00Z")), { status: "SKIPPED", reason: "daily cap reached" });
   const tuesday = await runFccDailySend(db, config(t.factory, m.factory), TUESDAY);
@@ -207,9 +207,9 @@ test("people who got the calmer v3 first email get its follow-up; everyone new g
   assert.equal(followUp.headers["In-Reply-To"], "<fcc-old-1@mail.example>");
   assert.equal(followUp.headers["Message-ID"], "<fcc-old-2@mail.example>");
   assert.equal(first.to, "lee@new-tel.example");
-  const copy = fccSubjectTestCopy("new");
-  assert.equal(first.subject, copy === "v7a" ? "Question about Talktone's RMD listing" : "Talktone's FCC listing");
-  assert.match(first.text, /noticed Talktone's listing \(RMD-new\) doesn't show a 2026 recertification yet/);
+  const copy = fccFlagOffCopy("new");
+  assert.equal(first.subject, copy === "v8a" ? "Question about Talktone's RMD listing" : "Talktone's FCC listing");
+  assert.match(first.text, /noticed Talktone's listing \(RMD-new\) doesn't show a 2026 recertification\./);
   assert.equal(first.headers["Message-ID"], `<fcc-${copy}-new-1@mail.example>`);
 });
 
@@ -365,7 +365,7 @@ test("the hot list counts toward the same 30 a day and goes before any normal fi
   const tuesday = await runFccDailySend(db, config(t.factory, m.factory), TUESDAY);
   assert.equal(tuesday.status === "RAN" && tuesday.firstEmails, 10);
   assert.ok(t.sent.slice(30, 35).every((message) => message.headers["Message-ID"].startsWith("<fcc-nov6-")), "the last five hot contacts go first on Tuesday");
-  assert.ok(t.sent.slice(35).every((message) => /^<fcc-v7[ab]-/.test(message.headers["Message-ID"])), "then the normal first emails");
+  assert.ok(t.sent.slice(35).every((message) => /^<fcc-v8[ab]-/.test(message.headers["Message-ID"])), "then the normal first emails");
   assert.equal(new Set(t.sent.map((message) => message.to)).size, 40, "nobody is emailed twice");
 });
 
@@ -481,6 +481,32 @@ test("only the first inbox sends the hot list, and an added inbox leaves its peo
   await runFccDailySend(db, config(t.factory, fakeMailbox().factory, { primary: false, fromAddress: "riley@mail.example", fromName: "Riley Hinsperger" }), MONDAY);
   assert.deepEqual(t.sent.map((message) => message.to), ["march-only@march-tel.example"]);
   assert.deepEqual(["h1", "h2", "m1"].map((id) => statusOf(raw, id)), ["ready", "ready", "ready"]);
+});
+
+test("first emails: anyone the hot list never held gets the flag-off words; anyone it held keeps the regular email", async () => {
+  const { raw, db } = database();
+  addContact(raw, "off", "owner@closed-tel.example");
+  addContact(raw, "left", "leftover@left-tel.example");
+  addNov6Contact(raw, "hleft", "leftover@left-tel.example");
+  addContact(raw, "held", "generic@held-tel.example");
+  addNov6Contact(raw, "hheld", "generic@held-tel.example", { sendable: false });
+  recordGo(raw);
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory), new Date("2026-11-06T15:00:00Z"));
+  const to = (email: string) => t.sent.find((message) => message.to === email)!;
+
+  const off = to("owner@closed-tel.example");
+  assert.equal(off.headers["Message-ID"], `<fcc-${fccFlagOffCopy("off")}-off-1@mail.example>`);
+  assert.match(off.text, /It looks like the portal may not be open for your listing right now/);
+  assert.doesNotMatch(off.text, /15 minutes|\$450/);
+  assert.ok(off.html?.includes("second-chance notices"), "the HTML part has the same words");
+
+  const left = to("leftover@left-tel.example");
+  assert.equal(left.headers["Message-ID"], `<fcc-${fccSubjectTestCopy("left")}-left-1@mail.example>`, "the flag was on and the hot list ran out of days");
+  assert.match(left.text, /in about 15 minutes/);
+
+  const held = to("generic@held-tel.example");
+  assert.equal(held.headers["Message-ID"], `<fcc-${fccSubjectTestCopy("held")}-held-1@mail.example>`, "a held hot-list row still means the flag was on");
 });
 
 test("the hot list closes after its last day, and anyone it never reached rejoins the March queue", async () => {
@@ -606,7 +632,7 @@ test("anyone on the hot list gets the November 6 email once and nothing from the
   assert.match(to("not-yet-emailed@one-tel.example")[0].headers["Message-ID"], /^<fcc-nov6-/);
   assert.equal(to("already-emailed@two-tel.example").length, 1);
   assert.match(to("already-emailed@two-tel.example")[0].headers["Message-ID"], /^<fcc-nov6-/);
-  assert.match(to("march-only@three-tel.example")[0].headers["Message-ID"], /^<fcc-v7[ab]-/, "the normal queue still goes");
+  assert.match(to("march-only@three-tel.example")[0].headers["Message-ID"], /^<fcc-v8[ab]-/, "the normal queue still goes");
   assert.match(to("generic-on-both@four-tel.example")[0].headers["Message-ID"], /^<fcc-v7[ab]-/, "a held hot-list row leaves March alone");
 });
 
@@ -648,7 +674,7 @@ test("the day-7 follow-up goes 7 days after the first email, in its thread, from
   assert.equal(last.headers["In-Reply-To"], second.headers["Message-ID"], "it answers the day-3 follow-up");
   assert.equal(last.headers.References, `${first.headers["Message-ID"]} ${second.headers["Message-ID"]}`, "and names the whole thread");
   assert.equal(last.headers["Message-ID"], first.headers["Message-ID"].replace("-1@", "-3@"), "its first email's copy stays in the Message-ID");
-  const copy = fccSubjectTestCopy("c1");
+  const copy = fccFlagOffCopy("c1");
   assert.equal(last.text, renderFccEmailDay7({ firstName: "Jane", company: "Crocker Communications", filings: [{ rmdNumber: "RMD-c1" }] as never }, copy, ADDRESS, "Riley Hinsperger").bodyPlain);
   assert.match(last.text, /^Hi Jane,\n\nI'll close this out after this one\. For context on why I reached out:/);
   assert.match(last.text, /\n\nCrocker Communications' listing \(RMD-c1\) still shows no 2026 recertification\. If you'd like the free list/);
@@ -816,13 +842,13 @@ test("new first emails from both inboxes split between the two test subjects by 
   const firsts = [...t.sent.slice(1), ...r.sent];
   assert.equal(firsts.length, 40);
   for (const message of firsts) {
-    const id = /^<fcc-(v7[ab])-(s\d+)-1@/.exec(message.headers["Message-ID"]);
+    const id = /^<fcc-(v8[ab])-(s\d+)-1@/.exec(message.headers["Message-ID"]);
     assert.ok(id, message.headers["Message-ID"]);
-    assert.equal(id[1], fccSubjectTestCopy(id[2]!), "the contact id picks the subject");
+    assert.equal(id[1], fccFlagOffCopy(id[2]!), "the contact id picks the subject");
     const n = id[2]!.slice(1);
-    assert.equal(message.subject, id[1] === "v7a" ? `Question about Company ${n}'s RMD listing` : `Company ${n}'s FCC listing`);
+    assert.equal(message.subject, id[1] === "v8a" ? `Question about Company ${n}'s RMD listing` : `Company ${n}'s FCC listing`);
   }
-  const listing = firsts.filter((message) => message.headers["Message-ID"].startsWith("<fcc-v7b-")).length;
+  const listing = firsts.filter((message) => message.headers["Message-ID"].startsWith("<fcc-v8b-")).length;
   assert.ok(listing > 10 && listing < 30, `${listing} of 40 got the listing subject`);
   for (const sent of [t.sent.slice(1), r.sent]) assert.ok(new Set(sent.map((message) => message.headers["Message-ID"].slice(0, 9))).size === 2, "each inbox sends both subjects");
 

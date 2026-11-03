@@ -1,3 +1,11 @@
+## 2026-11-03 (Tue, afternoon): FCC flag-off first email ready for review (not released)
+
+- **Why (Aidan, Nov 3, "Yes, push it"):** the Nov 3 re-scan shows 277 of 3,404 contacts with the Recertify flag on and 3,127 off. The regular first email says the officer files "in about 15 minutes", which is likely wrong for a closed button, and we take no deposit while the flag is off.
+- **Change:** a March first email to anyone with no row on the Nov 6 list uses the flag-off words (`<fcc-v8a-…>` or `<fcc-v8b-…>`, same two subjects, same contact split). Anyone with a Nov 6 row keeps the regular words, including people the list never reached. Day-3 and day-7 words are unchanged. No migration and no data change.
+- **Known gap:** 6 ready March rows have the flag on but no Nov 6 row, so they'd get the flag-off words. The reply flow still checks the flag before any deposit.
+- **Approval gate:** `FCC_COPY_VERSION` becomes `fcc-march1-pack-v8-flag-off`. That stops all FCC sending until a founder's go names it, so release after the day's last send and record the go the same evening.
+- **Checks on Aidan's PC:** FCC test files 79 pass, 0 fail; typecheck, eslint on the changed files and `check:safety` clean. Full suite: 1,094 pass, 4 skipped, 15 fail, all M2, private KW setup and Windows path tests, none FCC. This PC showed 15 failures without the Nov 2 change too. Riley's clean clone or CI is the proof.
+
 ## 2026-11-02 (Mon, afternoon): FCC day-7, subject test and owner profile picture live (`6809a70e`)
 
 - **Released (Riley's Claude, Nov 2, ~19:43 UTC; Riley that morning: "Yes, release tonight"):** `2eab3aa` (PR #16 at `902ac56`, plus branch `owner-profile-picture` merged on top) live as Worker `6809a70e-7b39-409b-a55e-c3145a819e4e` from the clean `rv` clone with `scripts/release-production.mjs`, after the day's last send (17:42 UTC). Migration `0088_fcc_day7_follow_up.sql`: receipts 90 → 91, stops `01111` before and after, `FccCampaignSend` 218 rows before and after; smoke test OK. Time Travel bookmark `000043f3-00000250-00005117-e7e127f3c6ab74904194e7af62c48f0a`. Rollback target `34eb415d`. Backup `backups/production/prod-export-20261102T194242Z.sql` (sha256 `f9f3c060…3e3ba4`). Full suite on `2eab3aa`: 1,107 pass, 4 skipped, 0 fail; typecheck clean.

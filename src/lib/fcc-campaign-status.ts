@@ -165,10 +165,11 @@ export type FccStats = {
   weekdaysLeft: number | null;
 };
 
-/** Each email version's row on the FCC screen, oldest first. v7a and v7b are the subject test: the same email under two subjects. */
+/** Each email version's row on the FCC screen, oldest first. v7a and v7b are the subject test: the same email under two subjects; v8a and v8b are the flag-off email under those subjects. */
 const VERSION_NAMES: Record<string, string> = {
   v3: "Calmer email (Oct 28)", v4: "Question email (Oct 29–Nov 1)", v5: "Question email, new signature", nov6: "November 6 email",
   v7a: "Subject test: “Question about …'s RMD listing”", v7b: "Subject test: “…'s FCC listing”",
+  v8a: "Flag-off email: “Question about …'s RMD listing”", v8b: "Flag-off email: “…'s FCC listing”",
 };
 const VERSION_ORDER = Object.keys(VERSION_NAMES);
 const rate = (part: number, whole: number) => (whole > 0 ? part / whole : null);

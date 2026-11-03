@@ -28,10 +28,11 @@
  * inbox, about 7 days after the first email and at least 4 after the day-3 one. It goes after the
  * day-3 follow-ups and before new first emails, inside the same daily count, with the day-3 checks
  * plus one more: nobody else at the company replied, was stopped, bounced or is held. Never to the
- * hot list. New first emails split between two subjects (fccSubjectTestCopy).
+ * hot list. New first emails split between two subjects (fccSubjectTestCopy), and anyone the hot
+ * list never held gets the flag-off words under those subjects (fccFlagOffCopy).
  */
 import {
-  fccCopyOfMessageId, fccSubjectTestCopy, renderFccEmail, renderFccEmailDay7, renderFccEmailNov6, renderFccEmailV5, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION,
+  fccCopyOfMessageId, fccFlagOffCopy, fccSubjectTestCopy, renderFccEmail, renderFccEmailDay7, renderFccEmailNov6, renderFccEmailV5, FCC_CAMPAIGN_KEY, FCC_COPY_VERSION,
   FCC_DAILY_SEND_CAP, FCC_DAY7_AFTER_FIRST_DAYS, FCC_DAY7_AFTER_FOLLOW_UP_DAYS, FCC_FOLLOW_UP_DELAY_DAYS, FCC_NOV6_CAMPAIGN_KEY, FCC_NOV6_LAST_SEND_DAY,
   type FccCampaignContact, type FccCopy,
 } from "@/lib/fcc-campaign";
@@ -90,6 +91,8 @@ export type FccRunResult =
 type ContactRow = {
   id: string; email: string; firstName: string; company: string; filingsJson: string;
   step1SentAt: string | null; step1MessageId: string | null;
+  /** First-email rows only: 1 if this person has a row on the November 6 list, whose companies had the Recertify flag on. */
+  onHotList?: number;
   /** Day-7 rows only: the day-3 follow-up's Message-ID, so the last email threads under both. */
   step2MessageId?: string | null;
 };
@@ -279,12 +282,14 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 3 AND s."status" <> 'FAILED')
       AND ${notOnHotList}
     ORDER BY ${FCC_DAY7_DUE_SQL}, c."id" LIMIT 200`).bind(FCC_CAMPAIGN_KEY, inbox, day, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
-  const { results: firsts } = await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
+  // The hot list holds the companies whose Recertify flag was on, so onHotList picks which first email a person gets.
+  const { results: firsts } = await db.prepare(`SELECT ${columns}, EXISTS (SELECT 1 FROM "FccCampaignContact" fh WHERE fh."campaignKey" = ? AND fh."email" = c."email") AS "onHotList"
+    FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" <> 'FAILED')
       AND ${notOnHotList}
     ORDER BY CASE c."emailKind" WHEN 'compliance' THEN 0 WHEN 'named' THEN 1 ELSE 2 END, c."createdAt", c."id" LIMIT 200`)
-    .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
+    .bind(FCC_NOV6_CAMPAIGN_KEY, FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, hotOpen ? 1 : 0).all<ContactRow>();
   const { results: hot } = hotOpen && config.primary !== false ? await db.prepare(`SELECT ${columns} FROM "FccCampaignContact" c
     WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."sendable" = 1
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 1 AND s."status" <> 'FAILED')
@@ -311,8 +316,11 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
   /** Claims, sends and records one email. Returns false when sending should stop for today. */
   const send = async (contact: ContactRow, step: 1 | 2 | 3, hot = false): Promise<boolean> => {
     // Every email carries its first email's copy in its Message-ID, so results can be split by version and each
-    // follow-up answers under the subject its first email used. New first emails split between two subjects.
-    const copy: FccCopy = hot ? "nov6" : step === 1 ? fccSubjectTestCopy(contact.id) : fccCopyOfMessageId(contact.step1MessageId);
+    // follow-up answers under the subject its first email used. New first emails split between two subjects, and
+    // anyone the hot list never held gets the flag-off words.
+    const copy: FccCopy = hot ? "nov6"
+      : step !== 1 ? fccCopyOfMessageId(contact.step1MessageId)
+      : contact.onHotList ? fccSubjectTestCopy(contact.id) : fccFlagOffCopy(contact.id);
     if (copy === "nov6" && !hot) {
       // Only the November 6 email itself carries this mark, and it has no follow-up.
       await stop(contact, "suppressed", "The November 6 email has no follow-up");
