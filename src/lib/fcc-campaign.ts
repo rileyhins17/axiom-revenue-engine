@@ -33,16 +33,37 @@ export const FCC_MAX_FOLLOW_UPS = 2;
 export const FCC_DAY7_AFTER_FIRST_DAYS = 7;
 /** ...and at least this many after the day-3 one, which runs late when the inbox is busy (the Nov 6 list went first Nov 2–5). */
 export const FCC_DAY7_AFTER_FOLLOW_UP_DAYS = 4;
+/** The one follow-up for the November 6 list goes this many days after its first email. */
+export const FCC_NOV6_FOLLOW_UP_DELAY_DAYS = 5;
+/**
+ * The days it may go. Its text says "my note last week" and that November 6 "has now passed", so it waits
+ * for Monday Nov 9; and it closes with the FCC finish line (Fri Nov 13), so it never arrives after the call.
+ */
+export const FCC_NOV6_FOLLOW_UP_FIRST_DAY = "2026-11-09";
+export const FCC_NOV6_FOLLOW_UP_LAST_DAY = "2026-11-13";
+/**
+ * Words in a hold or stop note that mean the company has since filed (or says it has), matched anywhere and
+ * ignoring case. The follow-up says the listing "still shows no 2026 recertification", so a contact whose own
+ * row, or any other row for the same address, carries one of these never gets it.
+ */
+export const FCC_RECERTIFIED_MARKS = ["recertif", "re-signed", "resigned"] as const;
+/**
+ * The note on March rows of companies that signed an RMD declaration in Jan–Feb 2026. That is not the March 1
+ * recertification, and the Nov 6 email (and so its follow-up) is written for them, so a row carrying this note
+ * never counts as recertified or as a stop. Same exception as the hot list's own first email.
+ */
+export const FCC_DECLARATION_NOTE = "Signed a 2026 RMD declaration";
 /**
  * The copy a founder's go must name (FccCampaignSetting.approvedCopy). Aidan's "v2" email (Notion
  * task, Oct 28) replaced the calmer v3 for every first email from Oct 29; v5 (Nov 1) keeps its words
  * and adds the founders' signature with the site link and logo; v6 added the one-off November 6
  * email; v7 adds the day-7 follow-up (Aidan's text, approved Oct 29) and a test of two subjects on
  * new first emails; v8 (Aidan, Nov 3) gives first emails an honest version for companies whose
- * Recertify button looks closed. Contacts keep the v3 list key; which copy a person got is in their
+ * Recertify button looks closed; v9 adds the one follow-up for the November 6 list (Aidan's text,
+ * "Wording is good", Nov 4). Contacts keep the v3 list key; which copy a person got is in their
  * first email's Message-ID ("<fcc-v7a-..." or "<fcc-v8a-..." from v7).
  */
-export const FCC_COPY_VERSION = "fcc-march1-pack-v8-flag-off";
+export const FCC_COPY_VERSION = "fcc-march1-pack-v9-nov6-followup";
 
 export type FccFilingRow = {
   business_name: string;
@@ -370,6 +391,13 @@ export function renderFccEmail(
  * signature. It is a first email only: no follow-up is scheduled. `listing_line` and `company_short`
  * come from the contact's first filing.
  */
+/** The Nov 6 email's subject. Its follow-up answers it with "Re: ", so both build it here. */
+export function fccNov6Subject(contact: Pick<FccCampaignContact, "filings">) {
+  const companyShort = contact.filings[0]?.companyShort?.trim();
+  if (!companyShort) throw new Error("Nov 6 contact is missing its listing line or short company name");
+  return `Did ${companyShort} get the FCC's RMD notice?`;
+}
+
 export function renderFccEmailNov6(
   contact: Pick<FccCampaignContact, "firstName" | "filings">,
   mailingAddress: string | null | undefined,
@@ -390,9 +418,46 @@ export function renderFccEmailNov6(
   const signature = fccSignature(signer, mailingAddress);
   const body = paragraphs.map((text) => `<p style="margin:0 0 14px">${escapeHtml(text)}</p>`).join("\n");
   return {
-    subject: `Did ${companyShort} get the FCC's RMD notice?`,
+    subject: fccNov6Subject(contact),
     bodyPlain: [...paragraphs, signature.plain].join("\n\n"),
     bodyHtml: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1f1f1f">\n${body}\n${signature.html}\n</div>`,
+  };
+}
+
+/**
+ * The one follow-up for the November 6 list (Aidan's text, "Wording is good", Nov 4; word for word). It answers
+ * the Nov 6 email in its thread, from the same inbox, 5 or more days after it. The footer is Aidan's own three
+ * lines: his name; the site and the mailing address; the not-legal-advice line with the "no thanks" opt-out,
+ * which US anti-spam law needs in every email. The address is the campaign's mailing address
+ * (FCC_CAMPAIGN_MAILING_ADDRESS), never written into code.
+ */
+export function renderFccEmailNov6FollowUp(
+  contact: Pick<FccCampaignContact, "firstName" | "filings">,
+  mailingAddress: string | null | undefined,
+  signerName = "Aidan Magee",
+): RenderedFccEmail {
+  const address = String(mailingAddress || "").trim() || ADDRESS_PLACEHOLDER;
+  const filing = contact.filings[0];
+  const companyShort = filing?.companyShort?.trim();
+  if (!companyShort) throw new Error("Nov 6 contact is missing its listing line or short company name");
+  const rmd = filing?.rmdNumber?.trim();
+  const listing = `${companyPossessive(companyShort)} public listing${rmd ? ` (${rmd})` : ""}`;
+  const paragraphs = [
+    `Hi ${contact.firstName},`,
+    `Following up on my note last week. ${listing} still shows no 2026 recertification, and it looks like the portal may still let you file it.`,
+    `The one notice date we've heard of, November 6, has now passed. Dates may differ, so I can't say where that leaves you. If you did get a notice, forward it and I'll tell you what I see, free.`,
+    `If you'd rather have it off your plate, it's still a flat $450, and your officer files from your own login. Want me to start? A one-word reply is fine.`,
+  ];
+  const footer = [
+    signerName.trim() || "Aidan Magee",
+    `Axiom · ${FCC_SITE_LABEL}/fcc-filings · ${address}`,
+    `We're not a law firm and this isn't legal advice. ${FCC_OPT_OUT}`,
+  ];
+  const html = [...paragraphs.map((text) => `<p style="margin:0 0 14px">${escapeHtml(text)}</p>`), `<p style="margin:0 0 14px">${footer.map(escapeHtml).join("<br>\n")}</p>`];
+  return {
+    subject: `Re: ${fccNov6Subject(contact)}`,
+    bodyPlain: [...paragraphs, footer.join("\n")].join("\n\n"),
+    bodyHtml: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1f1f1f">\n${html.join("\n")}\n</div>`,
   };
 }
 

@@ -28,6 +28,7 @@ import {
   renderFccEmail,
   renderFccEmailDay7,
   renderFccEmailNov6,
+  renderFccEmailNov6FollowUp,
   renderFccEmailV4,
   renderFccEmailV5,
   fccSignature,
@@ -226,6 +227,33 @@ test("renders the November 6 email word for word, as a first email with no follo
   assert.match(renderFccEmailNov6(contact, "257 Example St, Kitchener, ON N2C 0A0, Canada", { name: "Riley Hinsperger" }).bodyPlain, /Riley Hinsperger/);
   assert.match(renderFccEmailNov6(contact, null).bodyPlain, /\[MAILING ADDRESS GOES HERE\]/);
   assert.throws(() => renderFccEmailNov6({ firstName: "Sam", filings: [{ company: "x", rmdNumber: "", state: "", lastFilingDate: "", filingUrl: "" }] }, null), /missing its listing line/);
+});
+
+test("renders the Nov 6 follow-up word for word, under the first email's subject, with the address and the no-thanks line", () => {
+  const address = "257 Example St, Kitchener, ON N2C 0A0, Canada";
+  const contact = {
+    firstName: "Dana",
+    filings: [{ company: "Example Telecom LLC", rmdNumber: "RMD0000001", state: "", lastFilingDate: "2024-04-15", filingUrl: "https://example.test", companyShort: "Example Telecom", listingLine: "x" }],
+  };
+  const first = renderFccEmailNov6(contact, address);
+  const email = renderFccEmailNov6FollowUp(contact, address);
+  assert.equal(email.subject, `Re: ${first.subject}`, "answers the first email's subject exactly, so mail apps thread it");
+  assert.equal(email.bodyPlain, [
+    "Hi Dana,",
+    "Following up on my note last week. Example Telecom's public listing (RMD0000001) still shows no 2026 recertification, and it looks like the portal may still let you file it.",
+    "The one notice date we've heard of, November 6, has now passed. Dates may differ, so I can't say where that leaves you. If you did get a notice, forward it and I'll tell you what I see, free.",
+    "If you'd rather have it off your plate, it's still a flat $450, and your officer files from your own login. Want me to start? A one-word reply is fine.",
+    `Aidan Magee\nAxiom · axiominternational.ca/fcc-filings · ${address}\nWe're not a law firm and this isn't legal advice. Not useful? Reply "no thanks" and I won't follow up.`,
+  ].join("\n\n"));
+  assert.doesNotMatch(email.bodyPlain, /https?:|www\.|penalt|enforce|deadline/i);
+  assert.match(email.bodyHtml, /Reply &quot;no thanks&quot; and I won't follow up\./);
+  assert.ok(email.bodyHtml.includes(address));
+  assert.match(renderFccEmailNov6FollowUp(contact, address, "Riley Hinsperger").bodyPlain, /\nRiley Hinsperger\nAxiom · /);
+  assert.match(renderFccEmailNov6FollowUp(contact, null).bodyPlain, /\[MAILING ADDRESS GOES HERE\]/);
+  // A company whose name ends in s, and a filing with no number.
+  const plural = renderFccEmailNov6FollowUp({ firstName: "Sam", filings: [{ ...contact.filings[0], companyShort: "Crocker Communications", rmdNumber: "" }] }, address);
+  assert.match(plural.bodyPlain, /Crocker Communications' public listing still shows no 2026 recertification/);
+  assert.throws(() => renderFccEmailNov6FollowUp({ firstName: "Sam", filings: [{ company: "x", rmdNumber: "", state: "", lastFilingDate: "", filingUrl: "" }] }, address), /missing its listing line/);
 });
 
 test("builds the November 6 hot list in file order, holds generic inboxes, and keeps one row per mailbox", () => {
