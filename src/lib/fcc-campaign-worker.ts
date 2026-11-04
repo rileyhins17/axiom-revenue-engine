@@ -2,6 +2,7 @@ import { connect } from "cloudflare:sockets";
 
 import { fccReplyInboxFromImap, runFccReplyCheck, type FccOwnerMail, type FccReplyCheckResult } from "./fcc-campaign-replies";
 import { fccMailboxFromImap, type FccSendConfig } from "./fcc-campaign-sender";
+import { fccFilingStatusFromPortal } from "./fcc-filing-status";
 import { runFccSendTick, type FccTickResult } from "./fcc-campaign-tick";
 import { runFccWeeklyNumbers, type FccWeeklyNumbersResult } from "./fcc-weekly-numbers";
 import { OWNER_ALERT_INBOXES } from "./ops/health";
@@ -54,6 +55,8 @@ function sendConfig(env: FccEnv, inbox: FccInbox): FccSendConfig {
     newId: () => crypto.randomUUID(),
     transport: configured ? smtpFor(env, inbox) : null,
     mailbox: configured ? async () => fccMailboxFromImap(await imapFor(env, inbox)()) : null,
+    // The public FCC listing is read before every email, so nobody is told their listing shows no recertification when it now does.
+    filingStatus: configured ? fccFilingStatusFromPortal() : null,
   };
 }
 

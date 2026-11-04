@@ -37,6 +37,7 @@ import {
   type FccCampaignContact, type FccCopy,
 } from "@/lib/fcc-campaign";
 import { readFccSignatures } from "@/lib/fcc-campaign-control";
+import { fccRecertifiedBy, type FccFilingStatusReader } from "@/lib/fcc-filing-status";
 import { PermanentEmailError, type EmailTransport } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { imapDate, imapQuote, type ImapSession } from "@/lib/revenue-engine/imap-client";
@@ -77,6 +78,12 @@ export type FccSendConfig = {
   mailingAddress: string | null | undefined;
   transport: (() => Promise<EmailTransport>) | null;
   mailbox: (() => Promise<FccMailbox>) | null;
+  /**
+   * Reads a contact's public FCC listing right before an email that describes it (every step). A listing that
+   * now shows a recertification stops the contact; one that can't be read waits for the next run. Null skips the
+   * check (tests and dry runs).
+   */
+  filingStatus?: FccFilingStatusReader | null;
   newId: () => string;
 };
 
@@ -356,6 +363,30 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     await db.prepare(`INSERT INTO "EngineEmailSuppression" ("email","reason") VALUES (?,'BOUNCED') ON CONFLICT DO NOTHING`).bind(email).run();
   };
 
+  /**
+   * Every email says the listing shows no 2026 recertification, so the listing is read first. "stopped": it now
+   * shows one, and the contact is suppressed with the date. "unknown": the page couldn't be read, so this person
+   * waits for a later run rather than get an email that may be wrong. "send": still no recertification (or no
+   * reader is configured, or the contact has no filing URL to read).
+   */
+  const listingCheck = async (contact: Pick<ContactRow, "id" | "email" | "filingsJson">): Promise<"send" | "stopped" | "unknown"> => {
+    if (!config.filingStatus) return "send";
+    let url = "";
+    try { url = String((JSON.parse(contact.filingsJson) as Array<{ filingUrl?: string }>)[0]?.filingUrl ?? ""); } catch { url = ""; }
+    if (!/sys_id=[0-9a-f]{32}/i.test(url)) return "send";
+    const status = await config.filingStatus(url).catch(() => null);
+    if (!status) {
+      console.warn(JSON.stringify({ event: "fcc_listing_unreadable", email: contact.email }));
+      return "unknown";
+    }
+    if (fccRecertifiedBy(status, day)) {
+      await stop(contact, "suppressed", `The listing shows a ${status.lastRecertified} recertification (read before sending on ${day}), so the email would be wrong`);
+      counts.suppressed += 1;
+      return "stopped";
+    }
+    return "send";
+  };
+
   /** Claims, sends and records one email. Returns false when sending should stop for today. */
   const send = async (contact: ContactRow, step: 1 | 2 | 3, hot = false): Promise<boolean> => {
     // Every email carries its first email's copy in its Message-ID, so results can be split by version and each
@@ -537,24 +568,28 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
           continue;
         }
       }
+      if ((await listingCheck(contact)) !== "send") continue;
       if (!(await send(contact, 1, true))) return finish();
     }
     for (const contact of followUps) {
       if (remaining <= 0 || budget <= 0) break;
       const check = await followUpCheck(contact, 2);
       if (check === "inbox down") break;
-      if (check === "send" && !(await send(contact, 2))) return finish();
+      if (check !== "send" || (await listingCheck(contact)) !== "send") continue;
+      if (!(await send(contact, 2))) return finish();
     }
     // Day-7 follow-ups come after the day-3 ones, and only while the inbox can be read.
     for (const contact of followUpsHeldBack ? [] : day7s) {
       if (remaining <= 0 || budget <= 0) break;
       const check = await followUpCheck(contact, 3);
       if (check === "inbox down") break;
-      if (check === "send" && !(await send(contact, 3))) return finish();
+      if (check !== "send" || (await listingCheck(contact)) !== "send") continue;
+      if (!(await send(contact, 3))) return finish();
     }
     for (const contact of firsts) {
       if (remaining <= 0 || budget <= 0) break;
       if (await isSuppressed(db, contact.email)) { await stop(contact, "suppressed", "On the do-not-email list"); counts.suppressed += 1; continue; }
+      if ((await listingCheck(contact)) !== "send") continue;
       if (!(await send(contact, 1))) return finish();
     }
     return finish();
