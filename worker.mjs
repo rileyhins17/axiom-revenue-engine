@@ -10,7 +10,7 @@ import { EmailMessage } from "cloudflare:email";
 
 import { setCloudflareBindings } from "./src/lib/cloudflare";
 import { clearServerEnvCache } from "./src/lib/env";
-import { runFccCampaignCron, runFccReplyCheckCron } from "./src/lib/fcc-campaign-worker";
+import { runFccCampaignCron, runFccReplyCheckCron, runFccWeeklyNumbersCron } from "./src/lib/fcc-campaign-worker";
 import { alertEmail, OWNER_ALERT_INBOXES, recordAndSelectAlerts, runHealthChecks } from "./src/lib/ops/health";
 
 // Sign-in (better-auth) sets up three request stores the first time it is used, by
@@ -121,6 +121,10 @@ const exportedWorker = {
       ctx.waitUntil(runFccReplyCheckCron(env, globalThis.__axiomSendLoginEmail)
         .then((result) => console.log(JSON.stringify({ event: "fcc_reply_check", ...result })))
         .catch((error) => console.error("[fcc-reply-check] failure:", error instanceof Error ? error.message : "unknown")));
+      // Mondays from 8:00 Toronto: last week's FCC numbers, emailed to both founders once.
+      ctx.waitUntil(runFccWeeklyNumbersCron(env, globalThis.__axiomSendLoginEmail)
+        .then((result) => console.log(JSON.stringify({ event: "fcc_weekly_numbers", ...result })))
+        .catch((error) => console.error("[fcc-weekly-numbers] failure:", error instanceof Error ? error.message : "unknown")));
       return;
     }
     if (controller?.cron === FCC_TICK_CRON) {

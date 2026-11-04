@@ -3,6 +3,7 @@ import { connect } from "cloudflare:sockets";
 import { fccReplyInboxFromImap, runFccReplyCheck, type FccOwnerMail, type FccReplyCheckResult } from "./fcc-campaign-replies";
 import { fccMailboxFromImap, type FccSendConfig } from "./fcc-campaign-sender";
 import { runFccSendTick, type FccTickResult } from "./fcc-campaign-tick";
+import { runFccWeeklyNumbers, type FccWeeklyNumbersResult } from "./fcc-weekly-numbers";
 import { OWNER_ALERT_INBOXES } from "./ops/health";
 import type { EmailTransport } from "./revenue-engine/engine-email";
 import type { ProspectDb } from "./revenue-engine/engine-prospects-d1";
@@ -80,22 +81,43 @@ export async function runFccReplyCheckCron(env: FccEnv, sendOwnerEmail?: OwnerEm
   return runFccReplyCheck(env.DB as ProspectDb, {
     screenUrl: `${base}fcc`,
     inboxes: readable.map((inbox) => ({ address: inbox.address, open: async () => fccReplyInboxFromImap(await imapFor(env, inbox)()) })),
-    async tellFounders(mail) {
-      let gmail: EmailTransport | null = null;
-      try {
-        for (const to of OWNER_ALERT_INBOXES) {
-          try {
-            if (!sendOwnerEmail) throw new Error("the engine's alert email is not set up");
-            await sendOwnerEmail({ to, ...mail });
-          } catch (error) {
-            if (!readable[0]) throw error;
-            gmail ??= await smtpFor(env, readable[0])();
-            await gmail.send({ to, subject: mail.subject, text: mail.text, headers: {} });
-          }
-        }
-      } finally {
-        await (gmail as EmailTransport | null)?.close().catch(() => undefined);
-      }
-    },
+    tellFounders: foundersMailer(env, readable, sendOwnerEmail),
   });
+}
+
+/**
+ * Worker cron entry (every 15 minutes): Monday's email with last week's FCC numbers,
+ * once a week from 8:00 Toronto, to both founders. Read-only.
+ */
+export async function runFccWeeklyNumbersCron(env: FccEnv, sendOwnerEmail?: OwnerEmail): Promise<FccWeeklyNumbersResult> {
+  const inboxes = fccInboxes(env);
+  const readable = inboxes.filter((inbox) => inbox.address && inbox.password);
+  const base = (env.APP_BASE_URL?.trim() || "https://operations.getaxiom.ca/").replace(/\/?$/, "/");
+  const firstName = (name: string, fallback: string) => name.split(/\s+/)[0] || fallback;
+  return runFccWeeklyNumbers(env.DB as ProspectDb, {
+    screenUrl: `${base}fcc`,
+    inboxes: inboxes.map((inbox) => ({ key: inbox.primary ? "" : inbox.address, name: firstName(inbox.name, inbox.primary ? "Aidan" : "Riley") })),
+    tellFounders: foundersMailer(env, readable, sendOwnerEmail),
+  });
+}
+
+/** Emails both founders through the engine's own alert email, or from the first FCC Gmail when that fails. Throws when neither worked. */
+function foundersMailer(env: FccEnv, readable: FccInbox[], sendOwnerEmail?: OwnerEmail) {
+  return async (mail: FccOwnerMail) => {
+    let gmail: EmailTransport | null = null;
+    try {
+      for (const to of OWNER_ALERT_INBOXES) {
+        try {
+          if (!sendOwnerEmail) throw new Error("the engine's alert email is not set up");
+          await sendOwnerEmail({ to, ...mail });
+        } catch (error) {
+          if (!readable[0]) throw error;
+          gmail ??= await smtpFor(env, readable[0])();
+          await gmail.send({ to, subject: mail.subject, text: mail.text, headers: {} });
+        }
+      }
+    } finally {
+      await (gmail as EmailTransport | null)?.close().catch(() => undefined);
+    }
+  };
 }

@@ -88,6 +88,28 @@ export async function claimFccReplyCheckTry(db: ProspectDb, slot: string, now = 
   return changes(result) === 1;
 }
 
+const WEEKLY_NUMBERS_KEY = "fcc.weeklyNumbers";
+const WEEKLY_NUMBERS_TRY_KEY = "fcc.weeklyNumbersTry";
+
+/** The Monday the last weekly numbers email went (a Toronto day), when, and the week it covered. */
+export type FccWeeklyNumbersNote = { weekOf: string; at: string; from: string; to: string };
+
+export async function readFccWeeklyNumbers(db: ProspectDb) {
+  return get<FccWeeklyNumbersNote>(db, WEEKLY_NUMBERS_KEY);
+}
+
+export async function saveFccWeeklyNumbers(db: ProspectDb, note: FccWeeklyNumbersNote, now = new Date()) {
+  await put(db, WEEKLY_NUMBERS_KEY, note, now);
+}
+
+/** Claims the weekly numbers attempt for `slot` (a day and an hour). False when that slot was already tried. */
+export async function claimFccWeeklyNumbersTry(db: ProspectDb, slot: string, now = new Date()) {
+  const result = await db.prepare(`INSERT INTO "KvStore" ("key","value","updatedAt") VALUES (?,?,?)
+    ON CONFLICT("key") DO UPDATE SET "value" = excluded."value", "updatedAt" = excluded."updatedAt" WHERE "KvStore"."value" <> excluded."value"`)
+    .bind(WEEKLY_NUMBERS_TRY_KEY, JSON.stringify(slot), now.toISOString()).run();
+  return changes(result) === 1;
+}
+
 const SIGNATURES_KEY = "fcc.signatures";
 
 /** Each inbox's signature title and cell ("" is the first inbox, otherwise the inbox's address). */
