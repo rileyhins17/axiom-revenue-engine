@@ -527,7 +527,14 @@ export type FccSigner = { name: string; title?: string | null; phone?: string | 
 /** The signature's link shows the plain domain and opens the FCC filings page (Riley, Nov 1). */
 export const FCC_SITE_LABEL = "axiominternational.ca";
 export const FCC_SITE_URL = "https://axiominternational.ca/fcc-filings/";
-export const FCC_LOGO_URL = "https://axiominternational.ca/brand/axiom-lockup-400.png";
+/**
+ * The signature's logo: the site's white lockup baked onto its dark tile, served from this app's own
+ * static files (public/brand). The tile has to be part of the image: Gmail's dark mode flips CSS colours
+ * (a dark cell turns light) but leaves images alone, so a white lockup on a CSS tile vanished (Riley,
+ * Nov 4). 2x of the 164x63 box the signature shows it in.
+ */
+export const FCC_LOGO_URL = "https://operations.getaxiom.ca/brand/axiom-lockup-tile-328.png";
+export const FCC_LOGO_SIZE = { width: 164, height: 63 } as const;
 const FCC_OPT_OUT = `Not useful? Reply "no thanks" and I won't follow up.`;
 
 const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -558,9 +565,9 @@ export function fccSignature(signer: FccSigner, mailingAddress: string | null | 
     `<div style="height:8px;line-height:8px">&nbsp;</div>`,
     ...(phone ? [line(`C: ${phone}`)] : []),
     `<div><a href="${FCC_SITE_URL}" style="color:#1a56c4">${FCC_SITE_LABEL}</a></div>`,
-    // The site's logo is white (made for its dark pages), so it sits on a dark tile to show on white email.
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px"><tr><td style="background:#101318;padding:9px 12px;border-radius:4px">`
-      + `<a href="${FCC_SITE_URL}"><img src="${FCC_LOGO_URL}" alt="Axiom International" width="140" height="45" style="display:block;border:0;width:140px;height:45px"></a>`
+    // No CSS colour behind the logo: its dark tile is in the image file (see FCC_LOGO_URL).
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px"><tr><td>`
+      + `<a href="${FCC_SITE_URL}"><img src="${FCC_LOGO_URL}" alt="Axiom International" width="${FCC_LOGO_SIZE.width}" height="${FCC_LOGO_SIZE.height}" style="display:block;border:0;width:${FCC_LOGO_SIZE.width}px;height:${FCC_LOGO_SIZE.height}px"></a>`
       + `</td></tr></table>`,
     `</td></tr></table>`,
     `<p style="margin:14px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#777777">${escapeHtml(FCC_OPT_OUT)}</p>`,

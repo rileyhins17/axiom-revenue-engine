@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 
 import Database from "better-sqlite3";
 
 import {
   FCC_DAILY_SEND_CAP,
+  FCC_LOGO_SIZE,
+  FCC_LOGO_URL,
   FCC_NOV6_CAMPAIGN_KEY,
   buildFccCampaignContacts,
   buildFccNov6Contacts,
@@ -172,10 +176,18 @@ test("v5 keeps Aidan's words and signs with the founders' signature: plain domai
     "Not useful? Reply \"no thanks\" and I won't follow up.",
   ].join("\n")));
   assert.match(first.bodyHtml, /<a href="https:\/\/axiominternational\.ca\/fcc-filings\/" style="color:#1a56c4">axiominternational\.ca<\/a>/);
-  assert.match(first.bodyHtml, /<img src="https:\/\/axiominternational\.ca\/brand\/axiom-lockup-400\.png" alt="Axiom International"/);
+  assert.match(first.bodyHtml, /<img src="https:\/\/operations\.getaxiom\.ca\/brand\/axiom-lockup-tile-328\.png" alt="Axiom International" width="164" height="63"/);
+  assert.doesNotMatch(first.bodyHtml, /<td style="[^"]*background[^"]*">\s*<a [^>]*><img/,
+    "Gmail's dark mode flips CSS colours but not images, so the logo's dark tile belongs in the image file (MAIL-002)");
   assert.match(first.bodyHtml, /font-weight:bold">Riley Hinsperger<\/div>/);
   assert.match(first.bodyHtml, /C: 519-555-0100/);
   assert.match(first.bodyHtml, /Not useful\? Reply &quot;no thanks&quot; and I won&#39;t follow up\.|Not useful\? Reply &quot;no thanks&quot; and I won't follow up\./);
+
+  // The logo file ships with the app's static files, at twice the size the signature shows it.
+  const logoFile = path.join(process.cwd(), "public", new URL(FCC_LOGO_URL).pathname);
+  const png = readFileSync(logoFile);
+  assert.equal(png.subarray(1, 4).toString("latin1"), "PNG", `${logoFile} is a PNG`);
+  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [FCC_LOGO_SIZE.width * 2, FCC_LOGO_SIZE.height * 2]);
 
   const plainest = fccSignature({ name: "Aidan Magee" }, address);
   assert.equal(plainest.plain.split("\n")[1], "Co-founder", "the title defaults to Co-founder");

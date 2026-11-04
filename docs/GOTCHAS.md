@@ -48,6 +48,21 @@ Older entries from the retired website campaign are in git history before 2026-1
   days' contacts (`FCC_LATE_BOUNCE_DAYS` in `fcc-campaign-tick.ts`). Such a bounce counts
   toward the day it was sent, never toward the new day's pause or second-batch rules.
 
+## MAIL-002 — The signature's logo vanished in Gmail's dark mode
+
+- **Symptom:** Nov 4 (Riley, from the Gmail app on their phone): the Axiom logo at the foot of a
+  sent FCC email showed as a white wordmark on a light grey box, barely readable.
+- **Cause:** the site's lockup is white on a transparent background (made for its dark pages),
+  and the signature put it on a dark cell drawn with CSS (`background:#101318`). Gmail's dark
+  mode recolours CSS backgrounds and text (a dark cell turns light) but never touches images,
+  so the white image sat on a light tile. Light-mode readers saw it as intended.
+- **Fix (2026-11-04):** the dark tile is part of the image file: `public/brand/axiom-lockup-tile-328.png`
+  (328x126, shown at 164x63), served by the app itself at `FCC_LOGO_URL`, with no CSS colour
+  behind it. The look is the same in both modes.
+- **Prevention:** `fcc-campaign.test.ts` fails if a CSS background comes back behind the logo
+  or the file goes missing or changes size. Rule for any email image: a logo that needs a
+  particular background must carry that background in the file.
+
 ## OPS-015 — Cloudflare weekday 1 is Sunday
 
 - **Symptom:** a "weekday" schedule (`1-5`) ran on a Sunday.
