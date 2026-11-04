@@ -142,6 +142,28 @@ const GOOGLE_WARNINGS: Array<[criteria: string, reason: string]> = [
   [`FROM "mailer-daemon" NOT BODY "remote server" BODY "has been blocked"`, "Gmail says a message was blocked"],
 ];
 
+/**
+ * What the inbox check counts as a bounce. Gmail's own bounces come from
+ * mailer-daemon and most other mail servers write as postmaster, but not all: on
+ * Nov 3 a Purelymail server returned a Nov 6 email (5.1.1, no such mailbox) from
+ * noreply@purelymail.com, and the contact stayed `step1_sent`. So a message also
+ * counts when it comes from a no-reply address or carries a bounce subject
+ * (Microsoft "Undeliverable:", Postfix "Undelivered Mail Returned to Sender",
+ * Exim "Mail delivery failed", qmail "failure notice", sendmail "Returned mail").
+ * The checks that stop a contact also need that contact's address in the body,
+ * so a newsletter from a no-reply address never matches anyone; `bounceCount`
+ * can over-count, which only makes the tick look at today's contacts once more.
+ * IMAP's OR takes two keys, so n alternatives need n-1 leading ORs.
+ */
+const BOUNCE_MARKS = [
+  `FROM "mailer-daemon"`, `FROM "postmaster"`, `FROM "noreply"`, `FROM "no-reply"`,
+  `SUBJECT "undeliver"`, `SUBJECT "delivery status notification"`, `SUBJECT "delivery fail"`, `SUBJECT "delivery has failed"`,
+  `SUBJECT "failure notice"`, `SUBJECT "returned mail"`, `SUBJECT "not delivered"`,
+];
+export const FCC_BOUNCE_SEARCH = `${"OR ".repeat(BOUNCE_MARKS.length - 1)}${BOUNCE_MARKS.join(" ")}`;
+/** The bounce search before Nov 4 (Google's bounces only): the fallback if Gmail ever refuses the wider one. */
+const GOOGLE_BOUNCE_SEARCH = `OR FROM "mailer-daemon" FROM "postmaster"`;
+
 /** A 5xx that is about Gmail or the sender (a limit, a block, a login), not about the one recipient. */
 const SENDER_PROBLEM = /\b5\.4\.5\b|\b5\.7\.\d+|limit|quota|blocked|spam|policy|auth|password|log ?in/i;
 
@@ -169,6 +191,20 @@ export async function fccMailboxFromImap(session: ImapSession): Promise<FccMailb
   await session.examine(allMail);
   // One day early so a time-zone edge can never hide a same-day reply.
   const since = (iso: string) => imapDate(new Date(Date.parse(iso) - 86_400_000).toISOString());
+  // Should Gmail ever refuse the wider bounce search, sending must not stop over it: the Google-only
+  // search (what ran before Nov 4) takes over for the rest of this session, and the Worker logs say so.
+  let bounceSearch = FCC_BOUNCE_SEARCH;
+  const bounces = async (criteria: (bounce: string) => string) => {
+    try {
+      return await session.search(criteria(bounceSearch));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      if (bounceSearch === GOOGLE_BOUNCE_SEARCH || !/^IMAP (BAD|NO)\b/.test(detail)) throw error;
+      console.warn(JSON.stringify({ event: "fcc_bounce_search_fallback", detail: detail.slice(0, 200) }));
+      bounceSearch = GOOGLE_BOUNCE_SEARCH;
+      return session.search(criteria(bounceSearch));
+    }
+  };
   return {
     async hasMessagesFrom(fromPatterns, sinceIso) {
       for (const pattern of fromPatterns) {
@@ -177,16 +213,16 @@ export async function fccMailboxFromImap(session: ImapSession): Promise<FccMailb
       return false;
     },
     async hasBounceFor(email, sinceIso) {
-      return (await session.search(`SINCE ${since(sinceIso)} OR FROM "mailer-daemon" FROM "postmaster" BODY ${imapQuote(email)}`)).length > 0;
+      return (await bounces((bounce) => `SINCE ${since(sinceIso)} ${bounce} BODY ${imapQuote(email)}`)).length > 0;
     },
     async bounceCount(sinceIso) {
-      return (await session.search(`SINCE ${imapDate(sinceIso)} OR FROM "mailer-daemon" FROM "postmaster"`)).length;
+      return (await bounces((bounce) => `SINCE ${imapDate(sinceIso)} ${bounce}`)).length;
     },
     async bouncedAmong(emails, sinceIso) {
       const day = imapDate(sinceIso);
       const hits: string[] = [];
       for (const email of emails) {
-        if ((await session.search(`SINCE ${day} OR FROM "mailer-daemon" FROM "postmaster" BODY ${imapQuote(email)}`)).length > 0) hits.push(email);
+        if ((await bounces((bounce) => `SINCE ${day} ${bounce} BODY ${imapQuote(email)}`)).length > 0) hits.push(email);
       }
       return hits;
     },

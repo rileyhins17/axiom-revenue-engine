@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fccMailboxFromImap } from "@/lib/fcc-campaign-sender";
+import { fccMailboxFromImap, FCC_BOUNCE_SEARCH } from "@/lib/fcc-campaign-sender";
 import { imapDate, imapQuote, openImap, type ImapStream } from "./imap-client";
 
 /** A scripted IMAP server: each client line gets the replies `respond` returns. */
@@ -172,9 +172,62 @@ test("the FCC inbox check searches All Mail from a day before the first email, f
     'A004 SEARCH SINCE 25-Oct-2026 FROM "sam@beta.example"',
     'A005 SEARCH SINCE 25-Oct-2026 FROM "@beta.example"',
     'A006 SEARCH SINCE 25-Oct-2026 FROM "kim@gamma.example"',
-    'A007 SEARCH SINCE 25-Oct-2026 OR FROM "mailer-daemon" FROM "postmaster" BODY "gone@x.example"',
+    `A007 SEARCH SINCE 25-Oct-2026 ${FCC_BOUNCE_SEARCH} BODY "gone@x.example"`,
     "A008 LOGOUT",
   ]);
+});
+
+// Nov 3: a Purelymail server returned a Nov 6 email from noreply@purelymail.com, not mailer-daemon, and it went unrecorded.
+const purelymailBounce = {
+  from: "noreply@purelymail.com", subject: "Your message was not accepted",
+  body: "Delivery to jay@onechoice.example failed permanently. 550 5.1.1 The mailbox does not exist.",
+};
+const exchangeBounce = {
+  from: "MicrosoftExchange329e71ec88ae4615bbc36ab6ce41109e@zeta.example", subject: "Undeliverable: Question about Zeta's RMD listing",
+  body: "Your message to kim@zeta.example couldn't be delivered. kim wasn't found at zeta.example.",
+};
+const colleagueForward = {
+  from: "lee@fine.example", subject: "Re: Question about Fine's RMD listing",
+  body: "Looping in pat@bluepeak.example, who handles our FCC filings.",
+};
+const newsletter = { from: "noreply@news.example", subject: "This week in telecom", body: "Nothing about anyone we emailed." };
+
+test("a bounce from another mail server counts: a no-reply sender or a bounce subject, naming the address", async () => {
+  const server = fakeServer(gmailHolding([purelymailBounce, exchangeBounce, colleagueForward, newsletter]));
+  const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
+  const since = "2026-11-03T12:00:00.000Z";
+  assert.equal(await mailbox.hasBounceFor("jay@onechoice.example", since), true);
+  assert.equal(await mailbox.hasBounceFor("kim@zeta.example", since), true);
+  assert.equal(await mailbox.hasBounceFor("pat@bluepeak.example", since), false, "a colleague's forward names the address but is no bounce");
+  assert.deepEqual(await mailbox.bouncedAmong(["jay@onechoice.example", "kim@zeta.example", "pat@bluepeak.example", "lee@fine.example"], since),
+    ["jay@onechoice.example", "kim@zeta.example"]);
+  // The cheap count may include a no-reply newsletter: it only decides whether today's contacts are looked at again.
+  assert.equal(await mailbox.bounceCount(since), 3);
+  assert.equal(await mailbox.googleWarning(since), null);
+  await mailbox.close();
+});
+
+test("if Gmail refused the wider bounce search, the Google-only search takes over and sending goes on", async () => {
+  const plain = gmail({ 'OR FROM "mailer-daemon" FROM "postmaster" BODY "gone@x.example"': "30" });
+  const server = fakeServer((tag, command) => (command.startsWith("SEARCH") && command.includes("SUBJECT") ? [`${tag} BAD Could not parse command`] : plain(tag, command)));
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (text: string) => { warnings.push(text); };
+  try {
+    const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
+    assert.equal(await mailbox.hasBounceFor("gone@x.example", "2026-10-26T14:00:03.000Z"), true);
+    assert.equal(await mailbox.bounceCount("2026-10-26T14:00:03.000Z"), 0);
+    await mailbox.close();
+  } finally {
+    console.warn = warn;
+  }
+  assert.deepEqual(server.lines.filter((line) => line.includes("SEARCH")), [
+    `A004 SEARCH SINCE 25-Oct-2026 ${FCC_BOUNCE_SEARCH} BODY "gone@x.example"`,
+    'A005 SEARCH SINCE 25-Oct-2026 OR FROM "mailer-daemon" FROM "postmaster" BODY "gone@x.example"',
+    'A006 SEARCH SINCE 26-Oct-2026 OR FROM "mailer-daemon" FROM "postmaster"',
+  ]);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0]!, /fcc_bounce_search_fallback/);
 });
 
 test("UID FETCH reads accented text by its byte length and never marks mail read", async () => {

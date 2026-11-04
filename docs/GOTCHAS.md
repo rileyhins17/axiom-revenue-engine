@@ -27,6 +27,25 @@ Older entries from the retired website campaign are in git history before 2026-1
 - **Prevention:** never cache a promise (or anything pending) in module scope. Watch
   the Worker logs for `page_timeout` and `step_timeout` events: each names the step.
 
+## MAIL-001 — A bounce from another mail server went unrecorded
+
+- **Symptom:** Nov 3: a Nov 6 email to a Purelymail-hosted address came back two seconds
+  later (5.1.1, no such mailbox), but the contact stayed `step1_sent`, Today and the FCC
+  screen showed no bounce, and it counted toward neither the second-batch rule nor the
+  3-bounce pause. Aidan's Claude saw it in the inbox.
+- **Cause:** the inbox check only counted mail from `mailer-daemon` or `postmaster`.
+  Gmail's own bounces and most mail servers use those; Purelymail writes from
+  `noreply@purelymail.com`.
+- **Fix (2026-11-04):** `FCC_BOUNCE_SEARCH` in `src/lib/fcc-campaign-sender.ts` also counts
+  a no-reply sender or a bounce subject ("Undeliverable", "Undelivered Mail Returned to
+  Sender", "Mail delivery failed", "failure notice", "Returned mail", "not delivered"). The
+  checks that stop a contact still need that contact's address in the body. If Gmail ever
+  refuses the wider search, the Google-only one takes over for that session and the logs
+  show `fcc_bounce_search_fallback`. The missed contact was marked bounced by hand.
+- **Prevention:** `imap-client.test.ts` holds a Purelymail-style and an Exchange-style bounce.
+  A Nov 6 contact gets no follow-up, so a bounce that arrives after the day's last tick is
+  still never recorded for them; March contacts are re-checked before each follow-up.
+
 ## OPS-015 — Cloudflare weekday 1 is Sunday
 
 - **Symptom:** a "weekday" schedule (`1-5`) ran on a Sunday.
