@@ -136,6 +136,11 @@ export const FCC_DAY7_JOIN_SQL = `JOIN "FccCampaignSend" s1 ON s1."contactId" = 
 /** SQL over a contact row `r`: its hold and stop notes together, to search. */
 const NOTES_SQL = `(COALESCE(r."holdReason",'') || ' ' || COALESCE(r."stoppedReason",''))`;
 /**
+ * SQL: `r` is a row of either list. Naming both campaigns lets SQLite look the address up in the (campaignKey, email)
+ * index instead of reading every contact once per candidate (the same reason as FCC_DAY7_JOIN_SQL).
+ */
+const SAME_ADDRESS_SQL = `r."campaignKey" IN ('${FCC_CAMPAIGN_KEY}', '${FCC_NOV6_CAMPAIGN_KEY}') AND r."email" = c."email"`;
+/**
  * SQL over a contact row `r`: true when its hold or stop note says the company has recertified (FCC_RECERTIFIED_MARKS),
  * unless it is the Jan–Feb declaration note (FCC_DECLARATION_NOTE), whose own wording says "most likely recertified".
  */
@@ -143,16 +148,16 @@ export const FCC_RECERTIFIED_SQL = `((${FCC_RECERTIFIED_MARKS.map((mark) => `${N
 /**
  * The Nov 6 contacts still waiting for their one follow-up, from `FccCampaignContact c` and its first send row `s1`.
  * Binds the hot-list key once. A row qualifies only at `step1_sent` with its Nov 6 Message-ID and no step 2 yet, and
- * only when no row for the same address (its own included) carries a recertified note or is replied, bounced,
- * suppressed, held or failed. The one exception, as for the hot list's own email, is a stop that only says they
+ * only when no row for the same address (its own included; either list) carries a recertified note or is replied,
+ * bounced, suppressed, held or failed. The one exception, as for the hot list's own email, is a stop that only says they
  * signed a 2026 declaration. The FCC screen counts the same rows, so the screen and the sender can't disagree.
  */
 export const FCC_NOV6_FOLLOW_UP_FROM_SQL = `FROM "FccCampaignContact" c
     JOIN "FccCampaignSend" s1 ON s1."contactId" = c."id" AND s1."step" = 1 AND s1."status" <> 'FAILED'
     WHERE c."campaignKey" = ? AND c."status" = 'step1_sent' AND c."step1MessageId" LIKE '<fcc-nov6-%' AND c."step1SentAt" IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 2 AND s."status" <> 'FAILED')
-      AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" r WHERE r."email" = c."email" AND ${FCC_RECERTIFIED_SQL})
-      AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" r WHERE r."email" = c."email" AND r."id" <> c."id" AND r."status" IN ('replied','bounced','suppressed','held','failed')
+      AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" r WHERE ${SAME_ADDRESS_SQL} AND ${FCC_RECERTIFIED_SQL})
+      AND NOT EXISTS (SELECT 1 FROM "FccCampaignContact" r WHERE ${SAME_ADDRESS_SQL} AND r."id" <> c."id" AND r."status" IN ('replied','bounced','suppressed','held','failed')
         AND ${NOTES_SQL} NOT LIKE '%${FCC_DECLARATION_NOTE}%')`;
 /** The Toronto day a Nov 6 contact's follow-up falls due: 5 days after the first email, and never before Mon Nov 9. */
 export const FCC_NOV6_FOLLOW_UP_DUE_SQL = `max(date(s1."sendDay", '+${FCC_NOV6_FOLLOW_UP_DELAY_DAYS} days'), '${FCC_NOV6_FOLLOW_UP_FIRST_DAY}')`;
