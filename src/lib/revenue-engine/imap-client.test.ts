@@ -207,6 +207,32 @@ test("a bounce from another mail server counts: a no-reply sender or a bounce su
   await mailbox.close();
 });
 
+// Nov 4: the morning sweep marked two contacts bounced on Gmail's delay notices, with about a day of retries left.
+const gmailDelay = {
+  from: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>", subject: "Delivery Status Notification (Delay)",
+  body: "Delivery incomplete. There was a temporary problem delivering your message to seth@retrying.example. Gmail will retry for 46 more hours. You'll be notified if the delivery fails permanently.",
+};
+const exchangeDelay = {
+  from: "postmaster@zeta.example", subject: "Delivery delayed: Question about Zeta's RMD listing",
+  body: "Delivery to these recipients has been delayed: kim@slow.example",
+};
+const gmailFailure = {
+  from: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>", subject: "Delivery Status Notification (Failure)",
+  body: "Address not found. Your message wasn't delivered to dan@failed.example because the address couldn't be found. 550 5.1.1",
+};
+
+test("a delay notice isn't a bounce, and the final failure still is", async () => {
+  const server = fakeServer(gmailHolding([gmailDelay, exchangeDelay, gmailFailure]));
+  const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
+  const since = "2026-11-03T12:00:00.000Z";
+  assert.equal(await mailbox.hasBounceFor("seth@retrying.example", since), false);
+  assert.equal(await mailbox.hasBounceFor("kim@slow.example", since), false);
+  assert.equal(await mailbox.hasBounceFor("dan@failed.example", since), true);
+  assert.deepEqual(await mailbox.bouncedAmong(["seth@retrying.example", "kim@slow.example", "dan@failed.example"], since), ["dan@failed.example"]);
+  assert.equal(await mailbox.bounceCount(since), 1);
+  await mailbox.close();
+});
+
 test("if Gmail refused the wider bounce search, the Google-only search takes over and sending goes on", async () => {
   const plain = gmail({ 'OR FROM "mailer-daemon" FROM "postmaster" BODY "gone@x.example"': "30" });
   const server = fakeServer((tag, command) => (command.startsWith("SEARCH") && command.includes("SUBJECT") ? [`${tag} BAD Could not parse command`] : plain(tag, command)));

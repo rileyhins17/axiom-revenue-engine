@@ -160,7 +160,14 @@ const BOUNCE_MARKS = [
   `SUBJECT "undeliver"`, `SUBJECT "delivery status notification"`, `SUBJECT "delivery fail"`, `SUBJECT "delivery has failed"`,
   `SUBJECT "failure notice"`, `SUBJECT "returned mail"`, `SUBJECT "not delivered"`,
 ];
-export const FCC_BOUNCE_SEARCH = `${"OR ".repeat(BOUNCE_MARKS.length - 1)}${BOUNCE_MARKS.join(" ")}`;
+/**
+ * A delay notice isn't a bounce. Gmail writes "Delivery Status Notification (Delay)" while it is still retrying,
+ * and on Nov 4 the morning sweep marked two Nov 6 contacts bounced on those, with about a day of retries left.
+ * Other servers write "Delivery delayed". Gmail's search matches whole words, so both spellings are here. If the
+ * retries run out, the final failure arrives as its own message and still counts.
+ */
+const NOT_A_DELAY = `NOT SUBJECT "delay" NOT SUBJECT "delayed"`;
+export const FCC_BOUNCE_SEARCH = `${NOT_A_DELAY} ${"OR ".repeat(BOUNCE_MARKS.length - 1)}${BOUNCE_MARKS.join(" ")}`;
 /** The bounce search before Nov 4 (Google's bounces only): the fallback if Gmail ever refuses the wider one. */
 const GOOGLE_BOUNCE_SEARCH = `OR FROM "mailer-daemon" FROM "postmaster"`;
 
