@@ -1,59 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fccMailboxFromImap, FCC_BOUNCE_SEARCH } from "@/lib/fcc-campaign-sender";
-import { imapDate, imapQuote, openImap, type ImapStream } from "./imap-client";
+import { fccMailboxFromImap, FCC_BOUNCE_SEARCH, FCC_NO_REPLY_BOUNCE_SEARCH } from "@/lib/fcc-campaign-sender";
+import { imapDate, imapQuote, openImap } from "./imap-client";
+import { deliveryReport, fakeServer, gmail, gmailHolding } from "./test-support/fake-gmail";
 
-/** A scripted IMAP server: each client line gets the replies `respond` returns. */
-function fakeServer(respond: (tag: string, command: string) => string[]) {
-  const encoder = new TextEncoder();
-  const lines: string[] = [];
-  let push: (text: string) => void = () => {};
-  const readable = new ReadableStream<Uint8Array>({
-    start(controller) {
-      push = (text) => controller.enqueue(encoder.encode(text));
-      push("* OK Gimap ready\r\n");
-    },
-  });
-  let partial = "";
-  const writable = new WritableStream<Uint8Array>({
-    write(chunk) {
-      partial += new TextDecoder().decode(chunk);
-      for (let index = partial.indexOf("\r\n"); index >= 0; index = partial.indexOf("\r\n")) {
-        const line = partial.slice(0, index);
-        partial = partial.slice(index + 2);
-        lines.push(line);
-        const space = line.indexOf(" ");
-        for (const reply of respond(line.slice(0, space), line.slice(space + 1))) push(`${reply}\r\n`);
-      }
-    },
-  });
-  let closed = false;
-  const stream: ImapStream = { readable, writable, close: async () => { closed = true; } };
-  return { stream, lines, closed: () => closed };
-}
+type Server = ReturnType<typeof fakeServer>;
 
-function gmail(searchResults: Record<string, string>) {
-  return (tag: string, command: string) => {
-    if (command.startsWith("LOGIN")) return [`${tag} OK aidan authenticated (Success)`];
-    if (command.startsWith("LIST")) {
-      return [
-        '* LIST (\\HasNoChildren) "/" "INBOX"',
-        '* LIST (\\HasChildren \\Noselect) "/" "[Gmail]"',
-        '* LIST (\\All \\HasNoChildren) "/" {16}',
-        "[Gmail]/All Mail",
-        '* LIST (\\HasNoChildren \\Sent) "/" "[Gmail]/Sent Mail"',
-        `${tag} OK Success`,
-      ];
-    }
-    if (command.startsWith("EXAMINE")) return ["* 120 EXISTS", "* OK [READ-ONLY] opened", `${tag} OK [READ-ONLY] [Gmail]/All Mail selected. (Success)`];
-    if (command.startsWith("SEARCH")) {
-      const hit = Object.entries(searchResults).find(([needle]) => command.includes(needle));
-      return [`* SEARCH${hit ? ` ${hit[1]}` : ""}`, `${tag} OK SEARCH completed (Success)`];
-    }
-    if (command === "LOGOUT") return ["* BYE LOGOUT Requested", `${tag} OK 73 good day (Success)`];
-    return [`${tag} BAD unknown command`];
-  };
+const openMailbox = async (server: Server) => fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
+
+/** Runs `run` and returns what it logged through console.warn (each line is a JSON event). */
+async function withWarnings<T>(run: () => Promise<T>) {
+  const warnings: Array<Record<string, unknown>> = [];
+  const warn = console.warn;
+  console.warn = (text: string) => { warnings.push(JSON.parse(text) as Record<string, unknown>); };
+  try {
+    return { result: await run(), warnings };
+  } finally {
+    console.warn = warn;
+  }
 }
 
 test("quotes values safely and formats search dates", () => {
@@ -93,34 +58,6 @@ test("a refused login fails without echoing the password", async () => {
   });
 });
 
-/** A fake Gmail that really evaluates SEARCH criteria (SINCE, FROM, SUBJECT, BODY, NOT, OR) against stored messages. */
-function gmailHolding(messages: Array<{ from: string; subject: string; body: string }>) {
-  const plain = gmail({});
-  return (tag: string, command: string) => {
-    if (!command.startsWith("SEARCH ")) return plain(tag, command);
-    const tokens = command.slice(7).match(/"(?:[^"\\]|\\.)*"|\S+/g) ?? [];
-    const unquote = (token: string) => token.replace(/^"|"$/g, "").replace(/\\(.)/g, "$1").toLowerCase();
-    const matches = (message: { from: string; subject: string; body: string }) => {
-      const key = (): boolean => {
-        const token = tokens.shift();
-        if (token === "SINCE") { tokens.shift(); return true; }
-        if (token === "NOT") return !key();
-        if (token === "OR") { const left = key(); const right = key(); return left || right; }
-        const value = unquote(tokens.shift() ?? "");
-        if (token === "FROM") return message.from.toLowerCase().includes(value);
-        if (token === "SUBJECT") return message.subject.toLowerCase().includes(value);
-        if (token === "BODY") return message.body.toLowerCase().includes(value);
-        throw new Error(`unexpected search key ${token}`);
-      };
-      let hit = true;
-      while (tokens.length) hit = key() && hit;
-      return hit;
-    };
-    const hits = messages.map((message, index) => ({ message, index })).filter(({ message }) => { tokens.splice(0, tokens.length, ...(command.slice(7).match(/"(?:[^"\\]|\\.)*"|\S+/g) ?? [])); return matches(message); }).map(({ index }) => index + 1);
-    return [`* SEARCH${hits.length ? ` ${hits.join(" ")}` : ""}`, `${tag} OK SEARCH completed (Success)`];
-  };
-}
-
 const remoteBlock = {
   from: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>", subject: "Delivery Status Notification (Failure)",
   body: "Message blocked. Your message to pat@bluepeak.example has been blocked. See technical details below for more information. The response from the remote server was: 550 5.7.1 Message rejected by the recipient's spam filter",
@@ -139,8 +76,7 @@ const limitReached = {
 };
 
 test("a recipient's own spam filter bouncing one email is a bounce, not a Google warning", async () => {
-  const server = fakeServer(gmailHolding([remoteBlock]));
-  const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
+  const mailbox = await openMailbox(fakeServer(gmailHolding([remoteBlock])));
   assert.equal(await mailbox.googleWarning("2026-10-29T12:00:00.000Z"), null);
   assert.equal(await mailbox.bounceCount("2026-10-29T12:00:00.000Z"), 1);
   assert.deepEqual(await mailbox.bouncedAmong(["pat@bluepeak.example", "lee@fine.example"], "2026-10-29T12:00:00.000Z"), ["pat@bluepeak.example"]);
@@ -153,27 +89,39 @@ test("Google's own blocks, spam verdicts and sending limits still pause the camp
     [googleSpamVerdict, "Gmail says a message looked like spam"],
     [limitReached, "Gmail says the sending limit was reached"],
   ] as const) {
-    const server = fakeServer(gmailHolding([remoteBlock, message]));
-    const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
+    const mailbox = await openMailbox(fakeServer(gmailHolding([remoteBlock, message])));
     assert.equal(await mailbox.googleWarning("2026-10-29T12:00:00.000Z"), reason);
     await mailbox.close();
   }
 });
 
+test("a Gmail block that quotes the recipient's remote server, as a standard delivery report, is a bounce and does not pause", async () => {
+  // Oct 29: a Microsoft 365 recipient's spam filter refused one email and the campaign paused after 53 sends.
+  const oct29 = deliveryReport({
+    from: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>", subject: "Delivery Status Notification (Failure)",
+    explanation: "Message blocked. Your message to pat@bluepeak.example has been blocked. The response from the remote server was: 550 5.7.1 Message rejected by the recipient's spam filter",
+    recipient: "pat@bluepeak.example", action: "failed", status: "5.7.1", diagnostic: "550 5.7.1 Message rejected by the recipient's spam filter",
+    originalId: "fcc-v8-c4-1@axiom.example",
+  });
+  const mailbox = await openMailbox(fakeServer(gmailHolding([oct29])));
+  const since = "2026-10-29T12:00:00.000Z";
+  assert.equal(await mailbox.googleWarning(since), null, "no pause");
+  assert.deepEqual(await mailbox.bouncedAmong(["pat@bluepeak.example"], since, { "pat@bluepeak.example": ["<fcc-v8-c4-1@axiom.example>"] }), ["pat@bluepeak.example"]);
+  await mailbox.close();
+});
+
 test("the FCC inbox check searches All Mail from a day before the first email, for replies and for bounces", async () => {
   const server = fakeServer(gmail({ 'FROM "@beta.example"': "12", 'BODY "gone@x.example"': "30" }));
-  const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
+  const mailbox = await openMailbox(server);
   assert.equal(await mailbox.hasMessagesFrom(["sam@beta.example", "@beta.example"], "2026-10-26T14:00:03.000Z"), true);
   assert.equal(await mailbox.hasMessagesFrom(["kim@gamma.example"], "2026-10-26T14:00:03.000Z"), false);
-  assert.equal(await mailbox.hasBounceFor("gone@x.example", "2026-10-26T14:00:03.000Z"), true);
   await mailbox.close();
   assert.deepEqual(server.lines.slice(2), [
     'A003 EXAMINE "[Gmail]/All Mail"',
     'A004 SEARCH SINCE 25-Oct-2026 FROM "sam@beta.example"',
     'A005 SEARCH SINCE 25-Oct-2026 FROM "@beta.example"',
     'A006 SEARCH SINCE 25-Oct-2026 FROM "kim@gamma.example"',
-    `A007 SEARCH SINCE 25-Oct-2026 ${FCC_BOUNCE_SEARCH} BODY "gone@x.example"`,
-    "A008 LOGOUT",
+    "A007 LOGOUT",
   ]);
 });
 
@@ -193,8 +141,7 @@ const colleagueForward = {
 const newsletter = { from: "noreply@news.example", subject: "This week in telecom", body: "Nothing about anyone we emailed." };
 
 test("a bounce from another mail server counts: a no-reply sender or a bounce subject, naming the address", async () => {
-  const server = fakeServer(gmailHolding([purelymailBounce, exchangeBounce, colleagueForward, newsletter]));
-  const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
+  const mailbox = await openMailbox(fakeServer(gmailHolding([purelymailBounce, exchangeBounce, colleagueForward, newsletter])));
   const since = "2026-11-03T12:00:00.000Z";
   assert.equal(await mailbox.hasBounceFor("jay@onechoice.example", since), true);
   assert.equal(await mailbox.hasBounceFor("kim@zeta.example", since), true);
@@ -222,8 +169,7 @@ const gmailFailure = {
 };
 
 test("a delay notice isn't a bounce, and the final failure still is", async () => {
-  const server = fakeServer(gmailHolding([gmailDelay, exchangeDelay, gmailFailure]));
-  const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
+  const mailbox = await openMailbox(fakeServer(gmailHolding([gmailDelay, exchangeDelay, gmailFailure])));
   const since = "2026-11-03T12:00:00.000Z";
   assert.equal(await mailbox.hasBounceFor("seth@retrying.example", since), false);
   assert.equal(await mailbox.hasBounceFor("kim@slow.example", since), false);
@@ -233,27 +179,173 @@ test("a delay notice isn't a bounce, and the final failure still is", async () =
   await mailbox.close();
 });
 
+// Nov 4: notices from any mail provider. Every address and Message-ID here is made up.
+const OUR_ID = (contact: string) => `fcc-v8-${contact}-1@axiom.example`;
+const SINCE = "2026-11-03T12:00:00.000Z";
+
+test("a standard delivery report from any sender counts, and the Message-ID it quotes finds the right email even when the server rewrote the recipient", async () => {
+  // Neither its sender nor its subject is on any list: only the report structure gives it away.
+  const relayReport = deliveryReport({
+    from: "Mail Administrator <admin@mx.relay.example>", subject: "Message could not be sent",
+    explanation: "Your message could not be passed on to the mailbox you wrote to.",
+    recipient: "front-desk@alias-host.example", action: "failed", status: "5.1.1", diagnostic: "550 5.1.1 No such mailbox",
+    originalId: OUR_ID("c1"), originalTo: "front-desk@alias-host.example",
+  });
+  const mailbox = await openMailbox(fakeServer(gmailHolding([relayReport])));
+  assert.equal(await mailbox.bounceCount(SINCE), 1, "found by its structure alone");
+  const ids = { "jay@onechoice.example": [`<${OUR_ID("c1")}>`], "lee@fine.example": [`<${OUR_ID("c9")}>`] };
+  assert.deepEqual(await mailbox.bouncedAmong(["jay@onechoice.example", "lee@fine.example"], SINCE, ids), ["jay@onechoice.example"]);
+  assert.deepEqual(await mailbox.bouncedAmong(["jay@onechoice.example"], SINCE), [], "without the ID only the address is left, and the notice names the alias");
+  assert.equal(await mailbox.hasBounceFor("front-desk@alias-host.example", SINCE), true);
+  await mailbox.close();
+});
+
+test("a Microsoft 365 'Undeliverable' report counts for the email it quotes and for no other", async () => {
+  const ndr = deliveryReport({
+    from: "Microsoft Outlook <postmaster@zeta.onmicrosoft.example>", subject: "Undeliverable: Question about Zeta's RMD listing",
+    explanation: "Delivery has failed to these recipients or groups: kim@zeta.example. The email address you entered couldn't be found.",
+    html: true, recipient: "kim@zeta.example", action: "failed", status: "5.1.10",
+    diagnostic: "550 5.1.10 RESOLVER.ADR.RecipientNotFound; Recipient not found by SMTP address lookup", originalId: OUR_ID("c2"),
+  });
+  const mailbox = await openMailbox(fakeServer(gmailHolding([ndr])));
+  assert.deepEqual(await mailbox.bouncedAmong(["kim@zeta.example"], SINCE, { "kim@zeta.example": [`<${OUR_ID("c2")}>`] }), ["kim@zeta.example"]);
+  assert.deepEqual(await mailbox.bouncedAmong(["kim@zeta.example"], SINCE, { "kim@zeta.example": [`<${OUR_ID("c7")}>`] }), [],
+    "the notice quotes one of our emails, and it is not the one sent to this address");
+  assert.equal(await mailbox.hasBounceFor("kim@zeta.example", SINCE), true);
+  await mailbox.close();
+});
+
+test("a notice that quotes a founder's own email, not ours, is matched by the address", async () => {
+  const manual = deliveryReport({
+    from: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>", subject: "Delivery Status Notification (Failure)",
+    explanation: "Address not found. Your message wasn't delivered to pat@bluepeak.example.",
+    recipient: "pat@bluepeak.example", action: "failed", status: "5.1.1", diagnostic: "550 5.1.1 User unknown",
+    originalId: "CAFexample123@mail.gmail.example",
+  });
+  const mailbox = await openMailbox(fakeServer(gmailHolding([manual])));
+  assert.deepEqual(await mailbox.bouncedAmong(["pat@bluepeak.example", "dan@c4.example"], SINCE,
+    { "pat@bluepeak.example": [`<${OUR_ID("c5")}>`], "dan@c4.example": [`<${OUR_ID("c4")}>`] }), ["pat@bluepeak.example"]);
+  await mailbox.close();
+});
+
+test("a notice that names one contact but quotes another's email counts for the one it quotes", async () => {
+  const report = deliveryReport({
+    from: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>", subject: "Delivery Status Notification (Failure)",
+    explanation: "Your message to dan@c4.example was returned. A copy went to pat@bluepeak.example.",
+    recipient: "dan@c4.example", action: "failed", status: "5.1.1", diagnostic: "550 5.1.1 User unknown", originalId: OUR_ID("c4"),
+  });
+  const mailbox = await openMailbox(fakeServer(gmailHolding([report])));
+  assert.deepEqual(await mailbox.bouncedAmong(["dan@c4.example", "pat@bluepeak.example"], SINCE,
+    { "dan@c4.example": [`<${OUR_ID("c4")}>`], "pat@bluepeak.example": [`<${OUR_ID("c5")}>`] }), ["dan@c4.example"]);
+  await mailbox.close();
+});
+
+test("delays, successful delivery reports and automatic replies are never bounces, even from a system address that names the contact", async () => {
+  const eximWarning = {
+    from: "Mail Delivery System <Mailer-Daemon@mx.slow.example>", subject: "Warning: could not send message for past 4 hours",
+    body: "A message that you sent has not yet been delivered to one or more of its recipients after more than 4 hours on the queue.\r\nThe address to which the message has not yet been delivered is:\r\n\r\n  seth@retrying.example\r\n\r\nNo action is required. Delivery will continue to be attempted, and you will be notified if delivery fails permanently.",
+  };
+  const delayedReport = deliveryReport({
+    from: "postmaster@mx.slow.example", subject: "Mail delivery status", explanation: "Still trying.",
+    recipient: "kim@slow.example", action: "delayed", status: "4.4.1", diagnostic: "451 4.4.1 Connection timed out", originalId: OUR_ID("c3"),
+  });
+  const successReport = deliveryReport({
+    from: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>", subject: "Delivery Status Notification (Success)", explanation: "Your message was delivered.",
+    recipient: "ana@arrived.example", action: "delivered", status: "2.0.0", diagnostic: "250 2.0.0 OK", originalId: OUR_ID("c6"),
+  });
+  const outOfOffice = {
+    from: "Pat Example <noreply@bluepeak.example>", subject: "Automatic reply: Question about Bluepeak's RMD listing",
+    body: "I am out of the office until Monday, Nov 9. Your message to pat@bluepeak.example was received but I cannot answer it yet.",
+  };
+  const postmasterAuto = {
+    from: "postmaster@omega.example", subject: "Auto: Out of office",
+    body: "Thank you for writing to sam@omega.example. This mailbox is not monitored until Nov 9.",
+  };
+  const mailbox = await openMailbox(fakeServer(gmailHolding([eximWarning, delayedReport, successReport, outOfOffice, postmasterAuto])));
+  const emails = ["seth@retrying.example", "kim@slow.example", "ana@arrived.example", "pat@bluepeak.example", "sam@omega.example"];
+  assert.ok(await mailbox.bounceCount(SINCE) >= 5, "every one of them is found as a candidate; reading them is what drops them");
+  assert.deepEqual(await mailbox.bouncedAmong(emails, SINCE), []);
+  assert.deepEqual(await mailbox.bouncedAmong(emails, SINCE, Object.fromEntries(emails.map((email, index) => [email, [`<${OUR_ID(`c${index}`)}>`]]))), []);
+  for (const email of emails) assert.equal(await mailbox.hasBounceFor(email, SINCE), false, email);
+  await mailbox.close();
+});
+
+test("a delay followed by the final failure counts once the failure arrives", async () => {
+  const delay = deliveryReport({
+    from: "postmaster@mx.slow.example", subject: "Mail delivery status", explanation: "Still trying.",
+    recipient: "seth@retrying.example", action: "delayed", status: "4.4.1", diagnostic: "451 4.4.1 Connection timed out", originalId: OUR_ID("c8"),
+  });
+  const failure = deliveryReport({
+    from: "postmaster@mx.slow.example", subject: "Mail delivery status", explanation: "Giving up.",
+    recipient: "seth@retrying.example", action: "failed", status: "5.4.7", diagnostic: "554 5.4.7 Delivery expired", originalId: OUR_ID("c8"),
+  });
+  const ids = { "seth@retrying.example": [`<${OUR_ID("c8")}>`] };
+  const before = await openMailbox(fakeServer(gmailHolding([delay])));
+  assert.deepEqual(await before.bouncedAmong(["seth@retrying.example"], SINCE, ids), []);
+  await before.close();
+  const after = await openMailbox(fakeServer(gmailHolding([delay, failure])));
+  assert.deepEqual(await after.bouncedAmong(["seth@retrying.example"], SINCE, ids), ["seth@retrying.example"]);
+  await after.close();
+});
+
+test("if Gmail refuses the delivery-report search, the earlier no-reply search takes over and bounces still count", async () => {
+  const holding = gmailHolding([purelymailBounce]);
+  const server = fakeServer((tag, command) => (/SEARCH/.test(command) && command.includes("HEADER") ? [`${tag} BAD Could not parse command`] : holding(tag, command)));
+  const { result, warnings } = await withWarnings(async () => {
+    const mailbox = await openMailbox(server);
+    const outcome = { count: await mailbox.bounceCount(SINCE), among: await mailbox.bouncedAmong(["jay@onechoice.example"], SINCE) };
+    await mailbox.close();
+    return outcome;
+  });
+  assert.deepEqual(result, { count: 1, among: ["jay@onechoice.example"] });
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0]!.event, "fcc_bounce_search_fallback");
+  assert.equal(warnings[0]!.level, 1);
+  assert.deepEqual(server.lines.filter((line) => line.includes("SEARCH")), [
+    `A004 SEARCH SINCE 3-Nov-2026 ${FCC_BOUNCE_SEARCH}`,
+    `A005 SEARCH SINCE 3-Nov-2026 ${FCC_NO_REPLY_BOUNCE_SEARCH}`,
+    `A006 UID SEARCH SINCE 3-Nov-2026 ${FCC_NO_REPLY_BOUNCE_SEARCH}`,
+  ]);
+});
+
+test("if the notices cannot be read, the address search that ran before Nov 4 takes over and sending goes on", async () => {
+  // A server that does not know UID SEARCH: the notice scan fails, the address search answers.
+  const server = fakeServer(gmail({ 'BODY "gone@x.example"': "30" }));
+  const { result, warnings } = await withWarnings(async () => {
+    const mailbox = await openMailbox(server);
+    const outcome = { yes: await mailbox.hasBounceFor("gone@x.example", "2026-10-26T14:00:03.000Z"), no: await mailbox.hasBounceFor("kept@x.example", "2026-10-26T14:00:03.000Z") };
+    await mailbox.close();
+    return outcome;
+  });
+  assert.deepEqual(result, { yes: true, no: false });
+  assert.deepEqual(warnings.map((warning) => warning.event), ["fcc_bounce_notice_scan_failed"], "one warning, and the failed scan is not retried");
+  assert.deepEqual(server.lines.slice(2), [
+    'A003 EXAMINE "[Gmail]/All Mail"',
+    `A004 UID SEARCH SINCE 25-Oct-2026 ${FCC_BOUNCE_SEARCH}`,
+    `A005 SEARCH SINCE 25-Oct-2026 ${FCC_BOUNCE_SEARCH} BODY "gone@x.example"`,
+    `A006 SEARCH SINCE 25-Oct-2026 ${FCC_BOUNCE_SEARCH} BODY "kept@x.example"`,
+    "A007 LOGOUT",
+  ]);
+});
+
 test("if Gmail refused the wider bounce search, the Google-only search takes over and sending goes on", async () => {
   const plain = gmail({ 'OR FROM "mailer-daemon" FROM "postmaster" BODY "gone@x.example"': "30" });
   const server = fakeServer((tag, command) => (command.startsWith("SEARCH") && command.includes("SUBJECT") ? [`${tag} BAD Could not parse command`] : plain(tag, command)));
-  const warnings: string[] = [];
-  const warn = console.warn;
-  console.warn = (text: string) => { warnings.push(text); };
-  try {
-    const mailbox = await fccMailboxFromImap(await openImap(server.stream, { username: "aidan@mail.example", password: "pw" }));
-    assert.equal(await mailbox.hasBounceFor("gone@x.example", "2026-10-26T14:00:03.000Z"), true);
-    assert.equal(await mailbox.bounceCount("2026-10-26T14:00:03.000Z"), 0);
+  const { result, warnings } = await withWarnings(async () => {
+    const mailbox = await openMailbox(server);
+    const outcome = { yes: await mailbox.hasBounceFor("gone@x.example", "2026-10-26T14:00:03.000Z"), count: await mailbox.bounceCount("2026-10-26T14:00:03.000Z") };
     await mailbox.close();
-  } finally {
-    console.warn = warn;
-  }
+    return outcome;
+  });
+  assert.deepEqual(result, { yes: true, count: 0 });
   assert.deepEqual(server.lines.filter((line) => line.includes("SEARCH")), [
-    `A004 SEARCH SINCE 25-Oct-2026 ${FCC_BOUNCE_SEARCH} BODY "gone@x.example"`,
-    'A005 SEARCH SINCE 25-Oct-2026 OR FROM "mailer-daemon" FROM "postmaster" BODY "gone@x.example"',
-    'A006 SEARCH SINCE 26-Oct-2026 OR FROM "mailer-daemon" FROM "postmaster"',
+    `A004 UID SEARCH SINCE 25-Oct-2026 ${FCC_BOUNCE_SEARCH}`,
+    `A005 SEARCH SINCE 25-Oct-2026 ${FCC_BOUNCE_SEARCH} BODY "gone@x.example"`,
+    `A006 SEARCH SINCE 25-Oct-2026 ${FCC_NO_REPLY_BOUNCE_SEARCH} BODY "gone@x.example"`,
+    'A007 SEARCH SINCE 25-Oct-2026 OR FROM "mailer-daemon" FROM "postmaster" BODY "gone@x.example"',
+    'A008 SEARCH SINCE 26-Oct-2026 OR FROM "mailer-daemon" FROM "postmaster"',
   ]);
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0]!, /fcc_bounce_search_fallback/);
+  assert.deepEqual(warnings.map((warning) => warning.event), ["fcc_bounce_notice_scan_failed", "fcc_bounce_search_fallback", "fcc_bounce_search_fallback"]);
 });
 
 test("UID FETCH reads accented text by its byte length and never marks mail read", async () => {

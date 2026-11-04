@@ -42,7 +42,14 @@ Older entries from the retired website campaign are in git history before 2026-1
   checks that stop a contact still need that contact's address in the body. If Gmail ever
   refuses the wider search, the Google-only one takes over for that session and the logs
   show `fcc_bounce_search_fallback`. The missed contact was marked bounced by hand.
-- **Prevention:** `imap-client.test.ts` holds a Purelymail-style and an Exchange-style bounce.
+- **Second fix (2026-11-04, branch `fcc-any-provider-bounce`):** deciding from the sender still missed a
+  delivery report from an unlisted sender and counted delays and automatic replies from system
+  addresses. `src/lib/fcc-bounce-notice.ts` now reads the notice itself: a standard delivery
+  report's Action and Status decide; a plain notice needs a failure status or words and no delay
+  words; the quoted Message-ID picks the send, the address is the fallback.
+- **Prevention:** `imap-client.test.ts` holds a Purelymail-style and an Exchange-style bounce, and
+  `fcc-bounce-notice.test.ts` and `fcc-bounce-sweep.test.ts` hold the delivery-report, delay and
+  automatic-reply cases and the whole path from notice to a bounced contact.
   A Nov 6 contact gets no follow-up, so a bounce that arrives after the day's last tick had
   no later check at all; since Nov 4 each inbox's first look of the day sweeps the last 5
   days' contacts (`FCC_LATE_BOUNCE_DAYS` in `fcc-campaign-tick.ts`). Such a bounce counts

@@ -37,6 +37,7 @@ import {
   type FccCampaignContact, type FccCopy,
 } from "@/lib/fcc-campaign";
 import { readFccSignatures } from "@/lib/fcc-campaign-control";
+import { FCC_NOTICE_FETCH, noticeIsFor, readBounceNotice, type FccBounceNotice } from "@/lib/fcc-bounce-notice";
 import { PermanentEmailError, type EmailTransport } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { imapDate, imapQuote, type ImapSession } from "@/lib/revenue-engine/imap-client";
@@ -48,12 +49,16 @@ const FCC_FIRST_SEND_DAY = "2026-10-26T00:00:00.000Z";
 export type FccMailbox = {
   /** True when any message from one of `fromPatterns` arrived on or after `sinceIso`'s day. */
   hasMessagesFrom(fromPatterns: string[], sinceIso: string): Promise<boolean>;
-  /** True when a bounce mentioning `email` arrived on or after `sinceIso`'s day. */
+  /** True when a permanent bounce naming `email` arrived on or after `sinceIso`'s day. */
   hasBounceFor(email: string, sinceIso: string): Promise<boolean>;
-  /** How many bounce messages arrived from `sinceIso`'s day (not earlier). Cheap: one search. */
+  /** How many bounce-like messages arrived from `sinceIso`'s day (not earlier). Cheap: one search. */
   bounceCount(sinceIso: string): Promise<number>;
-  /** The addresses among `emails` that a bounce from `sinceIso`'s day (not earlier) mentions. */
-  bouncedAmong(emails: string[], sinceIso: string): Promise<string[]>;
+  /**
+   * The addresses among `emails` that a permanent bounce from `sinceIso`'s day (not earlier) is about. `sentMessageIds`
+   * maps an address to the Message-IDs of the emails sent to it: a notice that quotes one of our IDs is matched by the
+   * ID, so a recipient the server rewrote still counts; otherwise the address decides (see noticeIsFor).
+   */
+  bouncedAmong(emails: string[], sinceIso: string, sentMessageIds?: Record<string, string[]>): Promise<string[]>;
   /** A Google notice from `sinceIso`'s day (not earlier) that means sending must stop, or null. */
   googleWarning(sinceIso: string): Promise<string | null>;
   close(): Promise<void>;
@@ -150,9 +155,11 @@ const GOOGLE_WARNINGS: Array<[criteria: string, reason: string]> = [
  * counts when it comes from a no-reply address or carries a bounce subject
  * (Microsoft "Undeliverable:", Postfix "Undelivered Mail Returned to Sender",
  * Exim "Mail delivery failed", qmail "failure notice", sendmail "Returned mail").
- * The checks that stop a contact also need that contact's address in the body,
- * so a newsletter from a no-reply address never matches anyone; `bounceCount`
- * can over-count, which only makes the tick look at today's contacts once more.
+ * These marks only find candidates. Each candidate is then read by readBounceNotice
+ * (fcc-bounce-notice.ts), which keeps permanent failures and drops delays, automatic
+ * replies and ordinary mail, and names the sent email by its quoted Message-ID. So a
+ * newsletter from a no-reply address never matches anyone; `bounceCount` is only a
+ * cheap count that can over-count, which makes the tick look at today's contacts once more.
  * IMAP's OR takes two keys, so n alternatives need n-1 leading ORs.
  */
 const BOUNCE_MARKS = [
@@ -167,9 +174,28 @@ const BOUNCE_MARKS = [
  * retries run out, the final failure arrives as its own message and still counts.
  */
 const NOT_A_DELAY = `NOT SUBJECT "delay" NOT SUBJECT "delayed"`;
-export const FCC_BOUNCE_SEARCH = `${NOT_A_DELAY} ${"OR ".repeat(BOUNCE_MARKS.length - 1)}${BOUNCE_MARKS.join(" ")}`;
-/** The bounce search before Nov 4 (Google's bounces only): the fallback if Gmail ever refuses the wider one. */
+const wideBounceSearch = (marks: string[]) => `${NOT_A_DELAY} ${"OR ".repeat(marks.length - 1)}${marks.join(" ")}`;
+/**
+ * The bounce search of Nov 3 and 4: the second fallback if Gmail ever refuses the search below.
+ */
+export const FCC_NO_REPLY_BOUNCE_SEARCH = wideBounceSearch(BOUNCE_MARKS);
+/**
+ * Marks added for notices from any mail provider. The first is the standard delivery report, whatever its sender
+ * or subject says (multipart/report; report-type=delivery-status); the rest are more no-reply spellings and
+ * bounce subjects. A message found this way is only a candidate: readBounceNotice (fcc-bounce-notice.ts) reads it
+ * and decides whether it is a permanent bounce, a delay or something else.
+ */
+const ANY_PROVIDER_MARKS = [
+  `HEADER "Content-Type" "delivery-status"`, `FROM "donotreply"`, `FROM "do-not-reply"`,
+  `SUBJECT "returned to sender"`, `SUBJECT "mail system error"`, `SUBJECT "could not be delivered"`,
+];
+export const FCC_BOUNCE_SEARCH = wideBounceSearch([...BOUNCE_MARKS, ...ANY_PROVIDER_MARKS]);
+/** The bounce search before Nov 4 (Google's bounces only): the last fallback if Gmail ever refuses the wider ones. */
 const GOOGLE_BOUNCE_SEARCH = `OR FROM "mailer-daemon" FROM "postmaster"`;
+/** From the widest search to the narrowest: Gmail answering BAD or NO to one moves the session on to the next. */
+const BOUNCE_SEARCHES = [FCC_BOUNCE_SEARCH, FCC_NO_REPLY_BOUNCE_SEARCH, GOOGLE_BOUNCE_SEARCH];
+/** The most candidate notices read from one look; the newest win. A look normally finds a handful. */
+const NOTICE_LIMIT = 100;
 
 /** A 5xx that is about Gmail or the sender (a limit, a block, a login), not about the one recipient. */
 const SENDER_PROBLEM = /\b5\.4\.5\b|\b5\.7\.\d+|limit|quota|blocked|spam|policy|auth|password|log ?in/i;
@@ -198,20 +224,45 @@ export async function fccMailboxFromImap(session: ImapSession): Promise<FccMailb
   await session.examine(allMail);
   // One day early so a time-zone edge can never hide a same-day reply.
   const since = (iso: string) => imapDate(new Date(Date.parse(iso) - 86_400_000).toISOString());
-  // Should Gmail ever refuse the wider bounce search, sending must not stop over it: the Google-only
-  // search (what ran before Nov 4) takes over for the rest of this session, and the Worker logs say so.
-  let bounceSearch = FCC_BOUNCE_SEARCH;
-  const bounces = async (criteria: (bounce: string) => string) => {
-    try {
-      return await session.search(criteria(bounceSearch));
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      if (bounceSearch === GOOGLE_BOUNCE_SEARCH || !/^IMAP (BAD|NO)\b/.test(detail)) throw error;
-      console.warn(JSON.stringify({ event: "fcc_bounce_search_fallback", detail: detail.slice(0, 200) }));
-      bounceSearch = GOOGLE_BOUNCE_SEARCH;
-      return session.search(criteria(bounceSearch));
+  // Should Gmail ever refuse a wider bounce search, sending must not stop over it: the next narrower search
+  // (the Nov 3 one, then Google's bounces only as before) takes over for the rest of this session, and the Worker logs say so.
+  let level = 0;
+  const withBounceSearch = async <T,>(run: (bounce: string) => Promise<T>): Promise<T> => {
+    for (;;) {
+      try {
+        return await run(BOUNCE_SEARCHES[level]!);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        if (level === BOUNCE_SEARCHES.length - 1 || !/^IMAP (BAD|NO)\b/.test(detail)) throw error;
+        level += 1;
+        console.warn(JSON.stringify({ event: "fcc_bounce_search_fallback", level, detail: detail.slice(0, 200) }));
+      }
     }
   };
+  const bounces = (criteria: (bounce: string) => string) => withBounceSearch((bounce) => session.search(criteria(bounce)));
+
+  // The permanent-bounce notices from `day` on, read once per day asked about. Null when they could not be read
+  // (the caller then uses the address search that ran before Nov 4): sending must not stop over this either.
+  const noticeScans = new Map<string, Promise<FccBounceNotice[] | null>>();
+  const readNotices = async (day: string) => {
+    // At the search the session has settled on, without stepping down: a server that cannot do UID SEARCH must not
+    // narrow the search the address checks below depend on. The address checks step down on their own if they need to.
+    const uids = await session.uidSearch(`SINCE ${day} ${BOUNCE_SEARCHES[level]}`);
+    const fetched = await session.uidFetch(uids.slice(-NOTICE_LIMIT), FCC_NOTICE_FETCH);
+    return fetched.flatMap((item) => readBounceNotice(item.sections.HEADER ?? "", item.sections.TEXT ?? "") ?? []);
+  };
+  const notices = (day: string) => {
+    let scan = noticeScans.get(day);
+    if (!scan) {
+      scan = readNotices(day).catch((error: unknown) => {
+        console.warn(JSON.stringify({ event: "fcc_bounce_notice_scan_failed", detail: (error instanceof Error ? error.message : String(error)).slice(0, 200) }));
+        return null;
+      });
+      noticeScans.set(day, scan);
+    }
+    return scan;
+  };
+  const bodyHasBounceFor = async (email: string, day: string) => (await bounces((bounce) => `SINCE ${day} ${bounce} BODY ${imapQuote(email)}`)).length > 0;
   return {
     async hasMessagesFrom(fromPatterns, sinceIso) {
       for (const pattern of fromPatterns) {
@@ -220,16 +271,20 @@ export async function fccMailboxFromImap(session: ImapSession): Promise<FccMailb
       return false;
     },
     async hasBounceFor(email, sinceIso) {
-      return (await bounces((bounce) => `SINCE ${since(sinceIso)} ${bounce} BODY ${imapQuote(email)}`)).length > 0;
+      const day = since(sinceIso);
+      const found = await notices(day);
+      return found ? found.some((notice) => noticeIsFor(notice, email)) : bodyHasBounceFor(email, day);
     },
     async bounceCount(sinceIso) {
       return (await bounces((bounce) => `SINCE ${imapDate(sinceIso)} ${bounce}`)).length;
     },
-    async bouncedAmong(emails, sinceIso) {
+    async bouncedAmong(emails, sinceIso, sentMessageIds) {
       const day = imapDate(sinceIso);
+      const found = await notices(day);
+      if (found) return emails.filter((email) => found.some((notice) => noticeIsFor(notice, email, sentMessageIds?.[email])));
       const hits: string[] = [];
       for (const email of emails) {
-        if ((await bounces((bounce) => `SINCE ${day} ${bounce} BODY ${imapQuote(email)}`)).length > 0) hits.push(email);
+        if (await bodyHasBounceFor(email, day)) hits.push(email);
       }
       return hits;
     },

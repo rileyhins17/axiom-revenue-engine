@@ -146,11 +146,16 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
     const firstLookToday = scanned?.day !== day;
     if (firstLookToday || bounceMessages > (scanned?.count ?? 0)) {
       const from = firstLookToday ? addDays(day, -FCC_LATE_BOUNCE_DAYS) : day;
-      const { results: recent } = await db.prepare(`SELECT DISTINCT c."id", c."email" FROM "FccCampaignContact" c
+      const { results: sends } = await db.prepare(`SELECT DISTINCT c."id", c."email", s."messageId" FROM "FccCampaignContact" c
         JOIN "FccCampaignSend" s ON s."contactId" = c."id"
         WHERE s."sendDay" BETWEEN ? AND ? AND s."status" = 'SENT' AND c."status" IN ('step1_sent','step2_sent') AND COALESCE(s."senderAddress",'') = ?`)
-        .bind(from, day, inbox).all<{ id: string; email: string }>();
-      const bounced = new Set(recent.length > 0 ? await mailbox.bouncedAmong(recent.map((contact) => contact.email), `${from}T12:00:00.000Z`) : []);
+        .bind(from, day, inbox).all<{ id: string; email: string; messageId: string }>();
+      // A bounce notice quotes the Message-ID of the email it is about: hand the mailbox every ID sent to each address, so a
+      // notice is matched to the right email even when the server rewrote the recipient. The address is only the fallback.
+      const recent = [...new Map(sends.map((row) => [row.id, row])).values()];
+      const sentIds: Record<string, string[]> = {};
+      for (const row of sends) (sentIds[row.email] ??= []).push(row.messageId);
+      const bounced = new Set(recent.length > 0 ? await mailbox.bouncedAmong(recent.map((contact) => contact.email), `${from}T12:00:00.000Z`, sentIds) : []);
       for (const contact of recent.filter((row) => bounced.has(row.email))) {
         await db.prepare(`UPDATE "FccCampaignContact" SET "status" = 'bounced', "stoppedReason" = 'The email bounced', "updatedAt" = ? WHERE "id" = ?`)
           .bind(now.toISOString(), contact.id).run();
