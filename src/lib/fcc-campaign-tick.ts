@@ -12,12 +12,14 @@
  * - Pause everything (a founder must press Resume) on a Google warning in the
  *   inbox, 3 or more bounces in a day, a login Gmail refuses, or an email Gmail
  *   refuses.
+ * - Each inbox's first look of the day also sweeps the last FCC_LATE_BOUNCE_DAYS
+ *   days' contacts for a bounce that arrived after an earlier day's last tick.
  * Nothing is sent without a successful inbox check first.
  */
 import { FCC_DAILY_SEND_CAP } from "@/lib/fcc-campaign";
 import { noteFccRun, pauseFcc, readFccBounceScan, saveFccBounceScan } from "@/lib/fcc-campaign-control";
 import {
-  fccClosedGate, fccSentToday, fccSetting, runFccDailySend, senderKey, torontoDay,
+  addDays, fccClosedGate, fccSentToday, fccSetting, runFccDailySend, senderKey, torontoDay,
   type FccMailbox, type FccRunResult, type FccSendConfig,
 } from "@/lib/fcc-campaign-sender";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
@@ -33,6 +35,12 @@ export const FCC_GAP_MAX_MS = 180_000;
 export const FCC_SECOND_BATCH_MAX_BOUNCES = 1;
 /** This many bounces in a day pauses the campaign. */
 export const FCC_PAUSE_BOUNCES = 3;
+/**
+ * How far back the day's first bounce look reaches. A bounce that lands after the day's last tick is only ever
+ * seen the next morning (a Nov 6 contact gets no follow-up, so no later check), Gmail gives a delayed email up
+ * after about two days, and a weekend can sit in between.
+ */
+export const FCC_LATE_BOUNCE_DAYS = 5;
 export const FCC_AUTO_PAUSE_BY = "the automatic safety check";
 /** An added inbox's daily emails in its first and second week of sending; from week 3 it sends as many as the first inbox. */
 export const FCC_NEW_INBOX_RAMP = [15, 30] as const;
@@ -129,16 +137,21 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
     const warning = await mailbox.googleWarning(sinceIso);
     if (warning) return await pause(warning);
 
-    // Match bounces to today's contacts only when a new bounce message has arrived since the last look.
+    // Match bounces to this inbox's contacts when a new bounce message has arrived since the last look, and on the
+    // day's first look no matter what: that look reaches back FCC_LATE_BOUNCE_DAYS, so a bounce that landed after an
+    // earlier day's last tick is recorded now. Later looks cover today's contacts. Today's pause and second-batch
+    // rules count only today's sends (fccBouncesToday), so an older bounce found here never trips them.
     const bounceMessages = await mailbox.bounceCount(sinceIso);
     const scanned = await readFccBounceScan(db, inbox);
-    if (bounceMessages > (scanned?.day === day ? scanned.count : 0)) {
-      const { results: sentToday } = await db.prepare(`SELECT DISTINCT c."id", c."email" FROM "FccCampaignContact" c
+    const firstLookToday = scanned?.day !== day;
+    if (firstLookToday || bounceMessages > (scanned?.count ?? 0)) {
+      const from = firstLookToday ? addDays(day, -FCC_LATE_BOUNCE_DAYS) : day;
+      const { results: recent } = await db.prepare(`SELECT DISTINCT c."id", c."email" FROM "FccCampaignContact" c
         JOIN "FccCampaignSend" s ON s."contactId" = c."id"
-        WHERE s."sendDay" = ? AND s."status" = 'SENT' AND c."status" IN ('step1_sent','step2_sent') AND COALESCE(s."senderAddress",'') = ?`)
-        .bind(day, inbox).all<{ id: string; email: string }>();
-      const bounced = new Set(await mailbox.bouncedAmong(sentToday.map((contact) => contact.email), sinceIso));
-      for (const contact of sentToday.filter((row) => bounced.has(row.email))) {
+        WHERE s."sendDay" BETWEEN ? AND ? AND s."status" = 'SENT' AND c."status" IN ('step1_sent','step2_sent') AND COALESCE(s."senderAddress",'') = ?`)
+        .bind(from, day, inbox).all<{ id: string; email: string }>();
+      const bounced = new Set(recent.length > 0 ? await mailbox.bouncedAmong(recent.map((contact) => contact.email), `${from}T12:00:00.000Z`) : []);
+      for (const contact of recent.filter((row) => bounced.has(row.email))) {
         await db.prepare(`UPDATE "FccCampaignContact" SET "status" = 'bounced', "stoppedReason" = 'The email bounced', "updatedAt" = ? WHERE "id" = ?`)
           .bind(now.toISOString(), contact.id).run();
         await db.prepare(`INSERT INTO "EngineEmailSuppression" ("email","reason") VALUES (?,'BOUNCED') ON CONFLICT DO NOTHING`).bind(contact.email.toLowerCase()).run();

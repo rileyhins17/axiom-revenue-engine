@@ -178,7 +178,7 @@ const changes = (result: unknown) => {
   return r.meta?.changes ?? r.changes ?? 0;
 };
 
-function addDays(day: string, days: number) {
+export function addDays(day: string, days: number) {
   const date = new Date(`${day}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);

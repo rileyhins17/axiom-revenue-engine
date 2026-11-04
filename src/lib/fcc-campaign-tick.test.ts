@@ -7,7 +7,7 @@ import Database from "better-sqlite3";
 import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION } from "@/lib/fcc-campaign";
 import { pauseFcc, readFccNotes, resumeFcc } from "@/lib/fcc-campaign-control";
 import type { FccMailbox, FccSendConfig } from "@/lib/fcc-campaign-sender";
-import { FCC_GAP_MAX_MS, FCC_GAP_MIN_MS, fccDailyMax, gapAfter, runFccSendTick, torontoMinute, type FccTickResult } from "@/lib/fcc-campaign-tick";
+import { FCC_GAP_MAX_MS, FCC_GAP_MIN_MS, fccBouncesToday, fccDailyMax, gapAfter, runFccSendTick, torontoMinute, type FccTickResult } from "@/lib/fcc-campaign-tick";
 import { PermanentEmailError, type OutgoingEmail } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { applyEngineSchema } from "@/lib/revenue-engine/test-support/engine-schema";
@@ -162,6 +162,29 @@ test("2 bounces by noon means no second batch; 3 pauses everything until a found
   const control = (await readFccNotes(fresh.db)).control;
   assert.equal(control?.action, "paused");
   assert.match(control?.reason ?? "", /3 emails bounced today/);
+});
+
+test("a bounce that lands after the day's last tick is recorded on the next morning's first look, without counting toward that day's rules", async () => {
+  const { raw, db } = database();
+  addContacts(raw, 80);
+  const state: { bounced?: string[] } = {};
+  const h = harness(state);
+  await h.run(db, WED_10AM, WED_10AM + 2 * 60 * MINUTE);
+  assert.equal(h.sent.length, 30);
+  // Gmail gives person1's email up at 4 pm, after the day's last tick.
+  state.bounced = ["person1@co1.example"];
+  assert.equal(statusCount(raw, "bounced"), 0);
+
+  const THU_10AM = WED_10AM + 24 * 60 * MINUTE;
+  const first = await h.tick(db, THU_10AM);
+  assert.equal(first.status, "RAN");
+  assert.equal(statusCount(raw, "bounced"), 1, "the morning sweep found Wednesday's late bounce");
+  assert.equal((raw.prepare(`SELECT COUNT(*) AS n FROM "EngineEmailSuppression" WHERE "email" = 'person1@co1.example' AND "reason" = 'BOUNCED'`).get() as { n: number }).n, 1);
+  assert.equal(await fccBouncesToday(db, "2026-10-29"), 0, "it belongs to Wednesday, not to Thursday's pause and second-batch rules");
+  assert.equal(h.sent.length, 31, "Thursday's first email still went");
+  const looks = h.scans();
+  await h.run(db, THU_10AM + MINUTE, THU_10AM + 10 * MINUTE);
+  assert.equal(h.scans(), looks, "no new bounce message, no new look");
 });
 
 test("a Google warning in the inbox pauses before anything is sent", async () => {

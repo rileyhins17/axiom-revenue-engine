@@ -43,8 +43,10 @@ Older entries from the retired website campaign are in git history before 2026-1
   refuses the wider search, the Google-only one takes over for that session and the logs
   show `fcc_bounce_search_fallback`. The missed contact was marked bounced by hand.
 - **Prevention:** `imap-client.test.ts` holds a Purelymail-style and an Exchange-style bounce.
-  A Nov 6 contact gets no follow-up, so a bounce that arrives after the day's last tick is
-  still never recorded for them; March contacts are re-checked before each follow-up.
+  A Nov 6 contact gets no follow-up, so a bounce that arrives after the day's last tick had
+  no later check at all; since Nov 4 each inbox's first look of the day sweeps the last 5
+  days' contacts (`FCC_LATE_BOUNCE_DAYS` in `fcc-campaign-tick.ts`). Such a bounce counts
+  toward the day it was sent, never toward the new day's pause or second-batch rules.
 
 ## OPS-015 — Cloudflare weekday 1 is Sunday
 
