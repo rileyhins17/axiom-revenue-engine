@@ -161,3 +161,24 @@ test("the FCC screen counts day-7 emails as follow-ups and shows when the next o
   assert.deepEqual(screen.sentToday, { first: 0, followUps: 1 }, "the day-7 email sent today counts as a follow-up");
   assert.deepEqual(screen.sentAllTime, { first: 5, followUps: 7 });
 });
+
+test("the FCC screen counts the Nov 6 follow-ups as follow-ups due: 5 days after the first email, from Mon Nov 9 until Fri Nov 13", async () => {
+  const { raw, db } = database();
+  const emailed = (email: string, firstDay: string, status = "step1_sent") => {
+    add(raw, FCC_NOV6_CAMPAIGN_KEY, email, status, "2026-11-01T20:00:00.000Z");
+    const id = `c${row}`;
+    raw.prepare(`UPDATE "FccCampaignContact" SET "step1SentAt" = ?, "step1MessageId" = ? WHERE "id" = ?`).run(`${firstDay}T15:00:00Z`, `<fcc-nov6-${id}-1@x.example>`, id);
+    raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status") VALUES (?,?,1,?,?,?,'SENT')`)
+      .run(`${id}-1`, id, email, firstDay, `<fcc-nov6-${id}-1@x.example>`);
+  };
+  emailed("mon@a.example", "2026-11-02"); // due Sat Nov 7, so Monday Nov 9
+  emailed("tue@b.example", "2026-11-05"); // due Tue Nov 10
+  emailed("said-no@c.example", "2026-11-03", "replied");
+
+  const friday = await fccScreen(db, new Date("2026-11-06T20:00:00Z"));
+  assert.deepEqual([friday.followUpsDue, friday.followUpsLater, friday.nextFollowUpDay], [0, 2, "2026-11-09"]);
+  const monday = await fccScreen(db, new Date("2026-11-09T20:00:00Z"));
+  assert.deepEqual([monday.followUpsDue, monday.followUpsLater, monday.nextFollowUpDay], [1, 1, "2026-11-10"]);
+  const afterFinishLine = await fccScreen(db, new Date("2026-11-16T20:00:00Z"));
+  assert.deepEqual([afterFinishLine.followUpsDue, afterFinishLine.followUpsLater], [0, 0], "the follow-up closes with the Nov 13 call, so it stops showing as waiting");
+});

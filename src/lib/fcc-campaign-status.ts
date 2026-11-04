@@ -2,9 +2,13 @@
  * What the FCC screen and the Today card show. Read-only: nothing here changes
  * the campaign. Every number comes straight from the FCC tables.
  */
-import { FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_NOV6_CAMPAIGN_KEY, FCC_NOV6_LAST_SEND_DAY, fccCopySql } from "@/lib/fcc-campaign";
+import {
+  FCC_CAMPAIGN_KEY, FCC_COPY_VERSION, FCC_DAILY_SEND_CAP, FCC_NOV6_CAMPAIGN_KEY, FCC_NOV6_FOLLOW_UP_LAST_DAY, FCC_NOV6_LAST_SEND_DAY, fccCopySql,
+} from "@/lib/fcc-campaign";
 import { readFccNotes, type FccControlNote, type FccRunNote } from "@/lib/fcc-campaign-control";
-import { FCC_DAY7_DUE_SQL, FCC_DAY7_JOIN_SQL, fccSentToday, torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
+import {
+  FCC_DAY7_DUE_SQL, FCC_DAY7_JOIN_SQL, FCC_NOV6_FOLLOW_UP_DUE_SQL, FCC_NOV6_FOLLOW_UP_FROM_SQL, fccSentToday, torontoDay, torontoWeekday,
+} from "@/lib/fcc-campaign-sender";
 import { FCC_SECOND_BATCH_MAX_BOUNCES, FCC_SEND_WINDOWS, fccBouncesToday, fccDailyMax, torontoMinute } from "@/lib/fcc-campaign-tick";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
@@ -81,7 +85,7 @@ export async function fccScreen(db: ProspectDb, now = new Date()): Promise<FccSc
   const state: FccState = !setting || !approved ? "locked" : setting.enabled === 1 ? "live" : "paused";
   const batchSize = Math.min(FCC_DAILY_SEND_CAP, Math.max(0, setting?.dailyCap ?? 0));
 
-  const [notes, sends, groups, hotList, followUps, day7, replies, bounces, problems, sentToday, bouncesToday] = await Promise.all([
+  const [notes, sends, groups, hotList, followUps, day7, nov6Follows, replies, bounces, problems, sentToday, bouncesToday] = await Promise.all([
     readFccNotes(db),
     db.prepare(`SELECT "step", SUM("sendDay" = ?) AS today, COUNT(*) AS total FROM "FccCampaignSend" WHERE "status" IN ('CLAIMED','SENT') GROUP BY "step"`)
       .bind(day).all<{ step: number; today: number; total: number }>(),
@@ -105,6 +109,13 @@ export async function fccScreen(db: ProspectDb, now = new Date()): Promise<FccSc
           AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" s WHERE s."contactId" = c."id" AND s."step" = 3 AND s."status" <> 'FAILED')
           AND NOT ${ON_HOT_LIST})`)
       .bind(day, day, day, FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, day).first<{ due: number | null; later: number | null; nextDay: string | null }>(),
+    // The one follow-up for the Nov 6 list (v9): everyone still waiting for it, by the day it falls due, until its last day.
+    // The sender reads the same rows (FCC_NOV6_FOLLOW_UP_FROM_SQL).
+    day <= FCC_NOV6_FOLLOW_UP_LAST_DAY
+      ? db.prepare(`SELECT SUM(due <= ?) AS due, SUM(due > ?) AS later, MIN(CASE WHEN due > ? THEN due END) AS nextDay FROM (
+          SELECT ${FCC_NOV6_FOLLOW_UP_DUE_SQL} AS due ${FCC_NOV6_FOLLOW_UP_FROM_SQL})`)
+        .bind(day, day, day, FCC_NOV6_CAMPAIGN_KEY).first<{ due: number | null; later: number | null; nextDay: string | null }>()
+      : Promise.resolve(null),
     // One row per address: a reply or bounce on someone on both lists stops both of their rows.
     db.prepare(`SELECT "company","email",MAX("updatedAt") AS at,"stoppedReason" AS note FROM "FccCampaignContact"
       WHERE "campaignKey" IN (?, ?) AND "status" = 'replied' GROUP BY "email" ORDER BY at DESC LIMIT 50`).bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY).all<FccPerson>(),
@@ -118,7 +129,7 @@ export async function fccScreen(db: ProspectDb, now = new Date()): Promise<FccSc
 
   const byStep = (step: number) => sends.results.find((row) => Number(row.step) === step);
   const followUpsSent = (pick: "today" | "total") => Number(byStep(2)?.[pick] ?? 0) + Number(byStep(3)?.[pick] ?? 0);
-  const nextDays = [followUps?.nextDay, day7?.nextDay].filter((value): value is string => Boolean(value)).sort();
+  const nextDays = [followUps?.nextDay, day7?.nextDay, nov6Follows?.nextDay].filter((value): value is string => Boolean(value)).sort();
   const batches = groups.results.map((row) => ({
     name: notes.batchNames[row.createdAt] ?? `Loaded ${toronto(new Date(row.createdAt), { month: "short", day: "numeric" })}`,
     loadedAt: row.createdAt, total: Number(row.total), ready: Number(row.ready), held: Number(row.held), emailed: Number(row.emailed), stopped: Number(row.stopped),
@@ -138,7 +149,8 @@ export async function fccScreen(db: ProspectDb, now = new Date()): Promise<FccSc
     ready: batches.reduce((sum, batch) => sum + batch.ready, 0),
     held: batches.reduce((sum, batch) => sum + batch.held, 0),
     batches,
-    followUpsDue: Number(followUps?.due ?? 0) + Number(day7?.due ?? 0), followUpsLater: Number(followUps?.later ?? 0) + Number(day7?.later ?? 0),
+    followUpsDue: Number(followUps?.due ?? 0) + Number(day7?.due ?? 0) + Number(nov6Follows?.due ?? 0),
+    followUpsLater: Number(followUps?.later ?? 0) + Number(day7?.later ?? 0) + Number(nov6Follows?.later ?? 0),
     nextFollowUpDay: nextDays[0] ?? null, day7Due: Number(day7?.due ?? 0),
     replies: replies.results, bounces: bounces.results, problems: problems.results,
   };
