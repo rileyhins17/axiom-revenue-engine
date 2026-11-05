@@ -947,3 +947,54 @@ test("dry run from the Nov 1 counts: the first day-7 emails go Mon Nov 9 from bo
     assert.ok(total <= limit, `${key}: ${total} sent, limit ${limit}`);
   }
 });
+
+test("the public listing is read before every email: a recertified listing stops the contact, an unreadable one waits, and the words stay true", async () => {
+  const { raw, db } = database();
+  for (const id of ["a", "b", "c", "d"]) addContact(raw, id, `${id}@${id}-tel.example`);
+  // Real-shaped filing URLs, since the check needs a sys_id to read: 31 zeros then the contact's one-letter id as hex (a=61, b=62, ...).
+  const sysIdOf = (id: string) => `0000000000000000000000000000000${id.charCodeAt(0).toString(16)}`.slice(-32);
+  for (const id of ["a", "b", "c", "d"]) {
+    raw.prepare(`UPDATE "FccCampaignContact" SET "filingsJson" = json_set("filingsJson", '$[0].filingUrl', ?) WHERE "id" = ?`)
+      .run(`https://fccprod.servicenowservices.com/rmd?id=rmd_form&sys_id=${sysIdOf(id)}&view=sp`, id);
+  }
+  recordGo(raw);
+  const t = fakeTransport();
+  const m = fakeMailbox();
+  const reads: string[] = [];
+  const listings: Record<string, { lastRecertified: string | null; recertifyOpen: boolean | null } | null> = {
+    a: { lastRecertified: null, recertifyOpen: false },
+    b: { lastRecertified: "2026-10-31", recertifyOpen: true },   // recertified since the list was built
+    c: null,                                                     // the page can't be read right now
+    d: { lastRecertified: "2025-02-11", recertifyOpen: false },  // an old date is not a 2026 recertification
+  };
+  const filingStatus = async (url: string) => { const id = String.fromCharCode(parseInt(/sys_id=0+([0-9a-f]{2})&/.exec(url)![1]!, 16)); reads.push(id); return listings[id] ?? null; };
+
+  const monday = await runFccDailySend(db, config(t.factory, m.factory, { filingStatus }), MONDAY);
+  assert.equal(monday.status, "RAN");
+  assert.deepEqual(t.sent.map((message) => message.to).sort(), ["a@a-tel.example", "d@d-tel.example"]);
+  assert.deepEqual(reads.sort(), ["a", "b", "c", "d"], "every first email reads the listing first");
+  assert.equal(statusOf(raw, "b"), "suppressed");
+  assert.match((raw.prepare(`SELECT "stoppedReason" AS r FROM "FccCampaignContact" WHERE "id" = 'b'`).get() as { r: string }).r, /shows a 2026-10-31 recertification/);
+  assert.equal(statusOf(raw, "c"), "ready", "an unreadable listing is neither sent nor stopped");
+  assert.equal(monday.status === "RAN" && monday.suppressed, 1);
+
+  // The page comes back: c gets its first email on the next run.
+  listings.c = { lastRecertified: null, recertifyOpen: false };
+  await runFccDailySend(db, config(t.factory, m.factory, { filingStatus }), new Date("2026-10-26T15:00:00Z"));
+  assert.equal(statusOf(raw, "c"), "step1_sent");
+
+  // Day 3: a recertifies in the meantime, so the "still shows no 2026 recertification" follow-up never goes.
+  listings.a = { lastRecertified: "2026-10-28", recertifyOpen: true };
+  const thursday = await runFccDailySend(db, config(t.factory, m.factory, { filingStatus }), THURSDAY);
+  assert.equal(thursday.status === "RAN" && thursday.followUps, 2, "c and d get their follow-up");
+  assert.equal(statusOf(raw, "a"), "suppressed");
+  assert.ok(t.sent.every((message) => message.to !== "a@a-tel.example" || !message.subject.startsWith("Re:")), "no follow-up to a");
+
+  // Without a reader (tests, dry runs) nothing changes.
+  const { raw: raw2, db: db2 } = database();
+  addContact(raw2, "z", "z@z-tel.example");
+  recordGo(raw2);
+  const t2 = fakeTransport();
+  await runFccDailySend(db2, config(t2.factory, m.factory), MONDAY);
+  assert.equal(t2.sent.length, 1);
+});
