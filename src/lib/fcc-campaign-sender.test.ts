@@ -1074,6 +1074,28 @@ test("the Nov 6 follow-up goes only to a Nov 6 contact still at step1_sent, once
   assert.equal(riley.sent[0].headers["In-Reply-To"], "<fcc-nov6-rl-1@mail.example>");
 });
 
+test("the Nov 6 follow-up reads the public listing first: a 2026 recertification stops it, an unreadable page waits", async () => {
+  const { raw, db } = database();
+  for (const id of ["a", "b", "c"]) addNov6Emailed(raw, id, `${id}@${id}-tel.example`, "2026-11-03");
+  const sysIdOf = (id: string) => `0000000000000000000000000000000${id.charCodeAt(0).toString(16)}`.slice(-32);
+  for (const id of ["a", "b", "c"]) {
+    raw.prepare(`UPDATE "FccCampaignContact" SET "filingsJson" = json_set("filingsJson", '$[0].filingUrl', ?) WHERE "id" = ?`)
+      .run(`https://fccprod.servicenowservices.com/rmd?id=rmd_form&sys_id=${sysIdOf(id)}&view=sp`, id);
+  }
+  recordGo(raw);
+  const listings: Record<string, { lastRecertified: string | null; recertifyOpen: boolean | null } | null> = {
+    a: { lastRecertified: null, recertifyOpen: true },
+    b: { lastRecertified: "2026-11-05", recertifyOpen: true }, // filed after our first email
+    c: null,                                                   // the page can't be read right now
+  };
+  const filingStatus = async (url: string) => listings[String.fromCharCode(parseInt(/sys_id=0+([0-9a-f]{2})&/.exec(url)![1]!, 16))] ?? null;
+  const t = fakeTransport();
+  await runFccDailySend(db, config(t.factory, fakeMailbox().factory, { filingStatus }), NOV9);
+  assert.deepEqual(t.sent.map(local), ["a"]);
+  assert.equal(statusOf(raw, "b"), "suppressed");
+  assert.equal(statusOf(raw, "c"), "step1_sent", "an unreadable listing is neither sent nor stopped");
+});
+
 test("the Nov 6 follow-up falls due 5 days after the first email, never before Mon Nov 9, never after Fri Nov 13", async () => {
   const { raw, db } = database();
   addNov6Emailed(raw, "w", "w@w-tel.example", "2026-10-26"); // 5 days passed long ago, but the follow-up is not open before Monday Nov 9
