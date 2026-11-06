@@ -21,9 +21,10 @@ import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
 import { campaignFromRow, type Campaign } from "@/lib/outreach/outreach-model";
-import { importSql, planImport } from "@/lib/outreach/outreach-import";
+import { EMAIL_PATTERN, importSql, planImport } from "@/lib/outreach/outreach-import";
+import { checkMailServers, emailDomain } from "@/lib/outreach/outreach-mail-servers";
 import { parseStepText, renderEmail, wordsProblems, wordsVersion, type CampaignWords } from "@/lib/outreach/outreach-words";
-import { parseCsv } from "@/lib/outreach/outreach-csv";
+import { parseCsv, type CsvTable } from "@/lib/outreach/outreach-csv";
 
 const [command, ...args] = process.argv.slice(2);
 const q = (value: string | null) => (value === null ? "NULL" : `'${value.replace(/'/g, "''")}'`);
@@ -42,12 +43,24 @@ function citiesWith(words: CampaignWords, key = "us-cities"): Campaign {
   });
 }
 
+/** Every list's domains are looked up before it is planned: no mail server holds the row; a failed lookup stops here. */
+async function mailServersFor(table: CsvTable) {
+  const domains = table.rows.map((row) => (row.email ?? "").trim().toLowerCase()).filter((email) => EMAIL_PATTERN.test(email)).map(emailDomain);
+  const check = await checkMailServers(domains);
+  if (check.unreadable.length) fail(`Couldn't look up the mail servers of ${check.unreadable.join(", ")}. Nothing written; try again.`);
+  console.log(`Mail servers: ${new Set(domains).size} domains checked, ${check.noMailServer.size} without one.`);
+  return check.noMailServer;
+}
+
+async function run() {
 if (command === "preview") {
   const [first, follow, csv, count = "10"] = args;
   if (!first || !follow || !csv) fail("usage: preview <first.txt> <followup.txt> <list.csv> [count]");
   const words = readWords(first!, follow!);
   const campaign = citiesWith(words);
-  const plan = planImport(campaign, readFileSync(csv!, "utf8"), { batchId: "preview", name: "preview", loadedBy: "preview", now: new Date(), newId: randomUUID, sender: AIDAN, mailingAddress: mailing || "(mailing address)" });
+  const table = parseCsv(readFileSync(csv!, "utf8"));
+  const plan = planImport(campaign, table, { batchId: "preview", name: "preview", loadedBy: "preview", now: new Date(), newId: randomUUID, sender: AIDAN,
+    mailingAddress: mailing || "(mailing address)", noMailServer: await mailServersFor(table) });
   if (plan.errors.length) fail(`Can't load: ${plan.errors.join(" ")}`);
   const ready = plan.contacts.filter((contact) => contact.status === "ready");
   console.log(`${plan.contacts.length} rows: ${ready.length} ready, ${plan.contacts.length - ready.length} held. Words ${wordsVersion(words)}.\n`);
@@ -74,7 +87,7 @@ if (command === "preview") {
   const table = parseCsv(readFileSync(csv!, "utf8"));
   const plan = planImport(citiesWith(words, campaign!), table, {
     batchId: `b-${randomUUID()}`, name: name!, source: source ?? csv!.split(/[\\/]/).pop() ?? null, loadedBy: "Riley's Claude", now: new Date(), newId: randomUUID,
-    sender: AIDAN, mailingAddress: mailing || "(checked again at send time)",
+    sender: AIDAN, mailingAddress: mailing || "(checked again at send time)", noMailServer: await mailServersFor(table),
   });
   if (plan.errors.length) fail(`Can't load: ${plan.errors.join(" ")}`);
   writeFileSync(out!, importSql(plan));
@@ -112,3 +125,6 @@ if (command === "preview") {
 } else {
   fail("commands: preview, words-sql, import-sql, approve-sql, settings-sql (see the top of scripts/outreach.ts)");
 }
+}
+
+run().catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));

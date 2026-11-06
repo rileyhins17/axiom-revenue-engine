@@ -4,13 +4,15 @@
  *
  * A row is held when: its email address isn't valid; the same address is earlier in the file; a hold
  * rule fails (cities: verified must be yes/true); a blank the words use is empty; an email can't be
- * written from it (for example the first email would carry a link); or the address is on the
+ * written from it (for example the first email would carry a link); its domain has no mail server (when
+ * the loader checked: outreach-mail-servers.ts); or the address is on the
  * do-not-email list or bounced or said "no thanks" in any campaign (checked again before every send).
  * An address already in the campaign from an earlier batch is skipped, never emailed twice.
  */
 import type { Campaign } from "@/lib/outreach/outreach-model";
 import { FCC_SAID_NO_SQL } from "@/lib/outreach/outreach-blocked";
 import { parseCsv, type CsvTable } from "@/lib/outreach/outreach-csv";
+import { emailDomain } from "@/lib/outreach/outreach-mail-servers";
 import { fieldsUsed, renderEmail, wordsProblems, wordsVersion, type Sender } from "@/lib/outreach/outreach-words";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
@@ -32,6 +34,8 @@ const truthy = (value: string, allowed: string[]) => allowed.some((option) => op
  */
 export function planImport(campaign: Campaign, csv: string | CsvTable, input: {
   batchId: string; name: string; source?: string | null; loadedBy: string; now: Date; newId: () => string; sender: Sender; mailingAddress: string | null | undefined;
+  /** Domains with no mail server, from checkMailServers: their rows are held. */
+  noMailServer?: Map<string, string>;
 }): ImportPlan {
   const errors: string[] = [];
   let table: CsvTable = { columns: [], rows: [] };
@@ -59,6 +63,9 @@ export function planImport(campaign: Campaign, csv: string | CsvTable, input: {
     const earlier = seen.get(email);
     if (earlier) return hold(`Same email address as row ${earlier}`, `${id.toLowerCase()}@invalid.invalid`);
     seen.set(email, rowNumber);
+    const domain = emailDomain(email);
+    const mailProblem = input.noMailServer?.get(domain);
+    if (mailProblem) return hold(`${domain} ${mailProblem}, so the email would bounce`);
     for (const [column, allowed] of Object.entries(campaign.rules.holdUnless ?? {})) {
       const value = (fields[column] ?? "").trim();
       if (!truthy(value, allowed)) return hold(value ? `Not ${column} (${column} is "${value.slice(0, 40)}")` : `Not ${column} (blank)`);

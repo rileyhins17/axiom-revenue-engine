@@ -405,3 +405,40 @@ test("the hourly reply check reads every inbox, stops whoever wrote back, puts a
   assert.equal(told.length, 1, "nobody is reported twice");
   assert.deepEqual((await runOutreachReplyCheck(db, config, new Date("2026-11-09T22:20:00Z"))).status, "SKIPPED", "once an hour");
 });
+
+test("loading checks that every domain takes mail: no mail server, a null MX or no such domain holds the row; a lookup that keeps failing stops the load", async () => {
+  const { checkMailServers } = await import("@/lib/outreach/outreach-mail-servers");
+  const calls: string[] = [];
+  const answers: Record<string, unknown> = {
+    "city1.gov": { Status: 0, Answer: [{ type: 15, data: "10 mail.city1.gov." }] },
+    "city2.gov": { Status: 0, Answer: [] },
+    "city3.gov": { Status: 0, Answer: [{ type: 15, data: "0 ." }] },
+    "city4.gov": { Status: 3 },
+    "city5.gov": { Status: 2 },
+    "city6.gov": { Status: 0, Answer: [{ type: 5, data: "alias.city6.gov." }, { type: 15, data: "5 mx.city6.gov." }] },
+  };
+  const fakeFetch = async (url: string) => {
+    const name = new URL(url).searchParams.get("name")!;
+    calls.push(name);
+    if (name === "city7.gov") throw new Error("network down");
+    return new Response(JSON.stringify(answers[name]), { status: 200 });
+  };
+  const check = await checkMailServers(["city1.gov", "CITY1.gov", "city2.gov", "city3.gov", "city4.gov", "city5.gov", "city6.gov"], { fetch: fakeFetch });
+  assert.deepEqual([...check.noMailServer].sort(), [["city2.gov", "has no mail server"], ["city3.gov", "takes no mail (null MX)"], ["city4.gov", "doesn't exist"], ["city5.gov", "has no working mail server (DNS error)"]]);
+  assert.deepEqual(check.unreadable, []);
+  assert.equal(calls.filter((name) => name === "city1.gov").length, 1, "each domain is looked up once");
+  assert.equal(calls.filter((name) => name === "city5.gov").length, 3, "a DNS error is tried three times");
+  assert.deepEqual((await checkMailServers(["city7.gov"], { fetch: fakeFetch })).unreadable, ["city7.gov"]);
+  // The rows of a domain without a mail server are held with the reason; the rest are ready.
+  const { raw, db } = database();
+  const w = words();
+  raw.prepare(`UPDATE "OutreachCampaign" SET "wordsJson" = ?, "wordsVersion" = ? WHERE "key" = 'us-cities'`).run(JSON.stringify(w), wordsVersion(w));
+  let ids = 0;
+  const plan = planImport((await readCampaign(db, "us-cities"))!, csvOf(3), { batchId: "b", name: "Cities batch 1", loadedBy: "Riley's Claude", now: new Date(),
+    newId: () => `id-${++ids}`, sender: { name: "Aidan Magee", address: AIDAN }, mailingAddress: ADDRESS, noMailServer: check.noMailServer });
+  assert.deepEqual(plan.contacts.map((contact) => [contact.email, contact.status, contact.holdReason]), [
+    ["clerk1@city1.gov", "ready", null],
+    ["clerk2@city2.gov", "held", "city2.gov has no mail server, so the email would bounce"],
+    ["clerk3@city3.gov", "held", "city3.gov takes no mail (null MX), so the email would bounce"],
+  ]);
+});
