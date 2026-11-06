@@ -372,7 +372,7 @@ test("the hourly reply check reads every inbox, stops whoever wrote back, puts a
   ];
   // The reply to the city came to Riley's inbox, which never emailed it: it is still found.
   const inbox = (list: typeof messages) => async () => ({
-    async messagesSince() { return list.map(({ text: _text, ...message }) => message); },
+    async messagesSince() { return list.map(({ folder, uid, from, date, automatic }) => ({ folder, uid, from, date, automatic })); },
     async replyText(message: { uid: number }) { return list.find((item) => item.uid === message.uid)!.text; },
     async close() {},
   });
