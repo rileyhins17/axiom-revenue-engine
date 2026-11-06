@@ -2,6 +2,8 @@ import { readFccReplyCheck } from "@/lib/fcc-campaign-control";
 import { torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
 import { fccScreen } from "@/lib/fcc-campaign-status";
 import { FCC_SEND_WINDOWS, torontoMinute } from "@/lib/fcc-campaign-tick";
+import { OUTREACH_AUTO_PAUSE_BY } from "@/lib/outreach/outreach-sender";
+import { campaignSummaries } from "@/lib/outreach/outreach-status";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
 /**
@@ -47,13 +49,35 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
     "FCC emails are locked: the current email has no founder's go yet, so nothing is sending today.",
     "If you've both read and approved the new email, ask Claude to record the go. If not, it stays locked on purpose.");
 
-  // Live, with people waiting, and nothing out an hour after the first window opened: something is stuck.
+  // Live, with people waiting, and nothing out an hour after the first window opened: something is stuck. Campaigns go
+  // before FCC in a shared inbox and can fill its morning half, so while campaign emails went out today FCC gets until
+  // an hour into its afternoon window before this counts as stuck.
   const sentToday = fcc.sentToday.first + fcc.sentToday.followUps;
   const waiting = fcc.ready + fcc.followUpsDue;
-  const stalled = weekday && fcc.state === "live" && fcc.batchSize > 0 && waiting > 0 && minute >= first.start + 60 && minute < 16 * 60 && sentToday === 0;
+  const campaignsToday = Number((await db.prepare(`SELECT COUNT(*) AS n FROM "OutreachSend" WHERE "sendDay" = ? AND "kind" = 'real' AND "status" IN ('CLAIMED','SENT')`)
+    .bind(torontoDay(now)).first<{ n: number }>().catch(() => null))?.n ?? 0);
+  const fccDeadline = (campaignsToday > 0 ? FCC_SEND_WINDOWS[1].start : first.start) + 60;
+  const stalled = weekday && fcc.state === "live" && fcc.batchSize > 0 && waiting > 0 && minute >= fccDeadline && minute < 16 * 60 && sentToday === 0;
   add("fcc-sending", !stalled,
     `No FCC emails have gone out today, though sending is live and ${waiting} ${waiting === 1 ? "is" : "are"} waiting.`,
     `Look at "Last check" on the FCC screen for the reason, then ask Claude to read the Worker logs.`);
+
+  // Each campaign: an automatic pause (a founder's own Pause needs no email), and a live campaign with approved people
+  // waiting that has sent nothing an hour into its send hours.
+  const campaigns = await campaignSummaries(db, now).catch(() => null);
+  add("campaigns-screen", campaigns !== null, "The campaign numbers can't be read, so these checks can't see the campaigns.", "Ask Claude to check the Worker logs for the campaign queries.");
+  for (const { campaign, counts } of campaigns ?? []) {
+    const autoPaused = campaign.state === "paused" && campaign.stateBy === OUTREACH_AUTO_PAUSE_BY;
+    add(`campaign-paused:${campaign.key}`, !autoPaused,
+      `The ${campaign.name} campaign paused itself: ${campaign.stateReason ?? "no reason saved"}${campaign.stateAt ? ` (${when(campaign.stateAt)})` : ""}. Nothing in it sends until someone presses Resume.`,
+      "Read the reason on its Campaigns screen. Once it's sorted, press Resume there.");
+    const sendDay = campaign.sendDays.includes(torontoWeekday(now)) && (!campaign.startDay || torontoDay(now) >= campaign.startDay) && (!campaign.endDay || torontoDay(now) <= campaign.endDay);
+    const silent = sendDay && campaign.state === "live" && !campaign.problem && counts.ready + counts.followUpsDue > 0 && counts.sentToday === 0
+      && minute >= campaign.windowStart + 60 && minute < campaign.windowEnd;
+    add(`campaign-sending:${campaign.key}`, !silent,
+      `No ${campaign.name} emails have gone out today, though it is live and ${counts.ready + counts.followUpsDue} ${counts.ready + counts.followUpsDue === 1 ? "is" : "are"} waiting.`,
+      `Look at "Last check" on its Campaigns screen for the reason, then ask Claude to read the Worker logs.`);
+  }
 
   // The 9 a.m. reply check emails both founders who wrote back. If it hasn't finished by 10:30, replies sit unseen.
   const replyCheck = await readFccReplyCheck(db).catch(() => null);
@@ -98,8 +122,12 @@ const FIXED: Record<string, string> = {
   "fcc-locked": "The new FCC email has a founder's go, so sending can start.",
   "fcc-sending": "FCC emails are going out again.",
   "fcc-reply-check": "Today's reply check has finished.",
+  "campaigns-screen": "The campaign numbers can be read again.",
 };
-const fixedText = (check: HealthCheck) => FIXED[check.key] ?? `${check.key.replace(/-/g, " ")} is working again.`;
+const fixedText = (check: HealthCheck) => FIXED[check.key]
+  ?? (check.key.startsWith("campaign-paused:") ? `The ${check.key.slice(16)} campaign is no longer paused.`
+    : check.key.startsWith("campaign-sending:") ? `${check.key.slice(17)} campaign emails are going out again.`
+      : `${check.key.replace(/-/g, " ")} is working again.`);
 
 export function alertEmail(alerts: Awaited<ReturnType<typeof recordAndSelectAlerts>>) {
   const broken = [...alerts.newProblems, ...alerts.reminders];

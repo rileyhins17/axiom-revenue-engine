@@ -98,3 +98,26 @@ test("a missing sign-in email binding is reported", async () => {
   await saveFccReplyCheck(db, { day: "2026-11-03", at: "2026-11-03T14:00:00Z", found: 0 });
   assert.deepEqual(failing(await runHealthChecks(db, {}, TUE_1130)), ["login-email"]);
 });
+
+test("a campaign that paused itself emails both founders; a founder's own pause and a new campaign don't", async () => {
+  const { raw, db } = database();
+  sendOne(raw, "2026-11-03");
+  await saveFccReplyCheck(db, { day: "2026-11-03", at: "2026-11-03T14:00:00Z", found: 0 });
+  assert.deepEqual(failing(await runHealthChecks(db, ENV, TUE_1130)), [], "the new cities campaign starts paused by Riley's Claude: no alert");
+  raw.prepare(`UPDATE "OutreachCampaign" SET "state" = 'paused', "stateBy" = 'the automatic safety check', "stateReason" = 'Aidan''s inbox: 3 emails bounced today', "stateAt" = ? WHERE "key" = 'us-cities'`)
+    .run(TUE_8AM.toISOString());
+  const checks = await runHealthChecks(db, ENV, TUE_1130);
+  assert.deepEqual(failing(checks), ["campaign-paused:us-cities"]);
+  const mail = alertEmail(await recordAndSelectAlerts(db, checks, TUE_1130));
+  assert.match(mail!.text, /US cities: accessibility campaign paused itself: Aidan's inbox: 3 emails bounced today/);
+});
+
+test("FCC isn't reported stuck at 11:00 when campaign emails used the inbox's morning; by 1:30 it is", async () => {
+  const { raw, db } = database();
+  await saveFccReplyCheck(db, { day: "2026-11-03", at: "2026-11-03T14:00:00Z", found: 0 });
+  raw.prepare(`INSERT INTO "OutreachBatch" ("id","campaignKey","name","loadedBy","loadedAt","status") VALUES ('b','us-cities','B','Riley','2026-11-02T00:00:00Z','approved')`).run();
+  raw.prepare(`INSERT INTO "OutreachContact" ("id","campaignKey","batchId","rowNumber","email","fieldsJson","status","createdAt","updatedAt") VALUES ('oc','us-cities','b',2,'a@b.gov','{}','sent','x','x')`).run();
+  raw.prepare(`INSERT INTO "OutreachSend" ("sendId","campaignKey","contactId","step","email","senderAddress","sendDay","messageId","subject","status") VALUES ('o1','us-cities','oc',1,'a@b.gov','aidanmageebusiness@gmail.com','2026-11-03','<o1>','S','SENT')`).run();
+  assert.deepEqual(failing(await runHealthChecks(db, ENV, TUE_1130)), []);
+  assert.deepEqual(failing(await runHealthChecks(db, ENV, new Date("2026-11-03T18:31:00Z"))), ["fcc-sending"]);
+});
