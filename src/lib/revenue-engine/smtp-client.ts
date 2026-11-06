@@ -36,10 +36,14 @@ export function buildMessage(auth: SmtpAuth, message: OutgoingEmail, messageId: 
   return `${Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join("\r\n")}\r\n\r\n${body}`;
 }
 
-/** Minimal SMTP client over implicit TLS (port 465). One session, many messages. */
-export async function openSmtp(stream: SmtpStream, auth: SmtpAuth, newId: () => string): Promise<EmailTransport> {
-  const reader = stream.readable.getReader();
-  const writer = stream.writable.getWriter();
+/**
+ * Minimal SMTP client. One session, many messages. Over implicit TLS (port 465) by default; with `startTls`
+ * (port 587, Proton's submission server) the session starts in the clear, asks for STARTTLS, and the
+ * caller's `startTls` hands back the encrypted stream before anything private (the login) is sent.
+ */
+export async function openSmtp(stream: SmtpStream, auth: SmtpAuth, newId: () => string, options: { startTls?: () => Promise<SmtpStream> } = {}): Promise<EmailTransport> {
+  let reader = stream.readable.getReader();
+  let writer = stream.writable.getWriter();
   const decoder = new TextDecoder();
   let buffer = "";
 
@@ -70,7 +74,18 @@ export async function openSmtp(stream: SmtpStream, auth: SmtpAuth, newId: () => 
   }
 
   await command(null, [220]);
-  await command(`EHLO ${auth.fromAddress.split("@")[1]}`, [250]);
+  const ehlo = await command(`EHLO ${auth.fromAddress.split("@")[1]}`, [250]);
+  if (options.startTls) {
+    if (!/\bSTARTTLS\b/i.test(ehlo.text)) throw new Error("SMTP server does not offer STARTTLS");
+    await command("STARTTLS", [220]);
+    reader.releaseLock();
+    writer.releaseLock();
+    stream = await options.startTls();
+    reader = stream.readable.getReader();
+    writer = stream.writable.getWriter();
+    buffer = "";
+    await command(`EHLO ${auth.fromAddress.split("@")[1]}`, [250]);
+  }
   await command("AUTH LOGIN", [334]);
   await command(b64(auth.username), [334]);
   await command(b64(auth.password), [235]);

@@ -31,14 +31,40 @@ async function tls(hostname: string, port: number): Promise<SmtpStream> {
   return { readable: socket.readable, writable: socket.writable, close: () => socket.close() };
 }
 
+/** Port 587 (Proton's submission server): a plain connection, upgraded with STARTTLS before the login. */
+async function startTlsConnection(hostname: string, port: number) {
+  const socket = connect({ hostname, port }, { secureTransport: "starttls", allowHalfOpen: false });
+  await socket.opened;
+  const stream: SmtpStream = { readable: socket.readable, writable: socket.writable, close: () => socket.close() };
+  const startTls = async (): Promise<SmtpStream> => {
+    const secure = socket.startTls();
+    await secure.opened;
+    return { readable: secure.readable, writable: secure.writable, close: () => secure.close() };
+  };
+  return { stream, startTls };
+}
+
 const secret = (env: OutreachEnv, name: string) => (typeof env[name] === "string" ? (env[name] as string).trim() : "");
 
-/** An inbox's SMTP and IMAP, or nulls when its password secret isn't set. */
+/** "smtp.protonmail.ch:587" or "smtp.gmail.com" (port 465). */
+export function hostAndPort(value: string, fallback: number) {
+  const match = /^(.+):(\d{2,5})$/.exec(value.trim());
+  return match ? { host: match[1]!, port: Number(match[2]) } : { host: value.trim(), port: fallback };
+}
+
+/** An inbox's SMTP and IMAP, or nulls when its password secret isn't set. SMTP on port 587 uses STARTTLS; any other port, TLS from the start. */
 export function inboxConnections(env: OutreachEnv, inbox: Inbox) {
   const password = secret(env, inbox.passwordSecret);
   if (!password) return { transport: null, imap: null };
-  const transport = async (): Promise<EmailTransport> => openSmtp(await tls(inbox.smtpHost, 465),
-    { host: inbox.smtpHost, username: inbox.address, password, fromName: inbox.name, fromAddress: inbox.address }, () => crypto.randomUUID());
+  const smtp = hostAndPort(inbox.smtpHost, 465);
+  const login = { host: smtp.host, username: inbox.address, password, fromName: inbox.name, fromAddress: inbox.address };
+  const transport = async (): Promise<EmailTransport> => {
+    if (smtp.port === 587) {
+      const { stream, startTls } = await startTlsConnection(smtp.host, smtp.port);
+      return openSmtp(stream, login, () => crypto.randomUUID(), { startTls });
+    }
+    return openSmtp(await tls(smtp.host, smtp.port), login, () => crypto.randomUUID());
+  };
   const imap = async (): Promise<ImapSession> => openImap(await tls(inbox.imapHost, 993), { username: inbox.address, password });
   return { transport, imap };
 }
