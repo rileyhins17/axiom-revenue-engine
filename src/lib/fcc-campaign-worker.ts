@@ -18,7 +18,7 @@ export type FccEnv = {
   /** A second sending inbox (Riley's, Nov 1). It only sends once its own app password is set. */
   FCC_SENDER2_ADDRESS?: string; FCC_SENDER2_NAME?: string; FCC_SMTP_PASSWORD_2?: string;
 };
-type OwnerEmail = (mail: FccOwnerMail & { to: string }) => Promise<void>;
+export type OwnerEmail = (mail: FccOwnerMail & { to: string }) => Promise<void>;
 /** A sending inbox: the first is always Aidan's (it may still lack a password); an added one counts only with its password. */
 export type FccInbox = { address: string; name: string; password: string; primary: boolean };
 
@@ -105,7 +105,7 @@ export async function runFccWeeklyNumbersCron(env: FccEnv, sendOwnerEmail?: Owne
 }
 
 /** Emails both founders through the engine's own alert email, or from the first FCC Gmail when that fails. Throws when neither worked. */
-function foundersMailer(env: FccEnv, readable: FccInbox[], sendOwnerEmail?: OwnerEmail) {
+export function foundersMailer(env: FccEnv, readable: FccInbox[], sendOwnerEmail?: OwnerEmail) {
   return async (mail: FccOwnerMail) => {
     let gmail: EmailTransport | null = null;
     try {

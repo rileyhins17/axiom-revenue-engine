@@ -11,7 +11,9 @@ import { connect } from "cloudflare:sockets";
 
 import { fccMailboxFromImap, type FccMailbox } from "@/lib/fcc-campaign-sender";
 import { runFccSendTick, type FccTickResult } from "@/lib/fcc-campaign-tick";
-import { fccInboxes, sendConfig, type FccEnv } from "@/lib/fcc-campaign-worker";
+import { fccReplyInboxFromImap } from "@/lib/fcc-campaign-replies";
+import { fccInboxes, foundersMailer, sendConfig, type FccEnv, type OwnerEmail } from "@/lib/fcc-campaign-worker";
+import { runOutreachReplyCheck } from "@/lib/outreach/outreach-replies";
 import { inboxRef } from "@/lib/outreach/outreach-inboxes";
 import { readInboxes, type Inbox } from "@/lib/outreach/outreach-model";
 import { runOutreachTick, type OutreachInboxConfig, type OutreachTickResult } from "@/lib/outreach/outreach-sender";
@@ -52,6 +54,23 @@ export function outreachConfig(env: OutreachEnv, inbox: Inbox): OutreachInboxCon
     mailbox: imap ? async (): Promise<FccMailbox> => fccMailboxFromImap(await imap()) : null,
     newId: () => crypto.randomUUID(),
   };
+}
+
+/**
+ * Worker cron entry (every 15 minutes): the campaigns' reply check, once an hour from 7:00 to 21:00 Toronto. It reads
+ * every sending inbox, whichever one sent the email, and tells both founders about new replies.
+ */
+export async function runOutreachReplyCheckCron(env: OutreachEnv, sendOwnerEmail?: OwnerEmail, now = new Date()) {
+  const db = env.DB as ProspectDb;
+  const inboxes = (await readInboxes(db).catch(() => [] as Inbox[])).filter((inbox) => inbox.enabled);
+  const readable = inboxes.map((inbox) => ({ inbox, imap: inboxConnections(env, inbox).imap })).filter((row) => row.imap);
+  const base = (env.APP_BASE_URL?.trim() || "https://operations.getaxiom.ca/").replace(/\/?$/, "/");
+  const fccReadable = fccInboxes(env).filter((inbox) => inbox.address && inbox.password);
+  return runOutreachReplyCheck(db, {
+    screenUrl: `${base}campaigns`,
+    inboxes: readable.map(({ inbox, imap }) => ({ address: inbox.address, open: async () => fccReplyInboxFromImap(await imap!()) })),
+    tellFounders: foundersMailer(env, fccReadable, sendOwnerEmail),
+  }, now);
 }
 
 /** Worker cron entry (every 15 minutes): sends any test emails a founder queued on a batch, to their own inbox only. */

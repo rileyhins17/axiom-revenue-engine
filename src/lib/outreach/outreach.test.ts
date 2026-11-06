@@ -357,3 +357,51 @@ test("inbox limits: Riley's inbox ramps 15, 30, then 60; a lowered limit on the 
   await run(MON_9AM, MON_9AM + 6 * 60 * MINUTE);
   assert.equal(fake.sent.filter((send) => send.from === AIDAN).length, 20);
 });
+
+test("the hourly reply check reads every inbox, stops whoever wrote back, puts a no thanks on the do-not-email list and tells both founders once", async () => {
+  const { raw, db } = database();
+  await setUpCities(raw, db, { rows: 4 });
+  const fake = fakeInbox();
+  await (await harness(db, fake)).run(MON_9AM, MON_9AM + 30 * MINUTE);
+  assert.equal(fake.sent.length, 4);
+  const messages = [
+    { folder: "[Gmail]/All Mail", uid: 11, from: "clerk1@city1.gov", date: "2026-11-09T18:00:00.000Z", automatic: false, text: "Yes please, send the full report." },
+    { folder: "[Gmail]/All Mail", uid: 12, from: "it@city2.gov", date: "2026-11-09T19:00:00.000Z", automatic: false, text: "Not interested, thanks." },
+    { folder: "[Gmail]/All Mail", uid: 13, from: "clerk3@city3.gov", date: "2026-11-09T19:30:00.000Z", automatic: true, text: "I'm out of the office until Monday." },
+    { folder: "[Gmail]/All Mail", uid: 14, from: "someone@else.org", date: "2026-11-09T19:40:00.000Z", automatic: false, text: "Unrelated" },
+  ];
+  // The reply to the city came to Riley's inbox, which never emailed it: it is still found.
+  const inbox = (list: typeof messages) => async () => ({
+    async messagesSince() { return list.map(({ text: _text, ...message }) => message); },
+    async replyText(message: { uid: number }) { return list.find((item) => item.uid === message.uid)!.text; },
+    async close() {},
+  });
+  const told: Array<{ subject: string; text: string }> = [];
+  let fail = true;
+  const config = {
+    screenUrl: "https://operations.getaxiom.ca/campaigns",
+    inboxes: [{ address: AIDAN, open: inbox([]) }, { address: RILEY, open: inbox(messages) }],
+    tellFounders: async (mail: { subject: string; text: string }) => { if (fail) throw new Error("mail down"); told.push(mail); },
+  };
+  const { runOutreachReplyCheck } = await import("@/lib/outreach/outreach-replies");
+  await assert.rejects(runOutreachReplyCheck(db, config, new Date("2026-11-09T20:05:00Z")), /mail down/);
+  const statuses = Object.fromEntries((raw.prepare(`SELECT "email","status" FROM "OutreachContact"`).all() as Array<{ email: string; status: string }>).map((row) => [row.email, row.status]));
+  assert.deepEqual(statuses, { "clerk1@city1.gov": "replied", "clerk2@city2.gov": "suppressed", "clerk3@city3.gov": "replied", "clerk4@city4.gov": "sent" });
+  assert.ok(await addressBlocked(db, "clerk2@city2.gov"), "a colleague's no thanks stops the whole organisation");
+  assert.ok(await addressBlocked(db, "it@city2.gov"));
+  assert.equal(await addressBlocked(db, "clerk1@city1.gov"), false, "an interested reply is not a no");
+  // The email failed, so the next hour tells them, once, with both real replies and not the automatic one.
+  fail = false;
+  const result = await runOutreachReplyCheck(db, config, new Date("2026-11-09T21:05:00Z"));
+  assert.equal(result.status, "RAN");
+  assert.equal(told.length, 1);
+  assert.equal(told[0]!.subject, "Campaigns: 2 new replies");
+  assert.match(told[0]!.text, /Springfield 1 \(clerk1@city1\.gov\)/);
+  assert.match(told[0]!.text, /"Yes please, send the full report\."/);
+  assert.match(told[0]!.text, /Answer from rileyhinspergerbusiness@gmail\.com/);
+  assert.match(told[0]!.text, /said no thanks: never emailed again/);
+  assert.doesNotMatch(told[0]!.text, /out of the office/);
+  await runOutreachReplyCheck(db, config, new Date("2026-11-09T22:05:00Z"));
+  assert.equal(told.length, 1, "nobody is reported twice");
+  assert.deepEqual((await runOutreachReplyCheck(db, config, new Date("2026-11-09T22:20:00Z"))).status, "SKIPPED", "once an hour");
+});

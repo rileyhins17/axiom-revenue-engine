@@ -24,6 +24,7 @@ test("the send tick runs the campaigns and FCC sending, the 15-minute check runs
     AsyncLocalStorage: class {}, openNextWorkerModule: {}, EmailMessage: class {}, setCloudflareBindings: () => {}, clearServerEnvCache: () => {},
     runSendCron: async () => { runs.push("send"); return { fcc: {}, campaigns: {} }; },
     runOutreachTestCron: async () => { runs.push("tests"); return { sent: 0, requests: 0 }; },
+    runOutreachReplyCheckCron: async () => { runs.push("campaign-replies"); return { status: "SKIPPED", reason: "test" }; },
     runFccReplyCheckCron: async () => { runs.push("reply-check"); return {}; },
     runFccWeeklyNumbersCron: async () => { runs.push("weekly-numbers"); return {}; },
     runHealthChecks: async () => { runs.push("health"); return []; },
@@ -38,7 +39,7 @@ test("the send tick runs the campaigns and FCC sending, the 15-minute check runs
   await run("* 14-19 * * *");
   assert.deepEqual(runs, ["send"]);
   await run("*/15 * * * *");
-  assert.deepEqual(runs.sort(), ["health", "reply-check", "send", "tests", "weekly-numbers"]);
+  assert.deepEqual(runs.sort(), ["campaign-replies", "health", "reply-check", "send", "tests", "weekly-numbers"]);
   await run("0 11 * * MON-FRI");
-  assert.equal(runs.length, 5, "a retired schedule runs nothing");
+  assert.equal(runs.length, 6, "a retired schedule runs nothing");
 });
