@@ -10,9 +10,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Axiom Revenue Engine operating contract
 
-This repository is Axiom's FCC email engine: the live Worker `axiom-ops-omniscient`
-at operations.getaxiom.ca. It sends the FCC filing emails from the founders' Gmail
-inboxes, follows up, reads replies and bounces, and shows the founders what happened.
+This repository is Axiom's outreach engine: the live Worker `axiom-ops-omniscient`
+at operations.getaxiom.ca. It sends every campaign (cities, agencies) and the FCC filing
+emails from the founders' Gmail inboxes, follows up, reads replies and bounces, and shows
+the founders what happened. Campaigns: `docs/runbooks/CAMPAIGNS.md`.
 The old website campaign (call lists, connected calling, lead search, website checks)
 was removed on 2026-11-03; it is in git history if it is ever needed again.
 
@@ -30,7 +31,9 @@ assume an earlier agent's notes still match the code or production.
 ## Rules that protect the campaign
 
 - Never send a real email as a test. Tests use fakes; the `smtp-test` command only
-  emails the sending inbox itself.
+  emails the sending inbox itself, and a campaign's test emails only go to `TEST_INBOXES`.
+- A campaign batch sends only after its named approver approved it for the current words.
+  Record an approval given outside the screen only when that founder said so.
 - Any change to email wording gets a new `FCC_COPY_VERSION`, which locks sending
   until a founder's go names it. Record the go only when a founder has said so.
 - Never raise daily limits, add inboxes, change who is emailed or remove a safety
@@ -40,7 +43,7 @@ assume an earlier agent's notes still match the code or production.
 - Releases go only through `scripts/release-production.mjs` (fresh backup, checksum,
   live-settings guard, smoke test, automatic rollback), after the day's last send.
   Never use `wrangler deploy` directly; `npm run deploy` is blocked on purpose.
-- Never drop or rewrite live tables. Migrations add; the next free number is 0089
+- Never drop or rewrite live tables. Migrations add; the next free number is 0090
   and must be added to `KNOWN` in the release script.
 - This repository is public. Contact lists, the mailing address, app passwords and
   tokens live in the gitignored `outreach/` folder or in Cloudflare secrets, never

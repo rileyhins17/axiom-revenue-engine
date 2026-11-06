@@ -1,7 +1,7 @@
 # Axiom Revenue Engine
 
-Axiom's FCC email engine. It sends the FCC filing emails from the founders' Gmail
-inboxes on weekdays, follows up in the same thread, checks the inboxes for replies
+Axiom's outreach engine: the one sender for every outreach list. Campaigns (US cities from Nov 9,
+agencies next) and the FCC filing emails go from the founders' Gmail inboxes on weekdays, follows up in the same thread, checks the inboxes for replies
 and bounces, pauses itself when something looks wrong, and shows Riley and Aidan
 what happened at [operations.getaxiom.ca](https://operations.getaxiom.ca).
 
@@ -9,6 +9,8 @@ what happened at [operations.getaxiom.ca](https://operations.getaxiom.ca).
 
 - **Today**: today's sends per inbox, the latest replies to answer, follow-ups and
   how long the ready list lasts. A banner says when sending is paused or locked.
+- **Campaigns**: every list beside FCC (cities first): next send, Pause and Resume per campaign,
+  numbers, batches with 10 sample emails exactly as they will go out, held rows and Approve.
 - **FCC**: the full campaign: next send, Pause and Resume, sends per day, reply and
   bounce rates by email version and inbox, batches, replies, bounces and problems.
 - **Settings**: your account, profile picture and the iPhone home-screen app.
@@ -18,8 +20,9 @@ can sign in.
 
 ## How sending works
 
-Read [the FCC runbook](docs/runbooks/FCC_CAMPAIGN.md) before changing anything about
-sending. In short:
+Read [the campaigns runbook](docs/runbooks/CAMPAIGNS.md) and [the FCC runbook](docs/runbooks/FCC_CAMPAIGN.md)
+before changing anything about sending. Campaigns and FCC share each inbox's safe daily amount and its
+1 to 3 minute gap, and campaigns go first. FCC in short:
 
 - A tick runs every minute from 10:00 Toronto time on weekdays. It sends one email
   at a time, 1 to 3 minutes apart, in two windows (10:00–12:00 and 12:30–2:30). The
@@ -46,11 +49,12 @@ sending. In short:
 | Reply check | `src/lib/fcc-campaign-replies.ts` |
 | Pause, resume and notes | `src/lib/fcc-campaign-control.ts` |
 | Numbers for the screens | `src/lib/fcc-campaign-status.ts` |
+| Campaigns: lists, words, inbox limits, sending, screens | `src/lib/outreach/`, `src/app/campaigns` |
 | Health check | `src/lib/ops/health.ts` |
 | Gmail over SMTP and IMAP | `src/lib/revenue-engine/smtp-client.ts`, `imap-client.ts` |
 | Screens | `src/app/dashboard`, `src/app/fcc`, `src/app/settings` |
-| Contact lists, go and pause SQL | `scripts/fcc-campaign.ts` |
-| Database changes | `migrations/` (next free number: 0089) |
+| Contact lists, go and pause SQL | `scripts/fcc-campaign.ts`, `scripts/outreach.ts` |
+| Database changes | `migrations/` (next free number: 0090) |
 
 ## Working on it
 
