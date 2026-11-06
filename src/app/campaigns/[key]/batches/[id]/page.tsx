@@ -97,7 +97,7 @@ export default async function BatchPage({ params }: { params: Promise<{ key: str
 
     <Panel title="Held rows" icon={Lock} count={review.held.length} flush description="These are never sent.">
       {review.held.length ? <div className="overflow-x-auto"><table className="owner-table min-w-[520px]">
-        <thead><tr><th>Row</th><th>Email</th><th>Why it's held</th></tr></thead>
+        <thead><tr><th>Row</th><th>Email</th><th>Why it&rsquo;s held</th></tr></thead>
         <tbody>{review.held.map((row) => <tr key={row.row}><td className="tabular-nums">{row.row}</td><td className="break-all">{row.email}</td><td>{row.reason}</td></tr>)}</tbody>
       </table></div> : <div className="px-5 py-6 sm:px-6"><Empty>Nothing held.</Empty></div>}
     </Panel>
