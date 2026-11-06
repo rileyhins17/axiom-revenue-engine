@@ -14,6 +14,8 @@
  *   npx tsx scripts/outreach.ts settings-sql <campaign> <out.sql> key=value ...
  *       Changes a campaign's settings: state (live|paused), dailyLimit, inboxesJson, startDay, endDay,
  *       windowStart, windowEnd, sendDays, followUps, followUpBusinessDays, approversJson, rulesJson, priority.
+ *   npx tsx scripts/outreach.ts test-sql <batch id> <our own inbox> <out.sql>
+ *       Queues 3 sample emails and their follow-ups from a batch to one of TEST_INBOXES (the 15-minute check sends them).
  *   npx tsx scripts/outreach.ts new-campaign-sql <key> "<name>" <out.sql> inboxesJson=... dailyLimit=N approversJson=... [key=value ...]
  *       Adds a campaign (a new avenue), paused, with the same settings. Its words and lists then load on the screen.
  *
@@ -25,6 +27,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { campaignFromRow, type Campaign } from "@/lib/outreach/outreach-model";
 import { EMAIL_PATTERN, importSql, planImport } from "@/lib/outreach/outreach-import";
 import { checkMailServers, emailDomain } from "@/lib/outreach/outreach-mail-servers";
+import { TEST_INBOXES } from "@/lib/outreach/outreach-tests";
 import { parseStepText, renderEmail, wordsProblems, wordsVersion, type CampaignWords } from "@/lib/outreach/outreach-words";
 import { parseCsv, type CsvTable } from "@/lib/outreach/outreach-csv";
 
@@ -130,6 +133,18 @@ if (command === "preview") {
   const by = sets.some((set) => set.startsWith('"state"')) ? `, "stateBy" = 'Riley''s Claude', "stateAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now'), "stateReason" = NULL` : "";
   writeFileSync(out!, `UPDATE "OutreachCampaign" SET ${sets.join(", ")}${by}, "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "key" = ${q(campaign!)};\n`);
   console.log(`Settings for ${campaign} written to ${out}.`);
+} else if (command === "test-sql") {
+  // Queues a batch's test emails (3 samples and their follow-ups) for the 15-minute check, to our own inbox only.
+  const [batch, to, out] = args;
+  if (!batch || !to || !out) fail("usage: test-sql <batch id> <our own inbox> <out.sql>");
+  if (!TEST_INBOXES.has(to!.trim().toLowerCase())) fail(`Test emails only go to our own inboxes: ${[...TEST_INBOXES].join(", ")}.`);
+  const id = randomUUID();
+  const request = JSON.stringify({ id, batchId: batch, to: to!.trim().toLowerCase(), by: "Riley's Claude", count: 3, at: new Date().toISOString() });
+  // Running the file twice queues it once.
+  writeFileSync(out!, `INSERT INTO "KvStore" ("key","value","updatedAt") VALUES ('outreach.testRequests', json_array(json(${q(request)})), strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  ON CONFLICT("key") DO UPDATE SET "value" = CASE WHEN EXISTS (SELECT 1 FROM json_each("KvStore"."value") WHERE json_extract(json_each.value, '$.id') = ${q(id)})
+    THEN "KvStore"."value" ELSE json_insert("KvStore"."value", '$[#]', json(${q(request)})) END, "updatedAt" = excluded."updatedAt";\n`);
+  console.log(`Test emails for ${batch} to ${to} written to ${out}; the 15-minute check sends them.`);
 } else if (command === "new-campaign-sql") {
   // A new avenue is a row, never code: it starts paused, sends nothing until it has words, an approved batch and
   // a founder's Resume, and needs its inboxes, daily limit and approvers named up front.
