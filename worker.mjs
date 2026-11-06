@@ -11,7 +11,7 @@ import { EmailMessage } from "cloudflare:email";
 import { setCloudflareBindings } from "./src/lib/cloudflare";
 import { clearServerEnvCache } from "./src/lib/env";
 import { runFccReplyCheckCron, runFccWeeklyNumbersCron } from "./src/lib/fcc-campaign-worker";
-import { runSendCron } from "./src/lib/outreach/outreach-worker";
+import { runOutreachTestCron, runSendCron } from "./src/lib/outreach/outreach-worker";
 import { alertEmail, OWNER_ALERT_INBOXES, recordAndSelectAlerts, runHealthChecks } from "./src/lib/ops/health";
 
 // Sign-in (better-auth) sets up three request stores the first time it is used, by
@@ -123,6 +123,10 @@ const exportedWorker = {
       ctx.waitUntil(runFccReplyCheckCron(env, globalThis.__axiomSendLoginEmail)
         .then((result) => console.log(JSON.stringify({ event: "fcc_reply_check", ...result })))
         .catch((error) => console.error("[fcc-reply-check] failure:", error instanceof Error ? error.message : "unknown")));
+      // Test emails a founder queued on a campaign batch: to their own inbox only.
+      ctx.waitUntil(runOutreachTestCron(env)
+        .then((result) => { if (result.requests) console.log(JSON.stringify({ event: "outreach_tests", ...result })); })
+        .catch((error) => console.error("[outreach-tests] failure:", error instanceof Error ? error.message : "unknown")));
       // Mondays from 8:00 Toronto: last week's FCC numbers, emailed to both founders once.
       ctx.waitUntil(runFccWeeklyNumbersCron(env, globalThis.__axiomSendLoginEmail)
         .then((result) => console.log(JSON.stringify({ event: "fcc_weekly_numbers", ...result })))

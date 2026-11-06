@@ -1,4 +1,4 @@
-import { CalendarDays, Send, Settings, type LucideIcon } from "lucide-react";
+import { CalendarDays, Layers, Send, Settings, type LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 export type AppNavItem = {
@@ -11,6 +11,7 @@ export type AppNavItem = {
 
 export const APP_NAV_ITEMS: AppNavItem[] = [
   { title: "Today", label: "Today", description: "Overview", url: "/dashboard", icon: CalendarDays },
+  { title: "Campaigns", label: "Campaigns", description: "Cities and every other list", url: "/campaigns" as Route, icon: Layers },
   { title: "FCC", label: "FCC", description: "Emails, replies and pause", url: "/fcc" as Route, icon: Send },
   { title: "Settings", label: "Settings", description: "Your account", url: "/settings", icon: Settings },
 ];

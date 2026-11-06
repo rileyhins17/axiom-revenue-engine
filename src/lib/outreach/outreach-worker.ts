@@ -15,6 +15,7 @@ import { fccInboxes, sendConfig, type FccEnv } from "@/lib/fcc-campaign-worker";
 import { inboxRef } from "@/lib/outreach/outreach-inboxes";
 import { readInboxes, type Inbox } from "@/lib/outreach/outreach-model";
 import { runOutreachTick, type OutreachInboxConfig, type OutreachTickResult } from "@/lib/outreach/outreach-sender";
+import { runOutreachTestSends } from "@/lib/outreach/outreach-tests";
 import type { EmailTransport } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { openImap, type ImapSession } from "@/lib/revenue-engine/imap-client";
@@ -51,6 +52,15 @@ export function outreachConfig(env: OutreachEnv, inbox: Inbox): OutreachInboxCon
     mailbox: imap ? async (): Promise<FccMailbox> => fccMailboxFromImap(await imap()) : null,
     newId: () => crypto.randomUUID(),
   };
+}
+
+/** Worker cron entry (every 15 minutes): sends any test emails a founder queued on a batch, to their own inbox only. */
+export async function runOutreachTestCron(env: OutreachEnv, now = new Date()) {
+  return runOutreachTestSends(env.DB as ProspectDb, {
+    mailingAddress: env.FCC_CAMPAIGN_MAILING_ADDRESS,
+    transportFor: (inbox) => inboxConnections(env, inbox).transport,
+    newId: () => crypto.randomUUID(),
+  }, now);
 }
 
 export type SendCronResult = { fcc: FccTickResult & { inboxes?: Record<string, FccTickResult> }; campaigns: Record<string, OutreachTickResult> };

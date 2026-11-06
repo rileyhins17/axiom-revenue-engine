@@ -4,8 +4,9 @@ import test from "node:test";
 import manifest from "@/app/manifest";
 import { APP_NAV_ITEMS, getNavItemForPath } from "@/lib/navigation";
 
-test("owner navigation is Today, FCC and Settings, with nothing from the old call campaign", () => {
-  assert.deepEqual(APP_NAV_ITEMS.map((item) => item.title), ["Today", "FCC", "Settings"]);
+test("owner navigation is Today, Campaigns, FCC and Settings, with nothing from the old call campaign", () => {
+  assert.deepEqual(APP_NAV_ITEMS.map((item) => item.title), ["Today", "Campaigns", "FCC", "Settings"]);
+  assert.equal(getNavItemForPath("/campaigns/us-cities")?.title, "Campaigns");
   assert.equal(getNavItemForPath("/fcc")?.title, "FCC");
   assert.equal(getNavItemForPath("/dashboard")?.title, "Today");
   for (const retired of ["/call", "/prospects", "/walk-ins", "/email", "/archive", "/ask"]) {
