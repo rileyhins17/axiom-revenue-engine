@@ -398,7 +398,7 @@ test("the hourly reply check reads every inbox, stops whoever wrote back, puts a
   assert.equal(told[0]!.subject, "Campaigns: 2 new replies");
   assert.match(told[0]!.text, /Springfield 1 \(clerk1@city1\.gov\)/);
   assert.match(told[0]!.text, /"Yes please, send the full report\."/);
-  assert.match(told[0]!.text, /Answer from rileyhinspergerbusiness@gmail\.com/);
+  assert.match(told[0]!.text, /It came to rileyhinspergerbusiness@gmail\.com; answer from aidanmageebusiness@gmail\.com, which sent the email\./);
   assert.match(told[0]!.text, /said no thanks: never emailed again/);
   assert.doesNotMatch(told[0]!.text, /out of the office/);
   await runOutreachReplyCheck(db, config, new Date("2026-11-09T22:05:00Z"));
@@ -544,4 +544,15 @@ test("loading from the screen: Check saves nothing and shows the counts, holds a
   const down = await loadList(db, { ...base, name: "Down", save: true }, { ...context, checkMail: async () => ({ noMailServer: new Map<string, string>(), unreadable: ["city1.gov"] }) });
   assert.match((down as { error: string }).error, /Couldn't look up the mail servers of city1\.gov\. Nothing was loaded/);
   assert.equal(count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact"`), before);
+});
+
+test("an inbox that can't be read directly (Proton) has its checks read in the inbox it forwards to; no chains", async () => {
+  const { mailboxOwner } = await import("@/lib/outreach/outreach-inboxes");
+  const gmail = { address: "aidanmageebusiness@gmail.com", imapHost: "imap.gmail.com" };
+  const proton = { address: "aidan@getaxiom.ca", imapHost: "aidanmageebusiness@gmail.com" };
+  const chained = { address: "x@getaxiom.ca", imapHost: "aidan@getaxiom.ca" };
+  assert.equal(mailboxOwner(gmail, [gmail, proton]), gmail, "a Gmail inbox reads itself");
+  assert.equal(mailboxOwner(proton, [gmail, proton]), gmail, "the Proton inbox is read in Aidan's Gmail");
+  assert.equal(mailboxOwner(proton, [proton]), null, "not a sending inbox: nothing to read, so it can't send");
+  assert.equal(mailboxOwner(chained, [gmail, proton, chained]), null, "no chains");
 });

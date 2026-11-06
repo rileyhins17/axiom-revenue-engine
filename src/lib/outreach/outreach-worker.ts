@@ -14,7 +14,7 @@ import { runFccSendTick, type FccTickResult } from "@/lib/fcc-campaign-tick";
 import { fccReplyInboxFromImap } from "@/lib/fcc-campaign-replies";
 import { fccInboxes, foundersMailer, sendConfig, type FccEnv, type OwnerEmail } from "@/lib/fcc-campaign-worker";
 import { runOutreachReplyCheck } from "@/lib/outreach/outreach-replies";
-import { inboxRef } from "@/lib/outreach/outreach-inboxes";
+import { inboxRef, mailboxOwner } from "@/lib/outreach/outreach-inboxes";
 import { readInboxes, type Inbox } from "@/lib/outreach/outreach-model";
 import { runOutreachTick, type OutreachInboxConfig, type OutreachTickResult } from "@/lib/outreach/outreach-sender";
 import { runOutreachTestSends } from "@/lib/outreach/outreach-tests";
@@ -52,10 +52,15 @@ export function hostAndPort(value: string, fallback: number) {
   return match ? { host: match[1]!, port: Number(match[2]) } : { host: value.trim(), port: fallback };
 }
 
-/** An inbox's SMTP and IMAP, or nulls when its password secret isn't set. SMTP on port 587 uses STARTTLS; any other port, TLS from the start. */
-export function inboxConnections(env: OutreachEnv, inbox: Inbox) {
+/**
+ * An inbox's SMTP and IMAP, or nulls when a password secret isn't set. SMTP on port 587 uses STARTTLS; any other port,
+ * TLS from the start. IMAP is the mailbox its checks read (mailboxOwner): its own, or the sending inbox it forwards to.
+ */
+export function inboxConnections(env: OutreachEnv, inbox: Inbox, all: Inbox[] = [inbox]) {
   const password = secret(env, inbox.passwordSecret);
   if (!password) return { transport: null, imap: null };
+  const owner = mailboxOwner(inbox, all);
+  const ownerPassword = owner ? secret(env, owner.passwordSecret) : "";
   const smtp = hostAndPort(inbox.smtpHost, 465);
   const login = { host: smtp.host, username: inbox.address, password, fromName: inbox.name, fromAddress: inbox.address };
   const transport = async (): Promise<EmailTransport> => {
@@ -65,12 +70,14 @@ export function inboxConnections(env: OutreachEnv, inbox: Inbox) {
     }
     return openSmtp(await tls(smtp.host, smtp.port), login, () => crypto.randomUUID());
   };
-  const imap = async (): Promise<ImapSession> => openImap(await tls(inbox.imapHost, 993), { username: inbox.address, password });
+  const imap = owner && ownerPassword
+    ? async (): Promise<ImapSession> => openImap(await tls(owner.imapHost, 993), { username: owner.address, password: ownerPassword })
+    : null;
   return { transport, imap };
 }
 
-export function outreachConfig(env: OutreachEnv, inbox: Inbox): OutreachInboxConfig {
-  const { transport, imap } = inboxConnections(env, inbox);
+export function outreachConfig(env: OutreachEnv, inbox: Inbox, all: Inbox[] = [inbox]): OutreachInboxConfig {
+  const { transport, imap } = inboxConnections(env, inbox, all);
   return {
     inbox,
     ref: inboxRef(inbox.address, env.FCC_SENDER_ADDRESS),
@@ -89,7 +96,10 @@ export function outreachConfig(env: OutreachEnv, inbox: Inbox): OutreachInboxCon
 export async function runOutreachReplyCheckCron(env: OutreachEnv, sendOwnerEmail?: OwnerEmail, now = new Date()) {
   const db = env.DB as ProspectDb;
   const inboxes = (await readInboxes(db).catch(() => [] as Inbox[])).filter((inbox) => inbox.enabled);
-  const readable = inboxes.map((inbox) => ({ inbox, imap: inboxConnections(env, inbox).imap })).filter((row) => row.imap);
+  // One read per real mailbox: an inbox that forwards into another sending inbox is read there, once.
+  const seen = new Set<string>();
+  const readable = inboxes.map((inbox) => ({ inbox: mailboxOwner(inbox, inboxes) ?? inbox, imap: inboxConnections(env, inbox, inboxes).imap }))
+    .filter((row) => row.imap && !seen.has(row.inbox.address) && Boolean(seen.add(row.inbox.address)));
   const base = (env.APP_BASE_URL?.trim() || "https://operations.getaxiom.ca/").replace(/\/?$/, "/");
   const fccReadable = fccInboxes(env).filter((inbox) => inbox.address && inbox.password);
   return runOutreachReplyCheck(db, {
@@ -121,7 +131,7 @@ export async function runSendCron(env: OutreachEnv, now = new Date()): Promise<S
   const rows = await Promise.all(addresses.map(async (address) => {
     const settings = inboxes.find((inbox) => inbox.address === address && inbox.enabled);
     const campaign: OutreachTickResult = settings
-      ? await runOutreachTick(db, outreachConfig(env, settings), now).catch((error): OutreachTickResult => ({ status: "SKIPPED", reason: failed(error) }))
+      ? await runOutreachTick(db, outreachConfig(env, settings, inboxes), now).catch((error): OutreachTickResult => ({ status: "SKIPPED", reason: failed(error) }))
       : { status: "SKIPPED", reason: "no settings row" };
     const fccInbox = fcc.find((inbox) => inbox.address.trim().toLowerCase() === address);
     const fccResult: FccTickResult | null = !fccInbox ? null

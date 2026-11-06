@@ -28,6 +28,19 @@ export function inboxRef(address: string, fccFirstInbox: string | null | undefin
   return { address: normal, fccKey: normal === (fccFirstInbox ?? "").trim().toLowerCase() ? "" : normal };
 }
 
+/**
+ * Whose mailbox an inbox's checks (replies, bounces, Google warnings) read. Normally its own. An inbox that can't be
+ * read directly names another sending inbox in its `imapHost` instead, as aidan@getaxiom.ca would: Proton has no IMAP
+ * for servers, and it forwards that address's mail into aidanmageebusiness@gmail.com. Null when that inbox isn't
+ * a readable sending inbox (no chains).
+ */
+export function mailboxOwner<T extends Pick<Inbox, "address" | "imapHost">>(inbox: T, all: T[]): T | null {
+  const via = inbox.imapHost.trim().toLowerCase();
+  if (!via.includes("@")) return inbox;
+  const owner = all.find((row) => row.address === via);
+  return owner && !owner.imapHost.includes("@") ? owner : null;
+}
+
 /** The wait after an email: 1 to 3 minutes, fixed by its send id so every run agrees (same as FCC's gapAfter). */
 export function gapAfter(sendId: string) {
   let hash = 2166136261;

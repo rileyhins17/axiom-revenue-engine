@@ -87,3 +87,16 @@ test("a server that doesn't offer STARTTLS never gets the login", async () => {
   await assert.rejects(openSmtp(plain.stream, proton, () => "m1", { startTls: async () => plain.stream }), /does not offer STARTTLS/);
   assert.deepEqual(plain.lines, ["EHLO getaxiom.ca"]);
 });
+
+test("the usual Gmail session (port 465, TLS from the start) is unchanged: no STARTTLS, login, then the email", async () => {
+  const gmail = { host: "smtp.gmail.com", username: "aidanmageebusiness@gmail.com", password: "app-password", fromName: "Aidan Magee", fromAddress: "aidanmageebusiness@gmail.com" };
+  const server = fakeSmtp("220 smtp.gmail.com ESMTP", (line) => line.startsWith("EHLO") ? ["250-smtp.gmail.com at your service", "250 AUTH LOGIN PLAIN"]
+    : line === "AUTH LOGIN" ? ["334 VXNlcm5hbWU6"] : line === btoa(gmail.username) ? ["334 UGFzc3dvcmQ6"] : line === btoa(gmail.password) ? ["235 2.7.0 Accepted"]
+      : line.startsWith("MAIL FROM") || line.startsWith("RCPT TO") ? ["250 OK"] : line === "DATA" ? ["354 Go ahead"] : line === "<message>" ? ["250 2.0.0 OK"]
+        : line === "QUIT" ? ["221 closing"] : ["500 unexpected"]);
+  const transport = await openSmtp(server.stream, gmail, () => "m1");
+  await transport.send({ to: "jane@talktone.example", subject: "Hi", text: "Hello", headers: {} });
+  await transport.close();
+  assert.deepEqual(server.lines, ["EHLO gmail.com", "AUTH LOGIN", btoa(gmail.username), btoa(gmail.password), "MAIL FROM:<aidanmageebusiness@gmail.com>", "RCPT TO:<jane@talktone.example>", "DATA", "<message>", "QUIT"]);
+  assert.ok(server.closed());
+});

@@ -133,9 +133,9 @@ export async function runOutreachReplyCheck(db: ProspectDb, config: OutreachRepl
 
   // Tell both founders about every real reply not told yet (this run's and any an earlier failed email missed).
   const { results: toTell } = await db.prepare(`SELECT r."id", r."campaignKey", r."inbox", r."fromAddress", r."receivedAt", r."quote", r."kind",
-      COALESCE(json_extract(c."fieldsJson", '$.city'), json_extract(c."fieldsJson", '$.company'), c."email") AS label
+      COALESCE(json_extract(c."fieldsJson", '$.city'), json_extract(c."fieldsJson", '$.company'), c."email") AS label, c."senderAddress" AS sender
     FROM "OutreachReply" r JOIN "OutreachContact" c ON c."id" = r."contactId" WHERE r."toldFoundersAt" IS NULL AND r."kind" <> 'automatic' ORDER BY r."receivedAt"`)
-    .bind().all<{ id: string; campaignKey: string; inbox: string; fromAddress: string; receivedAt: string | null; quote: string | null; kind: string; label: string }>();
+    .bind().all<{ id: string; campaignKey: string; inbox: string; fromAddress: string; receivedAt: string | null; quote: string | null; kind: string; label: string; sender: string | null }>();
   let told = 0;
   if (toTell.length) {
     await config.tellFounders(foundersMail(toTell.map((row) => ({ ...row, campaign: campaigns.get(row.campaignKey)?.name ?? row.campaignKey })), config.screenUrl));
@@ -148,12 +148,13 @@ export async function runOutreachReplyCheck(db: ProspectDb, config: OutreachRepl
   return { status: "RAN", messages, found: found.length, told, unreadInboxes };
 }
 
-function foundersMail(rows: Array<{ campaign: string; label: string; fromAddress: string; inbox: string; receivedAt: string | null; quote: string | null; kind: string }>, screenUrl: string): FccOwnerMail {
+function foundersMail(rows: Array<{ campaign: string; label: string; fromAddress: string; inbox: string; receivedAt: string | null; quote: string | null; kind: string; sender: string | null }>, screenUrl: string): FccOwnerMail {
   const count = rows.length === 1 ? "1 new reply" : `${rows.length} new replies`;
   const entries = rows.map((row, index) => ({
     title: `${index + 1}. ${row.campaign}: ${row.label} (${row.fromAddress})${row.receivedAt ? `, ${shortDay(row.receivedAt)}` : ""}${row.kind === "no_thanks" ? " (said no thanks: never emailed again)" : ""}`,
     quote: row.quote ? `"${row.quote}"` : "(Open the email to read it.)",
-    where: `Answer from ${row.inbox}.`,
+    // Answer from the inbox that sent the email, so the thread holds; say where the reply landed when that's elsewhere.
+    where: !row.sender || row.sender === row.inbox ? `Answer from ${row.inbox}.` : `It came to ${row.inbox}; answer from ${row.sender}, which sent the email.`,
   }));
   const text = [
     `The hourly inbox check found ${count} to our campaigns.`, "",
