@@ -14,6 +14,7 @@ import { importSql, importToDb, planImport } from "@/lib/outreach/outreach-impor
 import { inboxDayMax, inboxRef } from "@/lib/outreach/outreach-inboxes";
 import { readCampaign, readInboxes, type Inbox } from "@/lib/outreach/outreach-model";
 import { addBusinessDays, runOutreachTick, type OutreachInboxConfig, type OutreachTickResult } from "@/lib/outreach/outreach-sender";
+import { batchReview } from "@/lib/outreach/outreach-status";
 import { findLink, parseStepText, renderEmail, wordsVersion, type CampaignWords } from "@/lib/outreach/outreach-words";
 import { PermanentEmailError, type OutgoingEmail } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
@@ -211,9 +212,9 @@ test("loading a list holds every row that can't go, with the reason, and skips a
   assert.equal(count(raw2, `SELECT COUNT(*) AS n FROM "OutreachContact"`), 8);
 });
 
-test("nothing sends before Aidan approves, while paused, or on words changed since the approval", async () => {
+test("nothing sends before Aidan approves, while paused, or on words other than the ones he approved", async () => {
   const { raw, db } = database();
-  await setUpCities(raw, db, { rows: 5, approve: false });
+  await setUpCities(raw, db, { rows: 20, approve: false });
   const fake = fakeInbox();
   const { run } = await harness(db, fake);
   await run(MON_9AM, MON_9AM + 20 * MINUTE);
@@ -224,15 +225,53 @@ test("nothing sends before Aidan approves, while paused, or on words changed sin
   await run(MON_9AM + 20 * MINUTE, MON_9AM + 40 * MINUTE);
   assert.equal(fake.sent.length, 0, "a paused campaign never sends");
   await resumeCampaign(db, "us-cities", "Riley");
-  // New words: the batch was approved on the old ones, so it locks until it is approved again.
+  // New words for the campaign: the batch keeps the words it was loaded and approved with.
   const changed: CampaignWords = { steps: [{ ...words().steps[0]!, body: `${words().steps[0]!.body}\n\nP.S. new line` }, words().steps[1]!] };
   raw.prepare(`UPDATE "OutreachCampaign" SET "wordsJson" = ?, "wordsVersion" = ? WHERE "key" = 'us-cities'`).run(JSON.stringify(changed), wordsVersion(changed));
   await run(MON_9AM + 40 * MINUTE, MON_9AM + 60 * MINUTE);
-  assert.equal(fake.sent.length, 0, "changed words lock the batch");
-  assert.deepEqual(await approveBatch(db, "batch-1", "Aidan", null), { ok: true });
+  assert.ok(fake.sent.length > 0, "the approved batch sends");
+  assert.ok(fake.sent.every((mail) => !/P\.S\. new line/.test(mail.text)), "on exactly the words Aidan approved");
+  // A batch from before batches kept their own words follows the campaign's: changed words lock it until approved again.
+  raw.prepare(`UPDATE "OutreachBatch" SET "wordsJson" = NULL, "wordsVersion" = NULL WHERE "id" = 'batch-1'`).run();
+  const before = fake.sent.length;
   await run(MON_9AM + 60 * MINUTE, MON_9AM + 80 * MINUTE);
-  assert.ok(fake.sent.length > 0);
-  assert.match(fake.sent[0]!.text, /P\.S\. new line/);
+  assert.equal(fake.sent.length, before, "changed words lock an older batch");
+  assert.deepEqual(await approveBatch(db, "batch-1", "Aidan", null), { ok: true });
+  await run(MON_9AM + 80 * MINUTE, MON_9AM + 100 * MINUTE);
+  assert.ok(fake.sent.length > before);
+  assert.match(fake.sent.at(-1)!.text, /P\.S\. new line/);
+});
+
+test("two batches of one campaign carry different words (B without the PDF sentence): each is approved on its own samples and sent with its own words, inside the same 30 a day", async () => {
+  const { raw, db } = database();
+  await setUpCities(raw, db, { rows: 20 }); // batch-1: words A, approved, campaign live
+  const sentenceA = " Your {pdf_date} agenda PDF also can't be read by a screen reader.";
+  assert.ok(FIRST.includes(sentenceA));
+  const wordsB: CampaignWords = { steps: [parseStepText(FIRST.replace(sentenceA, ""), 1), parseStepText(FOLLOW, 2)] };
+  const csvB = [HEADERS, ...Array.from({ length: 15 }, (_, k) => cityRow(21 + k, { pdf_date: "", pdf_url: "" }))].join("\n");
+  let ids = 1000;
+  const planB = planImport({ ...(await readCampaign(db, "us-cities"))!, words: wordsB }, csvB, {
+    batchId: "batch-2", name: "Cities batch B1", loadedBy: "Riley's Claude", now: new Date("2026-11-07T16:00:00Z"), newId: () => `b-contact-${++ids}`,
+    sender: { name: "Aidan Magee", address: AIDAN }, mailingAddress: ADDRESS,
+  });
+  assert.deepEqual(planB.errors, []);
+  assert.equal(planB.contacts.filter((contact) => contact.status === "ready").length, 15, "blank PDF fields don't hold B rows: B's words don't use them");
+  await importToDb(db, planB);
+  const review = await batchReview(db, "batch-2", ADDRESS, 10);
+  assert.ok(review!.samples.every((sample) => sample.first && !/agenda PDF/.test(sample.first.text)), "B's samples are written with B's words");
+  assert.ok((await batchReview(db, "batch-1", ADDRESS, 10))!.samples.every((sample) => /agenda PDF/.test(sample.first!.text)), "A's keep A's");
+
+  const fake = fakeInbox();
+  const { run } = await harness(db, fake);
+  await run(MON_9AM, MON_9AM + 90 * MINUTE);
+  assert.equal(fake.sent.length, 20, "only A sends while B waits for its approval");
+  assert.deepEqual(await approveBatch(db, "batch-2", "Aidan", "Read the 10 B samples"), { ok: true });
+  await run(MON_9AM + 90 * MINUTE, MON_9AM + 330 * MINUTE);
+  assert.equal(fake.sent.length, 30, "A and B share the campaign's 30 a day");
+  const toB = fake.sent.filter((mail) => /clerk(2[1-9]|3[0-5])@/.test(mail.to));
+  assert.equal(toB.length, 10);
+  assert.ok(toB.every((mail) => !/agenda PDF/.test(mail.text)), "B rows get B's words");
+  assert.ok(fake.sent.filter((mail) => !toB.includes(mail)).every((mail) => /Oct 21 agenda PDF/.test(mail.text)), "A rows get A's");
 });
 
 test("Mon Nov 9: 30 city emails from 9:00 in Aidan's inbox, then FCC in the afternoon; the inbox never passes 60 and never sends two within a minute", async () => {
@@ -493,7 +532,7 @@ test("bounces from cities and FCC together: the inbox rests for the rest of the 
   assert.ok(tuesday.some((mail) => mail.to.endsWith(".example")), "FCC sends from Aidan's inbox again on Tuesday");
 });
 
-test("loading from the screen: Check saves nothing and shows the counts, holds and samples; Load saves a waiting batch; new words lock approved batches", async () => {
+test("loading from the screen: Check saves nothing and shows the counts, holds and samples; Load saves a waiting batch; new words go with their batch", async () => {
   const { loadList } = await import("@/lib/outreach/outreach-load");
   const { raw, db } = database();
   let ids = 0;
@@ -530,12 +569,15 @@ test("loading from the screen: Check saves nothing and shows the counts, holds a
   // A second list with the campaign's own words (none pasted): nothing about the approval changes.
   const second = await loadList(db, { ...base, name: "Cities batch 2", csv: [HEADERS, cityRow(7), cityRow(8)].join("\n"), save: true }, context);
   assert.ok(second.ok && second.wordsChanged === false);
-  const approved = () => raw.prepare(`SELECT b."approvedWords" = c."wordsVersion" AS n FROM "OutreachBatch" b JOIN "OutreachCampaign" c ON c."key" = b."campaignKey" WHERE b."id" = ?`).get(loaded.batchId) as { n: number };
-  assert.equal(approved().n, 1);
-  // New words with a third list: saved, and the approved batch waits for Aidan again.
+  const { campaignDetail } = await import("@/lib/outreach/outreach-status");
+  const approvedOnItsWords = async (id: string) => (await campaignDetail(db, "us-cities", null))!.batches.find((batch) => batch.id === id)!.wordsCurrent;
+  assert.equal(await approvedOnItsWords(loaded.batchId), true);
+  // New words with a third list: they go with that batch (and become the campaign's latest); batch 1 keeps its approved words.
   const third = await loadList(db, { ...base, name: "Cities batch 3", csv: [HEADERS, cityRow(9)].join("\n"), first: FIRST.replace("free check", "quick check"), followUp: FOLLOW, save: true }, context);
-  assert.ok(third.ok && third.wordsChanged);
-  assert.equal(approved().n, 0, "changed words lock the approved batch until it is approved again");
+  assert.ok(third.ok && third.wordsChanged && third.batchId);
+  assert.equal(await approvedOnItsWords(loaded.batchId), true, "an approved batch keeps sending exactly what Aidan approved");
+  const thirdWords = raw.prepare(`SELECT "wordsJson" FROM "OutreachBatch" WHERE "id" = ?`).get(third.batchId) as { wordsJson: string };
+  assert.match(thirdWords.wordsJson, /quick check/, "the third batch carries its own new words");
 
   // Limits and lookups that fail: nothing is written.
   const before = count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact"`);

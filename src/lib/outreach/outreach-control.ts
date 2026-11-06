@@ -49,19 +49,23 @@ export async function resumeCampaign(db: ProspectDb, key: string, by: string, no
 
 export type ApproveResult = { ok: true } | { ok: false; why: string };
 
-/** A named approver opens a waiting batch for the campaign's current words. */
+/**
+ * A named approver opens a waiting batch for its words: the batch's own (every batch loaded since Nov 5 has them),
+ * or the campaign's for an older batch.
+ */
 export async function approveBatch(db: ProspectDb, batchId: string, by: string, note: string | null, now = new Date()): Promise<ApproveResult> {
-  const batch = await db.prepare(`SELECT "id","campaignKey","status","ready" FROM "OutreachBatch" WHERE "id" = ?`).bind(batchId)
-    .first<{ id: string; campaignKey: string; status: string; ready: number }>();
+  const batch = await db.prepare(`SELECT "id","campaignKey","status","ready","wordsVersion" FROM "OutreachBatch" WHERE "id" = ?`).bind(batchId)
+    .first<{ id: string; campaignKey: string; status: string; ready: number; wordsVersion: string | null }>();
   if (!batch) return { ok: false, why: "There's no such batch." };
   const campaign = await readCampaign(db, batch.campaignKey);
   if (!campaign) return { ok: false, why: "The batch's campaign is missing." };
   if (!campaign.approvers.includes(by)) return { ok: false, why: `Only ${campaign.approvers.join(" or ") || "a named founder"} can approve this campaign's batches.` };
-  if (!campaign.wordsVersion) return { ok: false, why: "The campaign has no email words yet." };
+  const words = batch.wordsVersion ?? campaign.wordsVersion;
+  if (!words) return { ok: false, why: "This batch has no email words." };
   if (batch.status === "stopped") return { ok: false, why: "This batch was stopped." };
   const result = await db.prepare(`UPDATE "OutreachBatch" SET "status" = 'approved', "approvedBy" = ?, "approvedAt" = ?, "approvedWords" = ?, "approvalNote" = ?
     WHERE "id" = ? AND ("status" = 'waiting' OR ("status" = 'approved' AND COALESCE("approvedWords",'') <> ?))`)
-    .bind(by.slice(0, 120), now.toISOString(), campaign.wordsVersion, note?.slice(0, 300) ?? null, batchId, campaign.wordsVersion).run();
+    .bind(by.slice(0, 120), now.toISOString(), words, note?.slice(0, 300) ?? null, batchId, words).run();
   if (changes(result) !== 1) return { ok: false, why: "This batch is already approved for these words." };
   return { ok: true };
 }

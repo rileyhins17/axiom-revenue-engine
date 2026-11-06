@@ -119,7 +119,7 @@ if (command === "preview") {
   const [batch, founder, evidence, out] = args;
   if (!batch || !founder || !["Riley", "Aidan"].includes(founder) || !evidence || !out) fail("usage: approve-sql <batch id> <Riley|Aidan> \"<where they said so>\" <out.sql>");
   writeFileSync(out!, `UPDATE "OutreachBatch" SET "status" = 'approved', "approvedBy" = ${q(founder!)}, "approvedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
-  "approvedWords" = (SELECT "wordsVersion" FROM "OutreachCampaign" WHERE "key" = "OutreachBatch"."campaignKey"), "approvalNote" = ${q(evidence!.slice(0, 300))}
+  "approvedWords" = COALESCE("wordsVersion", (SELECT "wordsVersion" FROM "OutreachCampaign" WHERE "key" = "OutreachBatch"."campaignKey")), "approvalNote" = ${q(evidence!.slice(0, 300))}
   WHERE "id" = ${q(batch!)} AND "status" <> 'stopped'
     AND EXISTS (SELECT 1 FROM "OutreachCampaign" c, json_each(c."approversJson") a WHERE c."key" = "OutreachBatch"."campaignKey" AND a."value" = ${q(founder!)});\n`);
   console.log(`Approval by ${founder} for ${batch} written to ${out}.`);

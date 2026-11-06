@@ -102,7 +102,7 @@ export function LoadListForm({ campaign, first, followUp, approvers, hasFollowUp
       </label> : null}
     </div>
     <p className="owner-meta">Blanks like {"{city}"} come from the list&rsquo;s columns; {"{sender_name}"} is the sending inbox&rsquo;s name. The engine adds the mailing address and the &ldquo;no thanks&rdquo; line itself.
-      {wordsEdited ? " You changed the words: loading saves them for the whole campaign." : ""}</p>
+      {wordsEdited ? " You changed the words: this batch is approved and sent with them." : ""}</p>
 
     <div className="flex flex-wrap gap-3">
       <Button type="button" variant="outline" size="lg" disabled={busy !== null || !csv.trim() || !name.trim()} onClick={() => void send(false)}>
@@ -118,7 +118,7 @@ export function LoadListForm({ campaign, first, followUp, approvers, hasFollowUp
         {current.rows} rows: {current.ready} ready, {current.held} held. {current.domains} email {current.domains === 1 ? "domain" : "domains"} checked for a mail server.</p>
       {current.wordsChanged ? <p className="flex gap-2 rounded-lg border border-[#e8c88b] bg-[#fdf6e7] px-4 py-3 text-sm">
         <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        These words are different from the campaign&rsquo;s current words. Loading saves them, and every batch already approved then waits for {approvers} to approve it again.</p> : null}
+        These words are new. This batch is approved and sent with them; batches already approved keep sending their own words.</p> : null}
       {current.samples.length ? <div className="space-y-3">
         <h3 className="flex items-center gap-2 text-sm font-semibold"><FileUp className="size-4" aria-hidden="true" />The first {current.samples.length} emails, exactly as they would go</h3>
         <div className="grid gap-3 xl:grid-cols-2">

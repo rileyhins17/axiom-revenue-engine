@@ -66,7 +66,7 @@ export default async function BatchPage({ params }: { params: Promise<{ key: str
         <ul className="owner-list text-sm text-[#3b3a36]">
           <li>Below are the first {review.samples.length} emails of this batch exactly as they will go out: who they come from, who they go to, the subject and every word, footer included. Each follow-up goes {campaign.followUpBusinessDays} business days later in the same thread, only if they haven&rsquo;t replied.</li>
           <li>Every held row is listed with the reason. Held rows are never sent.</li>
-          <li>Approving opens this batch for the campaign&rsquo;s current words only. If the words change, it locks until it is approved again.</li>
+          <li>Approving opens this batch for exactly these words. A batch&rsquo;s words never change: new words come with a new batch.</li>
           {batch.approvedBy && batch.approvedAt ? <li className="flex gap-2"><BadgeCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />Approved by {batch.approvedBy}, {when(batch.approvedAt)}{batch.approvalNote ? `: ${batch.approvalNote}` : ""}.</li> : null}
         </ul>
       </Panel>

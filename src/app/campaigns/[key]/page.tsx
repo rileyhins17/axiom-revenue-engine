@@ -125,7 +125,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ key: 
       </Panel>
     </div>
 
-    <Panel title="Email words" icon={FileText} description="Blanks in {braces} are filled from each row. The engine adds the footer below every email.">
+    <Panel title="Latest email words" icon={FileText} description="Each batch keeps the words it was loaded with; these are the latest, filled in when the next list is loaded. Blanks in {braces} come from each row; the engine adds the footer.">
       {first ? <div className="space-y-4 text-sm">
         <div><p className="owner-meta">First email · Subject</p><p className="font-semibold">{first.subject}</p>
           <pre className="mt-2 whitespace-pre-wrap font-sans text-[#3b3a36]">{first.body}</pre></div>

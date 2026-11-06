@@ -20,7 +20,9 @@ export const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-
 
 export type PlannedContact = { id: string; rowNumber: number; email: string; fields: Record<string, string>; status: "ready" | "held"; holdReason: string | null };
 export type ImportPlan = {
-  batch: { id: string; campaignKey: string; name: string; source: string | null; columns: string[]; loadedBy: string; loadedAt: string };
+  batch: { id: string; campaignKey: string; name: string; source: string | null; columns: string[]; loadedBy: string; loadedAt: string;
+    /** The words this batch is loaded, approved and sent with: the campaign passed in carries them. */
+    wordsJson: string; wordsVersion: string };
   contacts: PlannedContact[];
   /** Problems that stop the whole load (nothing is loaded). */
   errors: string[];
@@ -42,10 +44,12 @@ export function planImport(campaign: Campaign, csv: string | CsvTable, input: {
   try { table = typeof csv === "string" ? parseCsv(csv) : csv; } catch (error) { errors.push(error instanceof Error ? error.message : "The CSV can't be read."); }
   const oneLine = (text: string) => text.replace(/[\r\n]+/g, " ").trim();
   const batch = { id: input.batchId, campaignKey: campaign.key, name: oneLine(input.name).slice(0, 120), source: input.source ? oneLine(input.source).slice(0, 300) : null,
-    columns: table.columns, loadedBy: oneLine(input.loadedBy).slice(0, 120), loadedAt: input.now.toISOString() };
+    columns: table.columns, loadedBy: oneLine(input.loadedBy).slice(0, 120), loadedAt: input.now.toISOString(),
+    wordsJson: JSON.stringify(campaign.words), wordsVersion: wordsVersion(campaign.words) };
   if (campaign.problem) errors.push(`The campaign's settings can't be used: ${campaign.problem}.`);
   if (!batch.name) errors.push("The batch needs a name.");
   if (!errors.length && !table.columns.includes("email")) errors.push("The list needs an email column.");
+  if (!errors.length && !campaign.words.steps[0]?.subject) errors.push("The batch needs its email words (the first email starts with \"Subject: ...\").");
   if (!errors.length) errors.push(...wordsProblems(campaign.words, table.columns, campaign.rules));
   if (!errors.length && table.rows.length === 0) errors.push("The list has no rows.");
   if (errors.length) return { batch, contacts: [], errors };
@@ -108,8 +112,8 @@ export function importSql(plan: ImportPlan) {
   const b = plan.batch;
   const at = sqlText(b.loadedAt);
   const lines = [
-    `INSERT OR IGNORE INTO "OutreachBatch" ("id","campaignKey","name","source","columnsJson","rows","ready","held","loadedBy","loadedAt","status","sendOrder")
-      VALUES (${sqlText(b.id)}, ${sqlText(b.campaignKey)}, ${sqlText(b.name)}, ${sqlText(b.source)}, ${sqlText(JSON.stringify(b.columns))}, 0, 0, 0, ${sqlText(b.loadedBy)}, ${at}, 'waiting',
+    `INSERT OR IGNORE INTO "OutreachBatch" ("id","campaignKey","name","source","columnsJson","rows","ready","held","loadedBy","loadedAt","status","wordsJson","wordsVersion","sendOrder")
+      VALUES (${sqlText(b.id)}, ${sqlText(b.campaignKey)}, ${sqlText(b.name)}, ${sqlText(b.source)}, ${sqlText(JSON.stringify(b.columns))}, 0, 0, 0, ${sqlText(b.loadedBy)}, ${at}, 'waiting', ${sqlText(b.wordsJson)}, ${sqlText(b.wordsVersion)},
         (SELECT COALESCE(MAX("sendOrder"), 0) + 1 FROM "OutreachBatch" WHERE "campaignKey" = ${sqlText(b.campaignKey)}));`,
     ...plan.contacts.map((c) => `INSERT OR IGNORE INTO "OutreachContact" ("id","campaignKey","batchId","rowNumber","email","fieldsJson","status","holdReason","createdAt","updatedAt")
       VALUES (${sqlText(c.id)}, ${sqlText(b.campaignKey)}, ${sqlText(b.id)}, ${c.rowNumber}, ${sqlText(c.email)}, ${sqlText(JSON.stringify(c.fields))}, '${c.status}', ${sqlText(c.holdReason)}, ${at}, ${at});`),
@@ -125,9 +129,9 @@ export function importSql(plan: ImportPlan) {
 export async function importToDb(db: ProspectDb, plan: ImportPlan) {
   if (plan.errors.length) throw new Error(plan.errors.join(" "));
   const b = plan.batch;
-  await db.prepare(`INSERT OR IGNORE INTO "OutreachBatch" ("id","campaignKey","name","source","columnsJson","rows","ready","held","loadedBy","loadedAt","status","sendOrder")
-    VALUES (?,?,?,?,?,0,0,0,?,?,'waiting',(SELECT COALESCE(MAX("sendOrder"), 0) + 1 FROM "OutreachBatch" WHERE "campaignKey" = ?))`)
-    .bind(b.id, b.campaignKey, b.name, b.source, JSON.stringify(b.columns), b.loadedBy, b.loadedAt, b.campaignKey).run();
+  await db.prepare(`INSERT OR IGNORE INTO "OutreachBatch" ("id","campaignKey","name","source","columnsJson","rows","ready","held","loadedBy","loadedAt","status","wordsJson","wordsVersion","sendOrder")
+    VALUES (?,?,?,?,?,0,0,0,?,?,'waiting',?,?,(SELECT COALESCE(MAX("sendOrder"), 0) + 1 FROM "OutreachBatch" WHERE "campaignKey" = ?))`)
+    .bind(b.id, b.campaignKey, b.name, b.source, JSON.stringify(b.columns), b.loadedBy, b.loadedAt, b.wordsJson, b.wordsVersion, b.campaignKey).run();
   for (const c of plan.contacts) {
     await db.prepare(`INSERT OR IGNORE INTO "OutreachContact" ("id","campaignKey","batchId","rowNumber","email","fieldsJson","status","holdReason","createdAt","updatedAt")
       VALUES (?,?,?,?,?,?,?,?,?,?)`).bind(c.id, b.campaignKey, b.id, c.rowNumber, c.email, JSON.stringify(c.fields), c.status, c.holdReason, b.loadedAt, b.loadedAt).run();

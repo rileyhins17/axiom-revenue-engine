@@ -28,7 +28,7 @@ import {
   inboxSentSql, inboxSentToday, type InboxRef,
 } from "@/lib/outreach/outreach-inboxes";
 import { readCampaigns, type Campaign, type Inbox } from "@/lib/outreach/outreach-model";
-import { renderEmail, type Sender } from "@/lib/outreach/outreach-words";
+import { renderEmail, type CampaignWords, type Sender } from "@/lib/outreach/outreach-words";
 import { PermanentEmailError, type EmailTransport } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
@@ -62,6 +62,8 @@ export type OutreachTickOptions = { wait?: (ms: number) => Promise<void>; random
 type ContactRow = {
   id: string; campaignKey: string; email: string; fieldsJson: string; status: string; stepsSent: number;
   firstSentAt: string | null; firstMessageId: string | null; firstSubject: string | null; lastMessageId: string | null;
+  /** The batch's own words (JSON), or null for an older batch on the campaign's. */
+  batchWords: string | null;
 };
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error)).slice(0, 200);
@@ -99,10 +101,13 @@ export function campaignClosed(campaign: Campaign, inbox: string, now: Date, mai
   return null;
 }
 
-/** The contacts with an email due: follow-ups from this inbox first, then first emails. Approved batches on the current words only. */
+/**
+ * The contacts with an email due: follow-ups from this inbox first, then first emails. Only approved batches, each on the
+ * words it was approved on: its own (every batch loaded since Nov 5), or the campaign's for an older batch.
+ */
 async function dueContacts(db: ProspectDb, campaign: Campaign, inbox: string, day: string) {
-  const columns = `c."id", c."campaignKey", c."email", c."fieldsJson", c."status", c."stepsSent", c."firstSentAt", c."firstMessageId", c."firstSubject", c."lastMessageId"`;
-  const approved = `JOIN "OutreachBatch" b ON b."id" = c."batchId" AND b."status" = 'approved' AND b."approvedWords" = ?`;
+  const columns = `c."id", c."campaignKey", c."email", c."fieldsJson", c."status", c."stepsSent", c."firstSentAt", c."firstMessageId", c."firstSubject", c."lastMessageId", b."wordsJson" AS "batchWords"`;
+  const approved = `JOIN "OutreachBatch" b ON b."id" = c."batchId" AND b."status" = 'approved' AND b."approvedWords" = COALESCE(b."wordsVersion", ?)`;
   const { results: followUps } = campaign.followUps > 0 ? await db.prepare(`SELECT ${columns} FROM "OutreachContact" c ${approved}
       WHERE c."campaignKey" = ? AND c."status" = 'sent' AND c."senderAddress" = ? AND c."nextDueDay" <= ? AND c."stepsSent" BETWEEN 1 AND ?
         AND c."firstMessageId" IS NOT NULL
@@ -112,6 +117,15 @@ async function dueContacts(db: ProspectDb, campaign: Campaign, inbox: string, da
       WHERE c."campaignKey" = ? AND c."status" = 'ready' AND c."stepsSent" = 0
       ORDER BY b."sendOrder", c."rowNumber" LIMIT 25`).bind(campaign.wordsVersion, campaign.key).all<ContactRow>();
   return { followUps, firsts };
+}
+
+/** The words a contact's emails are written with: its batch's own, or the campaign's for an older batch. Null if unreadable. */
+function contactWords(contact: Pick<ContactRow, "batchWords">, campaign: Campaign): CampaignWords | null {
+  if (contact.batchWords === null || contact.batchWords === undefined) return campaign.words.steps.length ? campaign.words : null;
+  try {
+    const words = JSON.parse(contact.batchWords) as CampaignWords;
+    return Array.isArray(words?.steps) && words.steps[0]?.subject ? words : null;
+  } catch { return null; }
 }
 
 /** People a campaign emailed today, from any inbox, whose email has since bounced. */
@@ -262,7 +276,9 @@ export async function runOutreachTick(db: ProspectDb, config: OutreachInboxConfi
     const send = async (contact: ContactRow, step: number): Promise<"sent" | "next" | "stop"> => {
       let fields: Record<string, string> = {};
       try { fields = JSON.parse(contact.fieldsJson) as Record<string, string>; } catch { fields = {}; }
-      const rendered = renderEmail(campaign.words, step, fields, config.sender, config.mailingAddress,
+      const words = contactWords(contact, campaign);
+      if (!words) { await stopContact(db, contact.id, step === 1 ? "held" : "failed", "Its batch's email words can't be read"); return "next"; }
+      const rendered = renderEmail(words, step, fields, config.sender, config.mailingAddress,
         { noLinksInFirst: campaign.rules.noLinksInFirst, firstSubject: step === 1 ? null : contact.firstSubject });
       if (!rendered.ok) {
         // Can't be written as approved (a blank, a link): held for a person, and it takes no slot today.

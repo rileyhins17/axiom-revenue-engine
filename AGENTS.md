@@ -43,7 +43,7 @@ assume an earlier agent's notes still match the code or production.
 - Releases go only through `scripts/release-production.mjs` (fresh backup, checksum,
   live-settings guard, smoke test, automatic rollback), after the day's last send.
   Never use `wrangler deploy` directly; `npm run deploy` is blocked on purpose.
-- Never drop or rewrite live tables. Migrations add; the next free number is 0090
+- Never drop or rewrite live tables. Migrations add; the next free number is 0091
   and must be added to `KNOWN` in the release script.
 - This repository is public. Contact lists, the mailing address, app passwords and
   tokens live in the gitignored `outreach/` folder or in Cloudflare secrets, never

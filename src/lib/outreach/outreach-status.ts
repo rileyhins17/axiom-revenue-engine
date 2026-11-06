@@ -7,7 +7,7 @@ import { torontoMinute } from "@/lib/fcc-campaign-tick";
 import { readCampaignRun, type RunNote } from "@/lib/outreach/outreach-control";
 import { inboxCapNow, inboxDayMax, inboxRef, inboxSentToday } from "@/lib/outreach/outreach-inboxes";
 import { readCampaign, readCampaigns, readInboxes, type Campaign, type Inbox } from "@/lib/outreach/outreach-model";
-import { renderEmail, type RenderedEmail } from "@/lib/outreach/outreach-words";
+import { renderEmail, type CampaignWords, type RenderedEmail } from "@/lib/outreach/outreach-words";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
 export type CampaignCounts = {
@@ -110,7 +110,7 @@ export async function campaignDetail(db: ProspectDb, key: string, fccFirstInbox:
       inboxSent: await inboxSentToday(db, day, inboxRef(share.address, fccFirstInbox)), inboxDayMax: dayMax, inboxCapNow: inboxCapNow(dayMax, minute),
     };
   }));
-  const { results: batches } = await db.prepare(`SELECT b."id", b."name", b."source", b."loadedBy", b."loadedAt", b."status", b."approvedBy", b."approvedAt", b."approvedWords",
+  const { results: batches } = await db.prepare(`SELECT b."id", b."name", b."source", b."loadedBy", b."loadedAt", b."status", b."approvedBy", b."approvedAt", b."approvedWords", b."wordsVersion",
       COUNT(c."id") AS rows, SUM(c."status" = 'ready') AS ready, SUM(c."status" = 'held') AS held, SUM(c."stepsSent" > 0) AS emailed,
       SUM(c."status" IN ('replied','bounced','suppressed','failed')) AS stopped
     FROM "OutreachBatch" b LEFT JOIN "OutreachContact" c ON c."batchId" = b."id" WHERE b."campaignKey" = ? GROUP BY b."id" ORDER BY b."sendOrder" DESC`)
@@ -131,7 +131,8 @@ export async function campaignDetail(db: ProspectDb, key: string, fccFirstInbox:
     batches: batches.map((row) => ({
       id: String(row.id), name: String(row.name), source: row.source === null ? null : String(row.source), loadedBy: String(row.loadedBy), loadedAt: String(row.loadedAt),
       status: String(row.status), approvedBy: row.approvedBy === null ? null : String(row.approvedBy), approvedAt: row.approvedAt === null ? null : String(row.approvedAt),
-      wordsCurrent: row.approvedWords !== null && row.approvedWords === campaign.wordsVersion,
+      // Approved on the words it sends with: its own, or the campaign's for an older batch.
+      wordsCurrent: row.approvedWords !== null && row.approvedWords === (row.wordsVersion ?? campaign.wordsVersion),
       rows: n(row.rows), ready: n(row.ready), held: n(row.held), emailed: n(row.emailed), stopped: n(row.stopped),
     })),
     replies, bounces, problems, days: days.map((row) => ({ day: row.day, first: n(row.first), followUps: n(row.followUps) })),
@@ -151,6 +152,11 @@ export async function batchReview(db: ProspectDb, batchId: string, mailingAddres
   const campaign = await readCampaign(db, String(row.campaignKey));
   if (!campaign) return null;
   const detail = (await campaignDetail(db, campaign.key, null))?.batches.find((batch) => batch.id === batchId);
+  // The batch's own words (every batch since Nov 5), or the campaign's for an older batch.
+  let words: CampaignWords = campaign.words;
+  if (row.wordsJson !== null && row.wordsJson !== undefined) {
+    try { words = JSON.parse(String(row.wordsJson)) as CampaignWords; } catch { words = { steps: [] }; }
+  }
   const inboxes = await readInboxes(db);
   const senders = campaign.inboxes.map((share) => inboxes.find((inbox) => inbox.address === share.address)).filter((inbox): inbox is Inbox => Boolean(inbox));
   const { results: ready } = await db.prepare(`SELECT "rowNumber","email","fieldsJson" FROM "OutreachContact" WHERE "batchId" = ? AND "status" IN ('ready','sent','done') ORDER BY "rowNumber" LIMIT ?`)
@@ -161,8 +167,8 @@ export async function batchReview(db: ProspectDb, batchId: string, mailingAddres
     try { fields = JSON.parse(contact.fieldsJson) as Record<string, string>; } catch { fields = {}; }
     if (!inbox) return { row: contact.rowNumber, to: contact.email, from: "(no inbox set)", first: null, followUp: null, problem: "The campaign has no sending inbox." };
     const sender = { name: inbox.name, address: inbox.address };
-    const first = renderEmail(campaign.words, 1, fields, sender, mailingAddress, { noLinksInFirst: campaign.rules.noLinksInFirst });
-    const followUp = campaign.followUps > 0 && first.ok ? renderEmail(campaign.words, 2, fields, sender, mailingAddress, { firstSubject: first.email.subject }) : null;
+    const first = renderEmail(words, 1, fields, sender, mailingAddress, { noLinksInFirst: campaign.rules.noLinksInFirst });
+    const followUp = campaign.followUps > 0 && first.ok ? renderEmail(words, 2, fields, sender, mailingAddress, { firstSubject: first.email.subject }) : null;
     return {
       row: contact.rowNumber, to: contact.email, from: `${inbox.name} <${inbox.address}>`,
       first: first.ok ? first.email : null, followUp: followUp?.ok ? followUp.email : null,
