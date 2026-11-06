@@ -2,13 +2,16 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  AlertTriangle, BadgeCheck, CalendarClock, CheckCircle2, Clock, FileText, Inbox, Layers, ListChecks, Lock, MailCheck, MailX, PauseCircle, Reply, Send, Settings2, TrendingUp,
+  AlertTriangle, BadgeCheck, CalendarClock, CheckCircle2, Clock, FileText, Inbox, Layers, ListChecks, Lock, MailCheck, MailSearch, MailX, PauseCircle, Reply, Send, Settings2, TrendingUp, Upload,
   type LucideIcon,
 } from "lucide-react";
 
 import { CampaignPauseButton } from "@/components/campaigns/campaign-actions";
+import { buttonVariants } from "@/components/ui/button";
 import { Badge, Empty, Notice, OwnerPage, PageHeader, Panel, StatCard, type Tone } from "@/components/owner/kit";
 import { getCloudflareBindings, getDatabase } from "@/lib/cloudflare";
+import { readKv } from "@/lib/outreach/outreach-control";
+import { OUTREACH_REPLY_STATE } from "@/lib/outreach/outreach-replies";
 import { campaignDetail, type CampaignDetail, type PersonRow } from "@/lib/outreach/outreach-status";
 import { campaignFooter } from "@/lib/outreach/outreach-words";
 import { ownerForAccount } from "@/lib/owner-login";
@@ -49,8 +52,10 @@ export default async function CampaignPage({ params }: { params: Promise<{ key: 
   const firstInbox = typeof env.FCC_SENDER_ADDRESS === "string" ? env.FCC_SENDER_ADDRESS : null;
   const mailing = typeof env.FCC_CAMPAIGN_MAILING_ADDRESS === "string" ? env.FCC_CAMPAIGN_MAILING_ADDRESS : "";
   let data: CampaignDetail | null;
+  let replyCheck: { at?: string } | null = null;
   try {
-    data = await withTimeout(campaignDetail(getDatabase() as unknown as ProspectDb, key, firstInbox), 12_000, "campaign");
+    const db = getDatabase() as unknown as ProspectDb;
+    [data, replyCheck] = await withTimeout(Promise.all([campaignDetail(db, key, firstInbox), readKv<{ at?: string }>(db, OUTREACH_REPLY_STATE).catch(() => null)]), 12_000, "campaign");
   } catch {
     return <OwnerPage>
       <PageHeader eyebrow="Campaign" title="Campaign" />
@@ -78,6 +83,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ key: 
           : null}
         <ul className="mt-4 space-y-1.5 text-sm text-[#5c584f]">
           {data.lastRun ? <li className="flex gap-2"><Clock className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>Last check {when(data.lastRun.at)}: {data.lastRun.note}</span></li> : null}
+          <li className="flex gap-2"><MailSearch className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{replyCheck?.at ? `Inboxes last read for replies ${when(replyCheck.at)}.` : "Inboxes are read for replies every hour, 7 a.m. to 9 p.m., once this campaign has sent."}</span></li>
           <li className="flex gap-2"><BadgeCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>Batches are approved by {campaign.approvers.join(" or ") || "nobody yet"}.</span></li>
         </ul>
       </Panel>
@@ -128,7 +134,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ key: 
       </div> : <Empty>No words loaded yet.</Empty>}
     </Panel>
 
-    <Panel title="Batches" icon={Layers} flush description="Each loaded list. Open one to read its sample emails, its held rows, and approve it.">
+    <Panel title="Batches" icon={Layers} flush description="Each loaded list. Open one to read its sample emails, its held rows, and approve it."
+      action={owner ? <Link href={`/campaigns/${campaign.key}/load` as Route} className={buttonVariants({ variant: "outline", size: "sm" })}><Upload aria-hidden="true" />Load a list</Link> : undefined}>
       {data.batches.length ? <div className="overflow-x-auto"><table className="owner-table min-w-[640px]">
         <thead><tr><th>Batch</th><th>Loaded</th><th>Status</th><th className="text-right">Ready</th><th className="text-right">Held</th><th className="text-right">Emailed</th><th className="text-right">Stopped</th></tr></thead>
         <tbody>{data.batches.map((batch) => {
@@ -162,7 +169,9 @@ export default async function CampaignPage({ params }: { params: Promise<{ key: 
       <ul className="owner-list text-sm text-[#3b3a36]">
         <li>Only approved batches send, and only on the words they were approved on.</li>
         <li>It shares each inbox with FCC and other campaigns: no inbox goes over its safe daily amount, and campaigns go before FCC.</li>
-        <li>It pauses itself on a Google warning, Gmail refusing a send or a login, or 3 bounces in a day from one inbox. Only a founder&rsquo;s Resume restarts it.</li>
+        <li>It pauses itself when 3 of its own emails bounce in a day, on a Google warning, or when Gmail refuses a send or a login. Only a founder&rsquo;s Resume restarts it.</li>
+        <li>An inbox with 3 bounces in a day, from any campaign or FCC, sends nothing more that day and starts again the next morning. Nothing is paused.</li>
+        <li>Every hour from 7 a.m. to 9 p.m. both inboxes are read for replies. A reply stops that person&rsquo;s follow-ups; a &ldquo;no thanks&rdquo; also puts them on the do-not-email list for every campaign.</li>
       </ul>
     </Panel>
   </OwnerPage>;

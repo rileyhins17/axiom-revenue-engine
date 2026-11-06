@@ -20,7 +20,9 @@ import { readCampaigns } from "@/lib/outreach/outreach-model";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
 export const OUTREACH_REPLY_HOURS = { from: 7 * 60, to: 21 * 60 } as const;
-const STATE = "outreach.replyCheck";
+/** KvStore key: where each inbox was last read, and when the check last ran (the campaign screen shows it). */
+export const OUTREACH_REPLY_STATE = "outreach.replyCheck";
+const STATE = OUTREACH_REPLY_STATE;
 const TRY = "outreach.replyCheckTry";
 const DAY_MS = 86_400_000;
 

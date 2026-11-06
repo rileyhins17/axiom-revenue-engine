@@ -492,3 +492,56 @@ test("bounces from cities and FCC together: the inbox rests for the rest of the 
   assert.equal(tuesday.filter((mail) => mail.to.endsWith(".gov")).length, 5, "the cities send again on Tuesday");
   assert.ok(tuesday.some((mail) => mail.to.endsWith(".example")), "FCC sends from Aidan's inbox again on Tuesday");
 });
+
+test("loading from the screen: Check saves nothing and shows the counts, holds and samples; Load saves a waiting batch; new words lock approved batches", async () => {
+  const { loadList } = await import("@/lib/outreach/outreach-load");
+  const { raw, db } = database();
+  let ids = 0;
+  const mailOk = async () => ({ noMailServer: new Map<string, string>(), unreadable: [] as string[] });
+  const context = { loadedBy: "Aidan", now: new Date("2026-11-07T15:00:00Z"), newId: () => `x-${++ids}`, mailingAddress: ADDRESS, checkMail: mailOk };
+  const base = { campaign: "us-cities", name: "Cities batch 1", csv: csvOf(5, (i) => (i === 4 ? { verified: "no" } : {})), save: false };
+
+  assert.deepEqual(await loadList(db, { ...base, campaign: "nope" }, context), { ok: false, error: "That campaign doesn't exist." });
+  assert.match((await loadList(db, base, context) as { error: string }).error, /no words yet/, "the cities campaign starts with no words");
+  assert.match((await loadList(db, { ...base, first: FIRST }, context) as { error: string }).error, /follow-up's words too/);
+
+  raw.prepare(`INSERT INTO "EngineEmailSuppression" ("email","reason") VALUES ('clerk5@city5.gov','BOUNCED')`).run();
+  const check = await loadList(db, { ...base, first: FIRST, followUp: FOLLOW }, context);
+  assert.ok(check.ok);
+  assert.equal(check.saved, false);
+  assert.deepEqual([check.rows, check.ready, check.held], [5, 3, 2]);
+  assert.deepEqual(check.holds.map((hold) => [hold.row, hold.reason.slice(0, 22)]), [[5, "Not verified (verified"], [6, "On the do-not-email li"]]);
+  assert.equal(check.samples.length, 3);
+  assert.equal(check.samples[0]!.subject, "Springfield 1's website: 101 accessibility errors before the April 2027 deadline");
+  assert.match(check.samples[0]!.text, /Hi Pat1,[\s\S]*Aidan Magee, Axiom[\s\S]*Not useful\? Reply "no thanks"/);
+  assert.equal(check.samples[0]!.followUp!.subject, `Re: ${check.samples[0]!.subject}`);
+  assert.equal(check.wordsChanged, true);
+  assert.equal(count(raw, `SELECT COUNT(*) AS n FROM "OutreachBatch"`), 0, "Check writes nothing");
+  assert.equal((await readCampaign(db, "us-cities"))!.wordsVersion, null, "nor the words");
+
+  const loaded = await loadList(db, { ...base, first: FIRST, followUp: FOLLOW, save: true }, context);
+  assert.ok(loaded.ok && loaded.saved && loaded.batchId);
+  assert.deepEqual([loaded.rows, loaded.ready, loaded.held], [5, 3, 2]);
+  const batch = raw.prepare(`SELECT "status","loadedBy","source" FROM "OutreachBatch" WHERE "id" = ?`).get(loaded.batchId);
+  assert.deepEqual(batch, { status: "waiting", loadedBy: "Aidan", source: "Loaded on the Campaigns screen" });
+  assert.equal((await readCampaign(db, "us-cities"))!.wordsVersion, wordsVersion(words()), "the pasted words are saved");
+  assert.deepEqual(await approveBatch(db, loaded.batchId, "Aidan", null), { ok: true });
+
+  // A second list with the campaign's own words (none pasted): nothing about the approval changes.
+  const second = await loadList(db, { ...base, name: "Cities batch 2", csv: [HEADERS, cityRow(7), cityRow(8)].join("\n"), save: true }, context);
+  assert.ok(second.ok && second.wordsChanged === false);
+  const approved = () => raw.prepare(`SELECT b."approvedWords" = c."wordsVersion" AS n FROM "OutreachBatch" b JOIN "OutreachCampaign" c ON c."key" = b."campaignKey" WHERE b."id" = ?`).get(loaded.batchId) as { n: number };
+  assert.equal(approved().n, 1);
+  // New words with a third list: saved, and the approved batch waits for Aidan again.
+  const third = await loadList(db, { ...base, name: "Cities batch 3", csv: [HEADERS, cityRow(9)].join("\n"), first: FIRST.replace("free check", "quick check"), followUp: FOLLOW, save: true }, context);
+  assert.ok(third.ok && third.wordsChanged);
+  assert.equal(approved().n, 0, "changed words lock the approved batch until it is approved again");
+
+  // Limits and lookups that fail: nothing is written.
+  const before = count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact"`);
+  const many = await loadList(db, { ...base, name: "Big", csv: [HEADERS, ...Array.from({ length: 41 }, (_, i) => cityRow(100 + i))].join("\n"), save: true }, context);
+  assert.match((many as { error: string }).error, /41 different email domains; the screen checks up to 40/);
+  const down = await loadList(db, { ...base, name: "Down", save: true }, { ...context, checkMail: async () => ({ noMailServer: new Map<string, string>(), unreadable: ["city1.gov"] }) });
+  assert.match((down as { error: string }).error, /Couldn't look up the mail servers of city1\.gov\. Nothing was loaded/);
+  assert.equal(count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact"`), before);
+});
