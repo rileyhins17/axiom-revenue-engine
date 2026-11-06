@@ -10,8 +10,10 @@
  * - Each inbox runs its own tick with its own count, gap and bounces. An added
  *   inbox starts slowly (FCC_NEW_INBOX_RAMP) so Google doesn't flag it.
  * - Pause everything (a founder must press Resume) on a Google warning in the
- *   inbox, 3 or more bounces in a day, a login Gmail refuses, or an email Gmail
- *   refuses.
+ *   inbox, 3 or more of FCC's own bounces in a day, a login Gmail refuses, or an
+ *   email Gmail refuses. An inbox with 3 bounces today from FCC and the campaigns
+ *   together sends nothing more that day, without a pause (Aidan, Nov 5: a city
+ *   bounce never pauses FCC).
  * - Each inbox's first look of the day also sweeps the last FCC_LATE_BOUNCE_DAYS
  *   days' contacts for a bounce that arrived after an earlier day's last tick.
  * Nothing is sent without a successful inbox check first.
@@ -123,10 +125,25 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
     await noteFccRun(db, `${label}No second batch today: ${bounces} emails bounced this morning.`, now);
     return { status: "SKIPPED", reason: "no second batch: too many bounces" };
   };
+  // Bounces. FCC pauses on its own bounces only, as it always has (Aidan, Nov 5: "a city bounce never pauses FCC").
+  // The inbox's day counts everyone's: once FCC_PAUSE_BOUNCES of its emails bounced today, campaigns' included, it
+  // sends nothing more today (no pause: FCC starts again tomorrow), and the second batch still needs at most
+  // FCC_SECOND_BATCH_MAX_BOUNCES. Without campaign emails both counts are FCC's own, exactly as before.
+  const restToday = async (bounces: number): Promise<FccTickResult> => {
+    await noteFccRun(db, `${label}No more emails from this inbox today: ${bounces} of its emails bounced today (FCC and the campaigns together). FCC is not paused; it starts again tomorrow.`, now);
+    return { status: "SKIPPED", reason: "the inbox rests for the rest of today: too many bounces" };
+  };
+  const bounceRule = async (): Promise<FccTickResult | null> => {
+    const own = await fccBouncesToday(db, day, config);
+    if (own >= FCC_PAUSE_BOUNCES) return pause(`${own} emails bounced today`);
+    const total = await inboxBouncesToday(db, day, shared);
+    if (total >= FCC_PAUSE_BOUNCES) return restToday(total);
+    if (window.batch === 2 && total > FCC_SECOND_BATCH_MAX_BOUNCES) return noSecondBatch(total);
+    return null;
+  };
   // Decide from what is already known before logging in to Gmail at all.
-  const knownBounces = await inboxBouncesToday(db, day, shared);
-  if (knownBounces >= FCC_PAUSE_BOUNCES) return pause(`${knownBounces} emails bounced today`);
-  if (window.batch === 2 && knownBounces > FCC_SECOND_BATCH_MAX_BOUNCES) return noSecondBatch(knownBounces);
+  const known = await bounceRule();
+  if (known) return known;
 
   let mailbox: FccMailbox;
   try {
@@ -163,9 +180,8 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
       }
       await saveFccBounceScan(db, day, bounceMessages, now, inbox);
     }
-    const bounces = await inboxBouncesToday(db, day, shared);
-    if (bounces >= FCC_PAUSE_BOUNCES) return await pause(`${bounces} emails bounced today`);
-    if (window.batch === 2 && bounces > FCC_SECOND_BATCH_MAX_BOUNCES) return await noSecondBatch(bounces);
+    const found = await bounceRule();
+    if (found) return found;
 
     const delay = Math.max(0, dueAt - now.getTime()) + Math.floor(random() * JITTER_MS);
     if (delay > 0) await wait(delay);
@@ -187,8 +203,8 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
       return await pause(`Gmail refused an email (${failure?.detail ?? "no detail"})`);
     }
     if (result.status === "RAN" && result.bounced > 0) {
-      const total = await inboxBouncesToday(db, day, shared);
-      if (total >= FCC_PAUSE_BOUNCES) return await pause(`${total} emails bounced today`);
+      const own = await fccBouncesToday(db, day, config);
+      if (own >= FCC_PAUSE_BOUNCES) return await pause(`${own} emails bounced today`);
     }
     const sent = await inboxSentToday(db, day, shared);
     await noteFccRun(db, label + (result.status === "SKIPPED"

@@ -121,3 +121,22 @@ test("FCC isn't reported stuck at 11:00 when campaign emails used the inbox's mo
   assert.deepEqual(failing(await runHealthChecks(db, ENV, TUE_1130)), []);
   assert.deepEqual(failing(await runHealthChecks(db, ENV, new Date("2026-11-03T18:31:00Z"))), ["fcc-sending"]);
 });
+
+test("an inbox with 3 bounces today, campaigns and FCC together, is reported as stopped for the day, and it clears the next day", async () => {
+  const { raw, db } = database();
+  sendOne(raw, "2026-11-03");
+  await saveFccReplyCheck(db, { day: "2026-11-03", at: "2026-11-03T14:00:00Z", found: 0 });
+  raw.prepare(`INSERT INTO "OutreachBatch" ("id","campaignKey","name","loadedBy","loadedAt","status") VALUES ('b','us-cities','B','Riley','2026-11-02T00:00:00Z','approved')`).run();
+  for (const i of [1, 2, 3]) {
+    raw.prepare(`INSERT INTO "OutreachContact" ("id","campaignKey","batchId","rowNumber","email","fieldsJson","status","createdAt","updatedAt") VALUES (?,'us-cities','b',?,?,'{}','bounced','x','x')`)
+      .run(`oc${i}`, i + 1, `clerk${i}@city${i}.gov`);
+    raw.prepare(`INSERT INTO "OutreachSend" ("sendId","campaignKey","contactId","step","email","senderAddress","sendDay","messageId","subject","status") VALUES (?,'us-cities',?,1,?,'aidanmageebusiness@gmail.com','2026-11-03',?,'S','SENT')`)
+      .run(`o${i}`, `oc${i}`, `clerk${i}@city${i}.gov`, `<o${i}>`);
+  }
+  const checks = await runHealthChecks(db, { ...ENV, FCC_SENDER_ADDRESS: "aidanmageebusiness@gmail.com" }, TUE_1130);
+  assert.deepEqual(failing(checks), ["inbox-resting:aidanmageebusiness@gmail.com"]);
+  const mail = alertEmail(await recordAndSelectAlerts(db, checks, TUE_1130));
+  assert.match(mail!.text, /Aidan's inbox \(aidanmageebusiness@gmail\.com\) has stopped sending for today: 3 of its emails bounced today/);
+  const wednesday = await runHealthChecks(db, { ...ENV, FCC_SENDER_ADDRESS: "aidanmageebusiness@gmail.com" }, new Date("2026-11-04T16:30:00Z"));
+  assert.ok(!failing(wednesday).includes("inbox-resting:aidanmageebusiness@gmail.com"));
+});

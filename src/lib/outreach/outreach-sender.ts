@@ -13,8 +13,10 @@
  * - Checks before every email: the do-not-email list (and anyone who bounced or said "no thanks" in
  *   any campaign); someone else at the same organisation already replied; before a follow-up, the
  *   inbox is read for a reply from the person or their organisation, or a bounce, since the first email.
- * - Pauses (the campaign stays paused until a founder presses Resume): a Google warning in the inbox,
- *   3 bounces in a day from the inbox, a login Gmail refuses, an email Gmail refuses.
+ * - Pauses (the campaign stays paused until a founder presses Resume): 3 of the campaign's own emails
+ *   bounced today; and, for every campaign on the inbox, a Google warning in it, a login Gmail refuses, an
+ *   email Gmail refuses. An inbox with 3 bounces today (all campaigns and FCC together) sends nothing
+ *   more that day without pausing anyone (Aidan, Nov 5: "a city bounce never pauses FCC or agency sending").
  * - Every email is claimed before it is sent, so a crash can never send it twice.
  */
 import { SHARED_MAIL_DOMAINS, addDays, domainOf, torontoDay, torontoWeekday, type FccMailbox } from "@/lib/fcc-campaign-sender";
@@ -112,6 +114,12 @@ async function dueContacts(db: ProspectDb, campaign: Campaign, inbox: string, da
   return { followUps, firsts };
 }
 
+/** People a campaign emailed today, from any inbox, whose email has since bounced. */
+async function bouncesTodayBy(db: ProspectDb, campaign: string, day: string) {
+  return Number((await db.prepare(`SELECT COUNT(DISTINCT c."id") AS n FROM "OutreachContact" c JOIN "OutreachSend" s ON s."contactId" = c."id"
+    WHERE s."campaignKey" = ? AND s."sendDay" = ? AND s."kind" = 'real' AND c."status" = 'bounced'`).bind(campaign, day).first<{ n: number }>())?.n ?? 0);
+}
+
 async function sentTodayBy(db: ProspectDb, campaign: string, day: string, inbox?: string) {
   const mine = inbox ? ` AND "senderAddress" = ?` : "";
   return Number((await db.prepare(`SELECT COUNT(*) AS n FROM "OutreachSend" WHERE "campaignKey" = ? AND "sendDay" = ? AND "kind" = 'real' AND "status" IN ('CLAIMED','SENT')${mine}`)
@@ -155,10 +163,35 @@ export async function runOutreachTick(db: ProspectDb, config: OutreachInboxConfi
     }
     return { status: "PAUSED", campaigns: paused, reason };
   };
-  const knownBounces = await inboxBouncesToday(db, day, config.ref);
-  if (knownBounces >= PAUSE_BOUNCES) return pauseAll(`${knownBounces} emails bounced today`);
   const secondHalf = sent >= Math.ceil(dayMax / 2);
-  if (secondHalf && knownBounces > AFTERNOON_MAX_BOUNCES) return { status: "SKIPPED", reason: `no second half today: ${knownBounces} bounced` };
+  // Bounces (Aidan, Nov 5: "a city bounce never pauses FCC or agency sending"). A campaign with PAUSE_BOUNCES of its own
+  // today is paused until a founder resumes it; FCC and the other campaigns keep their own counts. The inbox itself sends
+  // nothing more today once PAUSE_BOUNCES of its emails bounced, from anyone (Google judges the inbox, not the campaign),
+  // and its second half still needs AFTERNOON_MAX_BOUNCES or fewer. Nothing else is paused; it starts again tomorrow.
+  const bounceRules = async (): Promise<OutreachTickResult | null> => {
+    const paused: string[] = [];
+    for (const campaign of campaigns) {
+      const own = await bouncesTodayBy(db, campaign.key, day);
+      if (own < PAUSE_BOUNCES) continue;
+      const reason = `${own} of its emails bounced today`;
+      if (await pauseCampaign(db, campaign.key, reason, OUTREACH_AUTO_PAUSE_BY, now)) {
+        paused.push(campaign.key);
+        await noteCampaignRun(db, campaign.key, `Paused: ${reason}`, now);
+      }
+    }
+    if (paused.length) return { status: "PAUSED", campaigns: paused, reason: `${PAUSE_BOUNCES} or more of its emails bounced today` };
+    const total = await inboxBouncesToday(db, day, config.ref);
+    if (total >= PAUSE_BOUNCES) {
+      for (const campaign of campaigns) {
+        await noteCampaignRun(db, campaign.key, `${label}nothing more from it today: ${total} of its emails bounced today (all campaigns and FCC). Nothing is paused; it starts again tomorrow.`, now);
+      }
+      return { status: "SKIPPED", reason: `the inbox rests for the rest of today: ${total} bounced` };
+    }
+    if (secondHalf && total > AFTERNOON_MAX_BOUNCES) return { status: "SKIPPED", reason: `no second half today: ${total} bounced` };
+    return null;
+  };
+  const known = await bounceRules();
+  if (known) return known;
 
   const last = await inboxLastSend(db, day, config.ref);
   const dueAt = last ? Date.parse(last.createdAt) + gapAfter(last.sendId) : now.getTime();
@@ -208,9 +241,8 @@ export async function runOutreachTick(db: ProspectDb, config: OutreachInboxConfi
       }
       await writeKv(db, bounceScanKey(inbox), { day, count: bounceMessages }, now);
     }
-    const bounces = await inboxBouncesToday(db, day, config.ref);
-    if (bounces >= PAUSE_BOUNCES) return await pauseAll(`${bounces} emails bounced today`);
-    if (secondHalf && bounces > AFTERNOON_MAX_BOUNCES) return { status: "SKIPPED", reason: `no second half today: ${bounces} bounced` };
+    const found = await bounceRules();
+    if (found) return found;
 
     const delay = Math.max(0, dueAt - now.getTime()) + Math.floor(random() * JITTER_MS);
     if (delay > 0) await wait(delay);

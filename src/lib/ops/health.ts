@@ -2,6 +2,8 @@ import { readFccReplyCheck } from "@/lib/fcc-campaign-control";
 import { torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
 import { fccScreen } from "@/lib/fcc-campaign-status";
 import { FCC_SEND_WINDOWS, torontoMinute } from "@/lib/fcc-campaign-tick";
+import { PAUSE_BOUNCES, inboxBouncesToday, inboxRef } from "@/lib/outreach/outreach-inboxes";
+import { readInboxes, type Inbox } from "@/lib/outreach/outreach-model";
 import { OUTREACH_AUTO_PAUSE_BY } from "@/lib/outreach/outreach-sender";
 import { campaignSummaries } from "@/lib/outreach/outreach-status";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
@@ -79,6 +81,17 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
       `Look at "Last check" on its Campaigns screen for the reason, then ask Claude to read the Worker logs.`);
   }
 
+  // An inbox sends nothing more today once 3 of its emails bounced, campaigns and FCC together. That is not a pause, so
+  // the pause alerts stay quiet (Aidan, Nov 5: a city bounce never pauses FCC); this says why the inbox went quiet.
+  const fccFirstInbox = typeof env.FCC_SENDER_ADDRESS === "string" ? env.FCC_SENDER_ADDRESS : null;
+  for (const inbox of (await readInboxes(db).catch(() => [] as Inbox[])).filter((row) => row.enabled)) {
+    const bounces = await inboxBouncesToday(db, torontoDay(now), inboxRef(inbox.address, fccFirstInbox)).catch(() => 0);
+    const owner = inbox.name.trim().split(/\s+/)[0] || inbox.address;
+    add(`inbox-resting:${inbox.address}`, bounces < PAUSE_BOUNCES,
+      `${owner}'s inbox (${inbox.address}) has stopped sending for today: ${bounces} of its emails bounced today, campaigns and FCC together. Nothing is paused; it starts again tomorrow.`,
+      "Look at who bounced on the Campaigns and FCC screens. If one list is bad, pause that campaign before tomorrow.");
+  }
+
   // The 9 a.m. reply check emails both founders who wrote back. If it hasn't finished by 10:30, replies sit unseen.
   const replyCheck = await readFccReplyCheck(db).catch(() => null);
   const replyCheckLate = minute >= 10 * 60 + 30 && replyCheck?.day !== torontoDay(now);
@@ -127,6 +140,7 @@ const FIXED: Record<string, string> = {
 const fixedText = (check: HealthCheck) => FIXED[check.key]
   ?? (check.key.startsWith("campaign-paused:") ? `The ${check.key.slice(16)} campaign is no longer paused.`
     : check.key.startsWith("campaign-sending:") ? `${check.key.slice(17)} campaign emails are going out again.`
+      : check.key.startsWith("inbox-resting:") ? `${check.key.slice(14)} can send again today.`
       : `${check.key.replace(/-/g, " ")} is working again.`);
 
 export function alertEmail(alerts: Awaited<ReturnType<typeof recordAndSelectAlerts>>) {

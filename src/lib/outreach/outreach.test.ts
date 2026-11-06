@@ -442,3 +442,53 @@ test("loading checks that every domain takes mail: no mail server, a null MX or 
     ["clerk3@city3.gov", "held", "city3.gov takes no mail (null MX), so the email would bounce"],
   ]);
 });
+
+test("a city bounce never pauses FCC: 3 city bounces pause cities only, Aidan's inbox sends nothing more that day, and FCC sends from it again the next day", async () => {
+  const { raw, db } = database();
+  await setUpCities(raw, db, { rows: 12 });
+  addFccContacts(raw, 120);
+  const bouncing = ["clerk1@city1.gov", "clerk2@city2.gov", "clerk3@city3.gov"];
+  const fake = fakeInbox({ refuse: (message) => (bouncing.includes(message.to) ? new PermanentEmailError("550 5.1.1 no such user") : null) });
+  const { run } = await harness(db, fake, true);
+  await run(MON_9AM, MON_9AM + 6 * 60 * MINUTE);
+  const city = (await readCampaign(db, "us-cities"))!;
+  assert.equal(city.state, "paused");
+  assert.match(city.stateReason!, /3 of its emails bounced today/);
+  assert.equal(count(raw, `SELECT "enabled" AS n FROM "FccCampaignSetting" WHERE "id" = 1`), 1, "FCC is not paused");
+  assert.equal(fake.sent.filter((mail) => mail.from === AIDAN).length, 0, "Aidan's inbox rests for the day after its 3rd bounce");
+  assert.ok(fake.sent.filter((mail) => mail.from === RILEY).length > 0, "Riley's inbox had no bounces and kept sending FCC");
+  // Tuesday: FCC sends from Aidan's inbox again; the cities stay paused until a founder resumes them.
+  const before = fake.sent.length;
+  await run(MON_9AM + 24 * 60 * MINUTE, MON_9AM + 30 * 60 * MINUTE);
+  const tuesday = fake.sent.slice(before);
+  assert.ok(tuesday.filter((mail) => mail.from === AIDAN).length > 0);
+  assert.ok(tuesday.every((mail) => !mail.to.endsWith(".gov")), "no city email while the cities are paused");
+});
+
+test("bounces from cities and FCC together: the inbox rests for the rest of the day, nobody is paused, and both send again the next day", async () => {
+  const { raw, db } = database();
+  await setUpCities(raw, db, { rows: 15 });
+  raw.prepare(`UPDATE "OutreachCampaign" SET "dailyLimit" = 5, "inboxesJson" = ? WHERE "key" = 'us-cities'`).run(JSON.stringify([{ address: AIDAN, perDay: 5 }]));
+  addFccContacts(raw, 120);
+  const bouncing = ["clerk1@city1.gov", "clerk2@city2.gov", "person1@co1.example"];
+  const refused: Array<{ to: string; at: number }> = [];
+  const fake = fakeInbox({ refuse: (message) => {
+    if (!bouncing.includes(message.to)) return null;
+    refused.push({ to: message.to, at: fake.now() });
+    return new PermanentEmailError("550 5.1.1 no such user");
+  } });
+  const { run } = await harness(db, fake, true);
+  await run(MON_9AM, MON_9AM + 6 * 60 * MINUTE);
+  assert.equal((await readCampaign(db, "us-cities"))!.state, "live", "2 city bounces don't pause the cities");
+  assert.equal(count(raw, `SELECT "enabled" AS n FROM "FccCampaignSetting" WHERE "id" = 1`), 1, "1 FCC bounce doesn't pause FCC");
+  const fromAidan = fake.sent.filter((mail) => mail.from === AIDAN);
+  assert.equal(fromAidan.filter((mail) => mail.to.endsWith(".gov")).length, 5, "the cities' 5 for the day (two bounced, so rows 3 to 7)");
+  assert.deepEqual(refused.map((row) => row.to).sort(), [...bouncing].sort(), "all three bounced from Aidan's inbox");
+  const third = Math.max(...refused.map((row) => row.at));
+  assert.deepEqual(fromAidan.filter((mail) => mail.at > third).map((mail) => mail.to), [], "nothing more from Aidan's inbox that day after its third bounce");
+  const before = fake.sent.length;
+  await run(MON_9AM + 24 * 60 * MINUTE, MON_9AM + 30 * 60 * MINUTE);
+  const tuesday = fake.sent.slice(before).filter((mail) => mail.from === AIDAN);
+  assert.equal(tuesday.filter((mail) => mail.to.endsWith(".gov")).length, 5, "the cities send again on Tuesday");
+  assert.ok(tuesday.some((mail) => mail.to.endsWith(".example")), "FCC sends from Aidan's inbox again on Tuesday");
+});
