@@ -10,7 +10,8 @@ import { EmailMessage } from "cloudflare:email";
 
 import { setCloudflareBindings } from "./src/lib/cloudflare";
 import { clearServerEnvCache } from "./src/lib/env";
-import { runFccCampaignCron, runFccReplyCheckCron, runFccWeeklyNumbersCron } from "./src/lib/fcc-campaign-worker";
+import { runFccReplyCheckCron, runFccWeeklyNumbersCron } from "./src/lib/fcc-campaign-worker";
+import { runSendCron } from "./src/lib/outreach/outreach-worker";
 import { alertEmail, OWNER_ALERT_INBOXES, recordAndSelectAlerts, runHealthChecks } from "./src/lib/ops/health";
 
 // Sign-in (better-auth) sets up three request stores the first time it is used, by
@@ -38,8 +39,9 @@ async function runHealthCron(env) {
 }
 
 const worker = openNextWorkerModule;
-// Every minute, 14:00-19:59 UTC (10:00 Toronto in both EDT and EST): one FCC send
-// tick. The tick itself keeps Toronto send windows, weekdays and the 1-3 minute gap.
+// Every minute, 14:00-19:59 UTC (9:00-14:59 Toronto in winter time): one send tick per inbox,
+// campaigns first, then FCC. Each keeps its own Toronto send windows and weekdays, and they
+// share the inbox's daily amount and its 1-3 minute gap.
 const FCC_TICK_CRON = "* 14-19 * * *";
 
 export { BucketCachePurge, DOQueueHandler, DOShardedTagCache };
@@ -128,10 +130,14 @@ const exportedWorker = {
       return;
     }
     if (controller?.cron === FCC_TICK_CRON) {
+      // Per inbox, the campaigns (cities first) and then FCC; at most one email per inbox a minute.
       ctx.waitUntil(
-        runFccCampaignCron(env)
-          .then((result) => console.log(JSON.stringify({ event: "fcc_campaign", ...result })))
-          .catch((error) => console.error("[fcc-campaign] failure:", error instanceof Error ? error.message : "unknown")),
+        runSendCron(env)
+          .then(({ fcc, campaigns }) => {
+            console.log(JSON.stringify({ event: "fcc_campaign", ...fcc }));
+            console.log(JSON.stringify({ event: "outreach_tick", campaigns }));
+          })
+          .catch((error) => console.error("[send-tick] failure:", error instanceof Error ? error.message : "unknown")),
       );
       return;
     }

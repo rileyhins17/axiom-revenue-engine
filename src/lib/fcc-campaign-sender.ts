@@ -53,6 +53,7 @@ import {
 } from "@/lib/fcc-campaign";
 import { readFccSignatures } from "@/lib/fcc-campaign-control";
 import { fccRecertifiedBy, type FccFilingStatusReader } from "@/lib/fcc-filing-status";
+import { inboxClaimedSinceSql, inboxRef, inboxSentSql, inboxSentToday } from "@/lib/outreach/outreach-inboxes";
 import { PermanentEmailError, type EmailTransport } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 import { imapDate, imapQuote, type ImapSession } from "@/lib/revenue-engine/imap-client";
@@ -348,7 +349,9 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
 
   const day = torontoDay(now);
   const cap = options.cap ?? Math.min(FCC_DAILY_SEND_CAP, Math.max(0, setting.dailyCap));
-  let remaining = cap - await fccSentToday(db, day, config);
+  // The inbox as FCC rows and campaign rows both name it: its day's count includes the other campaigns' emails.
+  const sharedInbox = inboxRef(config.fromAddress, config.primary === false ? null : config.fromAddress);
+  let remaining = cap - await inboxSentToday(db, day, sharedInbox);
   const inbox = senderKey(config);
   // Title and cell are optional extras: if they can't be read, the email still goes with name and title only.
   const signatures = await readFccSignatures(db).catch(() => ({} as Awaited<ReturnType<typeof readFccSignatures>>));
@@ -468,11 +471,14 @@ export async function runFccDailySend(db: ProspectDb, config: FccSendConfig, now
     // One statement, so two runs at once can never both pass the day's cap or the gap between emails.
     const claimedAt = now.toISOString();
     const gapSince = options.minGapMs ? new Date(now.getTime() - options.minGapMs).toISOString() : "9999-12-31";
+    // The count and the gap cover the whole inbox: this inbox's campaign emails (OutreachSend) as well as FCC's own.
+    const inboxSent = inboxSentSql(day, sharedInbox);
+    const recentClaim = inboxClaimedSinceSql(day, gapSince, sharedInbox);
     const claim = await db.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","createdAt","senderAddress")
       SELECT ?,?,?,?,?,?,'CLAIMED',?,NULLIF(?,'')
-      WHERE (SELECT COUNT(*) FROM "FccCampaignSend" WHERE "sendDay" = ? AND "status" IN ('CLAIMED','SENT') AND COALESCE("senderAddress",'') = ?) < ?
-        AND NOT EXISTS (SELECT 1 FROM "FccCampaignSend" WHERE "sendDay" = ? AND "createdAt" > ? AND COALESCE("senderAddress",'') = ?)
-      ON CONFLICT DO NOTHING`).bind(sendId, contact.id, step, contact.email, day, messageId, claimedAt, inbox, day, inbox, cap, day, gapSince, inbox).run();
+      WHERE ${inboxSent.sql} < ?
+        AND NOT ${recentClaim.sql}
+      ON CONFLICT DO NOTHING`).bind(sendId, contact.id, step, contact.email, day, messageId, claimedAt, inbox, ...inboxSent.binds, cap, ...recentClaim.binds).run();
     if (changes(claim) !== 1) {
       const taken = await db.prepare(`SELECT 1 AS hit FROM "FccCampaignSend" WHERE "contactId" = ? AND "step" = ? AND "status" <> 'FAILED'`)
         .bind(contact.id, step).first<{ hit: number }>();

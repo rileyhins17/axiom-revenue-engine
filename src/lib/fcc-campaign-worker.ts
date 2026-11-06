@@ -11,7 +11,7 @@ import type { ProspectDb } from "./revenue-engine/engine-prospects-d1";
 import { openImap } from "./revenue-engine/imap-client";
 import { openSmtp, type SmtpStream } from "./revenue-engine/smtp-client";
 
-type FccEnv = {
+export type FccEnv = {
   DB: unknown;
   FCC_SENDER_ADDRESS?: string; FCC_SENDER_NAME?: string; FCC_SMTP_HOST?: string; FCC_IMAP_HOST?: string;
   FCC_SMTP_PASSWORD?: string; FCC_CAMPAIGN_MAILING_ADDRESS?: string; APP_BASE_URL?: string;
@@ -45,7 +45,7 @@ function imapFor(env: FccEnv, inbox: FccInbox) {
   return async () => openImap(await tls(hosts(env).imap, 993), { username: inbox.address, password: inbox.password });
 }
 
-function sendConfig(env: FccEnv, inbox: FccInbox): FccSendConfig {
+export function sendConfig(env: FccEnv, inbox: FccInbox): FccSendConfig {
   const configured = Boolean(inbox.address && inbox.password);
   return {
     fromAddress: inbox.address,

@@ -19,9 +19,10 @@
 import { FCC_DAILY_SEND_CAP } from "@/lib/fcc-campaign";
 import { noteFccRun, pauseFcc, readFccBounceScan, saveFccBounceScan } from "@/lib/fcc-campaign-control";
 import {
-  addDays, fccClosedGate, fccSentToday, fccSetting, runFccDailySend, senderKey, torontoDay,
+  addDays, fccClosedGate, fccSetting, runFccDailySend, senderKey, torontoDay,
   type FccMailbox, type FccRunResult, type FccSendConfig,
 } from "@/lib/fcc-campaign-sender";
+import { inboxBouncesToday, inboxDayMax, inboxLastSend, inboxRef, inboxSentToday, inboxSetting } from "@/lib/outreach/outreach-inboxes";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
 /** Minutes after midnight, Toronto time. */
@@ -99,11 +100,15 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
   const inbox = senderKey(config);
   // An added inbox names itself in notes and pause reasons; the first inbox's wording is unchanged.
   const label = config.primary === false ? `${(config.fromName ?? config.fromAddress).trim().split(/\s+/)[0]}'s inbox: ` : "";
-  const dailyMax = await fccDailyMax(db, config, setting.dailyCap, day);
+  // Since Nov 9 the inbox is shared with the other campaigns (src/lib/outreach): its count, its gap between emails and its
+  // bounces include their emails, and a lowered limit on its settings row applies here too. Without campaign emails
+  // every number below is exactly FCC's own, as before.
+  const shared = inboxRef(config.fromAddress, config.primary === false ? null : config.fromAddress);
+  const setting2 = await inboxSetting(db, config.fromAddress);
+  const dailyMax = Math.min(await fccDailyMax(db, config, setting.dailyCap, day), setting2 ? inboxDayMax(setting2, day) : Number.POSITIVE_INFINITY);
   const cap = window.batch === 1 ? Math.ceil(dailyMax / FCC_SEND_WINDOWS.length) : dailyMax;
-  if (await fccSentToday(db, day, config) >= cap) return { status: "SKIPPED", reason: window.batch === 1 ? "first batch done" : "today's limit reached" };
-  const last = await db.prepare(`SELECT "sendId","createdAt" FROM "FccCampaignSend" WHERE "sendDay" = ? AND COALESCE("senderAddress",'') = ? ORDER BY "createdAt" DESC LIMIT 1`)
-    .bind(day, inbox).first<{ sendId: string; createdAt: string }>();
+  if (await inboxSentToday(db, day, shared) >= cap) return { status: "SKIPPED", reason: window.batch === 1 ? "first batch done" : "today's limit reached" };
+  const last = await inboxLastSend(db, day, shared);
   const dueAt = last ? Date.parse(last.createdAt) + gapAfter(last.sendId) : now.getTime();
   // A later run will be closer; don't log in to Gmail just to wait.
   if (dueAt - now.getTime() >= TICK_MS) return { status: "SKIPPED", reason: "waiting between emails" };
@@ -119,7 +124,7 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
     return { status: "SKIPPED", reason: "no second batch: too many bounces" };
   };
   // Decide from what is already known before logging in to Gmail at all.
-  const knownBounces = await fccBouncesToday(db, day, config);
+  const knownBounces = await inboxBouncesToday(db, day, shared);
   if (knownBounces >= FCC_PAUSE_BOUNCES) return pause(`${knownBounces} emails bounced today`);
   if (window.batch === 2 && knownBounces > FCC_SECOND_BATCH_MAX_BOUNCES) return noSecondBatch(knownBounces);
 
@@ -158,7 +163,7 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
       }
       await saveFccBounceScan(db, day, bounceMessages, now, inbox);
     }
-    const bounces = await fccBouncesToday(db, day, config);
+    const bounces = await inboxBouncesToday(db, day, shared);
     if (bounces >= FCC_PAUSE_BOUNCES) return await pause(`${bounces} emails bounced today`);
     if (window.batch === 2 && bounces > FCC_SECOND_BATCH_MAX_BOUNCES) return await noSecondBatch(bounces);
 
@@ -182,10 +187,10 @@ export async function runFccSendTick(db: ProspectDb, config: FccSendConfig, now 
       return await pause(`Gmail refused an email (${failure?.detail ?? "no detail"})`);
     }
     if (result.status === "RAN" && result.bounced > 0) {
-      const total = await fccBouncesToday(db, day, config);
+      const total = await inboxBouncesToday(db, day, shared);
       if (total >= FCC_PAUSE_BOUNCES) return await pause(`${total} emails bounced today`);
     }
-    const sent = await fccSentToday(db, day, config);
+    const sent = await inboxSentToday(db, day, shared);
     await noteFccRun(db, label + (result.status === "SKIPPED"
       ? `Nothing to send: ${result.reason}.`
       : result.firstEmails + result.followUps + result.day7FollowUps > 0
