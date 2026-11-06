@@ -20,6 +20,10 @@
 
 Campaign `us-cities`: weekdays 9:00 to 14:30 Toronto from Mon Nov 9, 30 a day, Aidan's inbox only until the Fri Nov 13 review, one follow-up 5 business days later, approver Aidan, priority 10. Aidan's Claude posts each batch in the Slack DM (columns: email, first_name, title, city, state, population, website, contact_page, verified, error_count, worst_problem, pdf_date, pdf_url, scan_date) with the two texts.
 
+## Load a batch from the screen (any founder, no PC needed)
+
+Campaigns → the campaign → **Load a list** (`/campaigns/<key>/load`). Pick the CSV (or paste it), give the batch a name, and change the words only if they are new. **Check the list** saves nothing: it shows how many rows are ready and held (with each reason) and the first 3 emails with their follow-ups exactly as they would go. **Load this batch** saves exactly what was checked and opens the batch, which waits for the campaign's approver (cities: Aidan) to read 10 samples and press Approve. New words are saved for the whole campaign and lock every approved batch until it is approved again. Up to 300 rows and 40 different email domains per load (the free plan allows 50 outside requests per request, and each domain is one mail-server lookup); bigger lists load from a PC.
+
 ## Load a batch (from a PC with this repo)
 
 ```

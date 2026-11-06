@@ -523,7 +523,7 @@ test("loading from the screen: Check saves nothing and shows the counts, holds a
   assert.ok(loaded.ok && loaded.saved && loaded.batchId);
   assert.deepEqual([loaded.rows, loaded.ready, loaded.held], [5, 3, 2]);
   const batch = raw.prepare(`SELECT "status","loadedBy","source" FROM "OutreachBatch" WHERE "id" = ?`).get(loaded.batchId);
-  assert.deepEqual(batch, { status: "waiting", loadedBy: "Aidan", source: "Loaded on the Campaigns screen" });
+  assert.deepEqual(batch, { status: "waiting", loadedBy: "Aidan", source: "the Campaigns screen" });
   assert.equal((await readCampaign(db, "us-cities"))!.wordsVersion, wordsVersion(words()), "the pasted words are saved");
   assert.deepEqual(await approveBatch(db, loaded.batchId, "Aidan", null), { ok: true });
 

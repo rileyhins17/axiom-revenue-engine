@@ -81,7 +81,7 @@ export async function loadList(db: ProspectDb, input: LoadInput, context: LoadCo
   const firstInbox = campaign.inboxes[0]?.address ?? "";
   const sender: Sender = { name: inboxes.find((inbox) => inbox.address === firstInbox)?.name ?? "Axiom", address: firstInbox };
   const plan = planImport(withWords, table, {
-    batchId: `b-${context.newId()}`, name, source: "Loaded on the Campaigns screen", loadedBy: context.loadedBy, now: context.now, newId: context.newId,
+    batchId: `b-${context.newId()}`, name, source: "the Campaigns screen", loadedBy: context.loadedBy, now: context.now, newId: context.newId,
     sender, mailingAddress: context.mailingAddress || "(the mailing address)", noMailServer: mail.noMailServer,
   });
   if (plan.errors.length) return { ok: false, error: plan.errors.join(" ") };
