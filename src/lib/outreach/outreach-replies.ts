@@ -143,7 +143,8 @@ export async function runOutreachReplyCheck(db: ProspectDb, config: OutreachRepl
   }
   // Automatic replies are recorded but never emailed about; mark everything up to now as handled.
   await db.prepare(`UPDATE "OutreachReply" SET "toldFoundersAt" = ? WHERE "toldFoundersAt" IS NULL`).bind(now.toISOString()).run();
-  await writeKv(db, STATE, { inboxes: { ...state.inboxes, ...readAt }, at: now.toISOString() }, now);
+  // The health check reads `at` (a check older than 2 hours alarms) and `unread` (an inbox that couldn't be opened).
+  await writeKv(db, STATE, { inboxes: { ...state.inboxes, ...readAt }, at: now.toISOString(), unread: unreadInboxes }, now);
   return { status: "RAN", messages, found: found.length, told, unreadInboxes };
 }
 

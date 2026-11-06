@@ -140,3 +140,23 @@ test("an inbox with 3 bounces today, campaigns and FCC together, is reported as 
   const wednesday = await runHealthChecks(db, { ...ENV, FCC_SENDER_ADDRESS: "aidanmageebusiness@gmail.com" }, new Date("2026-11-04T16:30:00Z"));
   assert.ok(!failing(wednesday).includes("inbox-resting:aidanmageebusiness@gmail.com"));
 });
+
+test("once a campaign has emailed anyone, a reply check that hasn't finished for 2 hours, or an inbox it couldn't open, is reported", async () => {
+  const { raw, db } = database();
+  sendOne(raw, "2026-11-03");
+  await saveFccReplyCheck(db, { day: "2026-11-03", at: "2026-11-03T14:00:00Z", found: 0 });
+  raw.prepare(`INSERT INTO "OutreachBatch" ("id","campaignKey","name","loadedBy","loadedAt","status") VALUES ('b','us-cities','B','Riley','2026-11-02T00:00:00Z','approved')`).run();
+  raw.prepare(`INSERT INTO "OutreachContact" ("id","campaignKey","batchId","rowNumber","email","fieldsJson","status","firstSentAt","createdAt","updatedAt")
+    VALUES ('oc','us-cities','b',2,'a@b.gov','{}','sent','2026-11-02T15:00:00Z','x','x')`).run();
+  const state = (value: unknown) => raw.prepare(`INSERT INTO "KvStore" ("key","value","updatedAt") VALUES ('outreach.replyCheck',?,'x')
+    ON CONFLICT("key") DO UPDATE SET "value" = excluded."value"`).run(JSON.stringify(value));
+  state({ inboxes: {}, at: "2026-11-03T13:05:00Z", unread: [] }); // 8:05 am
+  assert.deepEqual(failing(await runHealthChecks(db, ENV, TUE_8AM)), [], "before 9:00 nothing is late yet");
+  assert.deepEqual(failing(await runHealthChecks(db, ENV, TUE_1130)), ["campaign-reply-check"], "11:30, last finished 8:05");
+  state({ inboxes: {}, at: "2026-11-03T16:05:00Z", unread: ["rileyhinspergerbusiness@gmail.com"] }); // 11:05 am
+  const checks = await runHealthChecks(db, ENV, TUE_1130);
+  assert.deepEqual(failing(checks), ["campaign-reply-inboxes"]);
+  assert.match(checks.find((check) => check.key === "campaign-reply-inboxes")!.problem, /couldn't open rileyhinspergerbusiness@gmail\.com/);
+  state({ inboxes: {}, at: "2026-11-03T16:05:00Z", unread: [] });
+  assert.deepEqual(failing(await runHealthChecks(db, ENV, TUE_1130)), []);
+});

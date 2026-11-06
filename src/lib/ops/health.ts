@@ -2,7 +2,9 @@ import { readFccReplyCheck } from "@/lib/fcc-campaign-control";
 import { torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
 import { fccScreen } from "@/lib/fcc-campaign-status";
 import { FCC_SEND_WINDOWS, torontoMinute } from "@/lib/fcc-campaign-tick";
+import { readKv } from "@/lib/outreach/outreach-control";
 import { PAUSE_BOUNCES, inboxBouncesToday, inboxRef } from "@/lib/outreach/outreach-inboxes";
+import { OUTREACH_REPLY_HOURS, OUTREACH_REPLY_STATE } from "@/lib/outreach/outreach-replies";
 import { readInboxes, type Inbox } from "@/lib/outreach/outreach-model";
 import { OUTREACH_AUTO_PAUSE_BY } from "@/lib/outreach/outreach-sender";
 import { campaignSummaries } from "@/lib/outreach/outreach-status";
@@ -92,6 +94,24 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
       "Look at who bounced on the Campaigns and FCC screens. If one list is bad, pause that campaign before tomorrow.");
   }
 
+  // The campaigns' hourly reply check (7:00 to 21:00, every day). Once anyone has been emailed, a check that hasn't
+  // finished for 2 hours inside those hours, or an inbox it couldn't open, means a city reply could sit unseen
+  // (Riley, Nov 5: "a city reply is never missed, whichever inbox it lands in").
+  const emailedAny = Number((await db.prepare(`SELECT COUNT(*) AS n FROM "OutreachContact" WHERE "firstSentAt" IS NOT NULL`).bind()
+    .first<{ n: number }>().catch(() => null))?.n ?? 0) > 0;
+  if (emailedAny) {
+    const replies = await readKv<{ at?: string; unread?: string[] }>(db, OUTREACH_REPLY_STATE).catch(() => null);
+    const inHours = minute >= OUTREACH_REPLY_HOURS.from + 120 && minute < OUTREACH_REPLY_HOURS.to + 30;
+    const stale = inHours && (!replies?.at || Date.parse(replies.at) < now.getTime() - 2 * 3_600_000);
+    add("campaign-reply-check", !stale,
+      `The hourly check of the inboxes for campaign replies hasn't finished since ${replies?.at ? when(replies.at) : "it started"}, so a city reply could be waiting unseen.`,
+      "Look in both Gmail inboxes yourself today, then ask Claude to read the Worker logs (an inbox's app password may have changed).");
+    const unread = replies?.unread ?? [];
+    add("campaign-reply-inboxes", unread.length === 0,
+      `The last reply check couldn't open ${unread.join(" and ")}, so replies there may be waiting unseen.`,
+      "Look in that inbox yourself, then ask Claude to check it (its app password may have changed).");
+  }
+
   // The 9 a.m. reply check emails both founders who wrote back. If it hasn't finished by 10:30, replies sit unseen.
   const replyCheck = await readFccReplyCheck(db).catch(() => null);
   const replyCheckLate = minute >= 10 * 60 + 30 && replyCheck?.day !== torontoDay(now);
@@ -136,6 +156,8 @@ const FIXED: Record<string, string> = {
   "fcc-sending": "FCC emails are going out again.",
   "fcc-reply-check": "Today's reply check has finished.",
   "campaigns-screen": "The campaign numbers can be read again.",
+  "campaign-reply-check": "The hourly check of the inboxes for campaign replies is finishing again.",
+  "campaign-reply-inboxes": "Every inbox can be read for replies again.",
 };
 const fixedText = (check: HealthCheck) => FIXED[check.key]
   ?? (check.key.startsWith("campaign-paused:") ? `The ${check.key.slice(16)} campaign is no longer paused.`
