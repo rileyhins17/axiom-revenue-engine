@@ -14,6 +14,8 @@
  *   npx tsx scripts/outreach.ts settings-sql <campaign> <out.sql> key=value ...
  *       Changes a campaign's settings: state (live|paused), dailyLimit, inboxesJson, startDay, endDay,
  *       windowStart, windowEnd, sendDays, followUps, followUpBusinessDays, approversJson, rulesJson, priority.
+ *   npx tsx scripts/outreach.ts new-campaign-sql <key> "<name>" <out.sql> inboxesJson=... dailyLimit=N approversJson=... [key=value ...]
+ *       Adds a campaign (a new avenue), paused, with the same settings. Its words and lists then load on the screen.
  *
  * The mailing address for previews comes from $env:FCC_CAMPAIGN_MAILING_ADDRESS (outreach/fcc-campaign.env).
  */
@@ -40,6 +42,22 @@ function citiesWith(words: CampaignWords, key = "us-cities"): Campaign {
     sendDays: "Mon,Tue,Wed,Thu,Fri", windowStart: 540, windowEnd: 870, dailyLimit: 30, inboxesJson: JSON.stringify([{ address: AIDAN.address, perDay: 30 }]),
     followUps: 1, followUpBusinessDays: 5, wordsJson: JSON.stringify(words), wordsVersion: wordsVersion(words),
     rulesJson: JSON.stringify({ holdUnless: { verified: ["yes", "true", "y", "1", "verified"] }, noLinksInFirst: true, stopOnAutoReply: true }), approversJson: '["Aidan"]', note: null,
+  });
+}
+
+/** key=value settings as [column, SQL value], checked: only known columns, numbers as numbers, JSON that parses. */
+function settingPairs(pairs: string[]): Array<[string, string]> {
+  const allowed = new Set(["state", "dailyLimit", "inboxesJson", "startDay", "endDay", "windowStart", "windowEnd", "sendDays", "followUps", "followUpBusinessDays", "approversJson", "rulesJson", "priority", "name", "note"]);
+  const numbers = new Set(["dailyLimit", "windowStart", "windowEnd", "followUps", "followUpBusinessDays", "priority"]);
+  return pairs.map((pair): [string, string] => {
+    const at = pair.indexOf("=");
+    const key = pair.slice(0, at);
+    const value = pair.slice(at + 1);
+    if (at < 1 || !allowed.has(key)) fail(`Unknown setting "${key}".`);
+    if (key.endsWith("Json")) { try { JSON.parse(value); } catch { fail(`${key} is not valid JSON.`); } }
+    if (key === "state" && !["live", "paused"].includes(value)) fail("state is live or paused.");
+    if (numbers.has(key) && !Number.isFinite(Number(value))) fail(`${key} must be a number.`);
+    return [key, numbers.has(key) ? String(Number(value)) : value === "null" ? "NULL" : q(value)];
   });
 }
 
@@ -108,22 +126,25 @@ if (command === "preview") {
 } else if (command === "settings-sql") {
   const [campaign, out, ...pairs] = args;
   if (!campaign || !out || pairs.length === 0) fail("usage: settings-sql <campaign> <out.sql> key=value ...");
-  const allowed = new Set(["state", "dailyLimit", "inboxesJson", "startDay", "endDay", "windowStart", "windowEnd", "sendDays", "followUps", "followUpBusinessDays", "approversJson", "rulesJson", "priority", "name", "note"]);
-  const numbers = new Set(["dailyLimit", "windowStart", "windowEnd", "followUps", "followUpBusinessDays", "priority"]);
-  const sets = pairs.map((pair) => {
-    const at = pair.indexOf("=");
-    const key = pair.slice(0, at);
-    const value = pair.slice(at + 1);
-    if (at < 1 || !allowed.has(key)) fail(`Unknown setting "${key}".`);
-    if (key.endsWith("Json")) { try { JSON.parse(value); } catch { fail(`${key} is not valid JSON.`); } }
-    if (key === "state" && !["live", "paused"].includes(value)) fail("state is live or paused.");
-    return `"${key}" = ${numbers.has(key) ? String(Number(value)) : value === "null" ? "NULL" : q(value)}`;
-  });
+  const sets = settingPairs(pairs).map(([column, value]) => `"${column}" = ${value}`);
   const by = sets.some((set) => set.startsWith('"state"')) ? `, "stateBy" = 'Riley''s Claude', "stateAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now'), "stateReason" = NULL` : "";
   writeFileSync(out!, `UPDATE "OutreachCampaign" SET ${sets.join(", ")}${by}, "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "key" = ${q(campaign!)};\n`);
   console.log(`Settings for ${campaign} written to ${out}.`);
+} else if (command === "new-campaign-sql") {
+  // A new avenue is a row, never code: it starts paused, sends nothing until it has words, an approved batch and
+  // a founder's Resume, and needs its inboxes, daily limit and approvers named up front.
+  const [key, name, out, ...pairs] = args;
+  if (!key || !name || !out) fail("usage: new-campaign-sql <key> \"<name>\" <out.sql> inboxesJson=... dailyLimit=N approversJson=... [key=value ...]");
+  if (!/^[a-z0-9-]{2,40}$/.test(key!)) fail("The key is 2 to 40 lowercase letters, digits or dashes, like agencies.");
+  if (name!.length > 80) fail("The name is at most 80 characters.");
+  const settings = settingPairs(pairs).filter(([column]) => column !== "state" && column !== "name");
+  for (const needed of ["inboxesJson", "dailyLimit", "approversJson"]) if (!settings.some(([column]) => column === needed)) fail(`Name ${needed} for a new campaign.`);
+  const columns = ["key", "name", "state", "stateReason", "stateBy", "stateAt", ...settings.map(([column]) => column)];
+  const values = [q(key!), q(name!), "'paused'", q("New campaign: waiting for its words and an approved batch"), q("Riley's Claude"), "strftime('%Y-%m-%dT%H:%M:%fZ','now')", ...settings.map(([, value]) => value)];
+  writeFileSync(out!, `INSERT INTO "OutreachCampaign" (${columns.map((column) => `"${column}"`).join(",")}) VALUES (${values.join(", ")});\n`);
+  console.log(`New campaign ${key} (paused) written to ${out}. Next: load its words and first list on the Campaigns screen.`);
 } else {
-  fail("commands: preview, words-sql, import-sql, approve-sql, settings-sql (see the top of scripts/outreach.ts)");
+  fail("commands: preview, words-sql, import-sql, approve-sql, settings-sql, new-campaign-sql (see the top of scripts/outreach.ts)");
 }
 }
 

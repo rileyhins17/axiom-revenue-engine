@@ -43,6 +43,13 @@ npx tsx scripts/outreach.ts settings-sql us-cities <out\s.sql> 'inboxesJson=[{"a
 ```
 Then run the file with `wrangler d1 execute ... --file`. Raising limits, adding inboxes or changing who is emailed needs both founders' yes (AGENTS.md).
 
+## Add a campaign (a new avenue, no code)
+
+```
+npx tsx scripts/outreach.ts new-campaign-sql agencies "Agencies: overflow web work" <out\new.sql> 'inboxesJson=[{"address":"...","perDay":10}]' dailyLimit=10 'approversJson=["Aidan"]' [followUps=1 followUpBusinessDays=4 priority=20 'rulesJson={...}' sendDays=... windowStart=... windowEnd=... startDay=...]
+```
+Run the file with `wrangler d1 execute ... --file`. The campaign starts paused and sends nothing until its words and a first list are loaded (Campaigns screen → Load a list), its approver approves the batch, and a founder presses Resume. Its inboxes must be sending inboxes (below); both founders' yes is needed for a new avenue's limits (AGENTS.md).
+
 ## Add a sending inbox (no rebuild)
 
 1. The inbox's owner makes a Gmail (or Workspace) app password. It never goes in a file or a chat.
