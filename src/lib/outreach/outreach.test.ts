@@ -156,7 +156,8 @@ test("CSV: quotes, commas and line breaks inside quotes, a byte-order mark and a
 });
 
 test("words: blanks fill from the row, the engine adds the footer, the follow-up answers under the first subject", () => {
-  const fields = Object.fromEntries(HEADERS.split(",").map((column, index) => [column, cityRow(3).split(",")[index]!.replace(/^"|"$/g, "")]));
+  const fields = parseCsv(`${HEADERS}
+${cityRow(3)}`).rows[0]!;
   const sender = { name: "Aidan Magee", address: AIDAN };
   const first = renderEmail(words(), 1, fields, sender, ADDRESS, { noLinksInFirst: true });
   assert.ok(first.ok);
@@ -238,6 +239,9 @@ test("Mon Nov 9: 30 city emails from 9:00 in Aidan's inbox, then FCC in the afte
   const { raw, db } = database();
   await setUpCities(raw, db, { rows: 40 });
   addFccContacts(raw, 100);
+  // Riley's inbox first sent FCC emails on Nov 2 (as live), so this is its second week: 30 a day.
+  raw.prepare(`INSERT INTO "FccCampaignSend" ("sendId","contactId","step","email","sendDay","messageId","status","createdAt","senderAddress") VALUES ('old','f100',1,'person100@co100.example','2026-11-02','<old>','SENT','2026-11-02T15:00:00.000Z',?)`).run(RILEY);
+  raw.prepare(`UPDATE "FccCampaignContact" SET "status" = 'step1_sent' WHERE "id" = 'f100'`).run();
   const fake = fakeInbox();
   const { run } = await harness(db, fake, true);
   await run(MON_9AM, MON_9AM + 6 * 60 * MINUTE);
