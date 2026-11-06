@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { WifiOff } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Offline - Axiom Pipeline Engine",
+  title: "Offline - Axiom Revenue Engine",
 };
 
 export default function OfflinePage() {
@@ -14,7 +14,7 @@ export default function OfflinePage() {
         </div>
         <h1 className="mt-4 text-lg font-semibold text-white">Connection needed</h1>
         <p className="mt-2 text-sm leading-6 text-zinc-400">
-          Axiom Pipeline Engine keeps private CRM data online-only. Reconnect and reopen the app.
+          Axiom Revenue Engine keeps private business data online-only. Reconnect and reopen the app.
         </p>
       </section>
     </main>

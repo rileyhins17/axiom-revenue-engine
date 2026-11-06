@@ -1,11 +1,4 @@
-import {
-  Bot,
-  Database,
-  LayoutDashboard,
-  Settings,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
+import { CalendarDays, Layers, Send, Settings, type LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 export type AppNavItem = {
@@ -14,60 +7,13 @@ export type AppNavItem = {
   description: string;
   url: Route;
   icon: LucideIcon;
-  shortcut: string;
-  keywords: string[];
-  badgeKey?: "readyForTouch" | "followUp" | "replied" | "total";
 };
 
 export const APP_NAV_ITEMS: AppNavItem[] = [
-  {
-    title: "Dashboard",
-    label: "Dashboard",
-    description: "Pipeline overview",
-    url: "/dashboard",
-    icon: LayoutDashboard,
-    shortcut: "⌘1",
-    keywords: ["home", "overview", "status", "dashboard"],
-  },
-  {
-    title: "Vault",
-    label: "Vault",
-    description: "Lead database",
-    url: "/vault",
-    icon: Database,
-    shortcut: "⌘2",
-    keywords: ["database", "records", "export", "leads"],
-    badgeKey: "total",
-  },
-  {
-    title: "Clients",
-    label: "Clients",
-    description: "Deal pipeline & client management",
-    url: "/clients" as Route,
-    icon: Users,
-    shortcut: "⌘3",
-    keywords: ["crm", "deal", "client", "pipeline", "retainer", "revenue"],
-    badgeKey: "replied",
-  },
-  {
-    title: "Automation",
-    label: "Automation",
-    description: "Sequences & sends",
-    url: "/automation",
-    icon: Bot,
-    shortcut: "⌘4",
-    keywords: ["scheduler", "sequence", "mailbox", "follow-up"],
-    badgeKey: "followUp",
-  },
-  {
-    title: "Settings",
-    label: "Settings",
-    description: "Mailbox connections",
-    url: "/settings",
-    icon: Settings,
-    shortcut: "⌘5",
-    keywords: ["runtime", "gmail", "config", "preferences"],
-  },
+  { title: "Today", label: "Today", description: "Overview", url: "/dashboard", icon: CalendarDays },
+  { title: "Campaigns", label: "Campaigns", description: "Cities and every other list", url: "/campaigns" as Route, icon: Layers },
+  { title: "FCC", label: "FCC", description: "Emails, replies and pause", url: "/fcc" as Route, icon: Send },
+  { title: "Settings", label: "Settings", description: "Your account", url: "/settings", icon: Settings },
 ];
 
 export function getNavItemForPath(pathname: string | null | undefined) {

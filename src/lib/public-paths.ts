@@ -3,16 +3,14 @@ const PUBLIC_PATH_PREFIXES = [
   "/sign-up",
   "/offline",
   "/api/auth",
-  "/api/agent",
-  "/api/mcp",
   "/_next",
   "/favicon.ico",
 ];
 
 const PUBLIC_EXACT_PATHS = new Set([
   "/install",
-  "/api/internal/cron-tick",
   "/api/ios-profile",
+  "/api/health",
 ]);
 
 export function isPublicPath(pathname: string) {

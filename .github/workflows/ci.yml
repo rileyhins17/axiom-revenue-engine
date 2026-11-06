@@ -1,0 +1,54 @@
+name: Revenue Engine CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      # The live branch; main is months behind.
+      - codex/revenue-engine-production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BETTER_AUTH_SECRET: ci-only-secret-that-is-longer-than-thirty-two-characters
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Check the live config can't start anything unapproved
+        run: npm run check:safety
+
+      - name: Check generated Cloudflare bindings match the live config
+        run: npm run cf:typegen:check
+
+      - name: Apply all migrations to a fresh local D1 database
+        run: npm run db:migrate:local
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build for Cloudflare and validate the bundle without deploying
+        run: npm run build:cloudflare && npx wrangler deploy --config wrangler.production.jsonc --dry-run --outdir .wrangler/dry-run

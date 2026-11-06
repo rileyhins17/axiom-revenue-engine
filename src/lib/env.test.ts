@@ -1,100 +1,44 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { clearServerEnvCache, getServerEnv, parseEnvironmentBoolean } from "./env";
+import { clearServerEnvCache, getServerEnv, getTrustedOrigins } from "./env";
 
-const autonomousSwitches = [
-  "AUTONOMOUS_INTAKE_ENABLED",
-  "AUTONOMOUS_QUEUE_ENABLED",
-  "AUTONOMOUS_SEND_ENABLED",
-] as const;
-
-const envKeysToRestore = ["BETTER_AUTH_SECRET", ...autonomousSwitches];
-const originalEnv = new Map<string, string | undefined>();
+const mutableProcessEnv = process.env as Record<string, string | undefined>;
+const keys = ["BETTER_AUTH_SECRET", "APP_BASE_URL", "AUTH_ALLOWED_ORIGINS", "RATE_LIMIT_MAX_AUTH"] as const;
+const original = new Map<string, string | undefined>();
 
 test.beforeEach(() => {
-  for (const key of envKeysToRestore) {
-    originalEnv.set(key, process.env[key]);
-  }
-
-  process.env.BETTER_AUTH_SECRET = "test-secret-that-is-at-least-32-characters";
+  for (const key of keys) original.set(key, process.env[key]);
+  mutableProcessEnv.BETTER_AUTH_SECRET = "test-secret-that-is-at-least-32-characters";
 });
 
 test.afterEach(() => {
-  for (const key of envKeysToRestore) {
-    const value = originalEnv.get(key);
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = value;
-    }
+  for (const key of keys) {
+    const value = original.get(key);
+    if (value === undefined) delete mutableProcessEnv[key];
+    else mutableProcessEnv[key] = value;
   }
-
   clearServerEnvCache();
 });
 
-test("parseEnvironmentBoolean accepts booleans and explicit true/false forms", () => {
-  for (const [value, expected] of [
-    [true, true],
-    [false, false],
-    [1, true],
-    [0, false],
-    ["true", true],
-    [" TRUE ", true],
-    ["on", true],
-    ["false", false],
-    ["FALSE", false],
-    ["off", false],
-    ["1", true],
-    ["0", false],
-  ] as const) {
-    assert.equal(parseEnvironmentBoolean(value), expected, String(value));
-  }
-});
-
-test("all autonomous kill switches use the explicit parser", () => {
-  for (const [value, expected] of [
-    ["false", false],
-    ["0", false],
-    ["TRUE", true],
-    ["1", true],
-  ] as const) {
-    for (const key of autonomousSwitches) {
-      process.env[key] = value;
-    }
-
-    clearServerEnvCache();
-    const env = getServerEnv();
-
-    for (const key of autonomousSwitches) {
-      assert.equal(env[key], expected, `${key}=${value}`);
-    }
-  }
-});
-
-test("invalid autonomous boolean values fail closed instead of enabling automation", () => {
-  for (const key of autonomousSwitches) {
-    process.env[key] = "maybe";
-    clearServerEnvCache();
-
-    assert.throws(() => getServerEnv(), /Invalid boolean environment value/);
-
-    // A failed parse must not leave a partially cached environment behind.
-    process.env[key] = "false";
-    clearServerEnvCache();
-    assert.equal(getServerEnv()[key], false, key);
-  }
-});
-
-test("missing autonomous kill switches retain safe defaults", () => {
-  for (const key of autonomousSwitches) {
-    delete process.env[key];
-  }
-
+test("a short sign-in secret stops startup instead of running insecurely", () => {
+  mutableProcessEnv.BETTER_AUTH_SECRET = "too-short";
   clearServerEnvCache();
-  const env = getServerEnv();
+  assert.throws(() => getServerEnv(), /at least 32 characters/);
+});
 
-  assert.equal(env.AUTONOMOUS_INTAKE_ENABLED, true);
-  assert.equal(env.AUTONOMOUS_QUEUE_ENABLED, true);
-  assert.equal(env.AUTONOMOUS_SEND_ENABLED, false);
+test("sign-in rate limits have safe defaults and accept numbers from settings", () => {
+  delete mutableProcessEnv.RATE_LIMIT_MAX_AUTH;
+  clearServerEnvCache();
+  assert.equal(getServerEnv().RATE_LIMIT_MAX_AUTH, 10);
+  mutableProcessEnv.RATE_LIMIT_MAX_AUTH = "25";
+  clearServerEnvCache();
+  assert.equal(getServerEnv().RATE_LIMIT_MAX_AUTH, 25);
+});
+
+test("trusted origins are the app's own origin plus the listed extras, and ignore junk", () => {
+  mutableProcessEnv.APP_BASE_URL = "https://operations.getaxiom.ca/";
+  mutableProcessEnv.AUTH_ALLOWED_ORIGINS = "https://axiom-ops-omniscient.aidan-magee2.workers.dev, not a url";
+  clearServerEnvCache();
+  assert.deepEqual(getTrustedOrigins(), ["https://operations.getaxiom.ca", "https://axiom-ops-omniscient.aidan-magee2.workers.dev"]);
 });

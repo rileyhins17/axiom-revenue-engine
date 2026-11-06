@@ -1,6 +1,6 @@
 import { APIError } from "better-auth";
 
-import { getPrisma } from "@/lib/prisma";
+import { getDatabase } from "@/lib/cloudflare";
 
 type RateLimitOptions = {
   identifier: string;
@@ -20,39 +20,24 @@ export async function consumeRateLimit(options: RateLimitOptions) {
     };
   }
 
-  const prisma = getPrisma();
+  const db = getDatabase();
   const now = new Date();
   const windowMs = options.windowSeconds * 1000;
   const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
   const key = `${options.scope}:${options.identifier}:${windowStart.toISOString()}`;
 
-  // Create an empty window if this is the first request. Concurrent creators
-  // race on the unique key; the loser continues to the atomic increment.
-  await prisma.rateLimitWindow.create({
-      data: {
-        key,
-        windowStart,
-        count: 0,
-      },
-    })
-    .catch(() => null);
-
-  // SQLite applies `count = count + 1` atomically. The previous read-then-
-  // write flow allowed simultaneous requests to observe the same count and
-  // all pass the limit check.
-  const updated = await prisma.rateLimitWindow.update({
-    where: { key },
-    data: {
-      count: {
-        increment: 1,
-      },
-    },
-  });
+  // Create the window if this is the first request, then count atomically: SQLite applies
+  // `count = count + 1` in one step, so simultaneous requests can't all see the same count.
+  await db.prepare(`INSERT INTO "RateLimitWindow" ("id","key","windowStart","count","updatedAt") VALUES (?,?,?,0,?) ON CONFLICT("key") DO NOTHING`)
+    .bind(crypto.randomUUID(), key, windowStart.toISOString(), now.toISOString()).run();
+  const updated = await db.prepare(`UPDATE "RateLimitWindow" SET "count" = "count" + 1, "updatedAt" = ? WHERE "key" = ? RETURNING "count"`)
+    .bind(now.toISOString(), key).first<{ count: number }>();
+  const count = Number(updated?.count ?? 1);
 
   return {
-    allowed: updated.count <= options.limit,
-    count: updated.count,
-    remaining: Math.max(options.limit - updated.count, 0),
+    allowed: count <= options.limit,
+    count,
+    remaining: Math.max(options.limit - count, 0),
     resetAt: new Date(windowStart.getTime() + windowMs),
   };
 }
