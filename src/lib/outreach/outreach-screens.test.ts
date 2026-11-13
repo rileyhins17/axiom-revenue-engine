@@ -417,3 +417,39 @@ test("a campaign's batches: waiting first, then sending, then done; held reasons
   assert.equal(batchPhase({ status: "approved", wordsCurrent: false, ready: 0 }, 0), "done");
   assert.equal(batchPhase({ status: "waiting", wordsCurrent: false, ready: 0 }, 0), "waiting");
 });
+
+test("every screen's data stays far under the 50 database reads a request is allowed, with several campaigns and inboxes", async () => {
+  const { raw, db, batch, person, reply } = database();
+  raw.prepare(`INSERT INTO "OutreachInbox" ("address","name","passwordSecret","dailyMax") VALUES ('third-inbox@axiom.example','Casey Example','P3',40)`).run();
+  const inboxes = JSON.stringify([{ address: FIRST, perDay: 10 }, { address: SECOND, perDay: 10 }, { address: "third-inbox@axiom.example", perDay: 10 }]);
+  for (const key of ["districts", "counties", "agencies", "studios"]) {
+    raw.prepare(`INSERT INTO "OutreachCampaign" ("key","name","state","dailyLimit","inboxesJson","wordsJson","wordsVersion","approversJson") VALUES (?,?,'live',30,?,?,'w1','["Aidan"]')`).run(key, key, inboxes, WORDS);
+    const id = batch(`${key}-1`, { campaign: key });
+    person(id, `${key} one`, { campaign: key });
+    reply(person(id, `${key} two`, { campaign: key, sent: sentMonday(FIRST) }), "reply", "Yes.", FIRST, "2026-11-12T18:00:00.000Z");
+    person(batch(`${key}-2`, { campaign: key, status: "waiting" }), `${key} three`, { campaign: key });
+  }
+  const b = batch("cities-B1");
+  person(b, "Port Example", { sent: sentToday(FIRST, 5) });
+
+  let reads = 0;
+  const counted: ProspectDb = { prepare: (sql) => { const statement = db.prepare(sql); return { bind: (...values: unknown[]) => { const bound = statement.bind(...values); return {
+    all: async <T,>() => { reads += 1; return bound.all<T>(); }, first: async <T,>() => { reads += 1; return bound.first<T>(); }, run: async () => { reads += 1; return bound.run(); },
+  }; } }; } };
+  const count = async (work: () => Promise<unknown>) => { reads = 0; await work(); return reads; };
+  const { thisWeek, weekNumbers } = await import("@/lib/outreach/outreach-week");
+  const { campaignSummaries, batchReview } = await import("@/lib/outreach/outreach-status");
+  const week = thisWeek(NOW);
+  const budget = {
+    today: await count(() => Promise.all([todayData(counted, null, NOW), weekNumbers(counted, week.from, week.to, NOW)])),
+    replies: await count(() => listReplies(counted)),
+    campaigns: await count(() => Promise.all([campaignSummaries(counted, NOW), weekNumbers(counted, week.from, week.to, NOW)])),
+    campaign: await count(() => Promise.all([campaignDetail(counted, "us-cities", null, NOW), findContacts(counted, "port", { campaign: "us-cities" })])),
+    batch: await count(() => batchReview(counted, b, "100 Example Street, Kitchener, ON", 10)),
+    doNotEmail: await count(() => Promise.all([checkDoNotEmail(counted, "example.gov"), recentBlocks(counted)])),
+  };
+  if (process.env.SHOW_READS) console.log(`reads ${JSON.stringify(budget)}`);
+  // 5 campaigns and 3 inboxes here; live has fewer. The sign-in check adds at most a couple.
+  for (const [screen, used] of Object.entries(budget)) assert.ok(used <= 35, `${screen} made ${used} reads`);
+  assert.ok(budget.today <= 30, `Today made ${budget.today} reads`);
+});
