@@ -19,14 +19,39 @@ export type BatchRow = {
   id: string; name: string; source: string | null; loadedBy: string; loadedAt: string; status: string; approvedBy: string | null; approvedAt: string | null;
   wordsCurrent: boolean; rows: number; ready: number; held: number; emailed: number; stopped: number;
 };
+/** Where a batch stands: waiting for its approver, sending (someone in it still gets an email), done, or stopped by a founder. */
+export type BatchPhase = "waiting" | "sending" | "done" | "stopped";
+/** A batch on the campaign screen: its counts, why rows are held, and its own results. */
+export type BatchDetail = BatchRow & {
+  phase: BatchPhase;
+  /** People whose follow-up is still to come. */
+  followUpsLeft: number;
+  /** Why rows are held, most common first: "not verified" and so on. */
+  heldReasons: Array<{ reason: string; rows: number }>;
+  replies: number; noThanks: number; automatic: number; bounced: number; success: number;
+};
+export type FollowUpDay = { day: string; people: number };
 export type PersonRow = { email: string; label: string; at: string | null; note: string | null; inbox?: string | null };
 export type InboxToday = { address: string; name: string; perDay: number; sentByCampaign: number; inboxSent: number; inboxDayMax: number; inboxCapNow: number };
 
 export type CampaignSummary = { campaign: Campaign; counts: CampaignCounts; lastRun: RunNote | null; nextSend: string };
 export type CampaignDetail = CampaignSummary & {
-  inboxes: InboxToday[]; batches: BatchRow[]; replies: PersonRow[]; bounces: PersonRow[]; problems: PersonRow[];
+  inboxes: InboxToday[]; batches: BatchDetail[]; replies: PersonRow[]; bounces: PersonRow[]; problems: PersonRow[];
   days: Array<{ day: string; first: number; followUps: number }>;
+  /** Follow-ups by the day they fall due (today and later), and people whose follow-up has no day: on hold until someone sets one. */
+  followUps: { coming: FollowUpDay[]; onHold: number };
+  /** Replies a founder marked as counting toward the success number, all time. */
+  success: number;
 };
+
+/** Sending while anyone in it still gets an email; a batch whose words changed since its approval waits again. */
+export function batchPhase(batch: Pick<BatchRow, "status" | "wordsCurrent" | "ready">, followUpsLeft: number): BatchPhase {
+  if (batch.status === "stopped") return "stopped";
+  if (batch.status !== "approved") return "waiting";
+  const left = batch.ready > 0 || followUpsLeft > 0;
+  if (!batch.wordsCurrent) return left ? "waiting" : "done";
+  return left ? "sending" : "done";
+}
 
 const n = (value: unknown) => Number(value ?? 0);
 const toronto = (date: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", ...options }).format(date);
@@ -113,9 +138,20 @@ export async function campaignDetail(db: ProspectDb, key: string, fccFirstInbox:
   }));
   const { results: batches } = await db.prepare(`SELECT b."id", b."name", b."source", b."loadedBy", b."loadedAt", b."status", b."approvedBy", b."approvedAt", b."approvedWords", b."wordsVersion",
       COUNT(c."id") AS rows, SUM(c."status" = 'ready') AS ready, SUM(c."status" = 'held') AS held, SUM(c."stepsSent" > 0) AS emailed,
-      SUM(c."status" IN ('replied','bounced','suppressed','failed')) AS stopped
+      SUM(c."status" IN ('replied','bounced','suppressed','failed')) AS stopped, SUM(c."status" = 'sent') AS followUpsLeft, SUM(c."status" = 'bounced') AS bounced
     FROM "OutreachBatch" b LEFT JOIN "OutreachContact" c ON c."batchId" = b."id" WHERE b."campaignKey" = ? GROUP BY b."id" ORDER BY b."sendOrder" DESC`)
     .bind(key).all<Record<string, string | number | null>>();
+  const [heldReasons, batchReplies, followUpDays] = await Promise.all([
+    db.prepare(`SELECT "batchId", COALESCE("holdReason", 'No reason saved') AS reason, COUNT(*) AS rows FROM "OutreachContact" WHERE "campaignKey" = ? AND "status" = 'held'
+      GROUP BY 1, 2 ORDER BY rows DESC`).bind(key).all<{ batchId: string; reason: string; rows: number }>(),
+    // Per batch: people who wrote back, said no thanks or answered automatically, and replies marked as a success.
+    db.prepare(`SELECT c."batchId", COUNT(DISTINCT CASE WHEN r."kind" = 'reply' THEN r."contactId" END) AS replies, COUNT(DISTINCT CASE WHEN r."kind" = 'no_thanks' THEN r."contactId" END) AS noThanks,
+        COUNT(DISTINCT CASE WHEN r."kind" = 'automatic' THEN r."contactId" END) AS automatic, COUNT(DISTINCT CASE WHEN r."successAt" IS NOT NULL THEN r."contactId" END) AS success
+      FROM "OutreachReply" r JOIN "OutreachContact" c ON c."id" = r."contactId" WHERE r."campaignKey" = ? GROUP BY c."batchId"`).bind(key)
+      .all<{ batchId: string; replies: number; noThanks: number; automatic: number; success: number }>(),
+    db.prepare(`SELECT "nextDueDay" AS day, COUNT(*) AS people FROM "OutreachContact" WHERE "campaignKey" = ? AND "status" = 'sent' GROUP BY "nextDueDay" ORDER BY "nextDueDay"`).bind(key)
+      .all<{ day: string | null; people: number }>(),
+  ]);
   const people = async (sql: string, ...binds: unknown[]) => (await db.prepare(sql).bind(...binds).all<PersonRow>()).results;
   const replies = await people(`SELECT o."email", COALESCE(json_extract(o."fieldsJson", '$.city'), json_extract(o."fieldsJson", '$.company'), o."email") AS label,
       COALESCE(r."receivedAt", o."updatedAt") AS at, COALESCE(r."quote", o."stoppedReason") AS note, r."inbox" AS inbox
@@ -129,14 +165,27 @@ export async function campaignDetail(db: ProspectDb, key: string, fccFirstInbox:
     WHERE "campaignKey" = ? AND "kind" = 'real' AND "status" = 'SENT' GROUP BY "sendDay" ORDER BY "sendDay" DESC LIMIT 30`).bind(key).all<{ day: string; first: number; followUps: number }>();
   return {
     campaign, counts, lastRun: await readCampaignRun(db, key), nextSend: campaignNextSend(campaign, counts, now), inboxes,
-    batches: batches.map((row) => ({
-      id: String(row.id), name: String(row.name), source: row.source === null ? null : String(row.source), loadedBy: String(row.loadedBy), loadedAt: String(row.loadedAt),
-      status: String(row.status), approvedBy: row.approvedBy === null ? null : String(row.approvedBy), approvedAt: row.approvedAt === null ? null : String(row.approvedAt),
-      // Approved on the words it sends with: its own, or the campaign's for an older batch.
-      wordsCurrent: row.approvedWords !== null && row.approvedWords === (row.wordsVersion ?? campaign.wordsVersion),
-      rows: n(row.rows), ready: n(row.ready), held: n(row.held), emailed: n(row.emailed), stopped: n(row.stopped),
-    })),
+    batches: batches.map((row): BatchDetail => {
+      const base: BatchRow = {
+        id: String(row.id), name: String(row.name), source: row.source === null ? null : String(row.source), loadedBy: String(row.loadedBy), loadedAt: String(row.loadedAt),
+        status: String(row.status), approvedBy: row.approvedBy === null ? null : String(row.approvedBy), approvedAt: row.approvedAt === null ? null : String(row.approvedAt),
+        // Approved on the words it sends with: its own, or the campaign's for an older batch.
+        wordsCurrent: row.approvedWords !== null && row.approvedWords === (row.wordsVersion ?? campaign.wordsVersion),
+        rows: n(row.rows), ready: n(row.ready), held: n(row.held), emailed: n(row.emailed), stopped: n(row.stopped),
+      };
+      const results = batchReplies.results.find((item) => item.batchId === base.id);
+      return {
+        ...base, phase: batchPhase(base, n(row.followUpsLeft)), followUpsLeft: n(row.followUpsLeft),
+        heldReasons: heldReasons.results.filter((item) => item.batchId === base.id).map((item) => ({ reason: item.reason, rows: n(item.rows) })),
+        replies: n(results?.replies), noThanks: n(results?.noThanks), automatic: n(results?.automatic), bounced: n(row.bounced), success: n(results?.success),
+      };
+    }),
     replies, bounces, problems, days: days.map((row) => ({ day: row.day, first: n(row.first), followUps: n(row.followUps) })),
+    followUps: {
+      coming: followUpDays.results.filter((row): row is { day: string; people: number } => row.day !== null).map((row) => ({ day: row.day, people: n(row.people) })),
+      onHold: n(followUpDays.results.find((row) => row.day === null)?.people),
+    },
+    success: batchReplies.results.reduce((sum, row) => sum + n(row.success), 0),
   };
 }
 
