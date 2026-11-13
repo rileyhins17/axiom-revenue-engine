@@ -7,6 +7,7 @@ import { getCloudflareBindings } from "@/lib/cloudflare";
  */
 export function engineSetting(name: string): string {
   const bindings = getCloudflareBindings();
-  const value = bindings ? bindings[name] : process.env[name];
+  // "Local" means no D1 database is bound: only then may the process environment speak.
+  const value = bindings?.DB ? bindings[name] : bindings?.[name] ?? process.env[name];
   return typeof value === "string" ? value.trim() : "";
 }
