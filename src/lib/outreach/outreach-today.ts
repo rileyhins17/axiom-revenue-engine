@@ -156,7 +156,7 @@ export function needsYou(data: TodayData, viewer: string | null): NeedsYou {
         key: "replies", tone: "gold", title: `${plural(mine, "reply", "replies")} for you to answer`,
         detail: others.length ? `${others.map((group) => `${group.count} more ${group.count === 1 ? "waits" : "wait"} for ${group.name}`).join(", ")}.` : undefined,
         rows: data.toAnswer.newest.filter((reply) => !reply.answerFromName || same(reply.answerFromName, viewer)).slice(0, 2).map((reply) => ({
-          text: `${reply.organisation}: ${(reply.text ?? "Open it to read what they wrote.").replace(/\s+/g, " ").slice(0, 110)}`,
+          text: `${reply.organisation}: ${firstWords(reply.text ?? "Open it to read what they wrote.", 110)}`,
           meta: `${reply.campaign} · ${reply.at ? whenText(reply.at) : "time unknown"} · answer from ${reply.answerFromName ? "your inbox" : "the inbox it came to"}`,
         })),
         action: { label: "Open replies", href: "/replies" },
@@ -217,3 +217,12 @@ export function needsYou(data: TodayData, viewer: string | null): NeedsYou {
 }
 
 export { clockText };
+
+/** The start of a message for a card: whole words, with "..." when it was cut. */
+function firstWords(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= max) return flat;
+  const cut = flat.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[.,;:!?]+$/, "")}...`;
+}
