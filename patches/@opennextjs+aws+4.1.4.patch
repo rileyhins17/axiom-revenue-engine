@@ -1,0 +1,21 @@
+diff --git a/node_modules/@opennextjs/aws/dist/build/copyTracedFiles.js b/node_modules/@opennextjs/aws/dist/build/copyTracedFiles.js
+--- a/node_modules/@opennextjs/aws/dist/build/copyTracedFiles.js
++++ b/node_modules/@opennextjs/aws/dist/build/copyTracedFiles.js
+@@ -237,7 +237,16 @@
+                 symlinkSync(symlink, to);
+             }
+             catch (e) {
+-                if (e.code !== "EEXIST") {
++                if (e.code === "EPERM" || e.code === "EACCES") {
++                    const linkedStats = statSync(from);
++                    if (linkedStats.isDirectory()) {
++                        cpSync(from, to, { recursive: true, dereference: true });
++                    }
++                    else {
++                        copyFileAndMakeOwnerWritable(from, to);
++                    }
++                }
++                else if (e.code !== "EEXIST") {
+                     throw e;
+                 }
+             }

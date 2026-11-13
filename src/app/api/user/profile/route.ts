@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { getDatabase } from "@/lib/cloudflare";
 import { requireApiSession } from "@/lib/session";
-import { getPrisma } from "@/lib/prisma";
-
-const MAX_IMAGE_BYTES = 200_000;
+import { validateProfileImage } from "@/lib/profile-image";
 
 export async function PATCH(request: Request) {
   const authResult = await requireApiSession(request);
@@ -30,25 +29,9 @@ export async function PATCH(request: Request) {
     if (image === null) {
       data.image = null;
     } else if (typeof image === "string") {
-      if (!image.startsWith("data:image/")) {
-        return NextResponse.json(
-          { error: "Image must be a data URI (data:image/...)" },
-          { status: 400 }
-        );
-      }
-      const base64Part = image.split(",")[1];
-      if (!base64Part) {
-        return NextResponse.json(
-          { error: "Invalid data URI format" },
-          { status: 400 }
-        );
-      }
-      const sizeBytes = Math.ceil((base64Part.length * 3) / 4);
-      if (sizeBytes > MAX_IMAGE_BYTES) {
-        return NextResponse.json(
-          { error: `Image must be under ${MAX_IMAGE_BYTES / 1000}KB` },
-          { status: 400 }
-        );
+      const problem = validateProfileImage(image);
+      if (problem) {
+        return NextResponse.json({ error: problem }, { status: 400 });
       }
       data.image = image;
     }
@@ -61,10 +44,12 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const updated = await getPrisma().user.update({
-    where: { id: session.user.id },
-    data,
-  });
+  const fields = Object.keys(data);
+  const updated = await getDatabase()
+    .prepare(`UPDATE "User" SET ${fields.map((field) => `"${field}" = ?`).join(", ")}, "updatedAt" = ? WHERE "id" = ? RETURNING "id","name","email","image","role"`)
+    .bind(...fields.map((field) => data[field]), new Date().toISOString(), session.user.id)
+    .first<{ id: string; name: string; email: string; image: string | null; role: string | null }>();
+  if (!updated) return NextResponse.json({ error: "Account not found" }, { status: 404 });
 
   return NextResponse.json({
     id: updated.id,
