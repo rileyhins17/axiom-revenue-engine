@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { APP_NAV_ITEMS, getNavItemForPath } from "@/lib/navigation";
+import { APP_NAV_ITEMS, MORE_NAV_ITEMS, getNavItemForPath, type AppNavItem } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 export function AppSidebar() {
@@ -34,42 +34,49 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="owner-sidebar-content">
-        <SidebarGroup>
-          <div className="owner-sidebar-section-label">Workspace</div>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1.5">
-              {APP_NAV_ITEMS.map((item) => {
-                const isActive = current === item.url;
-                const Icon = item.icon;
-
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive}>
-                      <Link
-                        href={item.url}
-                        data-active={isActive ? "true" : "false"}
-                        aria-current={isActive ? "page" : undefined}
-                        title={`${item.title} — ${item.description}`}
-                        className={cn("owner-nav-item group", isActive && "is-active")}
-                      >
-                        <Icon className="size-[17px] shrink-0" aria-hidden="true" />
-                        <span className="min-w-0 flex-1">
-                          <span className="owner-nav-title">{item.title}</span>
-                          <span className="owner-nav-description">{item.description}</span>
-                        </span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <NavGroup label="Every day" items={APP_NAV_ITEMS} current={current} />
+        <NavGroup label="More" items={MORE_NAV_ITEMS} current={current} />
       </SidebarContent>
 
       <SidebarFooter className="owner-sidebar-footer">
         <span>Private owner workspace</span>
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+function NavGroup({ label, items, current }: { label: string; items: AppNavItem[]; current: string | undefined }) {
+  return (
+    <SidebarGroup>
+      <div className="owner-sidebar-section-label">{label}</div>
+      <SidebarGroupContent>
+        <SidebarMenu className="gap-1.5">
+          {items.map((item) => {
+            const isActive = current === item.url;
+            const Icon = item.icon;
+
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton asChild isActive={isActive}>
+                  <Link
+                    href={item.url}
+                    data-active={isActive ? "true" : "false"}
+                    aria-current={isActive ? "page" : undefined}
+                    title={`${item.title}: ${item.description}`}
+                    className={cn("owner-nav-item group", isActive && "is-active")}
+                  >
+                    <Icon className="size-[17px] shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 flex-1">
+                      <span className="owner-nav-title">{item.title}</span>
+                      <span className="owner-nav-description">{item.description}</span>
+                    </span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }

@@ -8,7 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { AppSidebar } from "@/components/app-sidebar";
 import { LayoutBreadcrumb } from "@/components/layout-breadcrumb";
-import { APP_NAV_ITEMS, getNavItemForPath } from "@/lib/navigation";
+import { APP_NAV_ITEMS, MORE_NAV_ITEMS, getNavItemForPath } from "@/lib/navigation";
 import { isPublicPath } from "@/lib/public-paths";
 import { cn } from "@/lib/utils";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -172,23 +172,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The places used all day; Settings and the account actions live under More. */
-const PRIMARY_URLS = ["/dashboard", "/fcc"];
-
 /**
- * Phone navigation (the home-screen app on iPhone): thumb-sized tabs and a More sheet,
- * clear of the home indicator.
+ * Phone navigation (the home-screen app on iPhone): Today, Replies, Campaigns and a More sheet
+ * (inboxes, the do-not-email list, the FCC archive, settings and the account actions), thumb-sized
+ * and clear of the home indicator.
  */
 function MobileTabBar({ pathname, email, onChangePicture, onSignOut }: { pathname: string | null; email: string; onChangePicture: () => void; onSignOut: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
-  const primary = APP_NAV_ITEMS.filter((item) => PRIMARY_URLS.includes(item.url));
-  const more = APP_NAV_ITEMS.filter((item) => !PRIMARY_URLS.includes(item.url));
+  const primary = APP_NAV_ITEMS;
+  const more = MORE_NAV_ITEMS;
   const current = getNavItemForPath(pathname)?.url;
   const moreActive = more.some((item) => item.url === current);
 
   return (
     <nav aria-label="Primary" className="owner-mobile-nav fixed inset-x-0 bottom-0 z-50 md:hidden">
-      <div className="grid grid-cols-3">
+      <div className="grid grid-cols-4">
         {primary.map((item) => {
           const active = item.url === current;
           const Icon = item.icon;
@@ -202,7 +200,7 @@ function MobileTabBar({ pathname, email, onChangePicture, onSignOut }: { pathnam
         })}
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <button type="button" className={cn("owner-mobile-nav-item", moreActive ? "is-active" : "")}>
+            <button type="button" aria-current={moreActive ? "page" : undefined} className={cn("owner-mobile-nav-item", moreActive ? "is-active" : "")}>
               <MoreHorizontal className="size-[22px]" aria-hidden="true" />
               <span>More</span>
             </button>

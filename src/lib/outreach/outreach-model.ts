@@ -14,7 +14,18 @@ export type CampaignRules = {
   noLinksInFirst?: boolean;
   /** An automatic reply (out of office) stops the follow-ups, as a person's reply does. Default true. */
   stopOnAutoReply?: boolean;
+  /**
+   * What the founders call this campaign's success number, e.g. "Price requests" for cities. It counts the
+   * replies a founder marked on the Replies screen. Nothing about sending reads it.
+   */
+  successLabel?: string;
 };
+
+/** The name of a campaign's success number (the replies a founder marked as the ones that count). */
+export function successLabelOf(campaign: { rules: CampaignRules }) {
+  const label = typeof campaign.rules.successLabel === "string" ? campaign.rules.successLabel.trim().slice(0, 40) : "";
+  return label || "Interested replies";
+}
 
 export type Campaign = {
   key: string; name: string; state: "live" | "paused"; stateReason: string | null; stateBy: string | null; stateAt: string | null;
