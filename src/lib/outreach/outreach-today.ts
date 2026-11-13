@@ -77,7 +77,8 @@ export async function todayData(db: ProspectDb, fccFirstInbox: string | null | u
         SUM(c."status" = 'ready') AS ready, SUM(c."status" = 'held') AS held
       FROM "OutreachBatch" b LEFT JOIN "OutreachContact" c ON c."batchId" = b."id" WHERE b."status" IN ('waiting','approved') GROUP BY b."id" ORDER BY b."sendOrder"`).bind()
       .all<{ id: string; campaignKey: string; name: string; loadedAt: string; loadedBy: string; status: string; approvedWords: string | null; wordsVersion: string | null; ready: number | null; held: number | null }>(),
-    repliesToAnswer(db, 2),
+    // A few more than the card shows, so each founder's card can lead with the replies that are theirs to answer.
+    repliesToAnswer(db, 8),
     readReplyCheck(db),
   ]);
   const byKey = new Map(campaigns.map((campaign) => [campaign.key, campaign]));
@@ -154,9 +155,9 @@ export function needsYou(data: TodayData, viewer: string | null): NeedsYou {
       cards.push({
         key: "replies", tone: "gold", title: `${plural(mine, "reply", "replies")} for you to answer`,
         detail: others.length ? `${others.map((group) => `${group.count} more ${group.count === 1 ? "waits" : "wait"} for ${group.name}`).join(", ")}.` : undefined,
-        rows: data.toAnswer.newest.map((reply) => ({
+        rows: data.toAnswer.newest.filter((reply) => !reply.answerFromName || same(reply.answerFromName, viewer)).slice(0, 2).map((reply) => ({
           text: `${reply.organisation}: ${(reply.text ?? "Open it to read what they wrote.").replace(/\s+/g, " ").slice(0, 110)}`,
-          meta: `${reply.campaign} · ${reply.at ? whenText(reply.at) : "time unknown"} · answer from ${reply.answerFromName ? `${reply.answerFromName}'s inbox` : "the inbox it came to"}`,
+          meta: `${reply.campaign} · ${reply.at ? whenText(reply.at) : "time unknown"} · answer from ${reply.answerFromName ? "your inbox" : "the inbox it came to"}`,
         })),
         action: { label: "Open replies", href: "/replies" },
       });

@@ -118,7 +118,7 @@ function addBatch(key: string, name: string, options: { approved?: boolean; load
     options.approved ? "Approved on the Campaigns screen after reading the samples" : null, ++order, JSON.stringify(words), version);
   const add = (status: Status, extra: { hold?: string | null; sent?: { at: Date; from: string } | null; due?: string | null }) => {
     const index = seq++;
-    const place = PLACES[index % PLACES.length]! + (index >= PLACES.length ? ` ${Math.floor(index / PLACES.length) + 1}` : "");
+    const place = `${["", "North ", "East ", "South ", "West ", "Upper ", "New "][Math.floor(index / PLACES.length) % 7]}${PLACES[index % PLACES.length]!}`;
     const first = PEOPLE[index % PEOPLE.length]!;
     const email = `${first.toLowerCase()}.${slug(place)}@${slug(place)}.example`;
     const contact = `c-demo-${index}`;
@@ -161,20 +161,20 @@ addCampaign("agencies", "Agencies: overflow web work", { state: "paused", reason
 
 if (scenario !== "empty") {
   // Last week's batch: emailed, some answered, follow-ups coming, two on hold.
-  const a1 = addBatch("us-cities", "cities-A1", { approved: true, loadedDaysAgo: 9, emailed: 30, sentDaysAgo: 6, followUpOnHold: 2 });
+  const a1 = addBatch("us-cities", "cities-A1", { approved: true, loadedDaysAgo: 6, emailed: 30, sentDaysAgo: 4, followUpOnHold: 2 });
   const calm = scenario === "calm";
   reply(a1.rows[5]!, "reply", "Yes please, send the full report. Who would do the fixes, and roughly what would it cost?", RILEY, daysAgo(0, 16), calm ? { answeredBy: "Riley", success: true } : {});
   reply(a1.rows[8]!, "reply", "Thanks for this. Our website is run by the Communications Office, not my desk. Please write to them; I've copied their director.", AIDAN, daysAgo(1, 19),
     calm ? { answeredBy: "Aidan" } : { from: `comms@${slug(a1.rows[8]!.place)}.example` });
-  reply(a1.rows[11]!, "reply", "Could you send pricing for fixing the forms and the PDF agendas? We have budget set aside for the April deadline.", RILEY, daysAgo(3, 18), { answeredBy: "Riley", success: true });
-  reply(a1.rows[14]!, "no_thanks", "Not interested, thanks. Please take us off your list.", AIDAN, daysAgo(4, 17));
-  reply(a1.rows[17]!, "automatic", "I am out of the office until Monday and will answer when I'm back.", AIDAN, daysAgo(5, 20));
-  reply(a1.rows[20]!, "automatic", "Thank you for contacting the City Clerk's office. We answer within three business days.", RILEY, daysAgo(5, 21));
+  reply(a1.rows[11]!, "reply", "Could you send pricing for fixing the forms and the PDF agendas? We have budget set aside for the April deadline.", RILEY, daysAgo(2, 18), { answeredBy: "Riley", success: true });
+  reply(a1.rows[14]!, "no_thanks", "Not interested, thanks. Please take us off your list.", AIDAN, daysAgo(3, 17));
+  reply(a1.rows[17]!, "automatic", "I am out of the office until Monday and will answer when I'm back.", AIDAN, daysAgo(3, 20));
+  reply(a1.rows[20]!, "automatic", "Thank you for contacting the City Clerk's office. We answer within three business days.", RILEY, daysAgo(3, 21));
   // A reply the sender's own inbox check found before a follow-up: the contact says replied, no message was recorded.
-  stop(a1.rows[23]!, "replied", "They wrote back Nov 9, so no more emails", daysAgo(2, 16));
+  stop(a1.rows[23]!, "replied", "They wrote back, so no more emails", daysAgo(2, 16));
   if (calm) db.prepare(`UPDATE "OutreachContact" SET "status" = 'sent', "stoppedReason" = NULL, "nextDueDay" = ? WHERE "id" = ?`).run(addBusinessDays(today, 2), a1.rows[23]!.id);
-  bounce(a1.rows[26]!, daysAgo(6, 15));
-  bounce(a1.rows[28]!, daysAgo(6, 15));
+  bounce(a1.rows[26]!, daysAgo(4, 15));
+  bounce(a1.rows[28]!, daysAgo(4, 15));
 
   // Today's batch: 28 out so far, 12 still to go.
   const b1 = addBatch("us-cities", "cities-B1", { approved: true, loadedDaysAgo: 3, emailed: 28, ready: 12 });

@@ -83,8 +83,8 @@ export default async function RepliesPage({ searchParams }: { searchParams: Prom
               <Badge tone={reply.answeredAt ? "success" : KIND[reply.kind].tone}>{reply.answeredAt ? `Answered${reply.answeredBy ? ` by ${reply.answeredBy}` : ""}` : KIND[reply.kind].text}</Badge>
               {reply.success ? <Badge tone="gold">{reply.successLabel}</Badge> : null}
               <span>{reply.campaign}</span>
-              {reply.kind === "reply" && reply.answerFromName ? <span>· answer from <b className="owner-ink">{reply.answerFromName}&rsquo;s inbox</b></span> : null}
             </span>
+            {reply.kind === "reply" && reply.answerFromName && !reply.answeredAt ? <span className="owner-meta">Answer from <b className="owner-ink">{reply.answerFromName}&rsquo;s inbox</b></span> : null}
             <span className="owner-reply-preview">{reply.text ?? "Open it in Gmail to read what they wrote."}</span>
           </summary>
           <div className="owner-reply-body">

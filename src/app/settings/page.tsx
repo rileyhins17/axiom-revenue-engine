@@ -21,7 +21,7 @@ export default async function SettingsPage() {
 
   return (
     <OwnerPage>
-      <PageHeader eyebrow="Settings" title="Settings" description="Your account and the phone app. FCC emails are paused and resumed on the FCC screen." />
+      <PageHeader eyebrow="Settings" title="Settings" description="Your account and the phone app. Campaigns are paused and resumed on their own screens." />
       <SettingsAccount userProfile={userProfile} />
     </OwnerPage>
   );

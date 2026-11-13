@@ -90,6 +90,11 @@ export async function campaignCounts(db: ProspectDb, key: string, now = new Date
 
 /** When the campaign's next email goes, in plain English. */
 export function campaignNextSend(campaign: Campaign, counts: CampaignCounts, now: Date) {
+  // A sentence that ends on "a.m." or "p.m." already has its full stop.
+  return nextSendText(campaign, counts, now).replace(/\.\.$/, ".");
+}
+
+function nextSendText(campaign: Campaign, counts: CampaignCounts, now: Date) {
   if (campaign.problem) return `Can't send: ${campaign.problem}.`;
   if (!campaign.wordsVersion) return "Nothing can send yet: the email words aren't loaded.";
   if (campaign.state === "paused") return "Paused. Nothing sends until a founder presses Resume.";

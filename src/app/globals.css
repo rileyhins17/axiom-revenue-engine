@@ -3260,3 +3260,14 @@ nav[aria-label="Primary"] .text-zinc-700,
   .owner-search input:focus-visible { outline: 2px solid var(--owner-gold); outline-offset: 1px; }
   .owner-num { font-variant-numeric: tabular-nums; }
 }
+
+/* The Approve sheet: says what is about to happen, in the light palette. */
+.owner-confirm-sheet { background: var(--owner-white) !important; color: var(--owner-ink) !important; border-top: 1px solid var(--owner-line-strong) !important; border-radius: 22px 22px 0 0; padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
+.owner-confirm-sheet [data-slot="sheet-title"] { color: var(--owner-ink); font-family: var(--font-fraunces), Georgia, serif; font-size: 1.3rem; line-height: 1.3; padding-right: 28px; }
+.owner-confirm-sheet [data-slot="sheet-description"] { color: var(--owner-text); font-size: 14.5px; line-height: 1.55; }
+.owner-confirm-sheet [data-slot="sheet-close"] { color: var(--owner-muted); }
+@media (min-width: 768px) { .owner-confirm-sheet { left: 50% !important; right: auto !important; width: min(560px, 100vw); transform: translateX(-50%); border-radius: 22px 22px 0 0; } }
+@layer components {
+  .owner-table thead th, .owner-table tbody td:first-child { white-space: nowrap; }
+  @media (max-width: 639px) { .owner-table thead th, .owner-table tbody td { padding-left: 14px; padding-right: 14px; } }
+}

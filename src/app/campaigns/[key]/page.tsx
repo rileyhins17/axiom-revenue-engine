@@ -2,17 +2,21 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  AlertTriangle, BadgeCheck, CalendarClock, CheckCircle2, Clock, FileText, Inbox, Layers, ListChecks, Lock, MailCheck, MailSearch, MailX, PauseCircle, Reply, Send, Settings2, TrendingUp, Upload,
+  AlertTriangle, BadgeCheck, BarChart3, CalendarClock, CheckCircle2, Clock, FileText, Layers, MailSearch, MailX, PauseCircle, Search, Settings2, Upload, Users,
   type LucideIcon,
 } from "lucide-react";
 
 import { CampaignPauseButton } from "@/components/campaigns/campaign-actions";
 import { buttonVariants } from "@/components/ui/button";
-import { Badge, Empty, Notice, OwnerPage, PageHeader, Panel, StatCard, type Tone } from "@/components/owner/kit";
-import { getCloudflareBindings, getDatabase } from "@/lib/cloudflare";
-import { readKv } from "@/lib/outreach/outreach-control";
-import { OUTREACH_REPLY_STATE } from "@/lib/outreach/outreach-replies";
-import { campaignDetail, type CampaignDetail, type PersonRow } from "@/lib/outreach/outreach-status";
+import { Badge, Empty, Facts, Notice, OwnerPage, PageHeader, Panel, RowLink, StatCard, type Tone } from "@/components/owner/kit";
+import { getDatabase } from "@/lib/cloudflare";
+import { engineSetting } from "@/lib/engine-settings";
+import { readReplyCheck } from "@/lib/outreach/outreach-inbox-health";
+import { dayText, per100, plural, whenText } from "@/lib/outreach/outreach-format";
+import { findContacts, type ContactHit } from "@/lib/outreach/outreach-lookup";
+import { successLabelOf } from "@/lib/outreach/outreach-model";
+import { OUTREACH_AUTO_PAUSE_BY } from "@/lib/outreach/outreach-sender";
+import { campaignDetail, type BatchDetail, type BatchPhase, type CampaignDetail, type PersonRow } from "@/lib/outreach/outreach-status";
 import { campaignFooter } from "@/lib/outreach/outreach-words";
 import { ownerForAccount } from "@/lib/owner-login";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
@@ -22,40 +26,55 @@ import { withTimeout } from "@/lib/timeout";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Campaign | Axiom Revenue Engine" };
 
-const when = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
-const dayLabel = (day: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", weekday: "short", month: "short", day: "numeric" }).format(new Date(`${day}T17:00:00Z`));
 const clock = (minute: number) => `${Math.floor(minute / 60) % 12 || 12}:${String(minute % 60).padStart(2, "0")} ${minute < 720 ? "a.m." : "p.m."}`;
-
-const STATES: Record<"live" | "paused", { text: string; tone: Tone; icon: LucideIcon }> = {
-  live: { text: "Live", tone: "success", icon: CheckCircle2 },
-  paused: { text: "Paused", tone: "warning", icon: PauseCircle },
+const PHASES: Array<{ phase: BatchPhase; title: string; empty?: string }> = [
+  { phase: "waiting", title: "Waiting for approval" },
+  { phase: "sending", title: "Sending" },
+  { phase: "done", title: "Done" },
+  { phase: "stopped", title: "Stopped" },
+];
+const PHASE_BADGE: Record<BatchPhase, { text: string; tone: Tone }> = {
+  waiting: { text: "Waiting for approval", tone: "warning" }, sending: { text: "Sending", tone: "success" }, done: { text: "Done", tone: "neutral" }, stopped: { text: "Stopped", tone: "neutral" },
 };
-const BATCH: Record<string, { text: string; tone: Tone }> = {
-  waiting: { text: "Waiting for approval", tone: "warning" }, approved: { text: "Approved", tone: "success" }, stopped: { text: "Stopped", tone: "neutral" },
-};
 
-function People({ title, icon, empty, people }: { title: string; icon: LucideIcon; empty: string; people: PersonRow[] }) {
-  return <Panel title={title} icon={icon} count={people.length}>
+function BatchRowLink({ campaign, batch, approvers }: { campaign: string; batch: BatchDetail; approvers: string }) {
+  const held = batch.heldReasons.slice(0, 2).map((item) => `${item.reason.replace(/\.$/, "")} (${item.rows})`).join("; ");
+  const badge = batch.phase === "waiting" && batch.status === "approved" ? { text: "Words changed: approve again", tone: "warning" as Tone }
+    : batch.phase === "waiting" ? { text: `Waits for ${approvers}`, tone: "warning" as Tone } : PHASE_BADGE[batch.phase];
+  return <RowLink href={`/campaigns/${campaign}/batches/${batch.id}` as Route} title={<>{batch.name}<Badge tone={badge.tone}>{badge.text}</Badge></>}
+    meta={batch.approvedBy && batch.approvedAt ? `Approved by ${batch.approvedBy}, ${whenText(batch.approvedAt)}` : `Loaded by ${batch.loadedBy}, ${whenText(batch.loadedAt)}`}>
+    <span className="block text-sm owner-text">
+      {batch.phase === "waiting" ? <><span className="owner-num">{batch.ready}</span> {batch.ready === 1 ? "email goes" : "emails go"} once approved</>
+        : <><span className="owner-num">{batch.emailed}</span> emailed · <span className="owner-num">{batch.ready}</span> still to go{batch.followUpsLeft ? ` · ${plural(batch.followUpsLeft, "follow-up")} to come` : ""}</>}
+      {batch.emailed ? <> · {plural(batch.replies, "reply", "replies")} · {plural(batch.bounced, "bounce")}</> : null}
+    </span>
+    {batch.held ? <span className="owner-meta block">{batch.held} held, never sent{held ? `: ${held}` : ""}</span> : null}
+  </RowLink>;
+}
+
+function People({ id, title, icon, empty, people }: { id?: string; title: string; icon: LucideIcon; empty: string; people: PersonRow[] }) {
+  return <Panel id={id} title={title} icon={icon} count={people.length}>
     {people.length ? <ul className="owner-list">{people.map((person, index) => <li key={`${person.email}-${index}`}>
-      <p className="text-sm font-semibold">{person.label}</p>
-      <p className="owner-meta break-all">{person.email}{person.inbox ? ` · came to ${person.inbox}` : ""}</p>
-      {person.at ? <p className="owner-meta">{when(person.at)}</p> : null}
-      {person.note ? <p className="mt-1 text-sm text-[#3b3a36]">{person.note}</p> : null}
+      <p className="text-sm font-semibold owner-ink">{person.label}</p>
+      <p className="owner-meta break-all">{person.email}{person.at ? ` · ${whenText(person.at)}` : ""}</p>
+      {person.note ? <p className="mt-1 text-sm owner-text">{person.note}</p> : null}
     </li>)}</ul> : <Empty>{empty}</Empty>}
   </Panel>;
 }
 
-export default async function CampaignPage({ params }: { params: Promise<{ key: string }> }) {
+export default async function CampaignPage({ params, searchParams }: { params: Promise<{ key: string }>; searchParams: Promise<{ q?: string }> }) {
   const session = await requireSession();
   const { key } = await params;
-  const env = getCloudflareBindings() ?? {};
-  const firstInbox = typeof env.FCC_SENDER_ADDRESS === "string" ? env.FCC_SENDER_ADDRESS : null;
-  const mailing = typeof env.FCC_CAMPAIGN_MAILING_ADDRESS === "string" ? env.FCC_CAMPAIGN_MAILING_ADDRESS : "";
+  const query = ((await searchParams).q ?? "").trim().slice(0, 120);
+  const mailing = engineSetting("FCC_CAMPAIGN_MAILING_ADDRESS");
   let data: CampaignDetail | null;
   let replyCheck: { at?: string } | null = null;
+  let found: ContactHit[] = [];
   try {
     const db = getDatabase() as unknown as ProspectDb;
-    [data, replyCheck] = await withTimeout(Promise.all([campaignDetail(db, key, firstInbox), readKv<{ at?: string }>(db, OUTREACH_REPLY_STATE).catch(() => null)]), 12_000, "campaign");
+    [data, replyCheck, found] = await withTimeout(Promise.all([
+      campaignDetail(db, key, engineSetting("FCC_SENDER_ADDRESS")), readReplyCheck(db), query.length >= 2 ? findContacts(db, query, { campaign: key, limit: 25 }) : Promise.resolve([]),
+    ]), 12_000, "campaign");
   } catch {
     return <OwnerPage>
       <PageHeader eyebrow="Campaign" title="Campaign" />
@@ -64,115 +83,155 @@ export default async function CampaignPage({ params }: { params: Promise<{ key: 
   }
   if (!data) notFound();
   const { campaign, counts } = data;
-  const state = STATES[campaign.state];
   const owner = Boolean(ownerForAccount(session.user.email ?? ""));
+  const autoPaused = campaign.state === "paused" && campaign.stateBy === OUTREACH_AUTO_PAUSE_BY;
+  const approvers = campaign.approvers.join(" or ") || "its approver";
   const [first, second] = campaign.words.steps;
   const rules = Object.entries(campaign.rules.holdUnless ?? {}).map(([column, values]) => `${column} must be ${values.slice(0, 2).join(" or ")}`);
+  const label = successLabelOf(campaign);
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Toronto" });
+  const coming = data.followUps.coming.filter((row) => row.day > today);
+  const withResults = data.batches.filter((batch) => batch.emailed > 0);
 
   return <OwnerPage>
     <PageHeader eyebrow={<Link href={"/campaigns" as Route} className="hover:underline">Campaigns</Link>} title={campaign.name}
-      status={<Badge tone={state.tone} icon={state.icon}>{state.text}</Badge>} description={campaign.note ?? undefined} />
+      status={campaign.state === "live" ? <Badge tone="success" icon={CheckCircle2}>Live</Badge>
+        : <Badge tone={autoPaused ? "danger" : "warning"} icon={PauseCircle}>{autoPaused ? "Paused itself" : "Paused"}</Badge>}
+      description={campaign.note ?? undefined} />
 
     {campaign.problem ? <Notice tone="danger" icon={AlertTriangle} title="This campaign can't send." role="alert">Its settings can&rsquo;t be used: {campaign.problem}.</Notice> : null}
 
+    {/* 1. Where it stands, and the switch */}
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
       <Panel title="Next send" icon={CalendarClock}>
-        <p className="text-lg font-medium leading-snug">{data.nextSend}</p>
+        <p className="text-lg font-medium leading-snug owner-ink">{data.nextSend}</p>
         {campaign.state === "paused" && campaign.stateReason
-          ? <div className="mt-4"><Notice tone="warning" icon={AlertTriangle} title={`Paused${campaign.stateBy ? ` by ${campaign.stateBy}` : ""}${campaign.stateAt ? `, ${when(campaign.stateAt)}` : ""}`}>{campaign.stateReason}</Notice></div>
+          ? <div className="mt-4"><Notice tone={autoPaused ? "danger" : "warning"} icon={AlertTriangle} title={`Paused${campaign.stateBy ? ` by ${campaign.stateBy}` : ""}${campaign.stateAt ? `, ${whenText(campaign.stateAt)}` : ""}`}>{campaign.stateReason}</Notice></div>
           : null}
-        <ul className="mt-4 space-y-1.5 text-sm text-[#5c584f]">
-          {data.lastRun ? <li className="flex gap-2"><Clock className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>Last check {when(data.lastRun.at)}: {data.lastRun.note}</span></li> : null}
-          <li className="flex gap-2"><MailSearch className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{replyCheck?.at ? `Inboxes last read for replies ${when(replyCheck.at)}.` : "Inboxes are read for replies every hour, 7 a.m. to 9 p.m., once this campaign has sent."}</span></li>
-          <li className="flex gap-2"><BadgeCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>Batches are approved by {campaign.approvers.join(" or ") || "nobody yet"}.</span></li>
+        <ul className="mt-4 space-y-1.5 text-sm" style={{ color: "var(--owner-muted)" }}>
+          {data.lastRun ? <li className="flex gap-2"><Clock className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>Last check {whenText(data.lastRun.at)}: {data.lastRun.note}</span></li> : null}
+          <li className="flex gap-2"><MailSearch className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{replyCheck?.at ? `Inboxes last read for replies ${whenText(replyCheck.at)}` : "Inboxes are read for replies every hour, 7 a.m. to 9 p.m., once this campaign has sent."}</span></li>
+          <li className="flex gap-2"><BadgeCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>Batches are approved by {approvers}.</span></li>
         </ul>
       </Panel>
-      <Panel title="Pause or resume" icon={PauseCircle}>
+      <Panel title={campaign.state === "live" ? "Pause" : "Resume"} icon={PauseCircle}>
         {owner ? <CampaignPauseButton campaign={campaign.key} state={campaign.state} /> : <Empty>Only Riley or Aidan can pause or resume campaigns.</Empty>}
       </Panel>
     </div>
 
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
-      <StatCard icon={Send} label="Sent today" value={counts.sentToday} detail={`of today's ${campaign.dailyLimit}`} />
-      <StatCard icon={MailCheck} label="Emailed" value={counts.emailed} detail={`${counts.followUpsSent} follow-ups sent`} />
-      <StatCard icon={Inbox} label="Ready to send" value={counts.ready} detail={counts.waiting ? `${counts.waiting} more waiting for approval` : "In approved batches"} />
-      <StatCard icon={Lock} label="Held" value={counts.held} detail="Never sent: see each batch for why" />
-      <StatCard icon={Reply} label="Replies" value={counts.replies} detail={`${counts.noThanks} said no thanks, plus ${counts.automatic} automatic`} />
-      <StatCard icon={MailX} label="Bounced" value={counts.bounced} detail={`${counts.stopped} stopped by us`} />
-      <StatCard icon={CalendarClock} label="Follow-ups due" value={counts.followUpsDue} detail={campaign.followUps ? `${campaign.followUpBusinessDays} business days after the first email` : "No follow-up"} />
-      <StatCard icon={AlertTriangle} label="Problems" value={counts.failed} detail="Gmail refused; waits for a person" />
-    </div>
+    {/* 2. Batches: what waits for an approval first */}
+    <Panel id="batches" title="Batches" icon={Layers} count={data.batches.length}
+      description="Each loaded list. Open one to read its sample emails and its held rows."
+      action={owner ? <Link href={`/campaigns/${campaign.key}/load` as Route} className={buttonVariants({ variant: "outline", size: "sm" })}><Upload aria-hidden="true" />Load a list</Link> : undefined}>
+      {data.batches.length ? <div className="space-y-5">
+        {PHASES.map(({ phase, title }) => {
+          const batches = data!.batches.filter((batch) => batch.phase === phase);
+          if (!batches.length) return null;
+          return <div key={phase}>
+            <p className="owner-section-label mb-1">{title} ({batches.length})</p>
+            <ul className="owner-rows">{batches.map((batch) => <li key={batch.id}><BatchRowLink campaign={campaign.key} batch={batch} approvers={approvers} /></li>)}</ul>
+          </div>;
+        })}
+      </div> : <Empty>No list loaded yet.{owner ? " Load one to get started." : ""}</Empty>}
+    </Panel>
+
+    {/* 3. Numbers */}
+    <section aria-label="Numbers" className="space-y-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatCard label="Sent today" value={counts.sentToday} detail={`of today's ${campaign.dailyLimit}`} />
+        <StatCard label="Emailed" value={counts.emailed} detail={`${plural(counts.followUpsSent, "follow-up")} sent too`} />
+        <StatCard href={`/replies?filter=all&campaign=${campaign.key}` as Route} label="Replies" value={counts.replies}
+          detail={`${per100(counts.replies, counts.emailed) ?? "0.0"} per 100 emailed · ${counts.noThanks} no thanks · ${counts.automatic} automatic`} />
+        <StatCard href={`/replies?filter=all&campaign=${campaign.key}` as Route} label={label} value={data.success}
+          detail={`${per100(data.success, counts.emailed) ?? "0.0"} per 100 emailed. Marked on the Replies screen.`} />
+        <StatCard label="Bounced" value={counts.bounced} detail={`${per100(counts.bounced, counts.emailed) ?? "0.0"} per 100 emailed`} />
+        <StatCard label="Ready to send" value={counts.ready} detail={counts.waiting ? `${counts.waiting} more wait for approval` : "In approved batches"} />
+        <StatCard label="Follow-ups due" value={counts.followUpsDue} detail={campaign.followUps ? `${coming.reduce((sum, row) => sum + row.people, 0)} more coming` : "This campaign sends no follow-up"} />
+        <StatCard label="Held" value={counts.held} detail="Never sent: each batch says why" />
+      </div>
+
+      {campaign.followUps && (coming.length || data.followUps.onHold) ? <Panel title="Follow-ups" icon={CalendarClock}
+        description={`One follow-up ${campaign.followUpBusinessDays} business days after the first email, in the same thread, only to people who haven't replied.`}>
+        {data.followUps.onHold ? <div className="mb-4"><Notice tone="warning" icon={PauseCircle} title={`${plural(data.followUps.onHold, "follow-up")} on hold`}>
+          These people got their first email, and their follow-up has no day set, so it won&rsquo;t go. Claude can put them back on a day when a founder says so.
+        </Notice></div> : null}
+        {coming.length ? <Facts items={coming.slice(0, 8).map((row) => ({ label: dayText(row.day), value: plural(row.people, "follow-up") }))} /> : <Empty>No follow-up is scheduled.</Empty>}
+      </Panel> : null}
+
+      {withResults.length ? <Panel title="Numbers by batch" icon={BarChart3} flush>
+        <div className="overflow-x-auto"><table className="owner-table min-w-[560px]">
+          <thead><tr><th>Batch</th><th className="text-right">Emailed</th><th className="text-right">Replies</th><th className="text-right">No thanks</th><th className="text-right">Bounced</th><th className="text-right">{label}</th></tr></thead>
+          <tbody>{withResults.map((batch) => <tr key={batch.id}>
+            <td className="font-semibold"><Link className="hover:underline" href={`/campaigns/${campaign.key}/batches/${batch.id}` as Route}>{batch.name}</Link></td>
+            <td className="text-right owner-num">{batch.emailed}</td><td className="text-right owner-num">{batch.replies}</td><td className="text-right owner-num">{batch.noThanks}</td>
+            <td className="text-right owner-num">{batch.bounced}</td><td className="text-right owner-num">{batch.success}</td>
+          </tr>)}</tbody>
+        </table></div>
+      </Panel> : null}
+
+      {data.days.length ? <Panel title="Emails out per day" icon={BarChart3} flush>
+        <div className="overflow-x-auto"><table className="owner-table min-w-[340px]">
+          <thead><tr><th>Day</th><th className="text-right">First</th><th className="text-right">Follow-up</th><th className="text-right">Total</th></tr></thead>
+          <tbody>{data.days.slice(0, 10).map((row) => <tr key={row.day}><td className="font-semibold">{dayText(row.day)}</td><td className="text-right owner-num">{row.first}</td>
+            <td className="text-right owner-num">{row.followUps}</td><td className="text-right owner-num">{row.first + row.followUps}</td></tr>)}</tbody>
+        </table></div>
+      </Panel> : null}
+    </section>
+
+    {/* 4. The words */}
+    <Panel title="The words" icon={FileText} description="Each batch keeps the words it was loaded with. These are the latest, filled in when the next list is loaded. Blanks in {braces} come from each row.">
+      {first ? <div className="space-y-4">
+        <div className="owner-email">
+          <div className="owner-email-head"><p><span>First email · Subject:</span> <b>{first.subject}</b></p></div>
+          <pre className="owner-email-body">{first.body}</pre>
+        </div>
+        {second ? <div className="owner-email">
+          <div className="owner-email-head"><p><span>Follow-up, {campaign.followUpBusinessDays} business days later · Subject:</span> Re: the first email&rsquo;s subject</p></div>
+          <pre className="owner-email-body">{second.body}</pre>
+        </div> : null}
+        <div><p className="owner-meta">The engine adds this under every email</p><pre className="mt-1 whitespace-pre-wrap font-sans text-sm" style={{ color: "var(--owner-muted)" }}>{campaignFooter(mailing || "(the mailing address)")}</pre></div>
+      </div> : <Empty>No words loaded yet. They come with the first list.</Empty>}
+    </Panel>
+
+    {/* 5. Schedule and limits: read-only here */}
+    <Panel title="Schedule and limits" icon={Settings2} description="Read-only. Changing a limit, an inbox or who is emailed takes both founders' yes; ask Claude.">
+      <Facts items={[
+        { label: "Send days", value: `${campaign.sendDays.join(", ")}, ${clock(campaign.windowStart)} to ${clock(campaign.windowEnd)} Toronto time` },
+        ...(campaign.startDay || campaign.endDay ? [{ label: "Runs", value: `${campaign.startDay ? `from ${dayText(campaign.startDay)}` : ""}${campaign.endDay ? ` to ${dayText(campaign.endDay)}` : ""}`.trim() }] : []),
+        { label: "Daily limit", value: `${campaign.dailyLimit} emails, follow-ups included` },
+        ...data.inboxes.map((inbox) => ({ label: `${inbox.name.split(" ")[0]}'s inbox`, value: `${inbox.sentByCampaign} of ${inbox.perDay} today (the whole inbox: ${inbox.inboxSent} of ${inbox.inboxDayMax})` })),
+        { label: "Follow-up", value: campaign.followUps ? `${campaign.followUps}, ${campaign.followUpBusinessDays} business days after the email before` : "None" },
+        { label: "Approved by", value: approvers },
+        { label: "A row is held when", value: [...rules, "a blank the words use is empty", campaign.rules.noLinksInFirst ? "the first email would carry a link" : null, "its domain has no mail server", "the address is on the do-not-email list"].filter(Boolean).join("; ") },
+        { label: "Judged by", value: label },
+      ]} />
+      <p className="owner-meta mt-3"><Link className="owner-link" href={"/inboxes" as Route}>See the inboxes</Link></p>
+    </Panel>
+
+    {/* 6. People */}
+    <Panel id="people" title="People" icon={Users} description="Find anyone on this campaign's lists by email address or organisation: where they stand, what they got, and whether they replied.">
+      <form action={`/campaigns/${campaign.key}#people`} method="get" className="owner-search" role="search">
+        <input type="search" name="q" defaultValue={query} placeholder="Address or organisation" aria-label="Find a person or organisation" autoComplete="off" autoCapitalize="none" spellCheck={false} />
+        <button type="submit" className={buttonVariants({ size: "lg" })}><Search aria-hidden="true" /><span className="sr-only sm:not-sr-only">Find</span></button>
+      </form>
+      {query.length >= 2 ? <div className="mt-4">
+        {found.length ? <ul className="owner-list">{found.map((person) => <li key={person.id}>
+          <p className="text-sm font-semibold owner-ink">{person.organisation}{person.person ? <span className="font-normal owner-text"> · {person.person}</span> : null}</p>
+          <p className="owner-meta break-all">{person.email} · batch {person.batch}</p>
+          <p className="mt-1 text-sm owner-text">{person.statusText}{person.emailsSent ? `. ${plural(person.emailsSent, "email")} sent${person.firstSentAt ? `, the first ${whenText(person.firstSentAt)}` : ""}` : ""}{person.replies ? `. ${plural(person.replies, "reply", "replies")} recorded` : ""}.</p>
+          {person.reason ? <p className="owner-meta">{person.reason}</p> : null}
+        </li>)}</ul> : <Empty>Nobody on this campaign&rsquo;s lists matches &ldquo;{query}&rdquo;.</Empty>}
+      </div> : null}
+    </Panel>
 
     <div className="grid gap-4 lg:grid-cols-2">
-      <Panel title="Inboxes today" icon={Inbox} flush description="This campaign's share, and the whole inbox with FCC and every campaign.">
-        {data.inboxes.length ? <div className="overflow-x-auto"><table className="owner-table min-w-[460px]">
-          <thead><tr><th>Inbox</th><th className="text-right">This campaign</th><th className="text-right">Whole inbox</th></tr></thead>
-          <tbody>{data.inboxes.map((inbox) => <tr key={inbox.address}>
-            <td><p className="font-semibold">{inbox.name}</p><p className="owner-meta break-all">{inbox.address}</p></td>
-            <td className="text-right tabular-nums">{inbox.sentByCampaign} of {inbox.perDay}</td>
-            <td className="text-right tabular-nums">{inbox.inboxSent} of {inbox.inboxDayMax}<p className="owner-meta">{inbox.inboxCapNow} allowed so far today</p></td>
-          </tr>)}</tbody>
-        </table></div> : <div className="px-5 py-6 sm:px-6"><Empty>No inbox sends this campaign.</Empty></div>}
-      </Panel>
-      <Panel title="Settings" icon={Settings2}>
-        <ul className="owner-list text-sm text-[#3b3a36]">
-          <li>{campaign.sendDays.join(", ")} from {clock(campaign.windowStart)} to {clock(campaign.windowEnd)} Toronto time{campaign.startDay ? `, from ${dayLabel(campaign.startDay)}` : ""}{campaign.endDay ? ` to ${dayLabel(campaign.endDay)}` : ""}.</li>
-          <li>Up to {campaign.dailyLimit} a day, follow-ups included, one every 1 to 3 minutes. Follow-ups go before new first emails.</li>
-          <li>{campaign.followUps ? `${campaign.followUps} follow-up${campaign.followUps === 1 ? "" : "s"}, ${campaign.followUpBusinessDays} business days apart, in the same thread from the same inbox.` : "No follow-up."} Any reply, bounce or &ldquo;no thanks&rdquo; stops it for good.</li>
-          <li>Held when: {[...rules, "a blank the words use is empty", campaign.rules.noLinksInFirst ? "the first email would carry a link or web address" : null, "the address is on the do-not-email list"].filter(Boolean).join("; ")}.</li>
-          <li>Words version {campaign.wordsVersion ?? "not loaded"}.</li>
-        </ul>
-      </Panel>
-    </div>
-
-    <Panel title="Latest email words" icon={FileText} description="Each batch keeps the words it was loaded with; these are the latest, filled in when the next list is loaded. Blanks in {braces} come from each row; the engine adds the footer.">
-      {first ? <div className="space-y-4 text-sm">
-        <div><p className="owner-meta">First email · Subject</p><p className="font-semibold">{first.subject}</p>
-          <pre className="mt-2 whitespace-pre-wrap font-sans text-[#3b3a36]">{first.body}</pre></div>
-        {second ? <div><p className="owner-meta">Follow-up · Subject: Re: the first email&rsquo;s subject</p><pre className="mt-2 whitespace-pre-wrap font-sans text-[#3b3a36]">{second.body}</pre></div> : null}
-        <div><p className="owner-meta">Footer on every email</p><pre className="mt-1 whitespace-pre-wrap font-sans text-[#5c584f]">{campaignFooter(mailing || "(the mailing address)")}</pre></div>
-      </div> : <Empty>No words loaded yet.</Empty>}
-    </Panel>
-
-    <Panel title="Batches" icon={Layers} flush description="Each loaded list. Open one to read its sample emails, its held rows, and approve it."
-      action={owner ? <Link href={`/campaigns/${campaign.key}/load` as Route} className={buttonVariants({ variant: "outline", size: "sm" })}><Upload aria-hidden="true" />Load a list</Link> : undefined}>
-      {data.batches.length ? <div className="overflow-x-auto"><table className="owner-table min-w-[640px]">
-        <thead><tr><th>Batch</th><th>Loaded</th><th>Status</th><th className="text-right">Ready</th><th className="text-right">Held</th><th className="text-right">Emailed</th><th className="text-right">Stopped</th></tr></thead>
-        <tbody>{data.batches.map((batch) => {
-          const status = batch.status === "approved" && !batch.wordsCurrent ? { text: "Words changed: approve again", tone: "warning" as Tone } : BATCH[batch.status] ?? { text: batch.status, tone: "neutral" as Tone };
-          return <tr key={batch.id}>
-            <td className="font-semibold"><Link className="hover:underline" href={`/campaigns/${campaign.key}/batches/${batch.id}` as Route}>{batch.name}</Link></td>
-            <td className="whitespace-nowrap">{when(batch.loadedAt)}<p className="owner-meta">by {batch.loadedBy}</p></td>
-            <td><Badge tone={status.tone}>{status.text}</Badge>{batch.approvedBy && batch.approvedAt ? <p className="owner-meta">{batch.approvedBy}, {when(batch.approvedAt)}</p> : null}</td>
-            <td className="text-right tabular-nums">{batch.ready}</td><td className="text-right tabular-nums">{batch.held}</td>
-            <td className="text-right tabular-nums">{batch.emailed}</td><td className="text-right tabular-nums">{batch.stopped}</td>
-          </tr>;
-        })}</tbody>
-      </table></div> : <div className="px-5 py-6 sm:px-6"><Empty>No list loaded yet.</Empty></div>}
-    </Panel>
-
-    <div className="grid gap-4 lg:grid-cols-3">
-      <People title="Replies" icon={Reply} people={data.replies} empty="No replies yet." />
       <People title="Bounces" icon={MailX} people={data.bounces} empty="Nothing has bounced." />
-      <People title="Problems" icon={AlertTriangle} people={data.problems} empty="No email has failed to send." />
+      <People id="problems" title="Problems" icon={AlertTriangle} people={data.problems} empty="No email has failed to send." />
     </div>
 
-    <Panel title="Emails out per day" icon={TrendingUp} flush>
-      {data.days.length ? <div className="overflow-x-auto"><table className="owner-table min-w-[360px]">
-        <thead><tr><th>Day</th><th className="text-right">First</th><th className="text-right">Follow-up</th><th className="text-right">Total</th></tr></thead>
-        <tbody>{data.days.map((row) => <tr key={row.day}><td className="font-semibold">{dayLabel(row.day)}</td><td className="text-right tabular-nums">{row.first}</td>
-          <td className="text-right tabular-nums">{row.followUps}</td><td className="text-right tabular-nums">{row.first + row.followUps}</td></tr>)}</tbody>
-      </table></div> : <div className="px-5 py-6 sm:px-6"><Empty>Nothing sent yet.</Empty></div>}
-    </Panel>
-
-    <Panel title="How this campaign sends" icon={ListChecks}>
-      <ul className="owner-list text-sm text-[#3b3a36]">
-        <li>Only approved batches send, and only on the words they were approved on.</li>
-        <li>It shares each inbox with FCC and other campaigns: no inbox goes over its safe daily amount, and campaigns go before FCC.</li>
-        <li>It pauses itself when 3 of its own emails bounce in a day, on a Google warning, or when Gmail refuses a send or a login. Only a founder&rsquo;s Resume restarts it.</li>
-        <li>An inbox with 3 bounces in a day, from any campaign or FCC, sends nothing more that day and starts again the next morning. Nothing is paused.</li>
-        <li>Every hour from 7 a.m. to 9 p.m. both inboxes are read for replies. A reply stops that person&rsquo;s follow-ups; a &ldquo;no thanks&rdquo; also puts them on the do-not-email list for every campaign.</li>
-      </ul>
-    </Panel>
+    {/* 7. Load a list */}
+    {owner ? <Panel title="Load a list" icon={Upload} description={`Check a list against this campaign's words and rules, then load it as a batch. Nothing in it sends until ${approvers} approves it.`}>
+      <Link href={`/campaigns/${campaign.key}/load` as Route} className={buttonVariants({ variant: "outline", size: "lg" })}><Upload aria-hidden="true" />Load a list</Link>
+    </Panel> : null}
   </OwnerPage>;
 }
