@@ -27,6 +27,13 @@ Older entries from the retired website campaign are in git history before 2026-1
 - **Prevention:** never cache a promise (or anything pending) in module scope. Watch
   the Worker logs for `page_timeout` and `step_timeout` events: each names the step.
 
+## TEST-001 — A test passed for a week, then failed on the live branch with no code change
+
+- **Symptom:** Nov 13: `npm test` on the untouched live branch failed 1 of 186 ("the hourly reply check reads every inbox ...": "Missing expected rejection"). It had passed at every release up to Nov 5.
+- **Cause:** the sender stamps `firstSentAt` with the real clock, and the test's made-up replies were dated Nov 9. Once the real date passed Nov 9, every reply read as older than the email it answered and was skipped.
+- **Fix (2026-11-13):** the test sets `firstSentAt` to the morning its fixtures are dated.
+- **Prevention:** a fixture with a real date needs every clock pinned, including ones the code under test reads for itself. After writing such a test, run it with the system date moved a month ahead (`faketime`, or temporarily shift the fixture dates back).
+
 ## MAIL-001 — A bounce from another mail server went unrecorded
 
 - **Symptom:** Nov 3: a Nov 6 email to a Purelymail-hosted address came back two seconds

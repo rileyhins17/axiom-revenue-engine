@@ -1,4 +1,4 @@
-# Campaigns: every outreach list beside FCC
+# Campaigns: every outreach list
 
 **What it is (Riley, Nov 5 2026).** The engine is the one sender for all our outreach. Each campaign has its own list (a CSV with any columns), email words with `{column}` blanks, schedule, daily limit, follow-up, Pause button and numbers, on the Campaigns screen (operations.getaxiom.ca/campaigns). FCC keeps its own code and screen until it stops; it shares the inboxes with the campaigns. Adding an avenue takes a list, the words, a schedule and a founder's OK: rows and SQL, never new code. Decision: `docs/adr/0065-campaigns-beside-fcc.md`.
 
@@ -16,6 +16,14 @@
 - **Mail servers.** Loading a list looks up every email domain (Cloudflare DNS over HTTPS): a domain with no mail server, a "null MX" or no such domain holds its rows ("... has no mail server, so the email would bounce"). A lookup that keeps failing stops the load; nothing is written. Batches should still arrive checked by Emailable (Aidan's side); the engine doesn't call it.
 - **Every bounce** goes on `EngineEmailSuppression` (`BOUNCED`), which FCC also reads, so nobody who bounced anywhere is emailed again.
 - **Test emails** go only to Riley's or Aidan's own inbox (`TEST_INBOXES`, fixed in code): "Send me a test" on a batch queues 3 samples and their follow-ups; the 15-minute check sends them.
+
+## The screens (Nov 13)
+
+- **Today** shows what needs each founder: a campaign that paused itself, replies to answer, batches waiting for their Approve, an inbox resting. Only a campaign's approver gets the Approve card; the other founder sees "waits for Aidan".
+- **Replies** lists every reply with the inbox to answer from. Answer in Gmail from the inbox that sent the email, then press **Mark answered**. Press **Count it in price requests** (the campaign's own label) on a reply that is the result the campaign is after: that count is the campaign's success number on Today, the campaign page and the Monday email. Both marks can be undone, and neither changes anything about sending or mail.
+- **A campaign's success label** is `successLabel` in its `rulesJson`; without one the number is called "Interested replies". To name it (no release): `npx tsx scripts/outreach.ts settings-sql us-cities <out\s.sql> 'rulesJson={...the current rules..., "successLabel":"Price requests"}'`, keeping every rule already there.
+- **Follow-ups on hold.** A person whose first email went and whose follow-up day was cleared (`nextDueDay` empty while `status` is `sent`) shows on the campaign page as "follow-up on hold". The sender skips them until a day is set again.
+- **Inboxes** and the **Do-not-email list** (under More) are read-only.
 
 ## Cities (Aidan's second path, item 4)
 
@@ -62,7 +70,7 @@ Run the file with `wrangler d1 execute ... --file`. The campaign starts paused a
 
 ## Check
 
-- Screen: operations.getaxiom.ca/campaigns (numbers, next send, last check, batches, replies, bounces, problems).
+- Screens: Today (what needs you, sending per inbox), Campaigns (numbers, next send, last check, batches, people, bounces, problems), Replies, More → Inboxes.
 - Logs: each minute an `outreach_tick` line (per inbox: `SENT`, `CHECKED`, `PAUSED` or why it skipped) beside FCC's `fcc_campaign` line.
 - SQL: `SELECT "status", COUNT(*) FROM "OutreachContact" WHERE "campaignKey" = 'us-cities' GROUP BY 1;`
 - A contact marked `failed` waits for a person: set it back to `ready` (first email) or `sent` (follow-up) to retry.

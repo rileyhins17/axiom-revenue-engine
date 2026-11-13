@@ -5,23 +5,21 @@ no personal details, contact lists or prices beyond what the emails themselves s
 
 ## The business
 
-- Axiom ([axiominternational.ca](https://axiominternational.ca/fcc-filings/)) helps US
-  voice providers with their listing in the FCC's Robocall Mitigation Database. Every
-  listing must be recertified by March 1 each year, and about 3,600 providers show no
-  2026 recertification.
-- The first email offers a free short list of what looks out of date on the listing.
-  Paid help after that is a flat price, stated in the email: Axiom prepares the updates
-  and a fresh mitigation plan, and the provider's own officer files them from their own
-  FCC login. Axiom never holds a login, isn't a law firm and gives no legal advice.
-- When a listing's Recertify button looks closed, the first email offers only the free
-  list, with no price (copy v8, Nov 3).
+- Axiom is Riley and Aidan's web studio. It finds work by email: each campaign is one list
+  and one offer (US cities and counties: a free website accessibility report ahead of the
+  April 2027 deadline; school districts; the next list after that).
+- The founders judge each campaign at their Thursday meeting by a few numbers: emails sent,
+  real replies, no thanks, bounces, and the campaign's own success number (cities: requests
+  for the report or a price, per 100 emailed).
+- The first campaign, FCC filing help for US voice providers, ran Oct 26 to Nov 11, 2026 and
+  was ended by both founders on Nov 12. Its record is kept.
 
 ## The engine's job
 
-Send the FCC emails from the founders' Gmail inboxes, follow up in the same thread, find
-replies and bounces, stop itself when something looks wrong, tell both founders, and show
-what happened. Nothing else. Calls, lead search, the website campaign and AI drafting
-were removed on 2026-11-03 ([ADR 0064](adr/0064-fcc-only-engine.md)).
+Send each campaign's emails from the founders' Gmail inboxes, follow up in the same thread,
+find replies and bounces, stop itself when something looks wrong, tell both founders, and show
+what needs them. Nothing else. Leads and conversations live in Axiom Command, not here: the
+engine finds the reply, a founder answers it from Gmail.
 
 ## Who decides
 

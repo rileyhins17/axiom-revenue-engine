@@ -1,60 +1,75 @@
 # Axiom Revenue Engine
 
-Axiom's outreach engine: the one sender for every outreach list. Campaigns (US cities from Nov 9,
-agencies next) and the FCC filing emails go from the founders' Gmail inboxes on weekdays, follows up in the same thread, checks the inboxes for replies
-and bounces, pauses itself when something looks wrong, and shows Riley and Aidan
-what happened at [operations.getaxiom.ca](https://operations.getaxiom.ca).
+Axiom's outreach sender and reply catcher. Every campaign (US cities and counties, school
+districts, and whatever list comes next) goes from the founders' Gmail inboxes on weekdays,
+follows up in the same thread, reads the inboxes for replies and bounces, pauses itself when
+something looks wrong, and shows Riley and Aidan what needs them at
+[operations.getaxiom.ca](https://operations.getaxiom.ca). FCC, the first campaign, ended on
+Nov 12, 2026; its record is kept as an archive ([ADR 0066](docs/adr/0066-outreach-first-engine.md)).
 
 ## Screens
 
-- **Today**: today's sends per inbox, the latest replies to answer, follow-ups and
-  how long the ready list lasts. A banner says when sending is paused or locked.
-- **Campaigns**: every list beside FCC (cities first): next send, Pause and Resume per campaign,
-  numbers, batches with 10 sample emails exactly as they will go out, held rows and Approve.
-- **FCC**: the full campaign: next send, Pause and Resume, sends per day, reply and
-  bounce rates by email version and inbox, batches, replies, bounces and problems.
-- **Settings**: your account, profile picture and the iPhone home-screen app.
+Phone tabs (the founders mostly use an iPhone): **Today**, **Replies**, **Campaigns**, **More**.
+
+- **Today**: what needs you, most urgent first, each with one button: a campaign that paused
+  itself, replies to answer, batches waiting for your Approve (only the campaign's approver gets
+  the card), an inbox resting for the day. Then emails sent today per inbox, each campaign's
+  row, and this week's numbers. With nothing to do it says so and when the next email goes.
+- **Replies**: everyone who wrote back, newest first, with what they said, which inbox to answer
+  from and a link that searches that Gmail inbox. Filters: To answer, Answered, No thanks,
+  Automatic, All, and by campaign. A founder marks a reply answered, and marks the ones that
+  count toward the campaign's success number (cities: price requests).
+- **Campaigns**: every campaign with today, what waits and its results. A campaign's page leads
+  with its batches (waiting for approval, sending, done), then numbers, the words, schedule and
+  limits, a search of its people, and Load a list. A batch's page shows 10 sample emails exactly
+  as they go out and every held row; Approve is pinned to the bottom and asks once more.
+- **More → Inboxes**: each sending inbox today: sent of its safe amount, bounces, resting or
+  not, when the next email goes, the last reply check, which campaigns use it. Read-only.
+- **More → Do-not-email list**: is an address or a domain blocked, why, when, in which campaign.
+- **More → FCC archive**: FCC's all-time numbers, read-only.
+- **More → Settings**: your account, profile picture and the iPhone home-screen app.
 
 Sign-in is by a 6-digit code emailed to Riley's or Aidan's own inbox. Nobody else
-can sign in.
+can sign in. The screens follow the phone's light or dark setting.
 
 ## How sending works
 
-Read [the campaigns runbook](docs/runbooks/CAMPAIGNS.md) and [the FCC runbook](docs/runbooks/FCC_CAMPAIGN.md)
-before changing anything about sending. Campaigns and FCC share each inbox's safe daily amount and its
-1 to 3 minute gap, and campaigns go first. FCC in short:
+Read [the campaigns runbook](docs/runbooks/CAMPAIGNS.md) before changing anything about sending. In short:
 
-- A tick runs every minute from 10:00 Toronto time on weekdays. It sends one email
-  at a time, 1 to 3 minutes apart, in two windows (10:00–12:00 and 12:30–2:30). The
-  second window opens only if 1 or fewer emails bounced that morning.
-- Each inbox has its own daily ceiling. A new inbox starts small and climbs.
-- Follow-ups go before new companies: one 3 days after the first email and a last
-  one about 7 days after it, in the same thread, from the same inbox.
-- Before every email the inbox is checked: anyone at that company who wrote back,
-  or an address that bounced, gets nothing more.
-- It pauses itself on a Google warning, a refused send or 3 bounces in a day. Only a
-  founder's Resume reopens it.
-- Any new email wording locks sending until a founder's go names that version.
-- Every 15 minutes a health check emails both founders if sending is paused, locked
-  during send hours, silent by 11:00 on a weekday, or if the 9 a.m. reply check
-  hasn't finished by 10:30. It emails again once it's fixed.
+- Nothing goes to anyone until the campaign is live and the contact's batch was approved by the
+  campaign's named approver, for exactly the words it was approved on.
+- A tick runs every minute in the send hours. Each inbox sends one email at a time, 1 to 3
+  minutes apart, never above its safe daily amount for all campaigns together: half before
+  12:30, the rest only if that inbox had 1 bounce or fewer.
+- Follow-ups go before first emails, in the same thread, from the same inbox.
+- Before every email: the do-not-email list, and whether anyone at the organisation replied.
+- A campaign pauses itself when 3 of its own emails bounce in a day, on a Google warning, or
+  when Gmail refuses a send or a login. An inbox with 3 bounces in a day rests until morning.
+- Every hour from 7:00 to 21:00 the inboxes are read for replies (read-only), and both
+  founders get one email per hour that found real ones.
+- Every 15 minutes a health check emails both founders about an automatic pause, an inbox
+  resting, a live campaign that is silent, or a reply check that stopped. On Mondays at 8:00
+  both get last week's numbers for every campaign.
+
+FCC's own sender ([its runbook](docs/runbooks/FCC_CAMPAIGN.md)) is still in the code, paused for good.
 
 ## Code
 
 | What | Where |
 | --- | --- |
 | Worker entry: schedules, request time limit, alert emails | `worker.mjs` |
-| Email wording and versions | `src/lib/fcc-campaign.ts` |
-| Who gets what, and when | `src/lib/fcc-campaign-sender.ts`, `src/lib/fcc-campaign-tick.ts` |
-| Reply check | `src/lib/fcc-campaign-replies.ts` |
-| Pause, resume and notes | `src/lib/fcc-campaign-control.ts` |
-| Numbers for the screens | `src/lib/fcc-campaign-status.ts` |
-| Campaigns: lists, words, inbox limits, sending, screens | `src/lib/outreach/`, `src/app/campaigns` |
+| FCC (ended): wording and versions | `src/lib/fcc-campaign.ts` |
+| FCC (ended): who got what, and when | `src/lib/fcc-campaign-sender.ts`, `src/lib/fcc-campaign-tick.ts` |
+| Reply checks | `src/lib/outreach/outreach-replies.ts` (hourly, campaigns), `src/lib/fcc-campaign-replies.ts` (daily, FCC) |
+| Monday numbers email | `src/lib/fcc-weekly-numbers.ts` (every campaign; the name is from FCC's days) |
+| Campaigns: lists, words, inbox limits, sending | `src/lib/outreach/` |
+| What Today, Replies, Inboxes and the do-not-email list show | `src/lib/outreach/outreach-today.ts`, `outreach-reply-list.ts`, `outreach-inbox-health.ts`, `outreach-lookup.ts`, `outreach-week.ts` |
 | Health check | `src/lib/ops/health.ts` |
+| Local preview with made-up data | `scripts/demo-data.ts`, `docs/runbooks/LOCAL_PREVIEW.md` |
 | Gmail over SMTP and IMAP | `src/lib/revenue-engine/smtp-client.ts`, `imap-client.ts` |
-| Screens | `src/app/dashboard`, `src/app/fcc`, `src/app/settings` |
+| Screens | `src/app/dashboard` (Today), `replies`, `campaigns`, `inboxes`, `do-not-email`, `fcc` (archive), `settings`; building blocks in `src/components/owner/kit.tsx` |
 | Contact lists, go and pause SQL | `scripts/fcc-campaign.ts`, `scripts/outreach.ts` |
-| Database changes | `migrations/` (next free number: 0091) |
+| Database changes | `migrations/` (next free number: 0092) |
 
 ## Working on it
 
