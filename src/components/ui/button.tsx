@@ -5,27 +5,28 @@ import { Slot } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 // One set of buttons for the whole owner app (Obsidian & Ivory):
-// default = the main action of a section (ink), gold = the main action on a dark card,
+// default = the main action of a section (ink; ivory when the phone is dark), gold = the main action on a dark card,
 // outline = a second action, secondary = a quiet filled action, ghost = a low-key action,
 // destructive = stops or removes something, link = an inline text action.
+// Colours are the --owner-* variables in src/app/globals.css, which carry both appearances.
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b8893b] aria-invalid:border-[#a1231b]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b8893b] aria-invalid:border-(--owner-danger)",
   {
     variants: {
       variant: {
         default:
-          "bg-[#0a0a0a] text-[#fbf6ea] shadow-[0_10px_24px_-14px_rgba(10,10,10,0.7)] hover:bg-[#1c1c1c] hover:shadow-[0_12px_28px_-14px_rgba(184,137,59,0.55)]",
+          "bg-(--owner-btn) text-(--owner-btn-text) shadow-[0_10px_24px_-14px_rgba(10,10,10,0.7)] hover:bg-(--owner-btn-hover) hover:shadow-[0_12px_28px_-14px_rgba(184,137,59,0.55)]",
         gold:
           "bg-[#f7e9c8] text-[#0a0a0a] shadow-[0_8px_24px_-10px_rgba(227,192,122,0.6)] hover:bg-[#fbf1da]",
         destructive:
-          "bg-[#a1231b] text-white shadow-[0_10px_24px_-14px_rgba(161,35,27,0.7)] hover:bg-[#8c1d16]",
+          "bg-(--owner-btn-danger) text-white shadow-[0_10px_24px_-14px_rgba(161,35,27,0.7)] hover:bg-(--owner-btn-danger-hover)",
         outline:
-          "border border-[#d9d2c3] bg-[#fffdf8] text-[#0a0a0a] hover:border-[#cfc6b3] hover:bg-[#f7f2e7]",
+          "border border-(--owner-btn-line) bg-(--owner-white) text-(--owner-ink) hover:border-(--owner-line-hover) hover:bg-(--owner-hover)",
         secondary:
-          "bg-[#f1ebdd] text-[#0a0a0a] hover:bg-[#e9e1cd]",
+          "bg-(--owner-btn-quiet) text-(--owner-ink) hover:bg-(--owner-btn-quiet-hover)",
         ghost:
-          "text-[#3b3a36] hover:bg-[#f1ebdd] hover:text-[#0a0a0a]",
-        link: "text-[#8a6420] underline-offset-4 hover:underline active:scale-100",
+          "text-(--owner-text) hover:bg-(--owner-btn-quiet) hover:text-(--owner-ink)",
+        link: "text-(--owner-gold-deep) underline-offset-4 hover:underline active:scale-100",
       },
       size: {
         default: "h-10 px-4",

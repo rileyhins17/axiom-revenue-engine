@@ -42,8 +42,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // The bar behind the clock is obsidian in both appearances, so one theme colour serves both.
   themeColor: "#0a0a0a",
-  colorScheme: "light",
+  // Dark follows the phone: see "Dark appearance" at the end of globals.css.
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({

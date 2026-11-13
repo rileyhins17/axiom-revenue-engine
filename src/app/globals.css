@@ -2766,8 +2766,8 @@ nav[aria-label="Primary"] .text-zinc-700,
   background: var(--owner-paper) !important;
   color: var(--owner-ink) !important;
 }
-.owner-app-shell .owner-main { background: radial-gradient(1200px 500px at 85% -10%, #efe7d6 0%, transparent 60%), var(--owner-paper); }
-.owner-app-shell .owner-topbar { background: rgba(247, 245, 239, 0.82); backdrop-filter: saturate(1.4) blur(14px); }
+.owner-app-shell .owner-main { background: radial-gradient(1200px 500px at 85% -10%, var(--owner-glow) 0%, transparent 60%), var(--owner-paper); }
+.owner-app-shell .owner-topbar { background: var(--owner-topbar); backdrop-filter: saturate(1.4) blur(14px); }
 .owner-app-shell h1, .owner-app-shell .font-display { font-family: var(--font-fraunces), Georgia, serif; font-weight: 560; letter-spacing: -0.015em; }
 .owner-app-shell h1 { font-size: clamp(1.7rem, 1.2rem + 1vw, 2.2rem); }
 
@@ -2805,10 +2805,10 @@ nav[aria-label="Primary"] .text-zinc-700,
 .owner-app-shell .owner-sidebar-footer-dot { background: #b8893b !important; animation: owner-pulse 2.4s ease-out infinite; }
 
 /* Topbar controls */
-.owner-app-shell .owner-icon-button, .owner-app-shell .owner-search-trigger button { background: var(--owner-white) !important; border-color: var(--owner-line) !important; color: #3b3a36 !important; }
-.owner-app-shell .owner-icon-button:hover, .owner-app-shell .owner-search-trigger button:hover { color: var(--owner-ink) !important; border-color: #cfc6b3 !important; }
+.owner-app-shell .owner-icon-button, .owner-app-shell .owner-search-trigger button { background: var(--owner-white) !important; border-color: var(--owner-line) !important; color: var(--owner-text) !important; }
+.owner-app-shell .owner-icon-button:hover, .owner-app-shell .owner-search-trigger button:hover { color: var(--owner-ink) !important; border-color: var(--owner-line-hover) !important; }
 .owner-app-shell .owner-avatar, .owner-app-shell .owner-avatar > span { background: #0a0a0a !important; color: #f2e3c2 !important; }
-.owner-app-shell .owner-breadcrumb-icon { background: var(--owner-white) !important; border-color: var(--owner-line) !important; color: #5c584f !important; }
+.owner-app-shell .owner-breadcrumb-icon { background: var(--owner-white) !important; border-color: var(--owner-line) !important; color: var(--owner-muted) !important; }
 .owner-app-shell .owner-mobile-nav { background: rgba(10, 10, 10, 0.95) !important; border-top-color: #1f1f1f !important; backdrop-filter: blur(14px); }
 .owner-app-shell .owner-mobile-nav-item { color: #cfcac0 !important; }
 .owner-app-shell .owner-mobile-nav-item.is-active { background: #1d1810 !important; color: #f2e3c2 !important; }
@@ -2817,7 +2817,7 @@ nav[aria-label="Primary"] .text-zinc-700,
 .owner-app-shell [data-owner-content] :is(.rounded-xl, .rounded-2xl).border { border-color: var(--owner-line); }
 .owner-app-shell [data-owner-content] .bg-white { background-color: var(--owner-white); }
 .owner-card-lift { transition: transform 260ms cubic-bezier(.2,.8,.2,1), box-shadow 260ms ease, border-color 260ms ease; }
-.owner-card-lift:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -22px rgba(10, 10, 10, 0.35); border-color: #d6ccb6; }
+.owner-card-lift:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -22px rgba(10, 10, 10, 0.35); border-color: var(--owner-line-strong); }
 
 /* Primary actions: ink with a gold sheen that sweeps on hover */
 .owner-cta { position: relative; overflow: hidden; background: #0a0a0a; color: #fbf6ea; box-shadow: 0 10px 30px -12px rgba(10, 10, 10, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08); transition: transform 160ms ease, box-shadow 260ms ease, background 260ms ease; }
@@ -2877,7 +2877,7 @@ nav[aria-label="Primary"] .text-zinc-700,
 @keyframes owner-glow-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(184, 137, 59, 0); } 50% { box-shadow: 0 0 0 6px rgba(184, 137, 59, 0.12); } }
 @keyframes owner-row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-.owner-skeleton { background: linear-gradient(90deg, #efe9dc 0%, #f8f2e4 40%, #efe9dc 80%); background-size: 1200px 100%; animation: owner-shimmer 1.4s linear infinite; border-radius: 12px; }
+.owner-skeleton { background: linear-gradient(90deg, var(--owner-skeleton) 0%, var(--owner-skeleton-shine) 40%, var(--owner-skeleton) 80%); background-size: 1200px 100%; animation: owner-shimmer 1.4s linear infinite; border-radius: 12px; }
 .owner-slide-out { animation: owner-slide-out 220ms cubic-bezier(.4,0,1,1) forwards; }
 .owner-float { animation: owner-float 3.6s ease-in-out infinite; }
 .owner-flame { display: inline-block; animation: owner-flicker 900ms ease-in-out infinite; transform-origin: 50% 90%; }
@@ -2885,7 +2885,7 @@ nav[aria-label="Primary"] .text-zinc-700,
 .owner-check path { stroke-dasharray: 24; animation: owner-check-draw 380ms 80ms cubic-bezier(.2,.8,.2,1) both; }
 
 /* Toasts: ivory card, ink text, gold timer bar */
-.owner-toast { position: relative; overflow: hidden; animation: owner-toast-in 340ms cubic-bezier(.2,.8,.2,1) both; background: #fffdf8; color: #0a0a0a; border: 1px solid #e6d6b3; box-shadow: 0 18px 40px -18px rgba(10, 10, 10, 0.45); }
+.owner-toast { position: relative; overflow: hidden; animation: owner-toast-in 340ms cubic-bezier(.2,.8,.2,1) both; background: var(--owner-white); color: var(--owner-ink); border: 1px solid var(--owner-gold-line); box-shadow: 0 18px 40px -18px rgba(10, 10, 10, 0.45); }
 .owner-toast-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; transform-origin: left; background: linear-gradient(90deg, #b8893b, #e3c07a); animation: owner-toast-bar linear forwards; }
 
 /* Lists: rows arrive one after another; the hovered row gets a gold edge */
@@ -2907,10 +2907,10 @@ nav[aria-label="Primary"] .text-zinc-700,
 
 /* Gold focus rings everywhere, and a quiet scrollbar */
 .owner-app-shell :is(a, button, input, textarea, select, [tabindex]):focus-visible { outline: 2px solid #b8893b !important; outline-offset: 2px; }
-.owner-app-shell ::selection { background: #f4ead6; color: #0a0a0a; }
-.owner-app-shell * { scrollbar-width: thin; scrollbar-color: #d6ccb6 transparent; }
+.owner-app-shell ::selection { background: var(--owner-selection); color: var(--owner-ink); }
+.owner-app-shell * { scrollbar-width: thin; scrollbar-color: var(--owner-line-strong) transparent; }
 .owner-app-shell ::-webkit-scrollbar { width: 10px; height: 10px; }
-.owner-app-shell ::-webkit-scrollbar-thumb { background: #d6ccb6; border-radius: 10px; border: 2px solid #f7f5ef; }
+.owner-app-shell ::-webkit-scrollbar-thumb { background: var(--owner-line-strong); border-radius: 10px; border: 2px solid var(--owner-paper); }
 
 /* Inputs lift into focus */
 .owner-app-shell [data-owner-content] :is(input, textarea, select) { transition: border-color 180ms ease, box-shadow 220ms ease; }
@@ -3041,6 +3041,29 @@ nav[aria-label="Primary"] .text-zinc-700,
   --owner-danger: #a1231b;
   --owner-danger-soft: #fcedeb;
   --owner-danger-line: #efc4bf;
+  /* Named so the dark appearance (end of this file) can re-colour them; the values are the old literals. */
+  --owner-on-ink: #fbf6ea;
+  --owner-gold-line: #e6d6b3;
+  --owner-info-soft: #fbf6ea;
+  --owner-info-line: #ecdcb8;
+  --owner-line-hover: #cfc6b3;
+  --owner-hover: #f7f2e7;
+  --owner-chip-line: #ddd5c5;
+  --owner-chip-text: #2b2925;
+  --owner-glow: #efe7d6;
+  --owner-topbar: rgba(247, 245, 239, 0.82);
+  --owner-skeleton: #efe9dc;
+  --owner-skeleton-shine: #f8f2e4;
+  --owner-selection: #f4ead6;
+  /* Buttons (src/components/ui/button.tsx) */
+  --owner-btn: #0a0a0a;
+  --owner-btn-hover: #1c1c1c;
+  --owner-btn-text: #fbf6ea;
+  --owner-btn-line: #d9d2c3;
+  --owner-btn-quiet: #f1ebdd;
+  --owner-btn-quiet-hover: #e9e1cd;
+  --owner-btn-danger: #a1231b;
+  --owner-btn-danger-hover: #8c1d16;
 }
 
 @layer components {
@@ -3095,15 +3118,15 @@ nav[aria-label="Primary"] .text-zinc-700,
   .owner-badge[data-tone="success"] { background: var(--owner-success-soft); border-color: var(--owner-success-line); color: var(--owner-success); }
   .owner-badge[data-tone="warning"] { background: var(--owner-warning-soft); border-color: var(--owner-warning-line); color: var(--owner-warning); }
   .owner-badge[data-tone="danger"] { background: var(--owner-danger-soft); border-color: var(--owner-danger-line); color: var(--owner-danger); }
-  .owner-badge[data-tone="neutral"] { background: #f1ece1; border-color: #e3dccd; color: #4a463f; }
-  .owner-badge[data-tone="gold"] { background: var(--owner-gold-soft); border-color: #e6d6b3; color: var(--owner-gold-deep); }
+  .owner-badge[data-tone="neutral"] { background: var(--owner-neutral-soft); border-color: var(--owner-neutral-line); color: var(--owner-neutral-text); }
+  .owner-badge[data-tone="gold"] { background: var(--owner-gold-soft); border-color: var(--owner-gold-line); color: var(--owner-gold-deep); }
 
   /* Notices: something to know or do, with at most one action */
   .owner-notice { display: flex; flex-direction: column; gap: 12px; border-radius: 16px; border: 1px solid; padding: 14px 16px; font-size: 14px; line-height: 1.55; color: var(--owner-ink); }
   .owner-notice-body { display: flex; min-width: 0; flex: 1; gap: 12px; }
   .owner-notice-body > svg { margin-top: 2px; width: 18px; height: 18px; flex: none; }
   .owner-notice-title { font-weight: 600; }
-  .owner-notice[data-tone="info"] { background: #fbf6ea; border-color: #ecdcb8; }
+  .owner-notice[data-tone="info"] { background: var(--owner-info-soft); border-color: var(--owner-info-line); }
   .owner-notice[data-tone="info"] .owner-notice-body > svg { color: var(--owner-gold-deep); }
   .owner-notice[data-tone="warning"] { background: var(--owner-warning-soft); border-color: var(--owner-warning-line); }
   .owner-notice[data-tone="warning"] .owner-notice-body > svg { color: var(--owner-warning); }
@@ -3115,7 +3138,7 @@ nav[aria-label="Primary"] .text-zinc-700,
 
   /* Lists inside panels */
   .owner-list > li { padding: 12px 0; }
-  .owner-list > li + li { border-top: 1px solid #efe9dc; }
+  .owner-list > li + li { border-top: 1px solid var(--owner-soft-line); }
   .owner-list > li:first-child { padding-top: 0; }
   .owner-list > li:last-child { padding-bottom: 0; }
   .owner-empty { font-size: 14px; line-height: 1.55; color: var(--owner-muted); }
@@ -3123,15 +3146,15 @@ nav[aria-label="Primary"] .text-zinc-700,
 
   /* Tables inside flush panels */
   .owner-table { width: 100%; text-align: left; font-size: 14px; }
-  .owner-table thead th { padding: 10px 20px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--owner-muted); background: #faf7f0; border-bottom: 1px solid var(--owner-line); }
-  .owner-table tbody td { padding: 12px 20px; border-top: 1px solid #efe9dc; }
+  .owner-table thead th { padding: 10px 20px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--owner-muted); background: var(--owner-raised); border-bottom: 1px solid var(--owner-line); }
+  .owner-table tbody td { padding: 12px 20px; border-top: 1px solid var(--owner-soft-line); }
   .owner-table tbody tr:first-child td { border-top: 0; }
   @media (min-width: 640px) { .owner-table thead th, .owner-table tbody td { padding-left: 24px; padding-right: 24px; } }
 
   /* Chips: filters and choices (one look, one active state) */
-  .owner-chip { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; border-radius: 999px; border: 1px solid #ddd5c5; background: var(--owner-white); padding: 0 14px; font-size: 14px; font-weight: 500; color: #2b2925; white-space: nowrap; transition: background 160ms ease, border-color 160ms ease, color 160ms ease; }
-  .owner-chip:hover { border-color: var(--owner-line-strong); background: #f7f2e7; }
-  .owner-chip:is([aria-current="page"], [aria-pressed="true"], [data-active="true"]) { background: var(--owner-ink); border-color: var(--owner-ink); color: #fbf6ea; }
+  .owner-chip { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; border-radius: 999px; border: 1px solid var(--owner-chip-line); background: var(--owner-white); padding: 0 14px; font-size: 14px; font-weight: 500; color: var(--owner-chip-text); white-space: nowrap; transition: background 160ms ease, border-color 160ms ease, color 160ms ease; }
+  .owner-chip:hover { border-color: var(--owner-line-strong); background: var(--owner-hover); }
+  .owner-chip:is([aria-current="page"], [aria-pressed="true"], [data-active="true"]) { background: var(--owner-ink); border-color: var(--owner-ink); color: var(--owner-on-ink); }
   .owner-chip-count { font-variant-numeric: tabular-nums; opacity: 0.75; }
 }
 
@@ -3261,7 +3284,7 @@ nav[aria-label="Primary"] .text-zinc-700,
   .owner-num { font-variant-numeric: tabular-nums; }
 }
 
-/* The Approve sheet: says what is about to happen, in the light palette. */
+/* The Approve sheet: says what is about to happen, in the page's own palette. */
 .owner-confirm-sheet { background: var(--owner-white) !important; color: var(--owner-ink) !important; border-top: 1px solid var(--owner-line-strong) !important; border-radius: 22px 22px 0 0; padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
 .owner-confirm-sheet [data-slot="sheet-title"] { color: var(--owner-ink); font-family: var(--font-fraunces), Georgia, serif; font-size: 1.3rem; line-height: 1.3; padding-right: 28px; }
 .owner-confirm-sheet [data-slot="sheet-description"] { color: var(--owner-text); font-size: 14.5px; line-height: 1.55; }
@@ -3270,4 +3293,159 @@ nav[aria-label="Primary"] .text-zinc-700,
 @layer components {
   .owner-table thead th, .owner-table tbody td:first-child { white-space: nowrap; }
   @media (max-width: 639px) { .owner-table thead th, .owner-table tbody td { padding-left: 14px; padding-right: 14px; } }
+}
+
+/* ==========================================================================
+   Dark appearance, 2026-11-13: the same product when the phone is dark.
+   It follows the device (prefers-color-scheme) with no switch, no stored
+   choice and no script. Warm near-black pages, ivory text, the same gold.
+   Everything above reads its colours from --owner-* variables, so this block
+   is mostly their dark values; the rules after them cover the chrome that is
+   dark in both appearances (sidebar, phone bars, More sheet, the feature
+   card), which gets a lighter hairline to stay apart from the dark page, and
+   the few colours still written out in markup.
+   Light appearance: nothing here applies.
+   ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  /* .owner-app-shell sets its own copies of some of these further up, so it is named here too. */
+  :root, .owner-app-shell {
+    /* Surfaces: page, panel, a step raised inside a panel */
+    --owner-paper: #141311;
+    --owner-white: #1d1b17;
+    --owner-raised: #262320;
+    /* Text */
+    --owner-ink: #f5f0e6;
+    --owner-text: #ddd6c8;
+    --owner-muted: #aba497;
+    --owner-subtle: #9d968a;
+    --owner-on-ink: #0a0a0a;
+    /* Lines */
+    --owner-line: #35312a;
+    --owner-line-strong: #51493c;
+    --owner-line-hover: #8a7f6b;
+    --owner-soft-line: #2c2923;
+    /* Gold: the bar and ring keep the brand gold; gold text and icons use the light gold */
+    --owner-gold: #b8893b;
+    --owner-gold-deep: #e3c07a;
+    --owner-gold-light: #e3c07a;
+    --owner-gold-soft: #2e2616;
+    --owner-gold-line: #5c4b27;
+    --owner-focus: #e3c07a;
+    /* Tones: soft tinted grounds, light text */
+    --owner-success: #8fd1a6;
+    --owner-success-soft: #14251b;
+    --owner-success-line: #2a4a31;
+    --owner-warning: #e8c074;
+    --owner-warning-soft: #2a2111;
+    --owner-warning-line: #5a461d;
+    --owner-danger: #f0a39a;
+    --owner-danger-soft: #2f1715;
+    --owner-danger-line: #66312c;
+    --owner-info-soft: #251f13;
+    --owner-info-line: #4e4021;
+    --owner-neutral-soft: #292621;
+    --owner-neutral-line: #3f3a31;
+    --owner-neutral-text: #cfc8ba;
+    --owner-track: #37332b;
+    /* Pieces */
+    --owner-hover: #2a2721;
+    --owner-chip-line: #51493c;
+    --owner-chip-text: #ddd6c8;
+    --owner-glow: rgba(184, 137, 59, 0.1);
+    --owner-topbar: rgba(20, 19, 17, 0.84);
+    --owner-skeleton: #211f1b;
+    --owner-skeleton-shine: #2f2b25;
+    --owner-selection: #5b4721;
+    --owner-pine: #f5f0e6;
+    --owner-pine-soft: #2a2721;
+    --owner-chrome-line: #2d2921;
+    /* Buttons: the main action is ivory with dark words */
+    --owner-btn: #f5f0e6;
+    --owner-btn-hover: #ffffff;
+    --owner-btn-text: #0a0a0a;
+    --owner-btn-line: #6b6252;
+    --owner-btn-quiet: #2c2923;
+    --owner-btn-quiet-hover: #383329;
+    --owner-btn-danger: #b93229;
+    --owner-btn-danger-hover: #c93d33;
+  }
+
+  /* The older component variables (inputs, default borders, tooltips, sheets, the public pages' ground). */
+  :root {
+    --background: #141311;
+    --foreground: #f5f0e6;
+    --card: #1d1b17;
+    --card-foreground: #f5f0e6;
+    --popover: #262320;
+    --popover-foreground: #f5f0e6;
+    --primary: #f5f0e6;
+    --primary-foreground: #0a0a0a;
+    --secondary: #2c2923;
+    --secondary-foreground: #f5f0e6;
+    --muted: #2c2923;
+    --muted-foreground: #aba497;
+    --accent: #2c2923;
+    --accent-foreground: #f5f0e6;
+    --destructive: #f0a39a;
+    --border: #35312a;
+    --input: #51493c;
+    --ring: #b8893b;
+    --sidebar: #0a0a0a;
+    --sidebar-foreground: #f2f0ea;
+    --sidebar-primary: #f5f0e6;
+    --sidebar-primary-foreground: #0a0a0a;
+    --sidebar-accent: #1d1810;
+    --sidebar-accent-foreground: #f7ecd4;
+    --sidebar-border: #2d2921;
+    --sidebar-ring: #b8893b;
+  }
+
+  /* Chrome that is dark in both appearances: a lighter hairline keeps it apart from the dark page. */
+  .owner-app-shell .owner-sidebar,
+  .owner-app-shell .owner-sidebar [data-sidebar="sidebar"],
+  [data-sidebar="sidebar"][data-mobile="true"] { border-right-color: var(--owner-chrome-line) !important; }
+  .owner-app-shell .owner-sidebar-brand { border-bottom-color: var(--owner-chrome-line) !important; }
+  .owner-app-shell .owner-sidebar-footer { border-top-color: var(--owner-chrome-line) !important; }
+  .owner-app-shell .owner-mobile-nav { border-top-color: var(--owner-chrome-line) !important; box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5); }
+  @media (max-width: 767px) { .owner-app-shell .owner-topbar { border-bottom-color: var(--owner-chrome-line); } }
+  .owner-app-shell .owner-avatar { border-color: rgba(227, 192, 122, 0.4); }
+  .owner-app-shell .owner-account-trigger:hover { background: var(--owner-btn-quiet); }
+  .owner-more-sheet { background: #1a1815 !important; border-top-color: #40361f !important; }
+  .owner-more-item:hover, .owner-more-item:active { background: #25211b; }
+  .owner-more-item[aria-current="page"] { background: #2a2315; }
+  .owner-feature { outline: 1px solid rgba(227, 192, 122, 0.24); outline-offset: -1px; box-shadow: 0 22px 44px -26px rgba(0, 0, 0, 0.9); }
+  .owner-confirm-sheet { box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.55); }
+  .owner-action-dock { box-shadow: 0 -14px 34px -18px rgba(0, 0, 0, 0.8); }
+
+  /* Outline buttons: an older rule gives every rounded, bordered box in a page the faint card line; on dark a button needs the stronger one. */
+  .owner-app-shell [data-owner-content] :is(a, button):is(.rounded-xl, .rounded-lg).border { border-color: var(--owner-btn-line); }
+  .owner-app-shell [data-owner-content] :is(a, button):is(.rounded-xl, .rounded-lg).border:hover { border-color: var(--owner-line-hover); }
+
+  /* The account menu opens outside the shell, so it is coloured here. */
+  .owner-account-menu { border-color: var(--owner-line-strong); background: var(--owner-raised); color: var(--owner-ink); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6); }
+  .owner-account-menu [data-slot="dropdown-menu-item"] { color: var(--owner-text); }
+  .owner-account-menu [data-slot="dropdown-menu-item"]:focus { background: var(--owner-btn-quiet-hover); color: var(--owner-ink); }
+
+  .owner-toast button { border-color: var(--owner-gold-line); background: var(--owner-raised); color: var(--owner-gold-deep); }
+  .owner-toast button:hover { background: var(--owner-btn-quiet-hover); }
+
+  /* Fields: the load form's boxes, the file picker and the search box. */
+  .owner-app-shell [data-owner-content] :is(input, textarea, select) { border-color: var(--owner-line-strong); background-color: var(--owner-paper); color: var(--owner-ink); }
+  .owner-app-shell [data-owner-content] :is(input, textarea)::placeholder { color: var(--owner-subtle); }
+  .owner-app-shell [data-owner-content] .owner-search input { background-color: var(--owner-white); }
+
+  /* /install and /offline were drawn for a dark ground and now get one (--background above); their faintest note is lifted to readable. */
+  .bg-background .text-zinc-500 { color: var(--owner-muted); }
+
+  /* Colours still written out in markup follow the palette. */
+  :is(.owner-app-shell, .owner-account-menu) :is(.text-\[\#202c26\], .text-\[\#0a0a0a\]) { color: var(--owner-ink); }
+  :is(.owner-app-shell, .owner-account-menu) .text-\[\#3b3a36\] { color: var(--owner-text); }
+  :is(.owner-app-shell, .owner-account-menu) :is(.text-\[\#5c584f\], .text-\[\#52645a\], .text-\[\#526158\]) { color: var(--owner-muted); }
+  .owner-app-shell .text-\[\#8a6420\] { color: var(--owner-gold-deep); }
+  .owner-app-shell .text-\[\#a1231b\] { color: var(--owner-danger); }
+  .owner-app-shell :is(.border-\[\#efe9dc\], .divide-\[\#efe9dc\] > *) { border-color: var(--owner-soft-line); }
+  .owner-app-shell .border-\[\#e6e1d6\] { border-color: var(--owner-line); }
+  .owner-app-shell .bg-\[\#fffdf8\] { background-color: var(--owner-white); }
+  .owner-app-shell .border-\[\#e8c88b\] { border-color: var(--owner-warning-line); }
+  .owner-app-shell .bg-\[\#fdf6e7\] { background-color: var(--owner-warning-soft); }
 }
