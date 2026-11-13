@@ -131,9 +131,9 @@ const exportedWorker = {
       ctx.waitUntil(runOutreachTestCron(env)
         .then((result) => { if (result.requests) console.log(JSON.stringify({ event: "outreach_tests", ...result })); })
         .catch((error) => console.error("[outreach-tests] failure:", error instanceof Error ? error.message : "unknown")));
-      // Mondays from 8:00 Toronto: last week's FCC numbers, emailed to both founders once.
+      // Mondays from 8:00 Toronto: last week's numbers for every campaign, emailed to both founders once.
       ctx.waitUntil(runFccWeeklyNumbersCron(env, globalThis.__axiomSendLoginEmail)
-        .then((result) => console.log(JSON.stringify({ event: "fcc_weekly_numbers", ...result })))
+        .then((result) => console.log(JSON.stringify({ event: "weekly_numbers", ...result })))
         .catch((error) => console.error("[fcc-weekly-numbers] failure:", error instanceof Error ? error.message : "unknown")));
       return;
     }

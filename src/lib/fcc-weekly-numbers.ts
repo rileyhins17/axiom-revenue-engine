@@ -1,31 +1,34 @@
 /**
- * The Monday 8 am FCC numbers email (Riley, Nov 1, idea 33). Once a week, on
- * Monday from 8:00 Toronto, both founders get last week's FCC numbers: emails
- * sent (first emails and follow-ups, by inbox), who wrote back, the reply rate,
- * bounces, and what is left on the list. Read-only: it changes no contact, send
- * or switch. It rides the Worker's 15-minute check, like the daily reply check.
+ * The Monday 8 am numbers email (Riley, Nov 1, idea 33; all campaigns since Nov 13). Once a week, on
+ * Monday from 8:00 Toronto, both founders get last week's numbers for every campaign: emails sent
+ * (first emails and follow-ups, by inbox), who wrote back, no thanks, bounces, each campaign's
+ * success number and what is left. FCC ended on Nov 12, 2026 and is not in it. Read-only: it changes
+ * no contact, send or switch. It rides the Worker's 15-minute check, like the reply checks.
  *
  * - "Last week" is the Monday to Sunday before this one, in Toronto days.
  * - At most one attempt an hour until the week's email goes.
- * - The email goes before the week is marked done, so a failed send is retried
- *   next hour and nobody gets two.
+ * - The email goes before the week is marked done, so a failed send is retried next hour and nobody
+ *   gets two. The "already sent" note keeps its old name in KvStore, so it carries over a release.
+ *
+ * The numbers themselves come from `weekNumbers` (outreach-week.ts), which the Today screen also reads.
  */
-import { FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY } from "@/lib/fcc-campaign";
 import { claimFccWeeklyNumbersTry, readFccWeeklyNumbers, saveFccWeeklyNumbers } from "@/lib/fcc-campaign-control";
 import type { FccOwnerMail } from "@/lib/fcc-campaign-replies";
 import { torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
-import { fccScreen, fccStats, type FccInboxRef } from "@/lib/fcc-campaign-status";
 import { torontoMinute } from "@/lib/fcc-campaign-tick";
+import { lastWeek, weekNumbers, type CampaignWeek, type WeekNumbers, type WeekReply } from "@/lib/outreach/outreach-week";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
+
+export { lastWeek, torontoMidnightIso } from "@/lib/outreach/outreach-week";
 
 /** Minutes after midnight, Toronto time, from which Monday's email can go. */
 export const FCC_WEEKLY_NUMBERS_FROM_MINUTE = 8 * 60;
-const DAY_MS = 86_400_000;
+/** How much of what someone wrote the email quotes. */
+const QUOTE_LENGTH = 200;
 
 export type FccWeeklyNumbersConfig = {
+  /** The Today screen. */
   screenUrl: string;
-  /** The sending inboxes: "" is the first inbox (Aidan's), an added one is its address. */
-  inboxes: FccInboxRef[];
   /** Emails both founders. Throws when it could not. */
   tellFounders: (mail: FccOwnerMail) => Promise<void>;
 };
@@ -34,86 +37,14 @@ export type FccWeeklyNumbersResult =
   | { status: "SKIPPED"; reason: string }
   | { status: "SENT"; weekOf: string; sent: number; replies: number };
 
-export type FccWeekNumbers = {
-  /** Toronto days, Monday and Sunday. */
-  from: string; to: string;
-  sent: { first: number; followUps: number; byInbox: Array<{ name: string; sent: number }> };
-  /** People who wrote back in the week, by hand or automatically, and how many said no. */
-  replies: { real: number; automatic: number; saidNo: number; people: Array<{ company: string; email: string; note: string | null }> };
-  bounced: number;
-};
-
 const skip = (reason: string): FccWeeklyNumbersResult => ({ status: "SKIPPED", reason });
 const longDay = (day: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "long", day: "numeric" }).format(new Date(`${day}T12:00:00Z`));
+const shortTime = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 const escapeHtml = (text: string) => text.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]!);
-const percent = (value: number | null) => (value === null ? "n/a" : `${Math.round(value * 1000) / 10}%`);
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
-
-/** Midnight at the start of a Toronto day, as an ISO instant (right through the clock change). */
-export function torontoMidnightIso(day: string) {
-  let guess = Date.parse(`${day}T05:00:00Z`);
-  for (let tries = 0; tries < 3; tries += 1) {
-    const [hour, minute] = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "America/Toronto" })
-      .format(new Date(guess)).split(":").map(Number);
-    const off = (torontoDay(new Date(guess)) < day ? -1 : 0) * 1440 + hour! * 60 + minute!;
-    if (off === 0) break;
-    guess -= off * 60_000;
-  }
-  return new Date(guess).toISOString();
-}
-
-/** The day after a Toronto day. */
-const dayAfter = (day: string) => torontoDay(new Date(Date.parse(`${day}T12:00:00Z`) + DAY_MS));
-
-/** Last week's numbers, Monday `from` to Sunday `to` (Toronto days), straight from the FCC tables. */
-export async function fccWeekNumbers(db: ProspectDb, inboxes: FccInboxRef[], from: string, to: string): Promise<FccWeekNumbers> {
-  const name = (key: string) => inboxes.find((inbox) => inbox.key === key)?.name ?? (key || "First inbox");
-  const start = torontoMidnightIso(from);
-  const end = torontoMidnightIso(dayAfter(to));
-  const reason = `lower(COALESCE("stoppedReason",''))`;
-  const saidNo = ["%stop%", "%no thank%", "%not interested%", "%remove%", "%unsubscribe%"].map((words) => `${reason} LIKE '${words}'`).join(" OR ");
-  const [sends, people, bounces] = await Promise.all([
-    db.prepare(`SELECT COALESCE("senderAddress",'') AS inbox, "step", COUNT(*) AS n FROM "FccCampaignSend"
-      WHERE "status" IN ('CLAIMED','SENT') AND "sendDay" BETWEEN ? AND ? GROUP BY 1, 2`).bind(from, to).all<{ inbox: string; step: number; n: number }>(),
-    // One row per address: someone on both lists has two rows marked replied together.
-    db.prepare(`SELECT "company", "email", MAX("stoppedReason") AS note, MAX(${reason} LIKE '%automatic reply%') AS automatic, MAX(${saidNo}) AS saidNo
-      FROM "FccCampaignContact" WHERE "campaignKey" IN (?, ?) AND "status" = 'replied' AND "updatedAt" >= ? AND "updatedAt" < ?
-      GROUP BY "email" ORDER BY MAX("updatedAt") DESC`).bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, start, end)
-      .all<{ company: string; email: string; note: string | null; automatic: number; saidNo: number }>(),
-    db.prepare(`SELECT COUNT(DISTINCT "email") AS n FROM "FccCampaignContact" WHERE "campaignKey" IN (?, ?) AND "status" = 'bounced' AND "updatedAt" >= ? AND "updatedAt" < ?`)
-      .bind(FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY, start, end).first<{ n: number }>(),
-  ]);
-  const byInbox = new Map<string, number>();
-  let first = 0;
-  let followUps = 0;
-  for (const row of sends.results) {
-    const count = Number(row.n);
-    if (Number(row.step) === 1) first += count; else followUps += count;
-    byInbox.set(name(row.inbox), (byInbox.get(name(row.inbox)) ?? 0) + count);
-  }
-  const replied = people.results;
-  return {
-    from, to,
-    sent: { first, followUps, byInbox: [...byInbox].map(([inboxName, sent]) => ({ name: inboxName, sent })) },
-    replies: {
-      real: replied.filter((row) => !Number(row.automatic)).length,
-      automatic: replied.filter((row) => Number(row.automatic)).length,
-      saidNo: replied.filter((row) => !Number(row.automatic) && Number(row.saidNo)).length,
-      people: replied.filter((row) => !Number(row.automatic)).map((row) => ({ company: row.company, email: row.email, note: row.note })),
-    },
-    bounced: Number(bounces?.n ?? 0),
-  };
-}
-
-/** The Monday to Sunday before `now`'s Toronto week. */
-export function lastWeek(now: Date) {
-  const today = torontoDay(now);
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const back = days.indexOf(torontoWeekday(now)) + 7;
-  const from = torontoDay(new Date(Date.parse(`${today}T12:00:00Z`) - back * DAY_MS));
-  const to = torontoDay(new Date(Date.parse(`${from}T12:00:00Z`) + 6 * DAY_MS));
-  return { from, to };
-}
+const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
+/** "Riley's inbox", or the address itself when the inbox has no name. */
+const inboxOf = (name: string) => (name.includes("@") ? name : `${firstName(name)}'s inbox`);
 
 export async function runFccWeeklyNumbers(db: ProspectDb, config: FccWeeklyNumbersConfig, now = new Date()): Promise<FccWeeklyNumbersResult> {
   if (torontoWeekday(now) !== "Mon") return skip("not Monday");
@@ -125,50 +56,75 @@ export async function runFccWeeklyNumbers(db: ProspectDb, config: FccWeeklyNumbe
   if (!(await claimFccWeeklyNumbersTry(db, `${weekOf} ${Math.floor(minute / 60)}`, now))) return skip("already tried this hour");
 
   const { from, to } = lastWeek(now);
-  const [week, stats, screen] = await Promise.all([fccWeekNumbers(db, config.inboxes, from, to), fccStats(db, config.inboxes, now), fccScreen(db, now)]);
-  await config.tellFounders(weeklyMail(week, stats, screen, config.screenUrl));
+  const week = await weekNumbers(db, from, to, now);
+  await config.tellFounders(weeklyMail(week, config.screenUrl));
   await saveFccWeeklyNumbers(db, { weekOf, at: now.toISOString(), from, to }, now);
-  return { status: "SENT", weekOf, sent: week.sent.first + week.sent.followUps, replies: week.replies.real };
+  return { status: "SENT", weekOf, sent: week.totals.sent, replies: week.totals.replies };
 }
 
-type Stats = Awaited<ReturnType<typeof fccStats>>;
-type Screen = Awaited<ReturnType<typeof fccScreen>>;
+const realReplies = (count: number) => plural(count, "real reply", "real replies");
+const sentWords = (first: number, followUps: number) => `${plural(first, "first email")} and ${plural(followUps, "follow-up")}`;
+
+/** One campaign's few lines: its name and state, last week, its success number, all time, and what is left. */
+function campaignLines(week: CampaignWeek) {
+  const state = week.state === "live" ? "Live" : `Paused${week.stateReason ? `: ${week.stateReason.trim().replace(/\.$/, "")}` : ""}`;
+  // Per 100 first emails of the same week, so a small week and a big one can be compared.
+  const rate = week.sent.first > 0 ? ` (${Math.round((week.success / week.sent.first) * 1000) / 10} per 100 emailed)` : "";
+  return [
+    `${week.name} (${state})`,
+    `Sent last week: ${sentWords(week.sent.first, week.sent.followUps)}. ${realReplies(week.replies)}, ${week.noThanks} no thanks, ${plural(week.bounced, "bounce")}.`,
+    `${week.successLabel}: ${week.success}${rate}`,
+    `All time: ${week.allTime.emailed} emailed, ${realReplies(week.allTime.replies)}. ${week.successLabel}: ${week.allTime.success}.`,
+    `Left: ${week.left.ready} ready, ${week.left.waitingApproval} waiting for approval, ${plural(week.left.followUpsDue, "follow-up")} due.`,
+  ];
+}
+
+/** One person who wrote back: who, what they said, and which inbox answers. */
+function personLines(reply: WeekReply, index: number) {
+  const quote = (reply.quote ?? "").replace(/\s+/g, " ").trim();
+  const from = inboxOf(reply.answerFromName ?? reply.inboxName);
+  const elsewhere = reply.answerFrom && reply.answerFrom !== reply.inbox ? ` It came to ${inboxOf(reply.inboxName)}.` : "";
+  const answered = reply.answeredAt ? ` Answered${reply.answeredBy ? ` by ${reply.answeredBy}` : ""}.` : "";
+  return [
+    `${index + 1}. ${reply.label} (${reply.from})${reply.kind === "no_thanks" ? ", said no thanks" : ""}. ${reply.campaign}${reply.at ? `, ${shortTime(reply.at)}` : ""}.`,
+    quote ? `"${quote.length > QUOTE_LENGTH ? `${quote.slice(0, QUOTE_LENGTH).trimEnd()}...` : quote}"` : "(Open the email to read it.)",
+    `${reply.kind === "no_thanks" ? `If you answer, answer from ${from}.` : `Answer from ${from}.`}${elsewhere}${answered}`,
+  ];
+}
 
 /** Both founders' Monday email, in plain words. */
-export function weeklyMail(week: FccWeekNumbers, stats: Stats, screen: Screen, screenUrl: string): FccOwnerMail {
-  const total = week.sent.first + week.sent.followUps;
-  const inboxes = week.sent.byInbox.map((inbox) => `${inbox.name} ${inbox.sent}`).join(", ");
-  const sentLine = total === 0
-    ? "No FCC emails went out last week."
-    : `${plural(total, "FCC email")} went out last week: ${plural(week.sent.first, "first email")} and ${plural(week.sent.followUps, "follow-up")}${inboxes ? ` (${inboxes})` : ""}.`;
-  const automatic = week.replies.automatic ? plural(week.replies.automatic, "automatic reply", "automatic replies") : "";
-  const repliesLine = week.replies.real === 0
-    ? `Nobody wrote back last week${automatic ? ` (${automatic}, out of office)` : ""}.`
-    : `${plural(week.replies.real, "person wrote", "people wrote")} back last week${week.replies.saidNo ? `, ${week.replies.saidNo} of them saying no` : ""}${automatic ? `, plus ${automatic}` : ""}.`;
-  const bouncesLine = week.bounced === 0 ? "Nothing bounced last week." : `${plural(week.bounced, "email")} bounced last week.`;
-  const allTime = `All time: ${plural(stats.emailed, "company", "companies")} emailed, ${plural(stats.replies.real, "real reply", "real replies")} (reply rate ${percent(stats.replyRate)}), ${plural(stats.bounced, "bounce")} (${percent(stats.bounceRate)}).`;
-  const stateLine = screen.state === "live" ? "Sending is live." : screen.state === "paused" ? "Sending is PAUSED." : "Sending is locked: the current email has no founder's go.";
-  const pace = stats.weekdaysLeft !== null ? `; at ${stats.newPerDay} new companies a weekday the list lasts about ${plural(stats.weekdaysLeft, "more weekday")}` : "";
-  const left = `Left on the list: ${plural(screen.ready, "company", "companies")} ready for a first email, ${plural(screen.followUpsDue, "follow-up")} due now and ${screen.followUpsLater} coming${pace}.`;
-  const versions = stats.byVersion.filter((row) => row.emailed > 0).map((row) => `${row.label}: ${row.emailed} emailed, ${plural(row.replies, "reply", "replies")} (${percent(row.rate)})`);
-  const people = week.replies.people.map((person, index) => `${index + 1}. ${person.company} (${person.email})${person.note ? `: ${person.note}` : ""}`);
+export function weeklyMail(week: WeekNumbers, screenUrl: string): FccOwnerMail {
+  const totals = week.totals;
+  const days = `${longDay(week.from)} to ${longDay(week.to)}`;
+  const inboxes = week.byInbox.map((inbox) => `${firstName(inbox.name)} ${inbox.sent}`).join(", ");
+  const sent = totals.sent === 0 ? "no emails sent" : `${plural(totals.sent, "email")} sent (${sentWords(totals.first, totals.followUps)}${inboxes ? `; ${inboxes}` : ""})`;
+  const totalsLine = `All campaigns: ${sent}, ${realReplies(totals.replies)}, ${totals.noThanks} no thanks, ${plural(totals.automatic, "automatic reply", "automatic replies")}, ${plural(totals.bounced, "bounce")}.`;
+  const silent = totals.sent + totals.replies + totals.noThanks + totals.automatic + totals.bounced === 0;
+  const silentLine = "It was a silent week: nothing went out and nobody wrote back.";
+  // A campaign is shown when anything happened in it last week or anything is left in it.
+  const shown = week.campaigns.filter((campaign) => campaign.sent.first + campaign.sent.followUps + campaign.replies + campaign.noThanks + campaign.automatic + campaign.bounced + campaign.success
+    + campaign.left.ready + campaign.left.waitingApproval + campaign.left.followUpsDue > 0).map(campaignLines);
+  const people = week.people.map(personLines);
+  // Someone counted but not listed: more than 50 wrote back, or the reply was seen just before a follow-up and its words aren't stored yet.
+  const unlisted = totals.replies + totals.noThanks - new Set(week.people.map((reply) => `${reply.contactId} ${reply.kind}`)).size;
+  const unlistedLine = unlisted > 0 ? `${unlisted} more wrote back and ${unlisted === 1 ? "is" : "are"} not listed here. Look on the Replies screen.` : "";
 
-  const subject = `FCC: last week's numbers (${longDay(week.from)} to ${longDay(week.to)})`;
+  const subject = `Last week's numbers (${days})`;
   const text = [
-    `FCC numbers for ${longDay(week.from)} to ${longDay(week.to)}.`, "",
-    sentLine, repliesLine, bouncesLine, "",
-    ...(people.length ? ["Who wrote back:", ...people, ""] : []),
-    allTime, stateLine, left, "",
-    ...(versions.length ? ["By email version, all time:", ...versions.map((line) => `- ${line}`), ""] : []),
-    `Everything is on the FCC screen: ${screenUrl}`,
+    `Last week's numbers for every campaign, ${days}.`, "",
+    totalsLine, ...(silent ? [silentLine] : []), "",
+    ...shown.flatMap((lines) => [...lines, ""]),
+    ...(people.length ? ["Who wrote back:", ...people.flatMap(([title, ...rest]) => [title!, ...rest.map((line) => `   ${line}`)]), ...(unlistedLine ? [unlistedLine] : []), ""]
+      : unlistedLine ? [unlistedLine, ""] : []),
+    `Everything is on the Today screen: ${screenUrl}`,
   ].join("\n");
   const html = [
-    `<p>FCC numbers for <strong>${escapeHtml(longDay(week.from))} to ${escapeHtml(longDay(week.to))}</strong>.</p>`,
-    `<p>${escapeHtml(sentLine)}<br>${escapeHtml(repliesLine)}<br>${escapeHtml(bouncesLine)}</p>`,
-    ...(people.length ? [`<p><strong>Who wrote back:</strong><br>${people.map(escapeHtml).join("<br>")}</p>`] : []),
-    `<p>${escapeHtml(allTime)}<br>${escapeHtml(stateLine)}<br>${escapeHtml(left)}</p>`,
-    ...(versions.length ? [`<p><strong>By email version, all time:</strong><br>${versions.map(escapeHtml).join("<br>")}</p>`] : []),
-    `<p><a href="${escapeHtml(screenUrl)}">Everything is on the FCC screen</a></p>`,
+    `<p>Last week's numbers for every campaign, <strong>${escapeHtml(days)}</strong>.</p>`,
+    `<p>${escapeHtml(totalsLine)}${silent ? `<br>${escapeHtml(silentLine)}` : ""}</p>`,
+    ...shown.map(([title, ...rest]) => `<p><strong>${escapeHtml(title!)}</strong><br>${rest.map(escapeHtml).join("<br>")}</p>`),
+    ...(people.length ? [`<p><strong>Who wrote back:</strong></p>`, ...people.map(([title, ...rest]) => `<p><strong>${escapeHtml(title!)}</strong><br>${rest.map(escapeHtml).join("<br>")}</p>`)] : []),
+    ...(unlistedLine ? [`<p>${escapeHtml(unlistedLine)}</p>`] : []),
+    `<p><a href="${escapeHtml(screenUrl)}">Everything is on the Today screen</a></p>`,
   ].join("\n");
   return { subject, text, html };
 }

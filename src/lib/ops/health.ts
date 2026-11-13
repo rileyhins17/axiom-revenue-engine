@@ -1,7 +1,7 @@
 import { readFccReplyCheck } from "@/lib/fcc-campaign-control";
 import { torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
 import { fccScreen } from "@/lib/fcc-campaign-status";
-import { FCC_SEND_WINDOWS, torontoMinute } from "@/lib/fcc-campaign-tick";
+import { torontoMinute } from "@/lib/fcc-campaign-tick";
 import { readKv } from "@/lib/outreach/outreach-control";
 import { PAUSE_BOUNCES, inboxBouncesToday, inboxRef } from "@/lib/outreach/outreach-inboxes";
 import { OUTREACH_REPLY_HOURS, OUTREACH_REPLY_STATE } from "@/lib/outreach/outreach-replies";
@@ -13,7 +13,9 @@ import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 /**
  * Self-check that runs every 15 minutes on the live Worker. Read-only: it never
  * changes business data or switches, it only tells Riley and Aidan when something
- * is wrong with FCC sending, in plain words, and when it is fixed again.
+ * is wrong with the campaign emails, the inboxes or the screens, in plain words, and
+ * when it is fixed again. FCC ended on Nov 12, 2026: it being paused is normal and no
+ * longer a problem; it being switched on again is one.
  */
 export type HealthCheck = { key: string; ok: boolean; problem: string; fix: string };
 export type HealthEnv = Record<string, unknown>;
@@ -26,45 +28,25 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
 
   let dbOk = true;
   try { await db.prepare("SELECT 1 AS n").bind().first(); } catch { dbOk = false; }
-  add("database", dbOk, "The app can't reach its database, so no FCC emails can go out and the FCC screen won't load.", "Usually Cloudflare fixes this itself within minutes. If it lasts over an hour, ask Claude to check the Cloudflare D1 status.");
+  add("database", dbOk, "The app can't reach its database, so no campaign emails can go out and the screens won't load.", "Usually Cloudflare fixes this itself within minutes. If it lasts over an hour, ask Claude to check the Cloudflare D1 status.");
   if (!dbOk) return checks;
 
   add("login-email", Boolean(env.LOGIN_EMAIL), "Sign-in codes can't be emailed, so nobody can log in.", "Ask Claude to restore the LOGIN_EMAIL email binding and redeploy.");
 
+  // FCC ended on Nov 12, 2026 and stays paused, so a pause there is no longer reported, and neither is a locked or a
+  // quiet FCC. Those checks are simply no longer made: a check that is not made sends nothing, so an alert that was
+  // open when they went gets no "fixed" email either. Only FCC sending again is a problem. Numbers that can't be read
+  // are reported, and every campaign and inbox check below runs all the same.
   let fcc: Awaited<ReturnType<typeof fccScreen>> | null = null;
   try { fcc = await fccScreen(db, now); } catch { fcc = null; }
-  add("fcc-screen", fcc !== null, "The FCC numbers can't be read, so the FCC screen and these checks are blind.", "Ask Claude to check the Worker logs for the FCC status queries.");
-  if (!fcc) return checks;
+  add("fcc-screen", fcc !== null, "The old FCC numbers can't be read, so the FCC archive screen may not load. Campaign emails are not affected.", "Ask Claude to check the Worker logs for the FCC status queries.");
+  if (fcc) {
+    add("fcc-live", fcc.state !== "live",
+      "FCC emails are switched on again. FCC ended on Nov 12, 2026 and should stay paused.",
+      "Open More, FCC archive and press Pause, unless you both decided to restart it.");
+  }
 
-  const weekday = !["Sat", "Sun"].includes(torontoWeekday(now));
   const minute = torontoMinute(now);
-  const [first] = FCC_SEND_WINDOWS;
-
-  // The sender pauses itself on a Google warning, a refused send or 3 bounces in a day, and until now nobody heard.
-  const paused = fcc.state === "paused";
-  const control = fcc.control?.action === "paused" ? fcc.control : null;
-  add("fcc-paused", !paused,
-    `FCC emails are paused${control ? `: ${control.reason ?? "no reason saved"} (${control.by}, ${when(control.at)})` : ""}. Nothing sends until someone presses Resume.`,
-    "Read the reason on the FCC screen. Once it's sorted, press Resume there (it only reopens an email you've both approved).");
-
-  // A new email version stops all sending until a founder's go names it. Only judged in weekday send hours.
-  const sendHours = weekday && minute >= 9 * 60 && minute < 16 * 60;
-  add("fcc-locked", !(sendHours && fcc.state === "locked"),
-    "FCC emails are locked: the current email has no founder's go yet, so nothing is sending today.",
-    "If you've both read and approved the new email, ask Claude to record the go. If not, it stays locked on purpose.");
-
-  // Live, with people waiting, and nothing out an hour after the first window opened: something is stuck. Campaigns go
-  // before FCC in a shared inbox and can fill its morning half, so while campaign emails went out today FCC gets until
-  // an hour into its afternoon window before this counts as stuck.
-  const sentToday = fcc.sentToday.first + fcc.sentToday.followUps;
-  const waiting = fcc.ready + fcc.followUpsDue;
-  const campaignsToday = Number((await db.prepare(`SELECT COUNT(*) AS n FROM "OutreachSend" WHERE "sendDay" = ? AND "kind" = 'real' AND "status" IN ('CLAIMED','SENT')`)
-    .bind(torontoDay(now)).first<{ n: number }>().catch(() => null))?.n ?? 0);
-  const fccDeadline = (campaignsToday > 0 ? FCC_SEND_WINDOWS[1].start : first.start) + 60;
-  const stalled = weekday && fcc.state === "live" && fcc.batchSize > 0 && waiting > 0 && minute >= fccDeadline && minute < 16 * 60 && sentToday === 0;
-  add("fcc-sending", !stalled,
-    `No FCC emails have gone out today, though sending is live and ${waiting} ${waiting === 1 ? "is" : "are"} waiting.`,
-    `Look at "Last check" on the FCC screen for the reason, then ask Claude to read the Worker logs.`);
 
   // Each campaign: an automatic pause (a founder's own Pause needs no email), and a live campaign with approved people
   // waiting that has sent nothing an hour into its send hours.
@@ -83,15 +65,15 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
       `Look at "Last check" on its Campaigns screen for the reason, then ask Claude to read the Worker logs.`);
   }
 
-  // An inbox sends nothing more today once 3 of its emails bounced, campaigns and FCC together. That is not a pause, so
-  // the pause alerts stay quiet (Aidan, Nov 5: a city bounce never pauses FCC); this says why the inbox went quiet.
+  // An inbox sends nothing more today once 3 of its emails bounced, whatever sent them. That is not a pause, so the
+  // pause alerts stay quiet (Aidan, Nov 5: a city bounce never pauses anything else); this says why the inbox went quiet.
   const fccFirstInbox = typeof env.FCC_SENDER_ADDRESS === "string" ? env.FCC_SENDER_ADDRESS : null;
   for (const inbox of (await readInboxes(db).catch(() => [] as Inbox[])).filter((row) => row.enabled)) {
     const bounces = await inboxBouncesToday(db, torontoDay(now), inboxRef(inbox.address, fccFirstInbox)).catch(() => 0);
     const owner = inbox.name.trim().split(/\s+/)[0] || inbox.address;
     add(`inbox-resting:${inbox.address}`, bounces < PAUSE_BOUNCES,
-      `${owner}'s inbox (${inbox.address}) has stopped sending for today: ${bounces} of its emails bounced today, campaigns and FCC together. Nothing is paused; it starts again tomorrow.`,
-      "Look at who bounced on the Campaigns and FCC screens. If one list is bad, pause that campaign before tomorrow.");
+      `${owner}'s inbox (${inbox.address}) has stopped sending for today: ${bounces} of its emails bounced today. Nothing is paused; it starts again tomorrow.`,
+      "Look at who bounced on the campaign's screen. If one list is bad, pause that campaign before tomorrow.");
   }
 
   // The campaigns' hourly reply check (7:00 to 21:00, every day). Once anyone has been emailed, a check that hasn't
@@ -112,7 +94,8 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
       "Look in that inbox yourself, then ask Claude to check it (its app password may have changed).");
   }
 
-  // The 9 a.m. reply check emails both founders who wrote back. If it hasn't finished by 10:30, replies sit unseen.
+  // FCC's 9 a.m. reply check still runs (people emailed before Nov 12 can still answer) and emails both founders who
+  // wrote back. If it hasn't finished by 10:30, replies sit unseen.
   const replyCheck = await readFccReplyCheck(db).catch(() => null);
   const replyCheckLate = minute >= 10 * 60 + 30 && replyCheck?.day !== torontoDay(now);
   add("fcc-reply-check", !replyCheckLate,
@@ -150,10 +133,8 @@ export async function recordAndSelectAlerts(db: ProspectDb, checks: HealthCheck[
 const FIXED: Record<string, string> = {
   database: "The database is reachable again.",
   "login-email": "Sign-in codes can be emailed again.",
-  "fcc-screen": "The FCC numbers can be read again.",
-  "fcc-paused": "FCC emails are no longer paused.",
-  "fcc-locked": "The new FCC email has a founder's go, so sending can start.",
-  "fcc-sending": "FCC emails are going out again.",
+  "fcc-screen": "The old FCC numbers can be read again.",
+  "fcc-live": "FCC emails are paused again.",
   "fcc-reply-check": "Today's reply check has finished.",
   "campaigns-screen": "The campaign numbers can be read again.",
   "campaign-reply-check": "The hourly check of the inboxes for campaign replies is finishing again.",

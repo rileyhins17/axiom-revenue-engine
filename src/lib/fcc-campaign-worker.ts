@@ -89,17 +89,15 @@ export async function runFccReplyCheckCron(env: FccEnv, sendOwnerEmail?: OwnerEm
 }
 
 /**
- * Worker cron entry (every 15 minutes): Monday's email with last week's FCC numbers,
- * once a week from 8:00 Toronto, to both founders. Read-only.
+ * Worker cron entry (every 15 minutes): Monday's email with last week's numbers for
+ * every campaign (FCC ended Nov 12 and is not in it), once a week from 8:00 Toronto,
+ * to both founders. Read-only. The name is from when it was FCC's email.
  */
 export async function runFccWeeklyNumbersCron(env: FccEnv, sendOwnerEmail?: OwnerEmail): Promise<FccWeeklyNumbersResult> {
-  const inboxes = fccInboxes(env);
-  const readable = inboxes.filter((inbox) => inbox.address && inbox.password);
+  const readable = fccInboxes(env).filter((inbox) => inbox.address && inbox.password);
   const base = (env.APP_BASE_URL?.trim() || "https://operations.getaxiom.ca/").replace(/\/?$/, "/");
-  const firstName = (name: string, fallback: string) => name.split(/\s+/)[0] || fallback;
   return runFccWeeklyNumbers(env.DB as ProspectDb, {
-    screenUrl: `${base}fcc`,
-    inboxes: inboxes.map((inbox) => ({ key: inbox.primary ? "" : inbox.address, name: firstName(inbox.name, inbox.primary ? "Aidan" : "Riley") })),
+    screenUrl: `${base}dashboard`,
     tellFounders: foundersMailer(env, readable, sendOwnerEmail),
   });
 }
