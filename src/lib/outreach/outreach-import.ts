@@ -122,6 +122,9 @@ export function importSql(plan: ImportPlan) {
   return `${lines.join("\n")}\n`;
 }
 
+/** How many rows one INSERT carries when the screen (or the Claude connector) loads a list. */
+export const IMPORT_CHUNK = 100;
+
 /**
  * Loads a plan straight into the database (the engine screen's upload). Returns the batch's counts and how
  * many rows were skipped because their address is already in the campaign.
@@ -132,9 +135,15 @@ export async function importToDb(db: ProspectDb, plan: ImportPlan) {
   await db.prepare(`INSERT OR IGNORE INTO "OutreachBatch" ("id","campaignKey","name","source","columnsJson","rows","ready","held","loadedBy","loadedAt","status","wordsJson","wordsVersion","sendOrder")
     VALUES (?,?,?,?,?,0,0,0,?,?,'waiting',?,?,(SELECT COALESCE(MAX("sendOrder"), 0) + 1 FROM "OutreachBatch" WHERE "campaignKey" = ?))`)
     .bind(b.id, b.campaignKey, b.name, b.source, JSON.stringify(b.columns), b.loadedBy, b.loadedAt, b.wordsJson, b.wordsVersion, b.campaignKey).run();
-  for (const c of plan.contacts) {
+  // The rows go in as one statement per IMPORT_CHUNK, in file order, each row exactly as the one-row insert wrote it
+  // (INSERT OR IGNORE still skips an address already in the campaign). A list used to cost one query a row.
+  for (let start = 0; start < plan.contacts.length; start += IMPORT_CHUNK) {
+    const rows = plan.contacts.slice(start, start + IMPORT_CHUNK)
+      .map((c) => ({ id: c.id, rowNumber: c.rowNumber, email: c.email, fieldsJson: JSON.stringify(c.fields), status: c.status, holdReason: c.holdReason }));
     await db.prepare(`INSERT OR IGNORE INTO "OutreachContact" ("id","campaignKey","batchId","rowNumber","email","fieldsJson","status","holdReason","createdAt","updatedAt")
-      VALUES (?,?,?,?,?,?,?,?,?,?)`).bind(c.id, b.campaignKey, b.id, c.rowNumber, c.email, JSON.stringify(c.fields), c.status, c.holdReason, b.loadedAt, b.loadedAt).run();
+      SELECT json_extract(j.value, '$.id'), ?, ?, json_extract(j.value, '$.rowNumber'), json_extract(j.value, '$.email'), json_extract(j.value, '$.fieldsJson'),
+        json_extract(j.value, '$.status'), json_extract(j.value, '$.holdReason'), ?, ?
+      FROM json_each(?) j ORDER BY j.key`).bind(b.campaignKey, b.id, b.loadedAt, b.loadedAt, JSON.stringify(rows)).run();
   }
   for (const statement of holdBlockedSql(b.id)) await db.prepare(statement.replace(/;\s*$/, "")).bind().run();
   const counts = await db.prepare(`SELECT "rows","ready","held" FROM "OutreachBatch" WHERE "id" = ?`).bind(b.id).first<{ rows: number; ready: number; held: number }>();

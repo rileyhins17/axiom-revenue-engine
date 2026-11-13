@@ -36,3 +36,19 @@ export async function addressBlocked(db: ProspectDb, email: string) {
 export async function suppress(db: ProspectDb, email: string, reason: "BOUNCED" | "UNSUBSCRIBED") {
   await db.prepare(`INSERT INTO "EngineEmailSuppression" ("email","reason") VALUES (?,?) ON CONFLICT DO NOTHING`).bind(email.toLowerCase(), reason).run();
 }
+
+/**
+ * Which of these addresses no campaign may email: the same rule as `addressBlocked`, for a whole list in one
+ * query (a list check used to ask once per row). Addresses are compared in lower case.
+ */
+export async function blockedAmong(db: ProspectDb, emails: string[]): Promise<Set<string>> {
+  const addresses = [...new Set(emails.map((email) => email.toLowerCase()))];
+  if (addresses.length === 0) return new Set();
+  const { results } = await db.prepare(`SELECT j.value AS email FROM json_each(?) j WHERE
+      EXISTS (SELECT 1 FROM "EngineEmailSuppression" s WHERE s."email" = j.value OR s."email" = '@' || substr(j.value, instr(j.value, '@') + 1))
+      OR EXISTS (SELECT 1 FROM "FccCampaignContact" f WHERE lower(f."email") = j.value AND (f."status" = 'bounced' OR ${FCC_SAID_NO_SQL}))
+      OR EXISTS (SELECT 1 FROM "OutreachContact" WHERE "email" = j.value AND "status" = 'bounced')
+      OR EXISTS (SELECT 1 FROM "OutreachReply" r JOIN "OutreachContact" o ON o."id" = r."contactId" WHERE o."email" = j.value AND r."kind" = 'no_thanks')`)
+    .bind(JSON.stringify(addresses)).all<{ email: string }>();
+  return new Set(results.map((row) => row.email));
+}

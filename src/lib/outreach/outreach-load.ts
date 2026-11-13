@@ -8,7 +8,7 @@
  * New words can come with the list. Saving them changes the campaign's words, which locks every approved
  * batch until its approver approves it again (the approval is for the words as they were).
  */
-import { addressBlocked } from "@/lib/outreach/outreach-blocked";
+import { blockedAmong } from "@/lib/outreach/outreach-blocked";
 import { parseCsv, type CsvTable } from "@/lib/outreach/outreach-csv";
 import { EMAIL_PATTERN, importToDb, planImport } from "@/lib/outreach/outreach-import";
 import { SCREEN_DOMAIN_LIMIT, checkMailServers, emailDomain, type MailServerCheck } from "@/lib/outreach/outreach-mail-servers";
@@ -87,8 +87,10 @@ export async function loadList(db: ProspectDb, input: LoadInput, context: LoadCo
   if (plan.errors.length) return { ok: false, error: plan.errors.join(" ") };
 
   // The do-not-email list is read now for the counts; loading holds the same rows again on the live data.
-  const contacts = await Promise.all(plan.contacts.map(async (contact) => contact.status === "ready" && await addressBlocked(db, contact.email)
-    ? { ...contact, status: "held" as const, holdReason: "On the do-not-email list (bounced, said no thanks or asked not to be contacted)" } : contact));
+  // One query for the whole list, so a long list costs no more database reads than a short one.
+  const blocked = await blockedAmong(db, plan.contacts.filter((contact) => contact.status === "ready").map((contact) => contact.email));
+  const contacts = plan.contacts.map((contact) => contact.status === "ready" && blocked.has(contact.email)
+    ? { ...contact, status: "held" as const, holdReason: "On the do-not-email list (bounced, said no thanks or asked not to be contacted)" } : contact);
   const ready = contacts.filter((contact) => contact.status === "ready");
   const samples = ready.slice(0, 3).flatMap((contact): LoadSample[] => {
     const one = renderEmail(chosen.words, 1, contact.fields, sender, context.mailingAddress || "(the mailing address)", { noLinksInFirst: campaign.rules.noLinksInFirst });
