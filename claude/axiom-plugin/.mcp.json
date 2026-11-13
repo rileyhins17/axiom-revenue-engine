@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "axiom-command": {
+      "type": "http",
+      "url": "${AXIOM_COMMAND_URL:-https://command.axiominternational.ca}/api/mcp",
+      "headers": { "Authorization": "Bearer ${AXIOM_COMMAND_KEY}" }
+    },
+    "axiom-engine": {
+      "type": "http",
+      "url": "${AXIOM_ENGINE_URL:-https://operations.getaxiom.ca}/api/mcp",
+      "headers": { "Authorization": "Bearer ${AXIOM_ENGINE_KEY}" }
+    }
+  }
+}

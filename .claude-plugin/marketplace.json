@@ -1,0 +1,16 @@
+{
+  "name": "axiom-tools",
+  "owner": {
+    "name": "Axiom"
+  },
+  "metadata": {
+    "description": "Axiom's own Claude Code plugins."
+  },
+  "plugins": [
+    {
+      "name": "axiom",
+      "source": "./claude/axiom-plugin",
+      "description": "Everything Axiom for Claude Code: the Axiom Command and Axiom Revenue Engine connectors, and when to use which."
+    }
+  ]
+}
