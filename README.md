@@ -27,7 +27,7 @@ Phone tabs (the founders mostly use an iPhone): **Today**, **Replies**, **Campai
   not, when the next email goes, the last reply check, which campaigns use it. Read-only.
 - **More → Do-not-email list**: is an address or a domain blocked, why, when, in which campaign.
 - **More → FCC archive**: FCC's all-time numbers, read-only.
-- **More → Settings**: your account, profile picture and the iPhone home-screen app.
+- **More → Settings**: your account, profile picture, the iPhone home-screen app, and the Claude connector (make or turn off your key).
 
 Sign-in is by a 6-digit code emailed to Riley's or Aidan's own inbox. Nobody else
 can sign in. The screens follow the phone's light or dark setting.
@@ -68,8 +68,9 @@ FCC's own sender ([its runbook](docs/runbooks/FCC_CAMPAIGN.md)) is still in the 
 | Local preview with made-up data | `scripts/demo-data.ts`, `docs/runbooks/LOCAL_PREVIEW.md` |
 | Gmail over SMTP and IMAP | `src/lib/revenue-engine/smtp-client.ts`, `imap-client.ts` |
 | Screens | `src/app/dashboard` (Today), `replies`, `campaigns`, `inboxes`, `do-not-email`, `fcc` (archive), `settings`; building blocks in `src/components/owner/kit.tsx` |
+| Claude connector: a founder's Claude reads the engine and does a few safe things (`docs/runbooks/CLAUDE_CONNECTOR.md`) | `src/lib/connector/`, `src/app/api/mcp` |
 | Contact lists, go and pause SQL | `scripts/fcc-campaign.ts`, `scripts/outreach.ts` |
-| Database changes | `migrations/` (next free number: 0092) |
+| Database changes | `migrations/` (next free number: 0093) |
 
 ## Working on it
 
