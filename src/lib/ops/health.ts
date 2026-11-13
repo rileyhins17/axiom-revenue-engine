@@ -86,7 +86,7 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
     const inHours = minute >= OUTREACH_REPLY_HOURS.from + 120 && minute < OUTREACH_REPLY_HOURS.to + 30;
     const stale = inHours && (!replies?.at || Date.parse(replies.at) < now.getTime() - 2 * 3_600_000);
     add("campaign-reply-check", !stale,
-      `The hourly check of the inboxes for campaign replies hasn't finished since ${replies?.at ? when(replies.at) : "it started"}, so a city reply could be waiting unseen.`,
+      `The hourly check of the inboxes for campaign replies hasn't finished since ${replies?.at ? when(replies.at) : "it started"}, so a reply could be waiting unseen.`,
       "Look in both Gmail inboxes yourself today, then ask Claude to read the Worker logs (an inbox's app password may have changed).");
     const unread = replies?.unread ?? [];
     add("campaign-reply-inboxes", unread.length === 0,
@@ -99,7 +99,7 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
   const replyCheck = await readFccReplyCheck(db).catch(() => null);
   const replyCheckLate = minute >= 10 * 60 + 30 && replyCheck?.day !== torontoDay(now);
   add("fcc-reply-check", !replyCheckLate,
-    "Today's 9 a.m. reply check hasn't finished, so replies may be waiting in the inboxes unseen.",
+    "The morning check of the old FCC inboxes for replies hasn't finished today, so a late FCC reply could be waiting unseen.",
     "Check both Gmail inboxes yourself today, then ask Claude to look at the reply check (an inbox's app password may have changed).");
 
   return checks;
@@ -146,11 +146,14 @@ const fixedText = (check: HealthCheck) => FIXED[check.key]
       : check.key.startsWith("inbox-resting:") ? `${check.key.slice(14)} can send again today.`
       : `${check.key.replace(/-/g, " ")} is working again.`);
 
+/** The first sentence of a problem, for the subject. A "." or ":" ends it only before a space, so "1:02" stays whole. */
+const headline = (problem: string) => problem.split(/(?<!\b[ap]\.m)[.:](?= |$)/)[0]!.trim();
+
 export function alertEmail(alerts: Awaited<ReturnType<typeof recordAndSelectAlerts>>) {
   const broken = [...alerts.newProblems, ...alerts.reminders];
   if (!broken.length && !alerts.fixed.length) return null;
   const subject = broken.length
-    ? `⚠️ Axiom engine: ${broken.length === 1 ? broken[0]!.problem.split(/[.:]/)[0] : `${broken.length} things need attention`}`
+    ? `⚠️ Axiom engine: ${broken.length === 1 ? headline(broken[0]!.problem) : `${broken.length} things need attention`}`
     : `✅ Axiom engine: ${alerts.fixed.length === 1 ? fixedText(alerts.fixed[0]!).replace(/\.$/, "") : `${alerts.fixed.length} issues fixed`}`;
   const lines: string[] = [];
   if (alerts.newProblems.length) lines.push("Something just went wrong:", ...alerts.newProblems.flatMap((c) => [`• ${c.problem}`, `  What to do: ${c.fix}`]), "");
