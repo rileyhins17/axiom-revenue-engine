@@ -403,6 +403,9 @@ test("the hourly reply check reads every inbox, stops whoever wrote back, puts a
   const fake = fakeInbox();
   await (await harness(db, fake)).run(MON_9AM, MON_9AM + 30 * MINUTE);
   assert.equal(fake.sent.length, 4);
+  // The sender stamps firstSentAt with the real clock after each send; pin it to the simulated Monday morning,
+  // or every reply below (Mon Nov 9) counts as older than the email and is skipped once that day has passed.
+  raw.prepare(`UPDATE "OutreachContact" SET "firstSentAt" = ? WHERE "firstSentAt" IS NOT NULL`).run(new Date(MON_9AM).toISOString());
   const messages = [
     { folder: "[Gmail]/All Mail", uid: 11, from: "clerk1@city1.gov", date: "2026-11-09T18:00:00.000Z", automatic: false, text: "Yes please, send the full report." },
     { folder: "[Gmail]/All Mail", uid: 12, from: "it@city2.gov", date: "2026-11-09T19:00:00.000Z", automatic: false, text: "Not interested, thanks." },
