@@ -66,12 +66,12 @@ export function ApproveDock({ batch, name, emails, campaign, wordsChanged }: { b
         <SheetHeader>
           <SheetTitle>Approve {count} in {name}?</SheetTitle>
           <SheetDescription>
-            They go out at {campaign}&rsquo;s next send times, exactly as the samples read, each with its follow-up. You can still pause the campaign or stop this batch afterwards, but an email that has gone can&rsquo;t be taken back.
+            Approving says you read the samples. The emails go out at {campaign}&rsquo;s next send times, exactly as the samples read, each with its follow-up. You can still pause the campaign or stop this batch afterwards, but an email that has gone can&rsquo;t be taken back.
           </SheetDescription>
         </SheetHeader>
         <div className="grid gap-2 px-4 pb-4">
           <Button type="button" size="lg" disabled={busy || !armed} data-approve-confirm onClick={() => void run(async () => { await post("/api/campaigns/approve", { batch, action: "approve" }); setOpen(false); return "Approved."; })}>
-            <CheckCircle2 aria-hidden="true" />{busy ? "Approving…" : `Yes, I read the samples: approve ${count}`}</Button>
+            <CheckCircle2 aria-hidden="true" />{busy ? "Approving…" : `Yes, approve ${count}`}</Button>
           {error ? <p role="alert" className="text-sm font-medium" style={{ color: "var(--owner-danger)" }}>{error}</p> : null}
           <Button type="button" variant="outline" size="lg" disabled={busy} onClick={() => setOpen(false)}>Not yet</Button>
         </div>
