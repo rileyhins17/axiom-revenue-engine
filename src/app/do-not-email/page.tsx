@@ -34,7 +34,7 @@ export default async function DoNotEmailPage({ searchParams }: { searchParams: P
 
     <Panel title="Check an address or a domain" icon={Search}>
       <form action="/do-not-email" method="get" className="owner-search" role="search">
-        <input type="search" name="q" defaultValue={query} placeholder="clerk@example.gov or example.gov" aria-label="An email address or a domain" autoComplete="off" autoCapitalize="none" spellCheck={false} inputMode="email" />
+        <input type="search" name="q" defaultValue={query} placeholder="Address or domain" aria-label="An email address or a domain" autoComplete="off" autoCapitalize="none" spellCheck={false} inputMode="email" />
         <button type="submit" className={buttonVariants({ size: "lg" })}><Search aria-hidden="true" /><span className="sr-only sm:not-sr-only">Check</span></button>
       </form>
       {check ? <div className="mt-4 space-y-4">
