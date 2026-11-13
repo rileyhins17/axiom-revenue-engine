@@ -30,7 +30,7 @@ const BASE = "https://engine.test";
 const MAILING = "100 Example Street, Kitchener, ON N0N 0N0, Canada";
 const AIDAN = "aidan@axiom-test.example";
 const RILEY = "riley@axiom-test.example";
-const READ_TOOLS = ["engine_today", "list_campaigns", "get_campaign", "list_batches", "get_batch", "list_replies", "get_reply", "find_contact", "inbox_health", "check_do_not_email"];
+const READ_TOOLS = ["engine_today", "list_campaigns", "get_campaign", "list_batches", "get_batch", "list_replies", "get_reply", "find_contact", "inbox_health", "check_do_not_email", "week_numbers"];
 const WRITE_TOOLS = ["pause_campaign", "check_list", "load_list", "send_test", "mark_reply_answered"];
 
 const FIRST = `Subject: {city}'s website: {error_count} accessibility problems
@@ -597,10 +597,10 @@ test("check_list saves nothing and shows ready, held and the samples; load_list 
   assert.equal((await s.call("load_list", { campaign: "nobody-here", name: "x", csv: CSV })).text, "That campaign doesn't exist.");
   assert.equal((await s.call("check_list", { campaign: "us-cities", name: "x", csv: "first_name,city\nDana,Marrow Sound" })).error, true);
   assert.equal((await s.call("check_list", { campaign: "us-cities", csv: CSV })).text, '"name" is needed.');
-  const big = ["email,first_name,city,verified,error_count", ...Array.from({ length: CONNECTOR_MAX_LIST_ROWS + 1 }, (_, i) => `person${i}@place${i}.example,Pat,Place ${i},yes,9`)].join("\n");
-  assert.equal(CONNECTOR_MAX_LIST_ROWS, 10);
-  assert.equal((await s.call("load_list", { campaign: "us-cities", name: "too-big", csv: big })).text,
-    "This list has 11 rows. The connector takes up to 10 rows at a time; split it into smaller batches, or load it on the campaign's Load a list screen. Nothing was saved.");
+  // The connector takes what the screen takes: up to 300 rows a load, and says so when a list is longer.
+  const big = ["email,first_name,city,verified,error_count", ...Array.from({ length: CONNECTOR_MAX_LIST_ROWS + 1 }, (_, i) => `person${i}@place${i % 20}.example,Pat,Place ${i},yes,9`)].join("\n");
+  assert.equal(CONNECTOR_MAX_LIST_ROWS, 300);
+  assert.equal((await s.call("load_list", { campaign: "us-cities", name: "too-big", csv: big })).text, "The screen loads up to 300 rows at a time; this list has 301. Split it into batches.");
   assert.equal((await s.call("check_list", { campaign: "us-cities", name: "too-big", csv: big })).error, true);
   assert.equal(s.all(`SELECT COUNT(*) AS n FROM "OutreachBatch" WHERE "name" = 'too-big'`)[0]!.n, 0);
 });
@@ -721,17 +721,17 @@ test("the connector's code has no path to approving, resuming, stopping a batch,
   assert.deepEqual(controls, ["pauseCampaign"]);
   assert.ok(!/outreach-control/.test(read("mcp-server.ts") + read("mcp-http.ts")));
   // The marked spot for the next tool is still there.
-  assert.match(read("mcp-tools.ts"), /\n {2}\/\/ week_numbers goes here\n/);
 });
 
 test("every tool call, key check, rate limit and audit row included, stays well inside the database's 50 queries a request", async () => {
   const s = setup();
   const key = await makeKey(s.db, "Riley", "header", NOW);
-  const full = ["email,first_name,city,verified,error_count", ...Array.from({ length: CONNECTOR_MAX_LIST_ROWS }, (_, i) => `person${i}@place${i}.example,Pat,Place ${i},yes,9`)].join("\n");
+  // A real-sized list: 120 rows, as many as Riley's Claude loads in one go.
+  const full = ["email,first_name,city,verified,error_count", ...Array.from({ length: 120 }, (_, i) => `person${i}@place${i % 20}.example,Pat,Place ${i},yes,9`)].join("\n");
   const calls: Array<[string, Record<string, unknown>]> = [
     ["engine_today", {}], ["list_campaigns", {}], ["get_campaign", { campaign: "us-cities" }], ["list_batches", {}], ["get_batch", { batch: "b-test-1" }],
     ["list_replies", { filter: "all" }], ["list_replies", { campaign: "fcc", filter: "all" }], ["get_reply", { id: `${RILEY}:[Gmail]/All Mail:9001:c2` }], ["find_contact", { query: ".example", limit: 50 }],
-    ["inbox_health", {}], ["check_do_not_email", { address: "elena@northmere.example" }], ["pause_campaign", { campaign: "school-districts", reason: "Counting queries" }],
+    ["inbox_health", {}], ["check_do_not_email", { address: "elena@northmere.example" }], ["week_numbers", {}], ["pause_campaign", { campaign: "school-districts", reason: "Counting queries" }],
     ["check_list", { campaign: "us-cities", name: "full list", csv: full }], ["load_list", { campaign: "us-cities", name: "full list", csv: full, first: `${FIRST}\nP.S. New words.`, followUp: FOLLOW }],
     ["send_test", { batch: "b-test-2" }], ["mark_reply_answered", { id: "contact:c8", success: true }],
   ];
@@ -818,4 +818,43 @@ test("every tool call writes one audit row: the tool, the founder, whether it wo
   const stillWorks = await tool("list_campaigns", {});
   assert.equal(stillWorks.status, 200);
   assert.equal(stillWorks.body.result.structuredContent.campaigns.length, 3);
+});
+
+test("week_numbers: this week, last week or the week holding a day, the same numbers the Monday email reports", async () => {
+  const s = setup();
+  const { weekNumbers } = await import("@/lib/outreach/outreach-week");
+  // NOW is Fri Nov 13, 2026: this week is Mon Nov 9 to today.
+  const now = (await s.call("week_numbers")).data;
+  assert.equal(now.week, "2026-11-09 to 2026-11-13");
+  const direct = await weekNumbers(s.db, "2026-11-09", "2026-11-13", NOW);
+  assert.deepEqual(now.totals, direct.totals);
+  assert.deepEqual(now.campaigns.map((row: Json) => [row.key, row.sent, row.replies, row.success, row.successLabel]), direct.campaigns.map((row) => [row.key, row.sent, row.replies, row.success, row.successLabel]));
+  assert.ok(now.totals.sent > 0 && now.campaigns.length >= 2, "the made-up week has emails in it");
+  assert.equal((await s.call("week_numbers", { week: "this" })).data.week, now.week);
+  assert.equal((await s.call("week_numbers", { week: "last" })).data.week, "2026-11-02 to 2026-11-08");
+  // Any day names its Monday-to-Sunday week; a day in the current week stops at today.
+  assert.equal((await s.call("week_numbers", { week: "2026-11-05" })).data.week, "2026-11-02 to 2026-11-08");
+  assert.equal((await s.call("week_numbers", { week: "2026-11-11" })).data.week, now.week);
+  assert.equal((await s.call("week_numbers", { week: "2026-11-20" })).text, "That week hasn't started yet.");
+  assert.equal((await s.call("week_numbers", { week: "2026-13-45" })).text, "That isn't a day. Use this, last, or a day like 2026-11-09.");
+  assert.equal((await s.call("week_numbers", { week: "next" })).text, '"week": Use this, last, or a day like 2026-11-09.');
+});
+
+test("mark_reply_answered: counting a reply as a success leaves answered as it was; with no mark named it means answered", async () => {
+  const s = setup();
+  const id = `${RILEY}:[Gmail]/All Mail:9001:c2`;
+  const counted = (await s.call("mark_reply_answered", { id, success: true })).data.reply;
+  assert.deepEqual([counted.success, counted.answeredAt], [true, null], "Claude can count a reply before a founder has answered it");
+  const answered = (await s.call("mark_reply_answered", { id })).data.reply;
+  assert.deepEqual([answered.success, answered.answeredBy], [true, "Riley"]);
+});
+
+test("find_contact says whether each address it finds is blocked, in one look for all of them", async () => {
+  const s = setup();
+  const found = (await s.call("find_contact", { query: ".example", limit: 50 })).data;
+  assert.ok(found.found > 10);
+  assert.ok(found.contacts.every((contact: Json) => typeof contact.blocked === "boolean"), "every hit carries an answer, not only the first ten");
+  const { addressBlocked } = await import("@/lib/outreach/outreach-blocked");
+  for (const contact of found.contacts.slice(0, 12)) assert.equal(contact.blocked, await addressBlocked(s.db, contact.email), contact.email);
+  assert.ok(found.contacts.some((contact: Json) => contact.blocked), "the made-up data has blocked people in it");
 });

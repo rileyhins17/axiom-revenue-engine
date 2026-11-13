@@ -13,11 +13,10 @@
 import { z } from "zod";
 
 import type { Founder } from "@/lib/connector/connector-keys";
-import { addressBlocked } from "@/lib/outreach/outreach-blocked";
+import { blockedAmong } from "@/lib/outreach/outreach-blocked";
 import { pauseCampaign } from "@/lib/outreach/outreach-control";
-import { parseCsv } from "@/lib/outreach/outreach-csv";
 import { clockText, type InboxHealth } from "@/lib/outreach/outreach-inbox-health";
-import { SCREEN_MAX_CSV_CHARS, loadList } from "@/lib/outreach/outreach-load";
+import { SCREEN_MAX_CSV_CHARS, SCREEN_MAX_ROWS, loadList } from "@/lib/outreach/outreach-load";
 import { checkDoNotEmail, findContacts } from "@/lib/outreach/outreach-lookup";
 import type { MailServerCheck } from "@/lib/outreach/outreach-mail-servers";
 import { readCampaign, readCampaigns, successLabelOf, type Campaign } from "@/lib/outreach/outreach-model";
@@ -25,6 +24,7 @@ import { FCC_FILTER, REPLY_FILTERS, getReply, listReplies, markReply, type Reply
 import { batchPhase, batchReview, campaignDetail, campaignSummaries, type BatchPhase, type CampaignCounts } from "@/lib/outreach/outreach-status";
 import { requestTestSend } from "@/lib/outreach/outreach-tests";
 import { needsYou, todayData } from "@/lib/outreach/outreach-today";
+import { lastWeek, thisWeek, weekNumbers } from "@/lib/outreach/outreach-week";
 import { OWNER_LOGINS } from "@/lib/owner-login";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
@@ -56,15 +56,8 @@ export type Tool = {
   run: (args: never, t: ToolContext) => Promise<unknown>;
 };
 
-/**
- * The most rows one list check or load takes through the connector. The list loader (outreach-load.ts) reads the
- * do-not-email list once per row and saves one row at a time, so a load costs about 12 queries plus 2 a row, and
- * the free Cloudflare plan allows about 50 database queries a request: 10 rows keeps a load near 32. Bigger lists
- * load on the screen or from a PC. Raise this once the loader saves its rows in one query.
- */
-export const CONNECTOR_MAX_LIST_ROWS = 10;
-/** How many of find_contact's hits get a do-not-email check (one query each). */
-export const BLOCKED_CHECKS = 10;
+/** A list through the connector has the screen's own limits (rows and email domains per load). */
+export const CONNECTOR_MAX_LIST_ROWS = SCREEN_MAX_ROWS;
 
 // ---------- Toronto time ----------
 const TIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:?\d{2})?$/;
@@ -178,13 +171,20 @@ const PHASE_TEXT: Record<BatchPhase, string> = {
   waiting: "Waiting for its approver", sending: "Approved: its emails go at the campaign's send times", done: "Done: everyone in it has had every email", stopped: "Stopped by a founder",
 };
 
+/** The Monday-to-Sunday week asked for, never running past today: "this", "last", or the week holding a day. */
+function weekRange(week: string, now: Date) {
+  const current = thisWeek(now);
+  if (week === "this") return current;
+  if (week === "last") return lastWeek(now);
+  if (Number.isNaN(Date.parse(`${week}T17:00:00Z`))) throw new ToolError("That isn't a day. Use this, last, or a day like 2026-11-09.");
+  const monday = thisWeek(new Date(`${week}T17:00:00Z`)).from;
+  if (monday > current.to) throw new ToolError("That week hasn't started yet.");
+  if (monday === current.from) return current;
+  const sunday = new Date(Date.parse(`${monday}T17:00:00Z`) + 6 * 86_400_000).toISOString().slice(0, 10);
+  return { from: monday, to: sunday };
+}
+
 async function listCheck(a: { campaign: string; name: string; csv: string; first?: string; followUp?: string }, t: ToolContext, save: boolean) {
-  let rows = 0;
-  // A CSV that can't be read is reported by the check itself, in its own words.
-  try { rows = parseCsv(a.csv).rows.length; } catch { rows = 0; }
-  if (rows > CONNECTOR_MAX_LIST_ROWS) {
-    throw new ToolError(`This list has ${rows} rows. The connector takes up to ${CONNECTOR_MAX_LIST_ROWS} rows at a time; split it into smaller batches, or load it on the campaign's Load a list screen. Nothing was saved.`);
-  }
   const result = await loadList(t.db, { campaign: a.campaign, name: a.name, csv: a.csv, ...(a.first ? { first: a.first } : {}), ...(a.followUp ? { followUp: a.followUp } : {}), save }, {
     loadedBy: via(t.founder), now: t.now, newId: t.newId ?? (() => crypto.randomUUID()), mailingAddress: t.settings.mailingAddress || null, ...(t.checkMail ? { checkMail: t.checkMail } : {}),
   });
@@ -386,16 +386,14 @@ export const TOOLS: Tool[] = [
       limit: { type: "integer", minimum: 1, maximum: 50, description: "How many (default 25)" },
     }, ["query"]),
     args: z.object({ query: z.string().trim().min(2).max(120), campaign: campaignArg.optional(), limit: z.number().int().min(1).max(50).optional() }).strict(),
-    description: `Look someone up by email address or organisation: every campaign row they are in, where each stands, emails sent, replies, and whether the address is blocked from every campaign (checked for the first ${BLOCKED_CHECKS} addresses).`,
+    description: `Look someone up by email address or organisation: every campaign row they are in, where each stands, emails sent, replies, and whether the address is blocked from every campaign.`,
     run: async (a, t) => {
       const hits = await findContacts(t.db, a.query, { campaign: a.campaign ?? null, limit: a.limit ?? 25 });
-      const addresses = [...new Set(hits.map((hit) => hit.email))].slice(0, BLOCKED_CHECKS);
-      const blocked = new Map(await Promise.all(addresses.map(async (address) => [address, await addressBlocked(t.db, address)] as const)));
+      const blocked = await blockedAmong(t.db, hits.map((hit) => hit.email));
       return {
         query: a.query, found: hits.length,
-        contacts: hits.map((hit) => ({ ...hit, blocked: blocked.get(hit.email) ?? null })),
-        note: hits.length === 0 ? "Nobody in any campaign matches. check_do_not_email says whether an address is blocked."
-          : blocked.size < new Set(hits.map((hit) => hit.email)).size ? `"blocked" is null beyond the first ${BLOCKED_CHECKS} addresses: use check_do_not_email for those.` : null,
+        contacts: hits.map((hit) => ({ ...hit, blocked: blocked.has(hit.email) })),
+        note: hits.length === 0 ? "Nobody in any campaign matches. check_do_not_email says whether an address is blocked." : null,
       };
     },
   }),
@@ -419,7 +417,17 @@ export const TOOLS: Tool[] = [
     },
   }),
 
-  // week_numbers goes here
+  tool({
+    name: "week_numbers", title: "A week's numbers", annotations: READ, saves: false,
+    inputSchema: obj({ week: { type: "string", description: "this (default: Monday to today), last (last Monday to Sunday), or any day of the week you want, like 2026-11-09" } }),
+    args: z.object({ week: z.string().regex(/^(this|last|\d{4}-\d{2}-\d{2})$/, "Use this, last, or a day like 2026-11-09.").optional() }).strict(),
+    description: "The numbers the founders judge each campaign by, for one Monday-to-Sunday week (Toronto days): emails sent as first emails and follow-ups, real replies, no thanks, automatic replies, bounces and the campaign's success number, per campaign and in total, with all-time totals, what is left to send, emails per inbox, and who wrote back. The Monday 8 a.m. email is last week's.",
+    run: async (a, t) => {
+      const range = weekRange(a.week ?? "this", t.now);
+      const week = await weekNumbers(t.db, range.from, range.to, t.now);
+      return { week: `${range.from} to ${range.to}`, ...week };
+    },
+  }),
 
   // Writes: each is something the screen already lets a founder do, and none of them can make an email go out.
   tool({
@@ -442,13 +450,13 @@ export const TOOLS: Tool[] = [
   tool({
     name: "check_list", title: "Check a list", annotations: { ...WRITE, idempotentHint: true }, saves: false, inputSchema: listSchema, args: listArgs,
     target: (a) => ({ kind: "campaign", id: a.campaign }),
-    description: `The screen's "Check the list". Saves nothing. Checks a CSV against a campaign's words and rules, looks up each email domain's mail server and the do-not-email list, and returns how many rows are ready and held (with each reason) and the first 3 emails exactly as they would go. Up to ${CONNECTOR_MAX_LIST_ROWS} rows at a time through the connector.`,
+    description: `The screen's "Check the list". Saves nothing. Checks a CSV against a campaign's words and rules, looks up each email domain's mail server and the do-not-email list, and returns how many rows are ready and held (with each reason) and the first 3 emails exactly as they would go. Up to ${CONNECTOR_MAX_LIST_ROWS} rows and 40 different email domains at a time, as on the screen.`,
     run: (a, t) => listCheck(a, t, false),
   }),
   tool({
     name: "load_list", title: "Load a batch", annotations: WRITE, saves: true, inputSchema: listSchema, args: listArgs,
     target: (a) => ({ kind: "campaign", id: a.campaign }),
-    description: `The screen's "Load this batch": saves the list as a batch that waits for the campaign's approver. Nothing in it sends until they approve it on the screen. Run check_list first and read its samples. New words given here become the campaign's latest words. Up to ${CONNECTOR_MAX_LIST_ROWS} rows at a time through the connector. ${APPROVE_ON_SCREEN}`,
+    description: `The screen's "Load this batch": saves the list as a batch that waits for the campaign's approver. Nothing in it sends until they approve it on the screen. Run check_list first and read its samples. New words given here become the campaign's latest words. Up to ${CONNECTOR_MAX_LIST_ROWS} rows and 40 different email domains at a time, as on the screen. ${APPROVE_ON_SCREEN}`,
     run: (a, t) => listCheck(a, t, true),
   }),
   tool({
@@ -478,14 +486,14 @@ export const TOOLS: Tool[] = [
     name: "mark_reply_answered", title: "Mark a reply", annotations: { ...WRITE, idempotentHint: true }, saves: true,
     inputSchema: obj({
       id: { type: "string", description: "The reply id from list_replies" },
-      answered: { type: "boolean", description: "true (default): a founder has written back, so it leaves To answer. false: not answered after all" },
-      success: { type: "boolean", description: "true: this reply counts toward the campaign's success number. false: it doesn't after all" },
+      answered: { type: "boolean", description: "true: a founder has written back, so it leaves To answer (the default when success is not given). false: not answered after all" },
+      success: { type: "boolean", description: "true: this reply counts toward the campaign's success number (given alone, it leaves answered as it is). false: it doesn't after all" },
     }, ["id"]),
     args: z.object({ id: replyArg, answered: z.boolean().optional(), success: z.boolean().optional() }).strict(),
     target: (a) => ({ kind: "reply", id: a.id }),
     description: "The Replies screen's marks: mark a reply answered once a founder has written back from their inbox, and optionally mark it as one that counts toward the campaign's success number. It changes only those marks: no email is sent and nobody's mail is touched. Mark a reply answered only when the founder says they answered it.",
     run: async (a, t) => {
-      const result = await markReply(t.db, a.id, { answered: a.answered ?? true, ...(a.success === undefined ? {} : { success: a.success }) }, t.founder, t.now);
+      const result = await markReply(t.db, a.id, { ...(a.answered !== undefined ? { answered: a.answered } : a.success === undefined ? { answered: true } : {}), ...(a.success === undefined ? {} : { success: a.success }) }, t.founder, t.now);
       if (!result.ok) throw new ToolError(result.why);
       return { reply: replyLine(result.reply) };
     },

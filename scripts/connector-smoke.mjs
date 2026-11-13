@@ -102,6 +102,7 @@ if (reply) await tool("get_reply", { id: reply.id }, (d) => ({ from: d.reply.org
 const found = await tool("find_contact", { query: reply?.organisation ?? "example", limit: 5 }, (d) => ({ found: d.found, first: d.contacts[0]?.statusText ?? "", blocked: d.contacts[0]?.blocked ?? "" }));
 await tool("inbox_health", {}, (d) => ({ inboxes: d.inboxes.length, first: `${d.inboxes[0]?.owner}: ${d.inboxes[0]?.sentToday} of ${d.inboxes[0]?.limitToday}, ${d.inboxes[0]?.nextSend}` }));
 await tool("check_do_not_email", { address: found?.contacts[0]?.email ?? "nobody@nowhere.example" }, (d) => ({ kind: d.kind, blocked: d.blocked, reasons: d.reasons.length }));
+await tool("week_numbers", {}, (d) => ({ week: d.week, sent: d.totals.sent, replies: d.totals.replies, campaigns: d.campaigns.length }));
 
 if (writes) {
   await tool("check_list", { campaign: PAUSE, name: "smoke check (not saved)", csv: CSV }, (d) => ({ saved: d.saved, rows: d.rows, ready: d.ready, held: d.held, why: d.heldRows[0]?.reason ?? "" }));

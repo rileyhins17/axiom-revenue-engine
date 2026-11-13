@@ -18,6 +18,7 @@ Each founder makes their own key in the engine: **Settings, Claude connector**. 
 | `find_contact` | Someone by email or organisation: every campaign row, emails sent, replies, and whether they are blocked. |
 | `inbox_health` | Each inbox today: sent of its limit, bounces, resting or not, next send, last reply check, its campaigns. |
 | `check_do_not_email` | Whether an address or a whole domain is blocked, and why. |
+| `week_numbers` | Any week's numbers per campaign: sent, replies, no thanks, bounces, the success number, what is left, who wrote back. `this`, `last`, or a day. |
 
 Every time is given twice: as stored, and in Toronto time (the field whose name ends in `Toronto`).
 
@@ -31,9 +32,9 @@ Each of these is something the screen already lets a founder do. None of them ma
 | `check_list` | The screen's "Check the list": saves nothing; shows ready rows, held rows with reasons and sample emails. |
 | `load_list` | The screen's "Load this batch": saves a batch that waits for its approver. |
 | `send_test` | Queues a batch's test emails to the founder's own inbox. There is no way to name another address. |
-| `mark_reply_answered` | The Replies screen's marks: answered, and whether the reply counts toward the success number. |
+| `mark_reply_answered` | The Replies screen's marks: answered, and whether the reply counts toward the success number. Counting a reply doesn't mark it answered. |
 
-Lists through the connector are small: up to 10 rows at a time. The list loader asks the database once or twice per row, and the free Cloudflare plan allows about 50 database queries per request. Bigger lists load on the campaign's Load a list screen or from a PC (`docs/runbooks/CAMPAIGNS.md`).
+A list through the connector has the screen's own limits: up to 300 rows and 40 different email domains at a time. Checking or loading a list costs a handful of database queries however long it is (the loader saves rows a hundred at a time and reads the do-not-email list once), so a real list fits inside what the free Cloudflare plan allows per request. Bigger lists load from a PC (`docs/runbooks/CAMPAIGNS.md`).
 
 ## What it can't do, and why
 
@@ -89,7 +90,7 @@ npx tsx scripts/demo-data.ts /tmp/connector-demo/demo.db busy
 APP_BASE_URL=http://localhost:3311 BETTER_AUTH_SECRET=<any 32 or more characters> AUTH_PASSWORD_SIGNIN=true AXIOM_LOCAL_SYNTHETIC_SIGNUP=1 AUTH_ALLOWED_EMAILS=<a founder's account address> DATABASE_PATH=/tmp/connector-demo/demo.db FCC_CAMPAIGN_MAILING_ADDRESS="100 Example Street, Kitchener, ON N0N 0N0, Canada" NEXT_TELEMETRY_DISABLED=1 npx next dev --webpack -p 3311
 ```
 
-A founder's account address is one of the two in `src/lib/owner-login.ts`. Sign that account up on the local copy (local only), open `http://localhost:3311/settings`, and make a key. Then:
+A founder's account address is one of the two in `src/lib/owner-login.ts`. Sign that account up on the local copy (local only; `docs/runbooks/LOCAL_PREVIEW.md` has the request), open `http://localhost:3311/settings`, and make a key. Then:
 
 ```
 CONNECTOR_KEY=<your local key> node scripts/connector-smoke.mjs http://localhost:3311
