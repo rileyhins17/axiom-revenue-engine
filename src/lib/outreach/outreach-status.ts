@@ -7,6 +7,7 @@ import { torontoMinute } from "@/lib/fcc-campaign-tick";
 import { readCampaignRun, type RunNote } from "@/lib/outreach/outreach-control";
 import { inboxCapNow, inboxDayMax, inboxRef, inboxSentToday } from "@/lib/outreach/outreach-inboxes";
 import { readCampaign, readCampaigns, readInboxes, type Campaign, type Inbox } from "@/lib/outreach/outreach-model";
+import { withSignatures } from "@/lib/outreach/outreach-signature";
 import { renderEmail, type CampaignWords, type RenderedEmail } from "@/lib/outreach/outreach-words";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
@@ -161,12 +162,14 @@ export async function batchReview(db: ProspectDb, batchId: string, mailingAddres
   const senders = campaign.inboxes.map((share) => inboxes.find((inbox) => inbox.address === share.address)).filter((inbox): inbox is Inbox => Boolean(inbox));
   const { results: ready } = await db.prepare(`SELECT "rowNumber","email","fieldsJson" FROM "OutreachContact" WHERE "batchId" = ? AND "status" IN ('ready','sent','done') ORDER BY "rowNumber" LIMIT ?`)
     .bind(batchId, size).all<{ rowNumber: number; email: string; fieldsJson: string }>();
+  // Samples and test emails show exactly what goes out, the signature included.
+  const signed = await withSignatures(db, senders.map((inbox) => ({ name: inbox.name, address: inbox.address })));
   const samples = ready.map((contact, index): SampleEmail => {
     const inbox = senders[index % Math.max(1, senders.length)];
     let fields: Record<string, string> = {};
     try { fields = JSON.parse(contact.fieldsJson) as Record<string, string>; } catch { fields = {}; }
     if (!inbox) return { row: contact.rowNumber, to: contact.email, from: "(no inbox set)", first: null, followUp: null, problem: "The campaign has no sending inbox." };
-    const sender = { name: inbox.name, address: inbox.address };
+    const sender = signed[index % Math.max(1, senders.length)] ?? { name: inbox.name, address: inbox.address };
     const first = renderEmail(words, 1, fields, sender, mailingAddress, { noLinksInFirst: campaign.rules.noLinksInFirst });
     const followUp = campaign.followUps > 0 && first.ok ? renderEmail(words, 2, fields, sender, mailingAddress, { firstSubject: first.email.subject }) : null;
     return {

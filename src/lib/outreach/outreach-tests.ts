@@ -63,7 +63,7 @@ export async function runOutreachTestSends(db: ProspectDb, deps: {
             await db.prepare(`INSERT INTO "OutreachSend" ("sendId","campaignKey","contactId","kind","step","email","senderAddress","sendDay","messageId","subject","status","createdAt")
               VALUES (?,?,NULL,'test',?,?,?,?,?,?,'CLAIMED',?)`).bind(deps.newId(), review.campaign.key, index + 1, request.to, address, torontoDay(now), messageId, email.subject, new Date().toISOString()).run();
             await transport.send({
-              to: request.to, subject: email.subject, text: email.text,
+              to: request.to, subject: email.subject, text: email.text, ...(email.html ? { html: email.html } : {}),
               headers: { "Message-ID": messageId, "X-Axiom-Test": "yes", ...(previous ? { "In-Reply-To": previous, References: previous } : {}) },
             });
             await db.prepare(`UPDATE "OutreachSend" SET "status" = 'SENT', "finishedAt" = ? WHERE "messageId" = ? AND "kind" = 'test'`).bind(new Date().toISOString(), messageId).run();

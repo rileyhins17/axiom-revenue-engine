@@ -598,3 +598,33 @@ test("an inbox that can't be read directly (Proton) has its checks read in the i
   assert.equal(mailboxOwner(proton, [proton]), null, "not a sending inbox: nothing to read, so it can't send");
   assert.equal(mailboxOwner(chained, [gmail, proton, chained]), null, "no chains");
 });
+
+test("a signed inbox ends its emails with the founder's signature; a no-links first email leaves out the link and logo", () => {
+  const fields = { first_name: "Dana", city: "Springfield", worst_problem: "5 images with no description" };
+  const signedWords: CampaignWords = { steps: [
+    { subject: "{city}'s website", body: "Hi {first_name},\n\nWe checked {city}. The biggest: {worst_problem}.\n\n{sender_name}\nAxiom, Kitchener-Waterloo" },
+    { body: "Following up on {city}.\n\n{sender_name}\nAxiom" },
+  ] };
+  const plain = { name: "Riley Example", address: "riley@example.com" };
+  const signed = { ...plain, signature: { title: "Co-founder, Axiom", phone: "555-0100" } };
+
+  const first = renderEmail(signedWords, 1, fields, signed, ADDRESS, { noLinksInFirst: true });
+  assert.ok(first.ok);
+  assert.match(first.email.text, /Co-founder, Axiom\n257 Example St,\nKitchener, ON N2C 0A0, Canada\nC: 555-0100\n\nNot useful\? Reply "no thanks"/);
+  assert.doesNotMatch(first.email.text, /getaxiom\.ca/);
+  assert.equal(first.email.text.match(/Riley Example/g)?.length, 1, "the name the words sign with is not repeated");
+  assert.ok(first.email.html);
+  assert.doesNotMatch(first.email.html, /<a |<img /);
+  assert.match(first.email.html, /no thanks/);
+
+  const follow = renderEmail(signedWords, 2, fields, signed, ADDRESS, { firstSubject: first.email.subject });
+  assert.ok(follow.ok);
+  assert.match(follow.email.text, /C: 555-0100\ngetaxiom\.ca\n\nNot useful/);
+  assert.match(follow.email.html ?? "", /<a href="https:\/\/getaxiom\.ca\/"><img src="https:\/\/operations\.getaxiom\.ca\/brand\/axiom-lockup-tile-328\.png"/);
+  assert.match(follow.email.html ?? "", /Following up on Springfield\./);
+
+  const unsigned = renderEmail(signedWords, 2, fields, plain, ADDRESS, { firstSubject: first.email.subject });
+  assert.ok(unsigned.ok);
+  assert.equal(unsigned.email.html, undefined);
+  assert.match(unsigned.email.text, /Axiom · 257 Example St/);
+});

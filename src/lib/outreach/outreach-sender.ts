@@ -29,6 +29,7 @@ import {
 } from "@/lib/outreach/outreach-inboxes";
 import { readCampaigns, type Campaign, type Inbox } from "@/lib/outreach/outreach-model";
 import { renderEmail, type CampaignWords, type Sender } from "@/lib/outreach/outreach-words";
+import { withSignatures } from "@/lib/outreach/outreach-signature";
 import { PermanentEmailError, type EmailTransport } from "@/lib/revenue-engine/engine-email";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
@@ -157,6 +158,8 @@ export async function runOutreachTick(db: ProspectDb, config: OutreachInboxConfi
   const campaigns = (await readCampaigns(db)).filter((campaign) => campaignClosed(campaign, inbox, now, config.mailingAddress) === null);
   if (campaigns.length === 0) return { status: "SKIPPED", reason: "no campaign sends from this inbox now" };
 
+  // The founder's full signature on a signed inbox (outreach-signature.ts); everyone else keeps the plain footer.
+  const [sender = config.sender] = await withSignatures(db, [config.sender]);
   const day = torontoDay(now);
   const minute = torontoMinute(now);
   const firstName = config.sender.name.trim().split(/\s+/)[0] || inbox;
@@ -278,7 +281,7 @@ export async function runOutreachTick(db: ProspectDb, config: OutreachInboxConfi
       try { fields = JSON.parse(contact.fieldsJson) as Record<string, string>; } catch { fields = {}; }
       const words = contactWords(contact, campaign);
       if (!words) { await stopContact(db, contact.id, step === 1 ? "held" : "failed", "Its batch's email words can't be read"); return "next"; }
-      const rendered = renderEmail(words, step, fields, config.sender, config.mailingAddress,
+      const rendered = renderEmail(words, step, fields, sender, config.mailingAddress,
         { noLinksInFirst: campaign.rules.noLinksInFirst, firstSubject: step === 1 ? null : contact.firstSubject });
       if (!rendered.ok) {
         // Can't be written as approved (a blank, a link): held for a person, and it takes no slot today.
@@ -318,7 +321,7 @@ export async function runOutreachTick(db: ProspectDb, config: OutreachInboxConfi
         : { "In-Reply-To": contact.lastMessageId ?? contact.firstMessageId, References: [...new Set([contact.firstMessageId, contact.lastMessageId].filter(Boolean))].join(" ") };
       try {
         await transport.send({
-          to: contact.email, subject: rendered.email.subject, text: rendered.email.text,
+          to: contact.email, subject: rendered.email.subject, text: rendered.email.text, ...(rendered.email.html ? { html: rendered.email.html } : {}),
           headers: { "Message-ID": messageId, "List-Unsubscribe": `<mailto:${inbox}?subject=no%20thanks>`, ...thread },
         });
         const at = new Date().toISOString();

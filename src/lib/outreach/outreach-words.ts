@@ -5,7 +5,9 @@
  *   same thread: its subject is "Re: " and the first email's subject, so it never needs its own.
  * - {sender_name} and {sender_first_name} are the sending inbox's name ("Aidan Magee", "Aidan").
  * - The engine adds the footer itself (mailing address and the "no thanks" line, which US and Canadian
- *   anti-spam law need in every email), so the words leave it out.
+ *   anti-spam law need in every email), so the words leave it out. An inbox whose founder chose the full
+ *   signature (Riley, Nov 13) gets it instead: name, title, address, cell, site link and logo, then the
+ *   same "no thanks" line. A no-links campaign's first email leaves out the link and the logo.
  * - A blank the words use that is empty in a row holds that row: no email ever goes with a hole in it.
  * - With noLinksInFirst, a first email with a link or a web address anywhere in it is held.
  */
@@ -13,8 +15,11 @@ import { normaliseColumn } from "@/lib/outreach/outreach-csv";
 
 export type StepWords = { subject?: string; body: string };
 export type CampaignWords = { steps: StepWords[] };
-export type Sender = { name: string; address: string };
-export type RenderedEmail = { subject: string; text: string };
+/** A founder's signature details (title, cell), from the signature settings the FCC emails used. */
+export type SenderSignature = { title?: string | null; phone?: string | null };
+/** With `signature`, the email ends with the founder's full signature instead of the plain footer. */
+export type Sender = { name: string; address: string; signature?: SenderSignature | null };
+export type RenderedEmail = { subject: string; text: string; html?: string };
 export type RenderResult = { ok: true; email: RenderedEmail } | { ok: false; reason: string };
 
 export const SENDER_BLANKS = ["sender_name", "sender_first_name"] as const;
@@ -90,6 +95,61 @@ export function campaignFooter(mailingAddress: string) {
   return `Axiom · ${mailingAddress.trim()}\nNot useful? Reply "no thanks" and we won't email you again.`;
 }
 
+const SITE_LABEL = "getaxiom.ca";
+const SITE_URL = "https://getaxiom.ca/";
+/** The logo tile the FCC signature used: its dark tile is in the image, so Gmail's dark mode shows it (MAIL-002). */
+export const SIGNATURE_LOGO_URL = "https://operations.getaxiom.ca/brand/axiom-lockup-tile-328.png";
+const LOGO = { width: 164, height: 63 } as const;
+const OPT_OUT = `Not useful? Reply "no thanks" and we won't email you again.`;
+const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** "1 Main St, Kitchener, ON" becomes "1 Main St," over "Kitchener, ON". */
+function addressLines(address: string) {
+  const comma = address.indexOf(",");
+  return comma < 0 ? [address] : [address.slice(0, comma + 1), address.slice(comma + 1).trim()];
+}
+
+/** True when the words' last paragraph already has the sender's name on a line, so the signature doesn't repeat it. */
+function signsOffWithName(body: string, name: string) {
+  const lastBlock = body.trim().split(/\n{2,}/).at(-1) ?? "";
+  return lastBlock.split("\n").some((line) => line.trim().toLowerCase() === name.trim().toLowerCase());
+}
+
+/**
+ * The founder's signature under a campaign email (the one Riley made for FCC, Nov 1): name, title, mailing
+ * address, cell, the site link and the logo, then the "no thanks" line. `link` false leaves out the link and
+ * the logo (a no-links campaign's first email). The plain copy is for mail apps that can't show HTML.
+ */
+export function campaignSignature(sender: Sender, mailingAddress: string, options: { link: boolean; name: boolean }) {
+  const title = sender.signature?.title?.trim() || "Co-founder";
+  const phone = sender.signature?.phone?.trim();
+  const address = addressLines(mailingAddress.trim());
+  const lines = [...(options.name ? [sender.name.trim()] : []), title, ...address, ...(phone ? [`C: ${phone}`] : []), ...(options.link ? [SITE_LABEL] : [])];
+  const plain = `${lines.join("\n")}\n\n${OPT_OUT}`;
+  const line = (text: string, style = "") => `<div${style ? ` style="${style}"` : ""}>${escapeHtml(text)}</div>`;
+  const html = [
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:${options.name ? 18 : 4}px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.45;color:#1f1f1f"><tr><td>`,
+    ...(options.name ? [line(sender.name.trim(), "font-size:15px;font-weight:bold")] : []),
+    line(title, "font-weight:bold;margin-bottom:2px"),
+    ...address.map((text) => line(text)),
+    ...(phone || options.link ? [`<div style="height:8px;line-height:8px">&nbsp;</div>`] : []),
+    ...(phone ? [line(`C: ${phone}`)] : []),
+    ...(options.link ? [
+      `<div><a href="${SITE_URL}" style="color:#1a56c4">${SITE_LABEL}</a></div>`,
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px"><tr><td>`
+        + `<a href="${SITE_URL}"><img src="${SIGNATURE_LOGO_URL}" alt="Axiom" width="${LOGO.width}" height="${LOGO.height}" style="display:block;border:0;width:${LOGO.width}px;height:${LOGO.height}px"></a>`
+        + `</td></tr></table>`,
+    ] : []),
+    `</td></tr></table>`,
+    `<p style="margin:14px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#777777">${escapeHtml(OPT_OUT)}</p>`,
+  ].join("\n");
+  return { plain, html };
+}
+
+function bodyHtml(body: string) {
+  return body.split(/\n{2,}/).map((para) => `<p style="margin:0 0 14px">${escapeHtml(para).replace(/\n/g, "<br>")}</p>`).join("\n");
+}
+
 function fill(text: string, fields: Record<string, string>, sender: Sender, missing: Set<string>) {
   const values: Record<string, string> = { ...fields, sender_name: sender.name.trim(), sender_first_name: sender.name.trim().split(/\s+/)[0] ?? "" };
   return text.replace(BLANK, (_whole, name: string) => {
@@ -116,11 +176,18 @@ export function renderEmail(words: CampaignWords, step: number, fields: Record<s
   const subject = step === 1 ? firstSubject : `Re: ${firstSubject.replace(/^re:\s*/i, "")}`;
   const body = fill(wordsN.body, fields, sender, missing);
   if (missing.size) return { ok: false, reason: `Blank ${[...missing].map((name) => `{${name}}`).join(", ")} in this row` };
-  const text = `${body.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+$/gm, "").trim()}\n\n${campaignFooter(address)}`;
+  const clean = body.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+$/gm, "").trim();
+  const signature = sender.signature
+    ? campaignSignature(sender, address, { link: !(step === 1 && options.noLinksInFirst), name: !signsOffWithName(clean, sender.name) })
+    : null;
+  const text = `${clean}\n\n${signature ? signature.plain : campaignFooter(address)}`;
+  const html = signature
+    ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1f1f1f">\n${bodyHtml(clean)}\n${signature.html}\n</div>`
+    : undefined;
   if (/[{}]/.test(subject) || /\{[^}]*\}/.test(body)) return { ok: false, reason: "A blank in the words could not be filled" };
   if (step === 1 && options.noLinksInFirst) {
     const link = findLink(`${subject}\n${body}`);
     if (link) return { ok: false, reason: `The first email would contain a link or web address ("${link}")` };
   }
-  return { ok: true, email: { subject, text } };
+  return { ok: true, email: html ? { subject, text, html } : { subject, text } };
 }
