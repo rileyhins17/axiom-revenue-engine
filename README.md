@@ -68,7 +68,7 @@ FCC's own sender ([its runbook](docs/runbooks/FCC_CAMPAIGN.md)) is still in the 
 | Local preview with made-up data | `scripts/demo-data.ts`, `docs/runbooks/LOCAL_PREVIEW.md` |
 | Gmail over SMTP and IMAP | `src/lib/revenue-engine/smtp-client.ts`, `imap-client.ts` |
 | Screens | `src/app/dashboard` (Today), `replies`, `campaigns`, `inboxes`, `do-not-email`, `fcc` (archive), `settings`; building blocks in `src/components/owner/kit.tsx` |
-| Claude connector: a founder's Claude reads the engine and does a few safe things (`docs/runbooks/CLAUDE_CONNECTOR.md`) | `src/lib/connector/`, `src/app/api/mcp` |
+| Claude connector: a founder's Claude reads the engine and can run a campaign for them, approvals included (`docs/runbooks/CLAUDE_CONNECTOR.md`) | `src/lib/connector/`, `src/app/api/mcp` |
 | Contact lists, go and pause SQL | `scripts/fcc-campaign.ts`, `scripts/outreach.ts` |
 | Database changes | `migrations/` (next free number: 0093) |
 

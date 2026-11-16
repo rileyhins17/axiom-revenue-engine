@@ -1,11 +1,13 @@
 /**
- * The Claude connector's tools: what a founder's Claude can read from the engine, and the few safe things it
- * can do. Every tool is built on the same functions the screens use, so the connector shows and does exactly
- * what the screen would for that founder.
+ * The Claude connector's tools: what a founder's Claude can read from the engine, and what it can do there.
+ * Every tool is built on the same functions the screens use, so the connector shows and does exactly what the
+ * screen would for that founder.
  *
- * On purpose there is no tool, and no code path from here, that approves a batch, starts a paused campaign
- * again, stops a batch, changes limits, inboxes, schedules or the do-not-email list, or touches FCC. Those
- * stay on the screen with the right founder signed in (connector.test.ts proves it).
+ * Since Nov 16, 2026 both founders let their own Claude run a campaign end to end (ADR 0067): approve a batch
+ * (only as one of the campaign's named approvers), resume a campaign, hold rows back and start a new, paused
+ * campaign on the founder's own inbox. On purpose there is still no tool, and no code path from here, that
+ * stops a batch, changes an existing campaign's limits, inboxes or schedule, adds an inbox, changes the
+ * do-not-email list, or touches FCC (connector.test.ts proves it).
  *
  * Adding a tool is one entry in TOOLS: a name, a title, a plain description, its arguments twice (zod to
  * check them, JSON Schema for Claude; a test keeps the two in step) and a `run`.
@@ -14,12 +16,12 @@ import { z } from "zod";
 
 import type { Founder } from "@/lib/connector/connector-keys";
 import { blockedAmong } from "@/lib/outreach/outreach-blocked";
-import { pauseCampaign } from "@/lib/outreach/outreach-control";
+import { MAX_HOLD_ADDRESSES, approveBatch, createCampaign, holdContacts, pauseCampaign, releaseContacts, resumeCampaign } from "@/lib/outreach/outreach-control";
 import { clockText, type InboxHealth } from "@/lib/outreach/outreach-inbox-health";
 import { SCREEN_MAX_CSV_CHARS, SCREEN_MAX_ROWS, loadList } from "@/lib/outreach/outreach-load";
 import { checkDoNotEmail, findContacts } from "@/lib/outreach/outreach-lookup";
 import type { MailServerCheck } from "@/lib/outreach/outreach-mail-servers";
-import { readCampaign, readCampaigns, successLabelOf, type Campaign } from "@/lib/outreach/outreach-model";
+import { FOUNDERS, readCampaign, readCampaigns, successLabelOf, type Campaign } from "@/lib/outreach/outreach-model";
 import { FCC_FILTER, REPLY_FILTERS, getReply, listReplies, markReply, type ReplyRow } from "@/lib/outreach/outreach-reply-list";
 import { batchPhase, batchReview, campaignDetail, campaignSummaries, type BatchPhase, type CampaignCounts } from "@/lib/outreach/outreach-status";
 import { requestTestSend } from "@/lib/outreach/outreach-tests";
@@ -136,8 +138,10 @@ export function argumentProblem(error: z.ZodError, given: unknown, properties: s
 // ---------- shapes ----------
 const via = (founder: Founder) => `${founder} (via Claude connector)`;
 const hours = (campaign: Campaign) => `${clockText(campaign.windowStart)} to ${clockText(campaign.windowEnd)} Toronto time`;
-const APPROVE_ON_SCREEN = "Approving is done by the campaign's approver on the screen; this connector can't approve.";
-const RESUME_ON_SCREEN = "Resuming is done by a founder on the campaign's screen; this connector can't resume.";
+const APPROVE_NEXT = "A named approver of the campaign approves it on the screen or with approve_batch.";
+const RESUME_NEXT = "A founder starts it again on the campaign's screen or with resume_campaign.";
+/** The most a campaign started through the connector sends a day. A founder raises it on the engine's own screens. */
+export const CONNECTOR_NEW_CAMPAIGN_MAX_PER_DAY = 30;
 
 function ownInbox(founder: Founder) {
   const owner = Object.values(OWNER_LOGINS).find((login) => login.name === founder);
@@ -196,7 +200,7 @@ async function listCheck(a: { campaign: string; name: string; csv: string; first
     rows: result.rows, ready: result.ready, held: result.held, alreadyInCampaign: result.skipped,
     heldRows: result.holds, samples: result.samples, emailDomainsChecked: result.domains, newWords: result.wordsChanged,
     note: result.saved
-      ? `Saved. The batch waits for ${approvers} to read its samples and press Approve on the screen: /campaigns/${a.campaign}/batches/${result.batchId}. Nothing in it sends before that. ${APPROVE_ON_SCREEN}`
+      ? `Saved. The batch waits for ${approvers} to read its samples and approve it: on the screen (/campaigns/${a.campaign}/batches/${result.batchId}) or with approve_batch through their own Claude. Nothing in it sends before that.`
       : `Nothing was saved. To load exactly this, call load_list with the same arguments.${result.wordsChanged ? " These words are new: loading saves them as the campaign's latest words." : ""}`,
   };
 }
@@ -266,7 +270,7 @@ export const TOOLS: Tool[] = [
   tool({
     name: "get_campaign", title: "One campaign", annotations: READ, saves: false, inputSchema: obj({ campaign: campaignProperty }, ["campaign"]), args: z.object({ campaign: campaignArg }).strict(),
     target: (a) => ({ kind: "campaign", id: a.campaign }),
-    description: `One campaign in full: its batches (waiting, sending, done or stopped, with counts, why rows are held and each batch's results), its numbers, schedule, limits, the email words, and follow-ups coming and on hold. Limits, inboxes, the schedule and the words can't be changed here. ${RESUME_ON_SCREEN}`,
+    description: `One campaign in full: its batches (waiting, sending, done or stopped, with counts, why rows are held and each batch's results), its numbers, schedule, limits, the email words, and follow-ups coming and on hold. Limits, inboxes, the schedule and the words can't be changed here. A paused campaign: ${RESUME_NEXT}`,
     run: async (a, t) => {
       const detail = await campaignDetail(t.db, a.campaign, t.settings.fccFirstInbox || null, t.now);
       if (!detail) throw new ToolError("There's no such campaign. Use a key from list_campaigns.");
@@ -299,7 +303,7 @@ export const TOOLS: Tool[] = [
     inputSchema: obj({ campaign: { ...campaignProperty, description: "Only this campaign's batches" }, state: { type: "string", enum: [...BATCH_STATES], description: "waiting (for approval), sending, done, stopped, or all (default)" } }),
     args: z.object({ campaign: campaignArg.optional(), state: z.enum(BATCH_STATES).optional() }).strict(),
     target: (a) => (a.campaign ? { kind: "campaign", id: a.campaign } : null),
-    description: `Batches in any campaign, newest first: waiting for approval, sending, done or stopped, with how many rows are ready, held and emailed. ${APPROVE_ON_SCREEN}`,
+    description: `Batches in any campaign, newest first: waiting for approval, sending, done or stopped, with how many rows are ready, held and emailed. A waiting batch: ${APPROVE_NEXT}`,
     run: async (a, t) => {
       const [campaigns, { results }] = await Promise.all([
         readCampaigns(t.db),
@@ -330,7 +334,7 @@ export const TOOLS: Tool[] = [
   tool({
     name: "get_batch", title: "One batch", annotations: READ, saves: false, inputSchema: obj({ batch: batchProperty }, ["batch"]), args: z.object({ batch: batchArg }).strict(),
     target: (a) => ({ kind: "batch", id: a.batch }),
-    description: `One batch as its approver sees it: up to 10 sample emails exactly as they go out (first email and follow-up), and every held row with its reason. ${APPROVE_ON_SCREEN} Stopping a batch is also done on the screen.`,
+    description: `One batch as its approver sees it: up to 10 sample emails exactly as they go out (first email and follow-up), and every held row with its reason. Read this before approving. ${APPROVE_NEXT} Stopping a batch is done on the screen.`,
     run: async (a, t) => {
       const review = await batchReview(t.db, a.batch, t.settings.mailingAddress || null, 10);
       if (!review) throw new ToolError("There's no such batch. Use an id from list_batches.");
@@ -340,7 +344,7 @@ export const TOOLS: Tool[] = [
         batch: { ...batch, campaign: campaign.key, campaignName: campaign.name, approvers: campaign.approvers, ...(phase ? { phaseText: PHASE_TEXT[phase] } : {}) },
         samples: review.samples, heldRows: review.held.slice(0, 200), heldRowsInAll: review.held.length,
         onScreen: `/campaigns/${campaign.key}/batches/${batch.id}`,
-        note: `${APPROVE_ON_SCREEN} Only ${campaign.approvers.join(" or ") || "a named founder"} can approve this campaign's batches.`,
+        note: `Only ${campaign.approvers.join(" or ") || "a named founder"} can approve this campaign's batches: on the screen, or with approve_batch through their own Claude.`,
       };
     },
   }),
@@ -429,22 +433,22 @@ export const TOOLS: Tool[] = [
     },
   }),
 
-  // Writes: each is something the screen already lets a founder do, and none of them can make an email go out.
+  // Writes: each is something the screen already lets a founder do.
   tool({
     name: "pause_campaign", title: "Pause a campaign", annotations: { ...WRITE, idempotentHint: true }, saves: true,
     inputSchema: obj({ campaign: campaignProperty, reason: { type: "string", maxLength: 300, description: "Why, in plain words. The founders see it on the screen" } }, ["campaign", "reason"]),
     args: z.object({ campaign: campaignArg, reason: z.string().trim().min(1).max(300) }).strict(),
     target: (a) => ({ kind: "campaign", id: a.campaign }),
-    description: `Pause one campaign, with a reason: nothing in it sends until a founder starts it again. Pausing is always allowed and touches only that campaign. ${RESUME_ON_SCREEN}`,
+    description: `Pause one campaign, with a reason: nothing in it sends until a founder starts it again. Pausing is always allowed and touches only that campaign. ${RESUME_NEXT}`,
     run: async (a, t) => {
       const campaign = await readCampaign(t.db, a.campaign);
       if (!campaign) throw new ToolError("There's no such campaign. Use a key from list_campaigns.");
       const changed = await pauseCampaign(t.db, a.campaign, a.reason, via(t.founder), t.now);
       return changed
         ? { campaign: campaign.key, name: campaign.name, state: "paused", changed: true, reason: a.reason, by: via(t.founder), at: t.now.toISOString(),
-          note: `Paused. Nothing in it sends until a founder presses Resume on /campaigns/${campaign.key}. ${RESUME_ON_SCREEN}` }
+          note: `Paused. Nothing in it sends until it is started again. ${RESUME_NEXT}` }
         : { campaign: campaign.key, name: campaign.name, state: "paused", changed: false, reason: campaign.stateReason, by: campaign.stateBy, at: campaign.stateAt,
-          note: `It was already paused, so the first reason is kept. ${RESUME_ON_SCREEN}` };
+          note: `It was already paused, so the first reason is kept. ${RESUME_NEXT}` };
     },
   }),
   tool({
@@ -456,7 +460,7 @@ export const TOOLS: Tool[] = [
   tool({
     name: "load_list", title: "Load a batch", annotations: WRITE, saves: true, inputSchema: listSchema, args: listArgs,
     target: (a) => ({ kind: "campaign", id: a.campaign }),
-    description: `The screen's "Load this batch": saves the list as a batch that waits for the campaign's approver. Nothing in it sends until they approve it on the screen. Run check_list first and read its samples. New words given here become the campaign's latest words. Up to ${CONNECTOR_MAX_LIST_ROWS} rows and 40 different email domains at a time, as on the screen. ${APPROVE_ON_SCREEN}`,
+    description: `The screen's "Load this batch": saves the list as a batch that waits for the campaign's approver. Nothing in it sends until it is approved. Run check_list first and read its samples. New words given here become the campaign's latest words. Up to ${CONNECTOR_MAX_LIST_ROWS} rows and 40 different email domains at a time, as on the screen. ${APPROVE_NEXT}`,
     run: (a, t) => listCheck(a, t, true),
   }),
   tool({
@@ -496,6 +500,99 @@ export const TOOLS: Tool[] = [
       const result = await markReply(t.db, a.id, { ...(a.answered !== undefined ? { answered: a.answered } : a.success === undefined ? { answered: true } : {}), ...(a.success === undefined ? {} : { success: a.success }) }, t.founder, t.now);
       if (!result.ok) throw new ToolError(result.why);
       return { reply: replyLine(result.reply) };
+    },
+  }),
+  // The controls both founders gave their own Claude on Nov 16, 2026 (ADR 0067). Each is the screen's own
+  // function with the screen's own checks; none changes an existing campaign's limits, inboxes or schedule.
+  tool({
+    name: "approve_batch", title: "Approve a batch", annotations: WRITE, saves: true,
+    inputSchema: obj({ batch: batchProperty, note: { type: "string", maxLength: 200, description: "A short note the founders see beside the approval" } }, ["batch"]),
+    args: z.object({ batch: batchArg, note: z.string().trim().max(200).optional() }).strict(),
+    target: (a) => ({ kind: "batch", id: a.batch }),
+    description: "The screen's Approve: opens a waiting batch for the words it was loaded with, so its emails go to real people at the campaign's send times while the campaign is live. Only works when the founder this key belongs to is one of the campaign's named approvers. Before approving, read get_batch: every sample exactly as it goes, and the held rows. Approve only when the founder asked for it or has told you to run the campaign for them.",
+    run: async (a, t) => {
+      const result = await approveBatch(t.db, a.batch, t.founder, `Through ${t.founder}'s Claude connector${a.note ? `: ${a.note}` : ""}`, t.now);
+      if (!result.ok) throw new ToolError(result.why);
+      const batch = await t.db.prepare(`SELECT "id","campaignKey","name","approvedWords" FROM "OutreachBatch" WHERE "id" = ?`).bind(a.batch).first<{ id: string; campaignKey: string; name: string; approvedWords: string | null }>();
+      const campaign = batch ? await readCampaign(t.db, batch.campaignKey) : null;
+      return {
+        approved: true, batch: a.batch, name: batch?.name ?? null, campaign: batch?.campaignKey ?? null, by: t.founder, at: t.now.toISOString(), words: batch?.approvedWords ?? null,
+        campaignState: campaign?.state ?? null,
+        note: campaign?.state === "live" ? "Approved. Its emails go at the campaign's send times." : `Approved. The campaign is paused, so nothing sends yet. ${RESUME_NEXT}`,
+      };
+    },
+  }),
+  tool({
+    name: "resume_campaign", title: "Resume a campaign", annotations: { ...WRITE, idempotentHint: true }, saves: true,
+    inputSchema: obj({ campaign: campaignProperty }, ["campaign"]), args: z.object({ campaign: campaignArg }).strict(),
+    target: (a) => ({ kind: "campaign", id: a.campaign }),
+    description: "The screen's Resume: starts a paused campaign again. It still sends only approved batches, on the words they were approved on, inside its limits and send hours. When a campaign paused itself (bounces), find out why with get_campaign first and hold the rows that would bounce again (hold_contacts) before resuming. Resume only when the founder asked for it or has told you to run the campaign for them.",
+    run: async (a, t) => {
+      const before = await readCampaign(t.db, a.campaign);
+      const outcome = await resumeCampaign(t.db, a.campaign, via(t.founder), t.now);
+      if (outcome.result === "MISSING" || !before) throw new ToolError("There's no such campaign. Use a key from list_campaigns.");
+      if (outcome.result === "NOT_READY") throw new ToolError(`It can't start: ${outcome.why}.`);
+      return outcome.result === "RESUMED"
+        ? { campaign: before.key, name: before.name, state: "live", changed: true, by: via(t.founder), at: t.now.toISOString(), wasPausedBecause: before.stateReason, wasPausedBy: before.stateBy,
+          note: "Live again. It sends only approved batches, at its send times." }
+        : { campaign: before.key, name: before.name, state: "live", changed: false, by: before.stateBy, at: before.stateAt, note: "It was already live." };
+    },
+  }),
+  tool({
+    name: "hold_contacts", title: "Hold rows back", annotations: { ...WRITE, idempotentHint: true }, saves: true,
+    inputSchema: obj({
+      batch: batchProperty,
+      addresses: { type: "array", items: { type: "string", maxLength: 254 }, minItems: 1, maxItems: MAX_HOLD_ADDRESSES, description: `The email addresses of the rows, as find_contact or get_batch shows them. Up to ${MAX_HOLD_ADDRESSES} at a time` },
+      reason: { type: "string", maxLength: 180, description: "Why, in plain words. The founders see it on the held row. Needed to hold" },
+      release: { type: "boolean", description: "true: take back a hold made with this tool, so the row waits for its first email again. It can't release a row the list check held" },
+    }, ["batch", "addresses"]),
+    args: z.object({ batch: batchArg, addresses: z.array(z.string().trim().min(3).max(254)).min(1).max(MAX_HOLD_ADDRESSES), reason: z.string().trim().min(1).max(180).optional(), release: z.boolean().optional() }).strict(),
+    target: (a) => ({ kind: "batch", id: a.batch }),
+    description: "Hold rows of one batch back so they are never emailed, with a reason: only people who haven't had their first email yet. Rows already emailed, replied, bounced or held stay as they are. With release, it takes back holds made with this tool, and only those. Holding is always safe: use it for addresses that look likely to bounce or that someone is already talking to.",
+    run: async (a, t) => {
+      const batch = await t.db.prepare(`SELECT "id","campaignKey","name" FROM "OutreachBatch" WHERE "id" = ?`).bind(a.batch).first<{ id: string; campaignKey: string; name: string }>();
+      if (!batch) throw new ToolError("There's no such batch. Use an id from list_batches.");
+      const asked = new Set(a.addresses.map((address) => address.toLowerCase())).size;
+      if (a.release) {
+        const released = await releaseContacts(t.db, batch.id, a.addresses, t.now);
+        return { batch: batch.id, name: batch.name, campaign: batch.campaignKey, released, asked,
+          note: released === asked ? "Released: they wait for their first email again." : `${released} of ${asked} released. The rest weren't held with this tool, or aren't in this batch.` };
+      }
+      if (!a.reason) throw new ToolError('"reason" is needed to hold rows.');
+      const held = await holdContacts(t.db, batch.id, a.addresses, a.reason, via(t.founder), t.now);
+      return { batch: batch.id, name: batch.name, campaign: batch.campaignKey, held, asked, reason: a.reason, by: via(t.founder),
+        note: held === asked ? "Held: none of them will be emailed." : `${held} of ${asked} held. The rest were already emailed, already held, or aren't in this batch.` };
+    },
+  }),
+  tool({
+    name: "create_campaign", title: "Start a new campaign", annotations: WRITE, saves: true,
+    inputSchema: obj({
+      key: { type: "string", description: "A short key for it: small letters, digits and dashes, like design-studios" },
+      name: { type: "string", maxLength: 80, description: "Its name on the screens, like Design studios: build partner" },
+      dailyLimit: { type: "integer", minimum: 1, maximum: CONNECTOR_NEW_CAMPAIGN_MAX_PER_DAY, description: `Most emails a day, follow-ups included. Up to ${CONNECTOR_NEW_CAMPAIGN_MAX_PER_DAY} here` },
+      followUps: { type: "integer", minimum: 0, maximum: 2, description: "Follow-ups after the first email (default 1)" },
+      followUpBusinessDays: { type: "integer", minimum: 2, maximum: 15, description: "Business days before a follow-up (default 5)" },
+      bothFoundersApprove: { type: "boolean", description: "true: either founder can approve its batches. Default: only the founder this key belongs to" },
+      successLabel: { type: "string", maxLength: 40, description: "What its success number is called, like Calls booked" },
+      note: { type: "string", maxLength: 600, description: "What the campaign is for, for the founders" },
+    }, ["key", "name", "dailyLimit"]),
+    args: z.object({
+      key: campaignArg, name: z.string().trim().min(1).max(80), dailyLimit: z.number().int().min(1).max(CONNECTOR_NEW_CAMPAIGN_MAX_PER_DAY),
+      followUps: z.number().int().min(0).max(2).optional(), followUpBusinessDays: z.number().int().min(2).max(15).optional(),
+      bothFoundersApprove: z.boolean().optional(), successLabel: z.string().trim().min(1).max(40).optional(), note: z.string().trim().max(600).optional(),
+    }).strict(),
+    target: (a) => ({ kind: "campaign", id: a.key }),
+    description: `Start a new campaign. It is made paused and with no words, so it can't send: load a list with its words (check_list, then load_list), have a named approver approve the batch, then resume it. It sends only from the own inbox of the founder this key belongs to, on weekdays 9:00 to 2:30 Toronto time, up to ${CONNECTOR_NEW_CAMPAIGN_MAX_PER_DAY} emails a day and never more than that inbox's own limit. Nothing about an existing campaign changes. Start one only when the founder asked for it or has told you to run outreach for them.`,
+    run: async (a, t) => {
+      const inbox = ownInbox(t.founder);
+      const approvers = a.bothFoundersApprove ? [...FOUNDERS] : [t.founder];
+      const result = await createCampaign(t.db, {
+        key: a.key, name: a.name, inbox, dailyLimit: a.dailyLimit, followUps: a.followUps ?? 1, followUpBusinessDays: a.followUpBusinessDays ?? 5,
+        approvers, successLabel: a.successLabel ?? null, note: a.note ?? null,
+      }, via(t.founder), t.now);
+      if (!result.ok) throw new ToolError(result.why);
+      return { created: true, campaign: a.key, name: a.name, state: "paused", inbox, dailyLimit: a.dailyLimit, followUps: a.followUps ?? 1, approvers, by: via(t.founder), at: t.now.toISOString(),
+        note: "Made, paused, with no words yet. Next: check_list and load_list with the first email and follow-up words, read get_batch, approve_batch, then resume_campaign." };
     },
   }),
 ];

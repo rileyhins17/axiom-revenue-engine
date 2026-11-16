@@ -32,6 +32,6 @@ test("the marketplace entry points at the plugin and their names match, so the i
   assert.ok(readme.includes(`claude plugin install ${manifest.name}@${market.name}`));
   const skill = readFileSync(join(plugin, "skills", "axiom-engine", "SKILL.md"), "utf8");
   assert.match(skill, /^---\nname: axiom-engine\ndescription: .+\n---\n/);
-  // The skill must keep saying what the connector can't do.
-  for (const rule of ["Approve a batch", "resume a campaign", "Never send a real email as a test"]) assert.ok(skill.includes(rule), rule);
+  // The skill must keep saying how to approve and resume with care, and what the connector can't do.
+  for (const rule of ["Approve a batch", "resume a campaign", "Stop a batch, change an existing campaign's limits", "Never send a real email as a test"]) assert.ok(skill.includes(rule), rule);
 });

@@ -87,3 +87,79 @@ export async function noteCampaignRun(db: ProspectDb, campaign: string, note: st
 export async function readCampaignRun(db: ProspectDb, campaign: string) {
   return readKv<RunNote>(db, runKey(campaign));
 }
+
+// ---------- holding rows back, and a new campaign (the Claude connector's controls, ADR 0062) ----------
+
+/** How every hold made here starts, so only these holds can be taken back by releaseContacts. */
+export const FOUNDER_HOLD = "Held by";
+/** The most addresses one hold or release takes (one statement, inside D1's limit of bound values). */
+export const MAX_HOLD_ADDRESSES = 80;
+
+const cleanAddresses = (emails: string[]) => [...new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))].slice(0, MAX_HOLD_ADDRESSES);
+
+async function recount(db: ProspectDb, batchId: string) {
+  await db.prepare(`UPDATE "OutreachBatch" SET "ready" = (SELECT COUNT(*) FROM "OutreachContact" WHERE "batchId" = ? AND "status" = 'ready'),
+    "held" = (SELECT COUNT(*) FROM "OutreachContact" WHERE "batchId" = ? AND "status" = 'held') WHERE "id" = ?`).bind(batchId, batchId, batchId).run();
+}
+
+/**
+ * Holds rows of one batch back: people who were never emailed and still wait for their first email. A held
+ * row is never sent. Rows already emailed, replied, bounced or held are left alone. Returns how many it held.
+ */
+export async function holdContacts(db: ProspectDb, batchId: string, emails: string[], reason: string, by: string, now = new Date()) {
+  const addresses = cleanAddresses(emails);
+  if (addresses.length === 0) return 0;
+  const why = `${FOUNDER_HOLD} ${by.slice(0, 80)}: ${reason.trim()}`.slice(0, 300);
+  const result = await db.prepare(`UPDATE "OutreachContact" SET "status" = 'held', "holdReason" = ?, "updatedAt" = ?
+    WHERE "batchId" = ? AND "status" = 'ready' AND "stepsSent" = 0 AND "email" IN (${addresses.map(() => "?").join(",")})`)
+    .bind(why, now.toISOString(), batchId, ...addresses).run();
+  const held = changes(result);
+  if (held > 0) await recount(db, batchId);
+  return held;
+}
+
+/** Takes back holds made by holdContacts, and only those: a row the list check held stays held. */
+export async function releaseContacts(db: ProspectDb, batchId: string, emails: string[], now = new Date()) {
+  const addresses = cleanAddresses(emails);
+  if (addresses.length === 0) return 0;
+  const result = await db.prepare(`UPDATE "OutreachContact" SET "status" = 'ready', "holdReason" = NULL, "updatedAt" = ?
+    WHERE "batchId" = ? AND "status" = 'held' AND "stepsSent" = 0 AND "holdReason" LIKE ? AND "email" IN (${addresses.map(() => "?").join(",")})`)
+    .bind(now.toISOString(), batchId, `${FOUNDER_HOLD} %`, ...addresses).run();
+  const released = changes(result);
+  if (released > 0) await recount(db, batchId);
+  return released;
+}
+
+export type NewCampaign = {
+  key: string; name: string;
+  /** The one inbox that sends it. It must be an inbox the engine already has, switched on. */
+  inbox: string;
+  /** Most emails a day, follow-ups included. Never more than the inbox's own daily limit. */
+  dailyLimit: number;
+  followUps: number; followUpBusinessDays: number;
+  approvers: string[]; successLabel?: string | null; note?: string | null;
+};
+export type NewCampaignResult = { ok: true } | { ok: false; why: string };
+
+/**
+ * A new campaign, always paused and with no words: it can't send until a list is loaded with its words, a
+ * named approver approves the batch and a founder resumes it. It uses an inbox the engine already has and
+ * stays inside that inbox's own daily limit; every other setting is the table's default (weekdays, 9:00 to 2:30).
+ */
+export async function createCampaign(db: ProspectDb, input: NewCampaign, by: string, now = new Date()): Promise<NewCampaignResult> {
+  if (await readCampaign(db, input.key)) return { ok: false, why: "There is already a campaign with that key." };
+  const address = input.inbox.trim().toLowerCase();
+  const inbox = await db.prepare(`SELECT "address","dailyMax","enabled" FROM "OutreachInbox" WHERE lower("address") = ?`).bind(address)
+    .first<{ address: string; dailyMax: number; enabled: number }>();
+  if (!inbox || inbox.enabled !== 1) return { ok: false, why: "That inbox isn't one the engine sends from." };
+  if (!Number.isInteger(input.dailyLimit) || input.dailyLimit < 1) return { ok: false, why: "The daily limit must be at least 1." };
+  if (input.dailyLimit > inbox.dailyMax) return { ok: false, why: `The daily limit can't be more than the inbox's own limit of ${inbox.dailyMax} a day.` };
+  if (input.approvers.length === 0) return { ok: false, why: "A campaign needs at least one approver." };
+  const rules = input.successLabel?.trim() ? { successLabel: input.successLabel.trim().slice(0, 40) } : {};
+  const at = now.toISOString();
+  await db.prepare(`INSERT INTO "OutreachCampaign" ("key","name","state","stateReason","stateBy","stateAt","dailyLimit","inboxesJson","followUps","followUpBusinessDays","rulesJson","approversJson","note","createdAt","updatedAt")
+    VALUES (?,?,'paused',?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(input.key, input.name.trim().slice(0, 80), "New campaign: not started yet", by.slice(0, 120), at, input.dailyLimit, JSON.stringify([{ address, perDay: input.dailyLimit }]),
+      input.followUps, input.followUpBusinessDays, JSON.stringify(rules), JSON.stringify(input.approvers), input.note?.trim().slice(0, 1000) || null, at, at).run();
+  return { ok: true };
+}

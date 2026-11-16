@@ -160,7 +160,7 @@ export function SettingsConnector({ founder, baseUrl }: { founder: string | null
 
   return (
     <Panel title="Claude connector" icon={Plug}
-      description="Lets your own Claude read the engine and do a few safe things: pause a campaign, check or load a list, send you a test, mark a reply answered. It can't approve a batch or resume a campaign: those stay on the screen.">
+      description="Lets your own Claude read the engine and run a campaign for you: load a list, send you a test, approve a batch you are the approver of, pause or resume, hold rows back, start a new campaign on your inbox. It can't change limits, inboxes or the do-not-email list.">
       {!founder ? <p className="text-sm">Only Riley or Aidan can have a connector key.</p> : (
         <div className="space-y-5">
           {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}

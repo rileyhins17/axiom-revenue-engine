@@ -1,6 +1,6 @@
 # The engine's Claude connector
 
-**What it is.** A small server inside the engine that a founder's own Claude can talk to (an MCP server, at `/api/mcp`). With it, Claude can read what the engine's screens show and do a few safe things for that founder. It is the sibling of Axiom Command's connector and works the same way. It costs nothing to run: no new service, no paid API.
+**What it is.** A small server inside the engine that a founder's own Claude can talk to (an MCP server, at `/api/mcp`). With it, Claude can read what the engine's screens show and, since Nov 16, 2026, run a campaign for that founder ([ADR 0067](../adr/0067-claude-runs-campaigns.md)). It is the sibling of Axiom Command's connector and works the same way. It costs nothing to run: no new service, no paid API.
 
 Each founder makes their own key in the engine: **Settings, Claude connector**. Claude signs in with that key, never with the sign-in cookie, and everything it does is done as that founder.
 
@@ -24,7 +24,7 @@ Every time is given twice: as stored, and in Toronto time (the field whose name 
 
 ## What Claude can do
 
-Each of these is something the screen already lets a founder do. None of them makes an email go to a contact.
+Each of these is something the screen already lets a founder do. The first five never make an email go to a contact.
 
 | Tool | What it does |
 | --- | --- |
@@ -33,14 +33,20 @@ Each of these is something the screen already lets a founder do. None of them ma
 | `load_list` | The screen's "Load this batch": saves a batch that waits for its approver. |
 | `send_test` | Queues a batch's test emails to the founder's own inbox. There is no way to name another address. |
 | `mark_reply_answered` | The Replies screen's marks: answered, and whether the reply counts toward the success number. Counting a reply doesn't mark it answered. |
+| `approve_batch` | The screen's Approve, for the words the batch was loaded with. Only through the Claude of a founder named as the campaign's approver. The approval note says it came through Claude. |
+| `resume_campaign` | The screen's Resume. The campaign still sends only approved batches, inside its limits and hours. |
+| `hold_contacts` | Holds rows of a batch back (people not emailed yet), with a reason, up to 80 at a time. `release` takes back holds made with this tool, and only those. |
+| `create_campaign` | A new campaign, made paused and with no words, on the founder's own inbox, weekdays 9:00 to 2:30, up to 30 emails a day and never more than the inbox's own limit. |
+
+The last four make email go to real people, or decide who gets it. Both founders gave their own Claude these on Nov 16, 2026 so a campaign can run while they are at work. Every call is in the audit log with the founder's name.
 
 A list through the connector has the screen's own limits: up to 300 rows and 40 different email domains at a time. Checking or loading a list costs a handful of database queries however long it is (the loader saves rows a hundred at a time and reads the do-not-email list once), so a real list fits inside what the free Cloudflare plan allows per request. Bigger lists load from a PC (`docs/runbooks/CAMPAIGNS.md`).
 
 ## What it can't do, and why
 
-Approve a batch. Resume a campaign. Stop a batch. Change limits, inboxes or schedules. Change the words of an approved batch. Change the do-not-email list. Anything about FCC.
+Stop a batch. Change an existing campaign's limits, inboxes or schedule. Add an inbox. Change the words of an approved batch. Change the do-not-email list. Anything about FCC.
 
-Those are the decisions that let email go out or change who gets it, so they stay on the screen with the right founder signed in. There is no tool for them and no code path to them from the connector; a test (`src/lib/connector/connector.test.ts`) fails if one appears. When asked, Claude says so and names the screen.
+Those stay on the screen with the right founder signed in, or need both founders' yes. There is no tool for them and no code path to them from the connector; a test (`src/lib/connector/connector.test.ts`) fails if one appears. When asked, Claude says so and names the screen.
 
 ## Make a key and add it to Claude
 
@@ -55,7 +61,7 @@ Those are the decisions that let email go out or change who gets it, so they sta
 
 The two are separate. A key (`axe_...`) only works in the header, and a link key (`axel_...`) only works in the address.
 
-Anyone holding your key or link can read the engine's data and pause a campaign, as you. Keep it private: never in a chat, a file in this repository or a screenshot. The link carries its key in the address, so treat the whole address as the secret.
+Anyone holding your key or link can read the engine's data and, as you, approve batches and start campaigns that email real people. Keep it private: never in a chat, a file in this repository or a screenshot. The link carries its key in the address, so treat the whole address as the secret.
 
 ## Turn a key off
 

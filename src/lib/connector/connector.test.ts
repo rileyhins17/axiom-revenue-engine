@@ -1,5 +1,6 @@
 // The Claude connector end to end, on made-up data in an in-memory database: keys, the two addresses, the MCP
-// protocol, every tool, and proof that nothing here can approve a batch or start a paused campaign again.
+// protocol, every tool, and proof of what it still can't do: stop a batch, change an existing campaign's limits,
+// inboxes or schedule, change the do-not-email list, or touch FCC.
 //
 // The audit log and the rate limiter are the real ones (src/lib/audit.ts, src/lib/rate-limit.ts): the test binds
 // its in-memory database as the Worker's database, so they write to it. Every person, place and address is invented.
@@ -31,7 +32,10 @@ const MAILING = "100 Example Street, Kitchener, ON N0N 0N0, Canada";
 const AIDAN = "aidan@axiom-test.example";
 const RILEY = "riley@axiom-test.example";
 const READ_TOOLS = ["engine_today", "list_campaigns", "get_campaign", "list_batches", "get_batch", "list_replies", "get_reply", "find_contact", "inbox_health", "check_do_not_email", "week_numbers"];
-const WRITE_TOOLS = ["pause_campaign", "check_list", "load_list", "send_test", "mark_reply_answered"];
+const WRITE_TOOLS = ["pause_campaign", "check_list", "load_list", "send_test", "mark_reply_answered", "approve_batch", "resume_campaign", "hold_contacts", "create_campaign"];
+/** The founder's own inbox, as the engine has it on file: a new campaign made through the connector sends from it. */
+const ownInboxRow = (raw: Raw, founder: "riley" | "aidan" = "riley") => raw.prepare(`INSERT OR IGNORE INTO "OutreachInbox" ("address","name","passwordSecret","dailyMax","rampJson","rampFrom","note") VALUES (?,?,?,60,'[]',NULL,'Made-up inbox')`)
+  .run(OWNER_LOGINS[founder].inbox, `${OWNER_LOGINS[founder].name} Own`, "TEST_PASSWORD_3");
 
 const FIRST = `Subject: {city}'s website: {error_count} accessibility problems
 
@@ -322,7 +326,8 @@ test("initialize answers in each protocol version it speaks and falls back to th
     assert.deepEqual(init.body.result.capabilities, { tools: { listChanged: false } });
     assert.deepEqual(init.body.result.serverInfo, { name: "axiom-engine", title: "Axiom Revenue Engine", version: "1.0.0" });
     assert.match(init.body.result.instructions, /You are connected as Riley\. Start with engine_today/);
-    assert.match(init.body.result.instructions, /You cannot approve a batch, resume a paused campaign, stop a batch/);
+    assert.match(init.body.result.instructions, /approve a batch when Riley is one of the campaign's named approvers \(approve_batch\)/);
+    assert.match(init.body.result.instructions, /You cannot stop a batch, change an existing campaign's limits, inboxes or schedule, add an inbox/);
     assert.ok(!init.body.result.instructions.includes("—"), "no em dash in what a founder's Claude reads");
   }
   for (const params of [{ protocolVersion: "2099-01-01" }, {}, undefined]) {
@@ -339,8 +344,8 @@ test("initialize answers in each protocol version it speaks and falls back to th
   assert.equal((await s.http({ key, body: { jsonrpc: "2.0", id: 3, method: "resources/list" } })).body.error.code, -32601);
   assert.equal((await s.http({ key, body: { jsonrpc: "1.0", id: 3, method: "ping" } })).body.error.code, -32600);
   assert.equal((await s.http({ key, body: '"just text"' })).body.error.code, -32600);
-  const unknown = await s.http({ key, body: { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "approve_batch", arguments: { batch: "b-test-2" } } } });
-  assert.deepEqual(unknown.body.error, { code: -32602, message: "There is no tool called approve_batch" });
+  const unknown = await s.http({ key, body: { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "stop_batch", arguments: { batch: "b-test-2" } } } });
+  assert.deepEqual(unknown.body.error, { code: -32602, message: "There is no tool called stop_batch" });
 
   const bad = await s.http({ key, body: "{ not json" });
   assert.equal(bad.status, 400);
@@ -371,18 +376,20 @@ test("tools/list: every tool has a name, title, description, input schema and an
     if (READ_TOOLS.includes(tool.name)) assert.deepEqual(tool.annotations, { readOnlyHint: true, openWorldHint: false });
     else assert.deepEqual({ ...tool.annotations, idempotentHint: true }, { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false });
   }
-  assert.deepEqual(tools.filter((tool) => tool.annotations.idempotentHint).map((tool) => tool.name), ["pause_campaign", "check_list", "mark_reply_answered"]);
-  // The connector says plainly what it can't do, so Claude explains instead of trying.
+  assert.deepEqual(tools.filter((tool) => tool.annotations.idempotentHint).map((tool) => tool.name), ["pause_campaign", "check_list", "mark_reply_answered", "resume_campaign", "hold_contacts"]);
+  // Each tool says what comes next and who may do it.
   const about = (name: string) => tools.find((tool) => tool.name === name)!.description;
-  for (const name of ["list_batches", "get_batch", "load_list"]) assert.match(about(name), /this connector can't approve/);
-  for (const name of ["get_campaign", "pause_campaign"]) assert.match(about(name), /this connector can't resume/);
+  for (const name of ["list_batches", "get_batch", "load_list"]) assert.match(about(name), /on the screen or with approve_batch/);
+  for (const name of ["get_campaign", "pause_campaign"]) assert.match(about(name), /on the campaign's screen or with resume_campaign/);
+  assert.match(about("approve_batch"), /Only works when the founder this key belongs to is one of the campaign's named approvers/);
+  assert.match(about("create_campaign"), /made paused and with no words, so it can't send/);
   assert.match(about("send_test"), /nowhere else/);
 
   for (const tool of TOOLS) {
     const shape = (tool.args as z.ZodObject).shape as Record<string, z.ZodType>;
     assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), Object.keys(shape).sort(), `${tool.name}: the same arguments`);
     assert.deepEqual([...tool.inputSchema.required].sort(), Object.keys(shape).filter((name) => !shape[name]!.safeParse(undefined).success).sort(), `${tool.name}: the same required arguments`);
-    assert.equal(tool.saves, ["pause_campaign", "load_list", "send_test", "mark_reply_answered"].includes(tool.name), tool.name);
+    assert.equal(tool.saves, ["pause_campaign", "load_list", "send_test", "mark_reply_answered", "approve_batch", "resume_campaign", "hold_contacts", "create_campaign"].includes(tool.name), tool.name);
   }
 });
 
@@ -485,7 +492,7 @@ test("list_batches and get_batch: batches by state in any campaign, and one batc
   assert.equal(batch.samples[0].followUp.subject, "Re: Alder Ridge's website: 40 accessibility problems");
   assert.equal(batch.samples[1].from, `Riley Sample <${RILEY}>`);
   assert.deepEqual(batch.heldRows, [{ row: 12, email: "greta@quillfeather.example", reason: "Not verified (verified is \"no\")" }]);
-  assert.match(batch.note, /this connector can't approve\. Only Aidan can approve this campaign's batches\./);
+  assert.match(batch.note, /^Only Aidan can approve this campaign's batches: on the screen, or with approve_batch through their own Claude\.$/);
   assert.equal((await s.call("get_batch", { batch: "b-nothing" })).text, "There's no such batch. Use an id from list_batches.");
   assert.equal((await s.call("get_batch", { batch: "../../settings" })).text, '"batch": Use a batch id from list_batches or get_campaign.');
 });
@@ -552,7 +559,7 @@ test("pause_campaign pauses one campaign with the reason as given, signed by the
   const s = setup();
   const paused = (await s.call("pause_campaign", { campaign: "school-districts", reason: "Two bounces from this list already. Riley wants to look first." })).data;
   assert.deepEqual([paused.state, paused.changed, paused.by, paused.atToronto], ["paused", true, "Riley (via Claude connector)", "Fri Nov 13, 1:01 p.m."]);
-  assert.match(paused.note, /this connector can't resume/);
+  assert.match(paused.note, /on the campaign's screen or with resume_campaign/);
   assert.deepEqual(s.all(`SELECT "state","stateReason","stateBy","stateAt" FROM "OutreachCampaign" WHERE "key" = 'school-districts'`),
     [{ state: "paused", stateReason: "Two bounces from this list already. Riley wants to look first.", stateBy: "Riley (via Claude connector)", stateAt: NOW.toISOString() }]);
   assert.deepEqual(s.all(`SELECT "key" FROM "OutreachCampaign" WHERE "state" = 'live'`), [{ key: "us-cities" }], "only that campaign");
@@ -585,7 +592,7 @@ test("check_list saves nothing and shows ready, held and the samples; load_list 
   const loaded = (await s.call("load_list", { campaign: "us-cities", name: "cities-C1", csv: CSV })).data;
   assert.deepEqual([loaded.saved, loaded.rows, loaded.ready, loaded.held], [true, 3, 2, 1]);
   assert.match(loaded.batch, /^b-new-\d+$/);
-  assert.match(loaded.note, /waits for Aidan to read its samples and press Approve on the screen.*this connector can't approve/);
+  assert.match(loaded.note, /waits for Aidan to read its samples and approve it: on the screen .* or with approve_batch through their own Claude/);
   assert.deepEqual(s.all(`SELECT "name","status","approvedBy","loadedBy","loadedAt","wordsVersion" FROM "OutreachBatch" WHERE "id" = ?`, loaded.batch),
     [{ name: "cities-C1", status: "waiting", approvedBy: null, loadedBy: "Riley (via Claude connector)", loadedAt: NOW.toISOString(), wordsVersion: VERSION }]);
   assert.deepEqual(s.all(`SELECT "status", COUNT(*) AS n FROM "OutreachContact" WHERE "batchId" = ? GROUP BY 1 ORDER BY 1`, loaded.batch), [{ status: "held", n: 1 }, { status: "ready", n: 2 }]);
@@ -652,8 +659,127 @@ test("mark_reply_answered marks a reply answered by the founder, and as a succes
   assert.equal((await s.call("mark_reply_answered", { id, answered: "yes" })).text, '"answered" must be true or false.');
 });
 
+// ---------- the controls both founders gave their own Claude (ADR 0067) ----------
+test("approve_batch: only a named approver's own connector approves, for the words the batch was loaded with; the approval says it came through Claude", async () => {
+  const s = setup();
+  assert.deepEqual(await s.call("approve_batch", { batch: "b-test-2" }), { error: true, text: "Only Aidan can approve this campaign's batches.", data: undefined });
+  assert.deepEqual(s.all(`SELECT "status","approvedBy" FROM "OutreachBatch" WHERE "id" = 'b-test-2'`), [{ status: "waiting", approvedBy: null }]);
+
+  const approved = (await s.call("approve_batch", { batch: "b-test-2", note: "Read all 3 samples" }, "Aidan")).data;
+  assert.deepEqual([approved.approved, approved.name, approved.campaign, approved.by, approved.words, approved.campaignState, approved.atToronto],
+    [true, "cities-B1", "us-cities", "Aidan", VERSION, "live", "Fri Nov 13, 1:01 p.m."]);
+  assert.equal(approved.note, "Approved. Its emails go at the campaign's send times.");
+  assert.deepEqual(s.all(`SELECT "status","approvedBy","approvedAt","approvedWords","approvalNote" FROM "OutreachBatch" WHERE "id" = 'b-test-2'`),
+    [{ status: "approved", approvedBy: "Aidan", approvedAt: NOW.toISOString(), approvedWords: VERSION, approvalNote: "Through Aidan's Claude connector: Read all 3 samples" }]);
+  // It is the screen's own approval: the batch now reads as sending, and no other batch changed.
+  assert.ok((await s.call("list_batches", { state: "sending" })).data.batches.some((batch: Json) => batch.id === "b-test-2"));
+  assert.deepEqual(s.all(`SELECT "status" FROM "OutreachBatch" WHERE "id" = 'b-test-3'`), [{ status: "waiting" }]);
+
+  assert.equal((await s.call("approve_batch", { batch: "b-test-2" }, "Aidan")).text, "This batch is already approved for these words.");
+  assert.equal((await s.call("approve_batch", { batch: "no-such-batch" }, "Aidan")).text, "There's no such batch.");
+  s.raw.prepare(`UPDATE "OutreachBatch" SET "status" = 'stopped' WHERE "id" = 'b-test-3'`).run();
+  assert.equal((await s.call("approve_batch", { batch: "b-test-3" })).text, "This batch was stopped.");
+  // In a paused campaign an approval sends nothing yet, and says so.
+  s.raw.prepare(`UPDATE "OutreachBatch" SET "status" = 'waiting' WHERE "id" = 'b-test-3'`).run();
+  await s.call("pause_campaign", { campaign: "school-districts", reason: "Paused for the test" });
+  const quiet = (await s.call("approve_batch", { batch: "b-test-3" })).data;
+  assert.deepEqual([quiet.campaignState, quiet.note], ["paused", "Approved. The campaign is paused, so nothing sends yet. A founder starts it again on the campaign's screen or with resume_campaign."]);
+});
+
+test("resume_campaign starts one paused campaign again, signed by the founder's connector, and changes nothing else about it; a campaign with no words can't start", async () => {
+  const s = setup();
+  const limits = () => JSON.stringify(s.all(`SELECT "key","dailyLimit","inboxesJson","sendDays","windowStart","windowEnd","approversJson","wordsVersion" FROM "OutreachCampaign" ORDER BY "key"`));
+  const before = limits();
+  const resumed = (await s.call("resume_campaign", { campaign: "county-it" }, "Aidan")).data;
+  assert.deepEqual([resumed.state, resumed.changed, resumed.by, resumed.wasPausedBecause, resumed.wasPausedBy, resumed.atToronto],
+    ["live", true, "Aidan (via Claude connector)", "3 of its emails bounced today", OUTREACH_AUTO_PAUSE_BY, "Fri Nov 13, 1:01 p.m."]);
+  assert.deepEqual(s.all(`SELECT "state","stateReason","stateBy","stateAt" FROM "OutreachCampaign" WHERE "key" = 'county-it'`),
+    [{ state: "live", stateReason: null, stateBy: "Aidan (via Claude connector)", stateAt: NOW.toISOString() }]);
+  assert.equal(limits(), before, "no limit, inbox, schedule, approver or word changed");
+  const again = (await s.call("resume_campaign", { campaign: "county-it" })).data;
+  assert.deepEqual([again.changed, again.note], [false, "It was already live."]);
+  assert.equal((await s.call("resume_campaign", { campaign: "nobody-here" })).text, "There's no such campaign. Use a key from list_campaigns.");
+  s.raw.prepare(`UPDATE "OutreachCampaign" SET "state" = 'paused', "wordsJson" = '{"steps":[]}', "wordsVersion" = NULL WHERE "key" = 'school-districts'`).run();
+  assert.equal((await s.call("resume_campaign", { campaign: "school-districts" })).text, "It can't start: it has no email words yet.");
+  assert.deepEqual(s.all(`SELECT "state" FROM "OutreachCampaign" WHERE "key" = 'school-districts'`), [{ state: "paused" }]);
+});
+
+test("hold_contacts holds only rows that wait for their first email, with the reason and who held them; release takes back only its own holds", async () => {
+  const s = setup();
+  const rows = () => s.all(`SELECT "email","status","holdReason" FROM "OutreachContact" WHERE "batchId" = 'b-test-2' ORDER BY "email"`);
+  const held = (await s.call("hold_contacts", { batch: "b-test-2", addresses: ["Ines@AlderRidge.example", "rafael@tallowpoint.example", "greta@quillfeather.example", "dana@porthalden.example", "nobody@nowhere.example"],
+    reason: "A shared webmaster mailbox: four of these bounced" })).data;
+  assert.deepEqual([held.held, held.asked, held.campaign, held.by], [2, 5, "us-cities", "Riley (via Claude connector)"]);
+  assert.equal(held.note, "2 of 5 held. The rest were already emailed, already held, or aren't in this batch.");
+  const why = "Held by Riley (via Claude connector): A shared webmaster mailbox: four of these bounced";
+  assert.deepEqual(rows(), [
+    { email: "greta@quillfeather.example", status: "held", holdReason: 'Not verified (verified is "no")' },
+    { email: "ines@alderridge.example", status: "held", holdReason: why },
+    { email: "rafael@tallowpoint.example", status: "held", holdReason: why },
+  ]);
+  assert.deepEqual(s.all(`SELECT "ready","held" FROM "OutreachBatch" WHERE "id" = 'b-test-2'`), [{ ready: 0, held: 3 }]);
+  // Someone already emailed, in another batch, is not touched even when named with their own batch.
+  assert.equal((await s.call("hold_contacts", { batch: "b-test-1", addresses: ["dana@porthalden.example", "sam@maplewoodsprings.example"], reason: "Already emailed" })).data.held, 0);
+  assert.deepEqual(s.all(`SELECT "status" FROM "OutreachContact" WHERE "id" IN ('c1','c2') ORDER BY "id"`), [{ status: "sent" }, { status: "replied" }]);
+  // The held rows show on the batch with their reason.
+  assert.ok((await s.call("get_batch", { batch: "b-test-2" })).data.heldRows.some((row: Json) => row.reason === why));
+
+  // Release: its own holds come back; the row the list check held stays held.
+  const released = (await s.call("hold_contacts", { batch: "b-test-2", addresses: ["ines@alderridge.example", "greta@quillfeather.example"], release: true })).data;
+  assert.deepEqual([released.released, released.asked], [1, 2]);
+  assert.deepEqual(rows().map((row) => [row.email, row.status]), [["greta@quillfeather.example", "held"], ["ines@alderridge.example", "ready"], ["rafael@tallowpoint.example", "held"]]);
+  assert.deepEqual(s.all(`SELECT "ready","held" FROM "OutreachBatch" WHERE "id" = 'b-test-2'`), [{ ready: 1, held: 2 }]);
+
+  assert.equal((await s.call("hold_contacts", { batch: "b-test-2", addresses: ["ines@alderridge.example"] })).text, '"reason" is needed to hold rows.');
+  assert.equal((await s.call("hold_contacts", { batch: "no-such-batch", addresses: ["ines@alderridge.example"], reason: "x" })).text, "There's no such batch. Use an id from list_batches.");
+  assert.equal((await s.call("hold_contacts", { batch: "b-test-2", addresses: [], reason: "x" })).error, true);
+  assert.equal((await s.call("hold_contacts", { batch: "b-test-2", addresses: Array.from({ length: 81 }, (_, i) => `p${i}@x.example`), reason: "x" })).error, true);
+});
+
+test("create_campaign makes a paused campaign with no words on the founder's own inbox; it sends only after a list is loaded with words, approved and resumed; other campaigns stay as they were", async () => {
+  const s = setup();
+  ownInboxRow(s.raw);
+  const others = () => JSON.stringify(s.all(`SELECT * FROM "OutreachCampaign" WHERE "key" <> 'design-studios' ORDER BY "key"`));
+  const before = others();
+  const inboxes = JSON.stringify(s.all(`SELECT * FROM "OutreachInbox" ORDER BY "address"`));
+  const made = (await s.call("create_campaign", { key: "design-studios", name: "Design studios: build partner", dailyLimit: 20, successLabel: "Calls booked", note: "Studios that sell sites and need a builder" })).data;
+  assert.deepEqual([made.created, made.state, made.inbox, made.dailyLimit, made.followUps, made.approvers.join(), made.by], [true, "paused", OWNER_LOGINS.riley.inbox, 20, 1, "Riley", "Riley (via Claude connector)"]);
+  assert.deepEqual(s.all(`SELECT "name","state","stateReason","stateBy","dailyLimit","inboxesJson","followUps","followUpBusinessDays","wordsJson","wordsVersion","rulesJson","approversJson","sendDays","windowStart","windowEnd","note"
+    FROM "OutreachCampaign" WHERE "key" = 'design-studios'`), [{
+    name: "Design studios: build partner", state: "paused", stateReason: "New campaign: not started yet", stateBy: "Riley (via Claude connector)", dailyLimit: 20,
+    inboxesJson: JSON.stringify([{ address: OWNER_LOGINS.riley.inbox, perDay: 20 }]), followUps: 1, followUpBusinessDays: 5, wordsJson: '{"steps":[]}', wordsVersion: null,
+    rulesJson: '{"successLabel":"Calls booked"}', approversJson: '["Riley"]', sendDays: "Mon,Tue,Wed,Thu,Fri", windowStart: 540, windowEnd: 870, note: "Studios that sell sites and need a builder",
+  }]);
+  assert.equal(others(), before, "no other campaign changed");
+  assert.equal(JSON.stringify(s.all(`SELECT * FROM "OutreachInbox" ORDER BY "address"`)), inboxes, "no inbox was added or changed");
+  // It reads back like any campaign, and can't start without words.
+  assert.equal((await s.call("get_campaign", { campaign: "design-studios" })).data.state, "paused");
+  assert.equal((await s.call("resume_campaign", { campaign: "design-studios" })).text, "It can't start: it has no email words yet.");
+  assert.equal((await s.call("create_campaign", { key: "design-studios", name: "Twice", dailyLimit: 5 })).text, "There is already a campaign with that key.");
+
+  // The whole run: load a list with its words, read it, approve it, resume.
+  const loaded = (await s.call("load_list", { campaign: "design-studios", name: "studios-1", csv: CSV, first: FIRST, followUp: FOLLOW })).data;
+  assert.deepEqual([loaded.saved, loaded.ready, loaded.newWords], [true, 3, true]);
+  assert.match(loaded.note, /waits for Riley to read its samples and approve it/);
+  assert.equal((await s.call("approve_batch", { batch: loaded.batch }, "Aidan")).text, "Only Riley can approve this campaign's batches.");
+  assert.equal((await s.call("approve_batch", { batch: loaded.batch })).data.campaignState, "paused");
+  assert.equal((await s.call("resume_campaign", { campaign: "design-studios" })).data.changed, true);
+  assert.deepEqual(s.all(`SELECT "state","dailyLimit" FROM "OutreachCampaign" WHERE "key" = 'design-studios'`), [{ state: "live", dailyLimit: 20 }]);
+  assert.equal(others(), before, "still no other campaign changed");
+
+  // Either founder as approver, when asked; an inbox the engine doesn't send from is refused; so is more than the inbox's own limit.
+  ownInboxRow(s.raw, "aidan");
+  const both = (await s.call("create_campaign", { key: "studios-two", name: "Studios two", dailyLimit: 30, followUps: 0, bothFoundersApprove: true }, "Aidan")).data;
+  assert.deepEqual([both.inbox, both.approvers.join(), both.followUps], [OWNER_LOGINS.aidan.inbox, "Riley,Aidan", 0]);
+  s.raw.prepare(`UPDATE "OutreachInbox" SET "enabled" = 0 WHERE "address" = ?`).run(OWNER_LOGINS.riley.inbox);
+  assert.equal((await s.call("create_campaign", { key: "studios-three", name: "Studios three", dailyLimit: 10 })).text, "That inbox isn't one the engine sends from.");
+  s.raw.prepare(`UPDATE "OutreachInbox" SET "enabled" = 1, "dailyMax" = 8 WHERE "address" = ?`).run(OWNER_LOGINS.riley.inbox);
+  assert.equal((await s.call("create_campaign", { key: "studios-three", name: "Studios three", dailyLimit: 10 })).text, "The daily limit can't be more than the inbox's own limit of 8 a day.");
+  assert.equal(s.all(`SELECT COUNT(*) AS n FROM "OutreachCampaign" WHERE "key" = 'studios-three'`)[0]!.n, 0);
+});
+
 // ---------- what the connector can't do ----------
-test("no write tool can approve a batch or start a paused campaign again: hostile arguments are refused and the batches, live campaigns, do-not-email list, inboxes and limits stay as they were", async () => {
+test("nothing but approve_batch by a named approver approves, and nothing but resume_campaign starts a campaign again: hostile arguments are refused and the batches, live campaigns, do-not-email list, inboxes and limits stay as they were", async () => {
   const s = setup();
   const before = guarded(s);
   const batches = s.all(`SELECT COUNT(*) AS n FROM "OutreachBatch"`)[0]!.n;
@@ -677,6 +803,20 @@ test("no write tool can approve a batch or start a paused campaign again: hostil
     ["get_batch", { batch: "b-test-2", action: "approve" }],
     ["check_do_not_email", { address: "elena@northmere.example", remove: true }],
     ["inbox_health", { dailyMax: 200 }],
+    // The new controls keep the screen's own checks. Riley is not an approver of us-cities; Aidan is.
+    ["approve_batch", { batch: "b-test-2" }],
+    ["approve_batch", { batch: "b-test-2", by: "Aidan" }],
+    ["approve_batch", { batch: "b-test-2", approvers: ["Riley"] }],
+    ["resume_campaign", { campaign: "county-it", dailyLimit: 500 }],
+    ["resume_campaign", { campaign: "county-it", inboxes: [{ address: RILEY, perDay: 200 }] }],
+    ["hold_contacts", { batch: "b-test-2", addresses: ["ines@alderridge.example"], reason: "x", status: "ready" }],
+    ["hold_contacts", { batch: "b-test-2", addresses: ["ines@alderridge.example"] }],
+    ["create_campaign", { key: "sneaky", name: "Sneaky", dailyLimit: 31 }],
+    ["create_campaign", { key: "sneaky", name: "Sneaky", dailyLimit: 10, inbox: AIDAN }],
+    ["create_campaign", { key: "sneaky", name: "Sneaky", dailyLimit: 10, state: "live" }],
+    ["create_campaign", { key: "us-cities", name: "Cities again", dailyLimit: 10 }],
+    // No inbox of Riley's own is on file in this test, so there is nothing for a new campaign to send from.
+    ["create_campaign", { key: "sneaky", name: "Sneaky", dailyLimit: 10 }],
   ];
   for (const [name, args] of hostile) {
     const refused = await s.call(name, args);
@@ -687,12 +827,12 @@ test("no write tool can approve a batch or start a paused campaign again: hostil
   assert.deepEqual(s.all(`SELECT "state","stateBy" FROM "OutreachCampaign" WHERE "key" = 'county-it'`), [{ state: "paused", stateBy: OUTREACH_AUTO_PAUSE_BY }]);
 
   // Nothing with such a name exists either: Claude is told there is no such tool.
-  for (const name of ["approve_batch", "resume_campaign", "stop_batch", "resume_fcc", "set_limit", "block_address", "unblock_address"]) {
+  for (const name of ["stop_batch", "resume_fcc", "set_limit", "set_inboxes", "add_inbox", "block_address", "unblock_address"]) {
     const answered = await answer({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: { batch: "b-test-2", campaign: "county-it" } } }, s.context("Aidan"));
     assert.equal(answered && "error" in answered && answered.error.code, -32602, name);
   }
 
-  // Then every write tool used properly, by the campaign's own approver: still nothing approved, nothing started again.
+  // Then the older write tools used properly, by the campaign's own approver: still nothing approved, nothing started again.
   await s.call("pause_campaign", { campaign: "county-it", reason: "Pausing a paused campaign changes nothing" }, "Aidan");
   await s.call("pause_campaign", { campaign: "school-districts", reason: "Pause is always allowed" }, "Aidan");
   const loaded = (await s.call("load_list", { campaign: "us-cities", name: "cities-C1", csv: CSV }, "Aidan")).data;
@@ -708,23 +848,24 @@ test("no write tool can approve a batch or start a paused campaign again: hostil
   assert.deepEqual(after.fcc, JSON.parse(before).fcc);
 });
 
-test("the connector's code has no path to approving, resuming, stopping a batch, FCC's switch or the do-not-email list", () => {
+test("the connector's code has no path to stopping a batch, FCC's switch or the do-not-email list, and takes only the named switches from the campaign controls", () => {
   const read = (name: string) => readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
   for (const name of ["mcp-tools.ts", "mcp-server.ts", "mcp-http.ts"]) {
     const source = read(name);
-    for (const banned of ["approveBatch", "resumeCampaign", "stopBatch", "resumeFcc", "suppress"]) assert.ok(!source.toLowerCase().includes(banned.toLowerCase()), `${name} mentions ${banned}`);
+    for (const banned of ["stopBatch", "resumeFcc", "suppress"]) assert.ok(!source.toLowerCase().includes(banned.toLowerCase()), `${name} mentions ${banned}`);
     assert.ok(!/\b(?:UPDATE|INSERT|DELETE|REPLACE)\b/.test(source), `${name} writes no SQL of its own`);
     assert.ok(!/fcc-campaign|outreach-sender|outreach-worker|outreach-replies"/.test(source), `${name} imports nothing that sends or changes FCC`);
   }
-  // Pause is the one switch it takes from the campaign controls.
+  // The switches it takes from the campaign controls, and no others (ADR 0067).
   const controls = [...read("mcp-tools.ts").matchAll(/import \{([^}]+)\} from "@\/lib\/outreach\/outreach-control"/g)].map((match) => match[1]!.trim());
-  assert.deepEqual(controls, ["pauseCampaign"]);
+  assert.deepEqual(controls, ["MAX_HOLD_ADDRESSES, approveBatch, createCampaign, holdContacts, pauseCampaign, releaseContacts, resumeCampaign"]);
   assert.ok(!/outreach-control/.test(read("mcp-server.ts") + read("mcp-http.ts")));
   // The marked spot for the next tool is still there.
 });
 
 test("every tool call, key check, rate limit and audit row included, stays well inside the database's 50 queries a request", async () => {
   const s = setup();
+  ownInboxRow(s.raw);
   const key = await makeKey(s.db, "Riley", "header", NOW);
   // A real-sized list: 120 rows, as many as Riley's Claude loads in one go.
   const full = ["email,first_name,city,verified,error_count", ...Array.from({ length: 120 }, (_, i) => `person${i}@place${i % 20}.example,Pat,Place ${i},yes,9`)].join("\n");
@@ -734,6 +875,9 @@ test("every tool call, key check, rate limit and audit row included, stays well 
     ["inbox_health", {}], ["check_do_not_email", { address: "elena@northmere.example" }], ["week_numbers", {}], ["pause_campaign", { campaign: "school-districts", reason: "Counting queries" }],
     ["check_list", { campaign: "us-cities", name: "full list", csv: full }], ["load_list", { campaign: "us-cities", name: "full list", csv: full, first: `${FIRST}\nP.S. New words.`, followUp: FOLLOW }],
     ["send_test", { batch: "b-test-2" }], ["mark_reply_answered", { id: "contact:c8", success: true }],
+    ["approve_batch", { batch: "b-test-3" }], ["resume_campaign", { campaign: "school-districts" }],
+    ["hold_contacts", { batch: "b-test-3", addresses: Array.from({ length: 80 }, (_, i) => (i === 0 ? "lucia@harrowglen.example" : `nobody${i}@harrowglen.example`)), reason: "Counting queries" }],
+    ["create_campaign", { key: "design-studios", name: "Design studios: build partner", dailyLimit: 20 }],
   ];
   assert.deepEqual([...new Set(calls.map(([name]) => name))], [...READ_TOOLS, ...WRITE_TOOLS], "every tool is counted");
   const used: Record<string, number> = {};
@@ -790,7 +934,7 @@ test("every tool call writes one audit row: the tool, the founder, whether it wo
   await tool("pause_campaign", { campaign: "school-districts", reason: "Riley asked: dana@marrowsound.example complained" });
   await tool("get_campaign", { campaign: "nobody-here" });
   await tool("pause_campaign", { campaign: "county-it", reason: "x", state: "live" });
-  await tool("approve_batch", { batch: "b-test-2" });
+  await tool("stop_batch", { batch: "b-test-2" });
 
   const rows = s.all<{ action: string; actorUserId: string | null; targetType: string; targetId: string | null; ipAddress: string; metadata: string }>(`SELECT * FROM "AuditEvent" ORDER BY rowid`);
   const fingerprint = async (address: string) => `#${(await sha256Hex(address)).slice(0, 10)}`;
