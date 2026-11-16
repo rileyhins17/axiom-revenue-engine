@@ -132,26 +132,29 @@ export async function releaseContacts(db: ProspectDb, batchId: string, emails: s
 
 export type NewCampaign = {
   key: string; name: string;
-  /** The one inbox that sends it. It must be an inbox the engine already has, switched on. */
-  inbox: string;
+  /** The founder whose sending inbox sends it: the switched-on inbox the engine already has under their name. */
+  founder: string;
   /** Most emails a day, follow-ups included. Never more than the inbox's own daily limit. */
   dailyLimit: number;
   followUps: number; followUpBusinessDays: number;
   approvers: string[]; successLabel?: string | null; note?: string | null;
 };
-export type NewCampaignResult = { ok: true } | { ok: false; why: string };
+export type NewCampaignResult = { ok: true; inbox: string } | { ok: false; why: string };
 
 /**
  * A new campaign, always paused and with no words: it can't send until a list is loaded with its words, a
- * named approver approves the batch and a founder resumes it. It uses an inbox the engine already has and
- * stays inside that inbox's own daily limit; every other setting is the table's default (weekdays, 9:00 to 2:30).
+ * named approver approves the batch and a founder resumes it. It uses the founder's own sending inbox, one the
+ * engine already has, and stays inside that inbox's daily limit; every other setting is the table's default
+ * (weekdays, 9:00 to 2:30).
  */
 export async function createCampaign(db: ProspectDb, input: NewCampaign, by: string, now = new Date()): Promise<NewCampaignResult> {
   if (await readCampaign(db, input.key)) return { ok: false, why: "There is already a campaign with that key." };
-  const address = input.inbox.trim().toLowerCase();
-  const inbox = await db.prepare(`SELECT "address","dailyMax","enabled" FROM "OutreachInbox" WHERE lower("address") = ?`).bind(address)
-    .first<{ address: string; dailyMax: number; enabled: number }>();
-  if (!inbox || inbox.enabled !== 1) return { ok: false, why: "That inbox isn't one the engine sends from." };
+  // A sending inbox belongs to the founder its name starts with ("Riley Hinsperger"), as on the Inboxes screen.
+  const { results } = await db.prepare(`SELECT "address","name","dailyMax","enabled" FROM "OutreachInbox" ORDER BY "createdAt","address"`).bind()
+    .all<{ address: string; name: string; dailyMax: number; enabled: number }>();
+  const inbox = results.find((row) => row.enabled === 1 && row.name.trim().split(/\s+/)[0] === input.founder);
+  if (!inbox) return { ok: false, why: `${input.founder} has no sending inbox switched on in the engine.` };
+  const address = inbox.address.trim().toLowerCase();
   if (!Number.isInteger(input.dailyLimit) || input.dailyLimit < 1) return { ok: false, why: "The daily limit must be at least 1." };
   if (input.dailyLimit > inbox.dailyMax) return { ok: false, why: `The daily limit can't be more than the inbox's own limit of ${inbox.dailyMax} a day.` };
   if (input.approvers.length === 0) return { ok: false, why: "A campaign needs at least one approver." };
@@ -161,5 +164,5 @@ export async function createCampaign(db: ProspectDb, input: NewCampaign, by: str
     VALUES (?,?,'paused',?,?,?,?,?,?,?,?,?,?,?,?)`)
     .bind(input.key, input.name.trim().slice(0, 80), "New campaign: not started yet", by.slice(0, 120), at, input.dailyLimit, JSON.stringify([{ address, perDay: input.dailyLimit }]),
       input.followUps, input.followUpBusinessDays, JSON.stringify(rules), JSON.stringify(input.approvers), input.note?.trim().slice(0, 1000) || null, at, at).run();
-  return { ok: true };
+  return { ok: true, inbox: address };
 }

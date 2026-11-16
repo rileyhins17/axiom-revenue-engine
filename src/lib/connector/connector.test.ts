@@ -33,9 +33,6 @@ const AIDAN = "aidan@axiom-test.example";
 const RILEY = "riley@axiom-test.example";
 const READ_TOOLS = ["engine_today", "list_campaigns", "get_campaign", "list_batches", "get_batch", "list_replies", "get_reply", "find_contact", "inbox_health", "check_do_not_email", "week_numbers"];
 const WRITE_TOOLS = ["pause_campaign", "check_list", "load_list", "send_test", "mark_reply_answered", "approve_batch", "resume_campaign", "hold_contacts", "create_campaign"];
-/** The founder's own inbox, as the engine has it on file: a new campaign made through the connector sends from it. */
-const ownInboxRow = (raw: Raw, founder: "riley" | "aidan" = "riley") => raw.prepare(`INSERT OR IGNORE INTO "OutreachInbox" ("address","name","passwordSecret","dailyMax","rampJson","rampFrom","note") VALUES (?,?,?,60,'[]',NULL,'Made-up inbox')`)
-  .run(OWNER_LOGINS[founder].inbox, `${OWNER_LOGINS[founder].name} Own`, "TEST_PASSWORD_3");
 
 const FIRST = `Subject: {city}'s website: {error_count} accessibility problems
 
@@ -736,18 +733,17 @@ test("hold_contacts holds only rows that wait for their first email, with the re
   assert.equal((await s.call("hold_contacts", { batch: "b-test-2", addresses: Array.from({ length: 81 }, (_, i) => `p${i}@x.example`), reason: "x" })).error, true);
 });
 
-test("create_campaign makes a paused campaign with no words on the founder's own inbox; it sends only after a list is loaded with words, approved and resumed; other campaigns stay as they were", async () => {
+test("create_campaign makes a paused campaign with no words on the founder's sending inbox; it sends only after a list is loaded with words, approved and resumed; other campaigns stay as they were", async () => {
   const s = setup();
-  ownInboxRow(s.raw);
   const others = () => JSON.stringify(s.all(`SELECT * FROM "OutreachCampaign" WHERE "key" <> 'design-studios' ORDER BY "key"`));
   const before = others();
   const inboxes = JSON.stringify(s.all(`SELECT * FROM "OutreachInbox" ORDER BY "address"`));
   const made = (await s.call("create_campaign", { key: "design-studios", name: "Design studios: build partner", dailyLimit: 20, successLabel: "Calls booked", note: "Studios that sell sites and need a builder" })).data;
-  assert.deepEqual([made.created, made.state, made.inbox, made.dailyLimit, made.followUps, made.approvers.join(), made.by], [true, "paused", OWNER_LOGINS.riley.inbox, 20, 1, "Riley", "Riley (via Claude connector)"]);
+  assert.deepEqual([made.created, made.state, made.inbox, made.dailyLimit, made.followUps, made.approvers.join(), made.by], [true, "paused", RILEY, 20, 1, "Riley", "Riley (via Claude connector)"]);
   assert.deepEqual(s.all(`SELECT "name","state","stateReason","stateBy","dailyLimit","inboxesJson","followUps","followUpBusinessDays","wordsJson","wordsVersion","rulesJson","approversJson","sendDays","windowStart","windowEnd","note"
     FROM "OutreachCampaign" WHERE "key" = 'design-studios'`), [{
     name: "Design studios: build partner", state: "paused", stateReason: "New campaign: not started yet", stateBy: "Riley (via Claude connector)", dailyLimit: 20,
-    inboxesJson: JSON.stringify([{ address: OWNER_LOGINS.riley.inbox, perDay: 20 }]), followUps: 1, followUpBusinessDays: 5, wordsJson: '{"steps":[]}', wordsVersion: null,
+    inboxesJson: JSON.stringify([{ address: RILEY, perDay: 20 }]), followUps: 1, followUpBusinessDays: 5, wordsJson: '{"steps":[]}', wordsVersion: null,
     rulesJson: '{"successLabel":"Calls booked"}', approversJson: '["Riley"]', sendDays: "Mon,Tue,Wed,Thu,Fri", windowStart: 540, windowEnd: 870, note: "Studios that sell sites and need a builder",
   }]);
   assert.equal(others(), before, "no other campaign changed");
@@ -767,13 +763,12 @@ test("create_campaign makes a paused campaign with no words on the founder's own
   assert.deepEqual(s.all(`SELECT "state","dailyLimit" FROM "OutreachCampaign" WHERE "key" = 'design-studios'`), [{ state: "live", dailyLimit: 20 }]);
   assert.equal(others(), before, "still no other campaign changed");
 
-  // Either founder as approver, when asked; an inbox the engine doesn't send from is refused; so is more than the inbox's own limit.
-  ownInboxRow(s.raw, "aidan");
+  // Either founder as approver, when asked; a founder with no sending inbox switched on is refused; so is more than the inbox's own limit.
   const both = (await s.call("create_campaign", { key: "studios-two", name: "Studios two", dailyLimit: 30, followUps: 0, bothFoundersApprove: true }, "Aidan")).data;
-  assert.deepEqual([both.inbox, both.approvers.join(), both.followUps], [OWNER_LOGINS.aidan.inbox, "Riley,Aidan", 0]);
-  s.raw.prepare(`UPDATE "OutreachInbox" SET "enabled" = 0 WHERE "address" = ?`).run(OWNER_LOGINS.riley.inbox);
-  assert.equal((await s.call("create_campaign", { key: "studios-three", name: "Studios three", dailyLimit: 10 })).text, "That inbox isn't one the engine sends from.");
-  s.raw.prepare(`UPDATE "OutreachInbox" SET "enabled" = 1, "dailyMax" = 8 WHERE "address" = ?`).run(OWNER_LOGINS.riley.inbox);
+  assert.deepEqual([both.inbox, both.approvers.join(), both.followUps], [AIDAN, "Riley,Aidan", 0]);
+  s.raw.prepare(`UPDATE "OutreachInbox" SET "enabled" = 0 WHERE "address" = ?`).run(RILEY);
+  assert.equal((await s.call("create_campaign", { key: "studios-three", name: "Studios three", dailyLimit: 10 })).text, "Riley has no sending inbox switched on in the engine.");
+  s.raw.prepare(`UPDATE "OutreachInbox" SET "enabled" = 1, "dailyMax" = 8 WHERE "address" = ?`).run(RILEY);
   assert.equal((await s.call("create_campaign", { key: "studios-three", name: "Studios three", dailyLimit: 10 })).text, "The daily limit can't be more than the inbox's own limit of 8 a day.");
   assert.equal(s.all(`SELECT COUNT(*) AS n FROM "OutreachCampaign" WHERE "key" = 'studios-three'`)[0]!.n, 0);
 });
@@ -815,8 +810,6 @@ test("nothing but approve_batch by a named approver approves, and nothing but re
     ["create_campaign", { key: "sneaky", name: "Sneaky", dailyLimit: 10, inbox: AIDAN }],
     ["create_campaign", { key: "sneaky", name: "Sneaky", dailyLimit: 10, state: "live" }],
     ["create_campaign", { key: "us-cities", name: "Cities again", dailyLimit: 10 }],
-    // No inbox of Riley's own is on file in this test, so there is nothing for a new campaign to send from.
-    ["create_campaign", { key: "sneaky", name: "Sneaky", dailyLimit: 10 }],
   ];
   for (const [name, args] of hostile) {
     const refused = await s.call(name, args);
@@ -865,7 +858,6 @@ test("the connector's code has no path to stopping a batch, FCC's switch or the 
 
 test("every tool call, key check, rate limit and audit row included, stays well inside the database's 50 queries a request", async () => {
   const s = setup();
-  ownInboxRow(s.raw);
   const key = await makeKey(s.db, "Riley", "header", NOW);
   // A real-sized list: 120 rows, as many as Riley's Claude loads in one go.
   const full = ["email,first_name,city,verified,error_count", ...Array.from({ length: 120 }, (_, i) => `person${i}@place${i % 20}.example,Pat,Place ${i},yes,9`)].join("\n");

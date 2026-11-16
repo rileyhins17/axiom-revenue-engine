@@ -36,7 +36,7 @@ Each of these is something the screen already lets a founder do. The first five 
 | `approve_batch` | The screen's Approve, for the words the batch was loaded with. Only through the Claude of a founder named as the campaign's approver. The approval note says it came through Claude. |
 | `resume_campaign` | The screen's Resume. The campaign still sends only approved batches, inside its limits and hours. |
 | `hold_contacts` | Holds rows of a batch back (people not emailed yet), with a reason, up to 80 at a time. `release` takes back holds made with this tool, and only those. |
-| `create_campaign` | A new campaign, made paused and with no words, on the founder's own inbox, weekdays 9:00 to 2:30, up to 30 emails a day and never more than the inbox's own limit. |
+| `create_campaign` | A new campaign, made paused and with no words, on the founder's sending inbox, weekdays 9:00 to 2:30, up to 30 emails a day and never more than the inbox's own limit. |
 
 The last four make email go to real people, or decide who gets it. Both founders gave their own Claude these on Nov 16, 2026 so a campaign can run while they are at work. Every call is in the audit log with the founder's name.
 

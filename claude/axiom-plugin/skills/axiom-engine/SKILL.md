@@ -40,7 +40,7 @@ Since Nov 16, 2026 both founders let their own Claude run a campaign for them. T
 - `approve_batch`: Approve a batch, but only through the Claude of a founder named as the campaign's approver. Read `get_batch` first: every sample exactly as it goes, and the held rows. Never approve words you would not put that founder's name under.
 - `resume_campaign`: resume a campaign. If it paused itself over bounces, find out why first and hold the rows that would bounce again.
 - `hold_contacts`: hold rows back so they are never emailed (people not emailed yet), with a reason. It can take back its own holds, never a hold the list check made.
-- `create_campaign`: a new campaign, made paused and with no words, on the founder's own inbox, up to 30 emails a day. It sends only after a list is loaded with its words, approved and resumed.
+- `create_campaign`: a new campaign, made paused and with no words, on the founder's sending inbox, up to 30 emails a day. It sends only after a list is loaded with its words, approved and resumed.
 
 ## What the connector can't do, on purpose
 

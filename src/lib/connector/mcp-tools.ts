@@ -582,16 +582,15 @@ export const TOOLS: Tool[] = [
       bothFoundersApprove: z.boolean().optional(), successLabel: z.string().trim().min(1).max(40).optional(), note: z.string().trim().max(600).optional(),
     }).strict(),
     target: (a) => ({ kind: "campaign", id: a.key }),
-    description: `Start a new campaign. It is made paused and with no words, so it can't send: load a list with its words (check_list, then load_list), have a named approver approve the batch, then resume it. It sends only from the own inbox of the founder this key belongs to, on weekdays 9:00 to 2:30 Toronto time, up to ${CONNECTOR_NEW_CAMPAIGN_MAX_PER_DAY} emails a day and never more than that inbox's own limit. Nothing about an existing campaign changes. Start one only when the founder asked for it or has told you to run outreach for them.`,
+    description: `Start a new campaign. It is made paused and with no words, so it can't send: load a list with its words (check_list, then load_list), have a named approver approve the batch, then resume it. It sends only from the sending inbox of the founder this key belongs to, on weekdays 9:00 to 2:30 Toronto time, up to ${CONNECTOR_NEW_CAMPAIGN_MAX_PER_DAY} emails a day and never more than that inbox's own limit. Nothing about an existing campaign changes. Start one only when the founder asked for it or has told you to run outreach for them.`,
     run: async (a, t) => {
-      const inbox = ownInbox(t.founder);
       const approvers = a.bothFoundersApprove ? [...FOUNDERS] : [t.founder];
       const result = await createCampaign(t.db, {
-        key: a.key, name: a.name, inbox, dailyLimit: a.dailyLimit, followUps: a.followUps ?? 1, followUpBusinessDays: a.followUpBusinessDays ?? 5,
+        key: a.key, name: a.name, founder: t.founder, dailyLimit: a.dailyLimit, followUps: a.followUps ?? 1, followUpBusinessDays: a.followUpBusinessDays ?? 5,
         approvers, successLabel: a.successLabel ?? null, note: a.note ?? null,
       }, via(t.founder), t.now);
       if (!result.ok) throw new ToolError(result.why);
-      return { created: true, campaign: a.key, name: a.name, state: "paused", inbox, dailyLimit: a.dailyLimit, followUps: a.followUps ?? 1, approvers, by: via(t.founder), at: t.now.toISOString(),
+      return { created: true, campaign: a.key, name: a.name, state: "paused", inbox: result.inbox, dailyLimit: a.dailyLimit, followUps: a.followUps ?? 1, approvers, by: via(t.founder), at: t.now.toISOString(),
         note: "Made, paused, with no words yet. Next: check_list and load_list with the first email and follow-up words, read get_batch, approve_batch, then resume_campaign." };
     },
   }),
