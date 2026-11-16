@@ -1,3 +1,6 @@
 cloudflare-env.d.ts linguist-generated=true -whitespace
 src/engine/worker-env.d.ts linguist-generated=true -whitespace
 migrations/*.sql text eol=lf
+# The Claude plugin is read by Claude Code as is: keep its files with Unix line endings on every PC (a Windows checkout broke the skill header test).
+claude/** text eol=lf
+.claude-plugin/** text eol=lf
