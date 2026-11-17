@@ -3,7 +3,7 @@ import { torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
 import { fccScreen } from "@/lib/fcc-campaign-status";
 import { torontoMinute } from "@/lib/fcc-campaign-tick";
 import { readKv } from "@/lib/outreach/outreach-control";
-import { PAUSE_BOUNCES, inboxBouncesToday, inboxRef } from "@/lib/outreach/outreach-inboxes";
+import { PAUSE_BOUNCES, inboxBouncesToday, inboxCapNow, inboxDayMax, inboxRef, inboxSentToday } from "@/lib/outreach/outreach-inboxes";
 import { OUTREACH_REPLY_HOURS, OUTREACH_REPLY_STATE } from "@/lib/outreach/outreach-replies";
 import { readInboxes, type Inbox } from "@/lib/outreach/outreach-model";
 import { OUTREACH_AUTO_PAUSE_BY } from "@/lib/outreach/outreach-sender";
@@ -47,9 +47,30 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
   }
 
   const minute = torontoMinute(now);
+  const fccFirstInbox = typeof env.FCC_SENDER_ADDRESS === "string" ? env.FCC_SENDER_ADDRESS : null;
+  const inboxes = await readInboxes(db).catch(() => [] as Inbox[]);
+
+  // Whether an inbox could send another email right now: it has room under its limit for this time of day (half
+  // before 12:30) and hasn't stopped for the day on bounces. Read once per inbox, only when a campaign needs it.
+  const roomNow = new Map<string, Promise<boolean>>();
+  const hasRoom = (address: string) => {
+    const key = address.trim().toLowerCase();
+    if (!roomNow.has(key)) {
+      roomNow.set(key, (async () => {
+        const inbox = inboxes.find((row) => row.address === key);
+        if (!inbox?.enabled) return false;
+        const ref = inboxRef(key, fccFirstInbox);
+        const [sent, bounces] = await Promise.all([inboxSentToday(db, torontoDay(now), ref), inboxBouncesToday(db, torontoDay(now), ref)]);
+        return sent < inboxCapNow(inboxDayMax(inbox, torontoDay(now)), minute) && bounces < PAUSE_BOUNCES;
+      })().catch(() => true));
+    }
+    return roomNow.get(key)!;
+  };
 
   // Each campaign: an automatic pause (a founder's own Pause needs no email), and a live campaign with approved people
-  // waiting that has sent nothing an hour into its send hours.
+  // waiting that has sent nothing an hour into its send hours although one of its inboxes had room. A campaign whose
+  // inboxes are full for now (another campaign that goes first used the morning half, Nov 17) is waiting its turn,
+  // not broken.
   const campaigns = await campaignSummaries(db, now).catch(() => null);
   add("campaigns-screen", campaigns !== null, "The campaign numbers can't be read, so these checks can't see the campaigns.", "Ask Claude to check the Worker logs for the campaign queries.");
   for (const { campaign, counts } of campaigns ?? []) {
@@ -58,8 +79,9 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
       `The ${campaign.name} campaign paused itself: ${campaign.stateReason ?? "no reason saved"}${campaign.stateAt ? ` (${when(campaign.stateAt)})` : ""}. Nothing in it sends until someone presses Resume.`,
       "Read the reason on its Campaigns screen. Once it's sorted, press Resume there.");
     const sendDay = campaign.sendDays.includes(torontoWeekday(now)) && (!campaign.startDay || torontoDay(now) >= campaign.startDay) && (!campaign.endDay || torontoDay(now) <= campaign.endDay);
-    const silent = sendDay && campaign.state === "live" && !campaign.problem && counts.ready + counts.followUpsDue > 0 && counts.sentToday === 0
+    const quiet = sendDay && campaign.state === "live" && !campaign.problem && counts.ready + counts.followUpsDue > 0 && counts.sentToday === 0
       && minute >= campaign.windowStart + 60 && minute < campaign.windowEnd;
+    const silent = quiet && (await Promise.all(campaign.inboxes.map((entry) => hasRoom(entry.address)))).some(Boolean);
     add(`campaign-sending:${campaign.key}`, !silent,
       `No ${campaign.name} emails have gone out today, though it is live and ${counts.ready + counts.followUpsDue} ${counts.ready + counts.followUpsDue === 1 ? "is" : "are"} waiting.`,
       `Look at "Last check" on its Campaigns screen for the reason, then ask Claude to read the Worker logs.`);
@@ -67,8 +89,7 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
 
   // An inbox sends nothing more today once 3 of its emails bounced, whatever sent them. That is not a pause, so the
   // pause alerts stay quiet (Aidan, Nov 5: a city bounce never pauses anything else); this says why the inbox went quiet.
-  const fccFirstInbox = typeof env.FCC_SENDER_ADDRESS === "string" ? env.FCC_SENDER_ADDRESS : null;
-  for (const inbox of (await readInboxes(db).catch(() => [] as Inbox[])).filter((row) => row.enabled)) {
+  for (const inbox of inboxes.filter((row) => row.enabled)) {
     const bounces = await inboxBouncesToday(db, torontoDay(now), inboxRef(inbox.address, fccFirstInbox)).catch(() => 0);
     const owner = inbox.name.trim().split(/\s+/)[0] || inbox.address;
     add(`inbox-resting:${inbox.address}`, bounces < PAUSE_BOUNCES,

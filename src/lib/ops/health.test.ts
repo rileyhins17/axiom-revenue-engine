@@ -162,6 +162,31 @@ test("a live campaign with people waiting that has sent nothing an hour into its
   assert.equal((await sending(TUE_1130)).ok, true);
 });
 
+test("a campaign waiting its turn is not reported: its inbox's morning half went to a campaign that goes first; it is reported once the inbox has room", async () => {
+  const { raw, db } = database();
+  await replyCheckDone(db);
+  // Agencies shares Aidan's inbox with cities, and cities goes first (priority 10 against 50).
+  raw.prepare(`UPDATE "OutreachCampaign" SET "state" = 'live', "stateBy" = 'Riley', "stateReason" = NULL, "startDay" = NULL, "dailyLimit" = 30 WHERE "key" = 'us-cities'`).run();
+  raw.prepare(`INSERT INTO "OutreachCampaign" ("key","name","state","priority","sendDays","windowStart","windowEnd","dailyLimit","inboxesJson","approversJson")
+    VALUES ('agencies','Agencies','live',50,'Mon,Tue,Wed,Thu,Fri',540,870,30,'[{"address":"aidanmageebusiness@gmail.com","perDay":30}]','["Riley"]')`).run();
+  for (const key of ["us-cities", "agencies"]) raw.prepare(`INSERT INTO "OutreachBatch" ("id","campaignKey","name","loadedBy","loadedAt","status") VALUES (?,?,'B','Riley','2026-11-02T00:00:00Z','approved')`).run(`b-${key}`, key);
+  raw.prepare(`INSERT INTO "OutreachContact" ("id","campaignKey","batchId","rowNumber","email","fieldsJson","status","createdAt","updatedAt") VALUES ('a1','agencies','b-agencies',2,'pat@studio.example','{}','ready','x','x')`).run();
+  // Cities sent the inbox's whole morning half: 30 of its 60.
+  for (let i = 1; i <= 30; i++) {
+    raw.prepare(`INSERT INTO "OutreachContact" ("id","campaignKey","batchId","rowNumber","email","fieldsJson","status","createdAt","updatedAt") VALUES (?,'us-cities','b-us-cities',?,?,'{}','sent','x','x')`).run(`c${i}`, i + 1, `clerk${i}@city${i}.gov`);
+    raw.prepare(`INSERT INTO "OutreachSend" ("sendId","campaignKey","contactId","step","email","senderAddress","sendDay","messageId","subject","status") VALUES (?,'us-cities',?,1,?,'aidanmageebusiness@gmail.com','2026-11-03',?,'S','SENT')`)
+      .run(`s${i}`, `c${i}`, `clerk${i}@city${i}.gov`, `<s${i}>`);
+  }
+  const env = { ...ENV, FCC_SENDER_ADDRESS: "aidanmageebusiness@gmail.com" };
+  const agencies = async (now: Date) => (await runHealthChecks(db, env, now)).find((c) => c.key === "campaign-sending:agencies")!;
+  assert.equal((await agencies(TUE_1130)).ok, true, "11:30: the morning half is used, so agencies waits for 12:30");
+  assert.deepEqual(failing(await runHealthChecks(db, env, TUE_1130)), []);
+  // 1:30 pm: the inbox has room again and agencies still sent nothing: that is a real problem.
+  const afternoon = await agencies(new Date("2026-11-03T18:30:00Z"));
+  assert.equal(afternoon.ok, false);
+  assert.match(afternoon.problem, /No Agencies emails have gone out today, though it is live and 1 is waiting\./);
+});
+
 test("an inbox with 3 bounces today is reported as stopped for the day, and it clears the next day", async () => {
   const { raw, db } = database();
   await replyCheckDone(db);
