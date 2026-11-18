@@ -198,7 +198,7 @@ export async function weekNumbers(db: ProspectDb, from: string, to: string, now 
       id: row.id, campaignKey: row.campaignKey, campaign: names.get(row.campaignKey) ?? row.campaignKey, contactId: row.contactId,
       label: String(row.label ?? row.fromAddress), from: row.fromAddress, kind: row.kind, at: row.at, quote: row.quote,
       answerFrom: row.sender, answerFromName: row.sender ? inboxName(row.sender) : null, inbox: row.inbox, inboxName: inboxName(row.inbox),
-      answeredAt: row.answeredAt, answeredBy: row.answeredBy, success: row.successAt !== null,
+      answeredAt: row.answeredAt, answeredBy: row.answeredAt ? row.answeredBy : null, success: row.successAt !== null,
     })),
   };
 }

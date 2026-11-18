@@ -2,7 +2,9 @@
  * The Replies screen: every message the hourly inbox check recorded (OutreachReply), newest first, with who
  * should answer it and from which inbox, and the two marks a founder can put on a reply (migration 0091):
  *
- * - answered: someone wrote back to them, so it leaves "To answer";
+ * - answered: someone wrote back to them, so it leaves "To answer". The hourly reply check makes this mark itself
+ *   when it sees our answer in the inbox ("Riley (seen in Sent)", outreach-answered.ts); a founder can still make
+ *   or undo it by hand;
  * - success: this reply counts toward the campaign's success number (cities: they asked for the report or a
  *   price), which the founders judge each campaign by.
  *
@@ -13,6 +15,7 @@
  * It is listed with the id "contact:<contact id>"; marking it stores a row under that id, so the mark has a home.
  */
 import { FCC_CAMPAIGN_KEY, FCC_NOV6_CAMPAIGN_KEY } from "@/lib/fcc-campaign";
+import { answeredByShown, notAnsweredMark } from "@/lib/outreach/outreach-answered";
 import { firstNameOf } from "@/lib/outreach/outreach-inbox-health";
 import { readCampaigns, readInboxes, successLabelOf, type Inbox } from "@/lib/outreach/outreach-model";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
@@ -124,7 +127,7 @@ function shape(row: RawRow, names: Map<string, string>, labels: Map<string, stri
     at: row.receivedAt ?? row.foundAt, text: row.quote ?? row.stoppedReason,
     landedIn: landed, answerFrom, answerFromName: answerFrom ? firstNameOf(answerInbox?.name ?? "", answerFrom) : null,
     gmailUrl: landed && isGmail(inboxes.find((inbox) => inbox.address === landed)) ? gmailSearchUrl(landed, from) : null,
-    answeredAt: row.answeredAt, answeredBy: row.answeredBy, success: Boolean(row.successAt), successBy: row.successBy,
+    answeredAt: row.answeredAt, answeredBy: answeredByShown(row.answeredAt, row.answeredBy), success: Boolean(row.successAt), successBy: row.successBy,
     successLabel: labels.get(row.campaignKey) ?? "Interested replies", canMark: true,
   };
 }
@@ -244,7 +247,8 @@ export async function markReply(db: ProspectDb, id: string, mark: ReplyMark, by:
     await db.prepare(`UPDATE "OutreachReply" SET "answeredAt" = ?, "answeredBy" = ? WHERE "contactId" = ? AND "kind" = 'reply' AND "answeredAt" IS NULL
       AND ("id" = ? OR COALESCE("receivedAt","foundAt") <= ?)`).bind(at, who, row.contactId, id, row.receivedAt ?? row.foundAt).run();
   } else if (mark.answered === false) {
-    await db.prepare(`UPDATE "OutreachReply" SET "answeredAt" = NULL, "answeredBy" = NULL WHERE "id" = ?`).bind(id).run();
+    // Remembers when it was said, so the reply check doesn't mark it answered again from the same sent message.
+    await db.prepare(`UPDATE "OutreachReply" SET "answeredAt" = NULL, "answeredBy" = ? WHERE "id" = ?`).bind(notAnsweredMark(now), id).run();
   }
   if (mark.success === true) {
     if (row.kind !== "reply") return { ok: false, why: "Only a person's reply can count toward the success number." };

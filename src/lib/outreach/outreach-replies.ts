@@ -10,10 +10,13 @@
  * - Both founders get one email per run listing the new replies, what they said and which inbox to answer
  *   from. It goes before anything is marked as told, so a failed email is retried next hour.
  * - An inbox that can't be opened is read from where it left off next time; the run says so.
+ * - A reply one of us has since answered from Gmail is marked answered (outreach-answered.ts), so "To answer"
+ *   never waits on someone pressing the button.
  */
 import { SHARED_MAIL_DOMAINS, domainOf, torontoDay } from "@/lib/fcc-campaign-sender";
 import type { FccInboxMessage, FccOwnerMail, FccReplyInbox } from "@/lib/fcc-campaign-replies";
 import { torontoMinute } from "@/lib/fcc-campaign-tick";
+import { markAnswered, readAnswers, repliesWaiting, type AnswersRead } from "@/lib/outreach/outreach-answered";
 import { suppress } from "@/lib/outreach/outreach-blocked";
 import { readKv, writeKv } from "@/lib/outreach/outreach-control";
 import { readCampaigns } from "@/lib/outreach/outreach-model";
@@ -36,7 +39,7 @@ export type OutreachReplyConfig = {
 };
 export type OutreachReplyResult =
   | { status: "SKIPPED"; reason: string }
-  | { status: "RAN"; messages: number; found: number; told: number; unreadInboxes: string[] };
+  | { status: "RAN"; messages: number; found: number; told: number; unreadInboxes: string[]; /** Replies marked answered because our answer was seen in the inbox. */ answered: number };
 
 type Contact = { id: string; campaignKey: string; email: string; status: string; firstSentAt: string; label: string };
 type Found = { id: string; contact: Contact; message: FccInboxMessage; kind: "reply" | "automatic" | "no_thanks"; quote: string; subject: string | null };
@@ -61,7 +64,7 @@ export async function runOutreachReplyCheck(db: ProspectDb, config: OutreachRepl
   const { results: untold } = await db.prepare(`SELECT r."id", r."inbox", r."fromAddress", r."receivedAt", r."subject", r."quote", r."kind", c."id" AS contactId
     FROM "OutreachReply" r JOIN "OutreachContact" c ON c."id" = r."contactId" WHERE r."toldFoundersAt" IS NULL`).bind()
     .all<{ id: string; inbox: string; fromAddress: string; receivedAt: string | null; subject: string | null; quote: string | null; kind: Found["kind"]; contactId: string }>();
-  if (contacts.length === 0 && untold.length === 0) return { status: "RAN", messages: 0, found: 0, told: 0, unreadInboxes: [] };
+  if (contacts.length === 0 && untold.length === 0) return { status: "RAN", messages: 0, found: 0, told: 0, unreadInboxes: [], answered: 0 };
 
   const state = (await readKv<{ inboxes: Record<string, string> }>(db, STATE)) ?? { inboxes: {} };
   const earliest = contacts.reduce((min, contact) => (contact.firstSentAt < min ? contact.firstSentAt : min), contacts[0]?.firstSentAt ?? now.toISOString());
@@ -79,6 +82,10 @@ export async function runOutreachReplyCheck(db: ProspectDb, config: OutreachRepl
     if (!SHARED_MAIL_DOMAINS.has(domain)) add(byDomain, domain, contact);
   }
   const campaigns = new Map((await readCampaigns(db)).map((campaign) => [campaign.key, campaign]));
+
+  // Real replies nobody has answered yet: has one of us answered since?
+  const waiting = await repliesWaiting(db);
+  const answers: AnswersRead = { replyIds: new Map(), sent: [] };
 
   const unreadInboxes: string[] = [];
   const found: Found[] = [];
@@ -103,6 +110,11 @@ export async function runOutreachReplyCheck(db: ProspectDb, config: OutreachRepl
         }
       }
       readAt[address] = now.toISOString();
+      // Read-only like the rest. If it fails, the replies were still read: the answers are looked for again next hour.
+      await readAnswers(inbox, address, waiting).then((read) => {
+        for (const [id, messageId] of read.replyIds) answers.replyIds.set(id, messageId);
+        answers.sent.push(...read.sent);
+      }).catch(() => undefined);
     } catch {
       unreadInboxes.push(address);
     } finally {
@@ -131,6 +143,8 @@ export async function runOutreachReplyCheck(db: ProspectDb, config: OutreachRepl
     }
   }
 
+  const answered = await markAnswered(db, waiting, answers, config.inboxes.map((entry) => entry.address)).catch(() => 0);
+
   // Tell both founders about every real reply not told yet (this run's and any an earlier failed email missed).
   const { results: toTell } = await db.prepare(`SELECT r."id", r."campaignKey", r."inbox", r."fromAddress", r."receivedAt", r."quote", r."kind",
       COALESCE(json_extract(c."fieldsJson", '$.city'), json_extract(c."fieldsJson", '$.company'), c."email") AS label, c."senderAddress" AS sender
@@ -145,7 +159,7 @@ export async function runOutreachReplyCheck(db: ProspectDb, config: OutreachRepl
   await db.prepare(`UPDATE "OutreachReply" SET "toldFoundersAt" = ? WHERE "toldFoundersAt" IS NULL`).bind(now.toISOString()).run();
   // The health check reads `at` (a check older than 2 hours alarms) and `unread` (an inbox that couldn't be opened).
   await writeKv(db, STATE, { inboxes: { ...state.inboxes, ...readAt }, at: now.toISOString(), unread: unreadInboxes }, now);
-  return { status: "RAN", messages, found: found.length, told, unreadInboxes };
+  return { status: "RAN", messages, found: found.length, told, unreadInboxes, answered };
 }
 
 function foundersMail(rows: Array<{ campaign: string; label: string; fromAddress: string; inbox: string; receivedAt: string | null; quote: string | null; kind: string; sender: string | null }>, screenUrl: string): FccOwnerMail {

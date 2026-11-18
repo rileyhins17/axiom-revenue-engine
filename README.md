@@ -17,8 +17,10 @@ Phone tabs (the founders mostly use an iPhone): **Today**, **Replies**, **Campai
   row, and this week's numbers. With nothing to do it says so and when the next email goes.
 - **Replies**: everyone who wrote back, newest first, with what they said, which inbox to answer
   from and a link that searches that Gmail inbox. Filters: To answer, Answered, No thanks,
-  Automatic, All, and by campaign. A founder marks a reply answered, and marks the ones that
-  count toward the campaign's success number (cities: price requests).
+  Automatic, All, and by campaign. The hourly reply check marks a reply answered once it sees
+  a founder's answer in that thread in the inbox ("seen in Sent"); a founder can also mark or
+  un-mark it by hand, and marks the ones that count toward the campaign's success number
+  (cities: price requests).
 - **Campaigns**: every campaign with today, what waits and its results. A campaign's page leads
   with its batches (waiting for approval, sending, done), then numbers, the words, schedule and
   limits, a search of its people, and Load a list. A batch's page shows 10 sample emails exactly

@@ -58,7 +58,7 @@ export default async function RepliesPage({ searchParams }: { searchParams: Prom
 
   return <OwnerPage>
     <PageHeader eyebrow="Replies" title="Replies"
-      description="Everyone who wrote back to any campaign, newest first. Answer from the inbox that sent them the email, so the thread holds; then mark it answered here." />
+      description="Everyone who wrote back to any campaign, newest first. Answer from the inbox that sent them the email, so the thread holds. The hourly inbox check marks it answered once it sees your answer; you can also mark it here." />
 
     <div className="space-y-2.5">
       {fcc ? null : <Chips label="Kind of reply" items={FILTER_ORDER.map((name) => ({ href: href(name, campaign), text: FILTER_TEXT[name], count: list.counts[name], active: name === filter }))} />}

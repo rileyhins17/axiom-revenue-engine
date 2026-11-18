@@ -515,7 +515,7 @@ test("list_replies and get_reply: the filters, one campaign, FCC's ended replies
   const one = (await s.call("get_reply", { id: `${RILEY}:[Gmail]/All Mail:9001:c2` })).data;
   assert.equal(one.reply.text, "Yes please, send the full report. What would the fixes cost?");
   assert.deepEqual([one.reply.person, one.reply.organisation, one.reply.from, one.reply.landedIn, one.reply.answerFrom, one.reply.atToronto], ["Sam", "Maplewood Springs", "sam@maplewoodsprings.example", RILEY, RILEY, "Fri Nov 13, 11:30 a.m."]);
-  assert.equal(one.howToAnswer, `Riley answers from ${RILEY}, the inbox that sent the email, so the thread holds. Then mark it answered with mark_reply_answered.`);
+  assert.equal(one.howToAnswer, `Riley answers from ${RILEY}, the inbox that sent the email, so the thread holds. The hourly inbox check marks it answered once it sees that answer in the inbox; mark_reply_answered does it sooner.`);
   assert.equal((await s.call("get_reply", { id: "fcc:pat@haldentelecom.example" })).data.reply.text, 'They wrote back: "We already filed this ourselves."');
   assert.equal((await s.call("get_reply", { id: "contact:nobody" })).text, "There's no such reply. Use an id from list_replies.");
 });

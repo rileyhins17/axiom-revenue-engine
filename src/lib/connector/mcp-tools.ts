@@ -377,7 +377,7 @@ export const TOOLS: Tool[] = [
       return {
         reply: replyLine(reply),
         howToAnswer: reply.answerFrom
-          ? `${reply.answerFromName ?? "The inbox's owner"} answers from ${reply.answerFrom}, the inbox that sent the email, so the thread holds. Then mark it answered with mark_reply_answered.`
+          ? `${reply.answerFromName ?? "The inbox's owner"} answers from ${reply.answerFrom}, the inbox that sent the email, so the thread holds. The hourly inbox check marks it answered once it sees that answer in the inbox; mark_reply_answered does it sooner.`
           : "This reply is kept to read. It has no inbox on file to answer from.",
       };
     },
@@ -495,7 +495,7 @@ export const TOOLS: Tool[] = [
     }, ["id"]),
     args: z.object({ id: replyArg, answered: z.boolean().optional(), success: z.boolean().optional() }).strict(),
     target: (a) => ({ kind: "reply", id: a.id }),
-    description: "The Replies screen's marks: mark a reply answered once a founder has written back from their inbox, and optionally mark it as one that counts toward the campaign's success number. It changes only those marks: no email is sent and nobody's mail is touched. Mark a reply answered only when the founder says they answered it.",
+    description: "The Replies screen's marks: mark a reply answered once a founder has written back from their inbox, and optionally mark it as one that counts toward the campaign's success number. It changes only those marks: no email is sent and nobody's mail is touched. The hourly inbox check already marks a reply answered when it sees the founder's answer in the inbox (shown as 'seen in Sent'), so this is for the ones it can't see. Mark a reply answered only when the founder says they answered it.",
     run: async (a, t) => {
       const result = await markReply(t.db, a.id, { ...(a.answered !== undefined ? { answered: a.answered } : a.success === undefined ? { answered: true } : {}), ...(a.success === undefined ? {} : { success: a.success }) }, t.founder, t.now);
       if (!result.ok) throw new ToolError(result.why);

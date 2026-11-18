@@ -37,7 +37,18 @@ export type FccReplyInbox = {
   messagesSince(sinceIso: string, notFrom: string[]): Promise<FccInboxMessage[]>;
   /** The start of what the message says, without the quoted email under it. */
   replyText(message: FccInboxMessage): Promise<string>;
+  /** The Message-ID of each of these messages still in its folder, keyed `folder:uid`. Read-only. */
+  messageIds?(messages: Array<{ folder: string; uid: number }>): Promise<Map<string, string>>;
+  /** Mail in this mailbox addressed (To or Cc) to any of `to`, from `sinceIso`'s day on: what we sent them. Read-only. */
+  mailTo?(sinceIso: string, to: string[]): Promise<FccSentMessage[]>;
   close(): Promise<void>;
+};
+
+/** One message we sent, as far as its headers say: who sent it, to whom, when, and the thread it sits in. */
+export type FccSentMessage = {
+  from: string; to: string[]; date: string | null; messageId: string;
+  /** Every Message-ID in its In-Reply-To and References headers. */
+  references: string[];
 };
 
 export type FccOwnerMail = { subject: string; text: string; html: string };
@@ -210,6 +221,16 @@ export function senderAddress(from: string) {
   return match ? match[1]!.toLowerCase() : "";
 }
 
+/** Every `<id>` in a Message-ID, In-Reply-To or References header. */
+export function messageIdsIn(value: string) {
+  return value.match(/<[^<>\s]+>/g) ?? [];
+}
+
+/** Every email address in a To or Cc header, lower case. */
+export function addressesIn(value: string) {
+  return (value.match(/[^\s<>"',;:()]+@[^\s<>"',;:()]+/g) ?? []).map((address) => address.toLowerCase());
+}
+
 /** Out-of-office and other machine replies. */
 export function isAutomaticReply(headers: string) {
   const autoSubmitted = headerValue(headers, "auto-submitted").toLowerCase();
@@ -291,6 +312,8 @@ export async function fccReplyInboxFromImap(session: ImapSession): Promise<FccRe
   const boxes = await session.listMailboxes();
   const withFlag = (flag: string) => boxes.find((box) => box.flags.some((value) => value.toLowerCase() === flag))?.name;
   const folders = [withFlag("\\all") ?? "INBOX", withFlag("\\junk")].filter((name): name is string => Boolean(name));
+  // Where our own sent mail is: Gmail keeps it in All Mail; elsewhere it is the Sent folder.
+  const sentFolder = withFlag("\\all") ?? withFlag("\\sent");
   let open = "";
   const examine = async (folder: string) => {
     if (open === folder) return;
@@ -317,6 +340,44 @@ export async function fccReplyInboxFromImap(session: ImapSession): Promise<FccRe
       await examine(message.folder);
       const [item] = await session.uidFetch([message.uid], "BODY.PEEK[HEADER.FIELDS (CONTENT-TYPE CONTENT-TRANSFER-ENCODING)] BODY.PEEK[TEXT]<0.4000>");
       return item ? replyQuote(item.sections.HEADER ?? "", item.sections.TEXT ?? "") : "";
+    },
+    async messageIds(messages) {
+      const ids = new Map<string, string>();
+      // The folder that is already open goes first, so a run changes folder as little as it can.
+      const wanted = folders.filter((folder) => messages.some((message) => message.folder === folder)).sort((a, b) => Number(b === open) - Number(a === open));
+      for (const folder of wanted) {
+        await examine(folder);
+        for (const item of await session.uidFetch(messages.filter((message) => message.folder === folder).map((message) => message.uid), "BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)]")) {
+          const [id] = messageIdsIn(headerValue(item.sections.HEADER ?? "", "message-id"));
+          if (id) ids.set(`${folder}:${item.uid}`, id);
+        }
+      }
+      return ids;
+    },
+    async mailTo(sinceIso, to) {
+      const found: FccSentMessage[] = [];
+      if (!sentFolder || to.length === 0) return found;
+      await examine(sentFolder);
+      const uids = new Set<number>();
+      // One search per 25 addresses: OR TO "a" OR TO "b" TO "c".
+      for (let start = 0; start < to.length; start += 25) {
+        const keys = to.slice(start, start + 25).map((address) => `TO ${imapQuote(address)}`);
+        const any = [...keys.slice(0, -1).map((key) => `OR ${key}`), keys[keys.length - 1]].join(" ");
+        for (const uid of await session.uidSearch(`SINCE ${imapDate(sinceIso)} ${any}`)) uids.add(uid);
+      }
+      for (const item of await session.uidFetch([...uids], "BODY.PEEK[HEADER.FIELDS (FROM TO CC DATE MESSAGE-ID IN-REPLY-TO REFERENCES)]")) {
+        const headers = item.sections.HEADER ?? "";
+        const from = senderAddress(headerValue(headers, "from"));
+        const [messageId] = messageIdsIn(headerValue(headers, "message-id"));
+        const date = Date.parse(headerValue(headers, "date"));
+        if (!from || !messageId) continue;
+        found.push({
+          from, messageId, date: Number.isNaN(date) ? null : new Date(date).toISOString(),
+          to: addressesIn(`${headerValue(headers, "to")} ${headerValue(headers, "cc")}`),
+          references: [...new Set(messageIdsIn(`${headerValue(headers, "in-reply-to")} ${headerValue(headers, "references")}`))],
+        });
+      }
+      return found;
     },
     close: () => session.close(),
   };
