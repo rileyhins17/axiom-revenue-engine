@@ -1,4 +1,4 @@
-import { getPrisma } from "@/lib/prisma";
+import { getDatabase } from "@/lib/cloudflare";
 
 type AuditEventInput = {
   action: string;
@@ -11,17 +11,17 @@ type AuditEventInput = {
 
 export async function writeAuditEvent(input: AuditEventInput): Promise<void> {
   try {
-    const prisma = getPrisma();
-    await prisma.auditEvent.create({
-      data: {
-        action: input.action,
-        actorUserId: input.actorUserId ?? null,
-        targetType: input.targetType ?? null,
-        targetId: input.targetId ?? null,
-        ipAddress: input.ipAddress ?? null,
-        metadata: input.metadata ? JSON.stringify(input.metadata) : null,
-      },
-    });
+    await getDatabase().prepare(`INSERT INTO "AuditEvent" ("id","actorUserId","action","targetType","targetId","ipAddress","metadata") VALUES (?,?,?,?,?,?,?)`)
+      .bind(
+        crypto.randomUUID(),
+        input.actorUserId ?? null,
+        input.action,
+        input.targetType ?? null,
+        input.targetId ?? null,
+        input.ipAddress ?? null,
+        input.metadata ? JSON.stringify(input.metadata) : null,
+      )
+      .run();
   } catch (error) {
     console.error("[AUDIT_WRITE_FAILED]", error);
   }

@@ -1,2 +1,3 @@
-console.error("Remote database migration is blocked: this checkout still targets the legacy production D1 database. No database command was attempted.");
+// Live migrations run only inside scripts/release-production.mjs, after its backup.
+console.error("Remote database migrations are blocked. They run only inside scripts/release-production.mjs, after a fresh backup. No database command was attempted.");
 process.exitCode = 1;

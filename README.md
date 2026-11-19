@@ -1,142 +1,95 @@
-# Axiom Pipeline Engine
+# Axiom Revenue Engine
 
-Private Axiom operations app for lead intake, enrichment, autonomous first-touch outreach, reply tracking, and CRM movement.
+Axiom's outreach sender and reply catcher. Every campaign (US cities and counties, school
+districts, and whatever list comes next) goes from the founders' Gmail inboxes on weekdays,
+follows up in the same thread, reads the inboxes for replies and bounces, pauses itself when
+something looks wrong, and shows Riley and Aidan what needs them at
+[operations.getaxiom.ca](https://operations.getaxiom.ca). FCC, the first campaign, ended on
+Nov 12, 2026; its record is kept as an archive ([ADR 0066](docs/adr/0066-outreach-first-engine.md)).
 
-The product direction, production baseline, target architecture, conversion strategy, safety gates, and staged root rebuild are documented in [`docs/AXIOM_REBUILD_BLUEPRINT.md`](docs/AXIOM_REBUILD_BLUEPRINT.md).
+## Screens
 
-The live app runs at `https://operations.getaxiom.ca`. The Cloudflare Worker and D1 resources still use the legacy resource name `axiom-ops-omniscient` so the production domain, bindings, and database stay stable. The npm package name is `axiom-pipeline-engine`.
+Phone tabs (the founders mostly use an iPhone): **Today**, **Replies**, **Campaigns**, **More**.
 
-## Current Production Shape
+- **Today**: what needs you, most urgent first, each with one button: a campaign that paused
+  itself, replies to answer, batches waiting for your Approve (only the campaign's approver gets
+  the card), an inbox resting for the day. Then emails sent today per inbox, each campaign's
+  row, and this week's numbers. With nothing to do it says so and when the next email goes.
+- **Replies**: everyone who wrote back, newest first, with what they said, which inbox to answer
+  from and a link that searches that Gmail inbox. Filters: To answer, Answered, No thanks,
+  Automatic, All, and by campaign. The hourly reply check marks a reply answered once it sees
+  a founder's answer in that thread in the inbox ("seen in Sent"); a founder can also mark or
+  un-mark it by hand, and marks the ones that count toward the campaign's success number
+  (cities: price requests).
+- **Campaigns**: every campaign with today, what waits and its results. A campaign's page leads
+  with its batches (waiting for approval, sending, done), then numbers, the words, schedule and
+  limits, a search of its people, and Load a list. A batch's page shows 10 sample emails exactly
+  as they go out and every held row; Approve is pinned to the bottom and asks once more.
+- **More → Inboxes**: each sending inbox today: sent of its safe amount, bounces, resting or
+  not, when the next email goes, the last reply check, which campaigns use it. Read-only.
+- **More → Do-not-email list**: is an address or a domain blocked, why, when, in which campaign.
+- **More → FCC archive**: FCC's all-time numbers, read-only.
+- **More → Settings**: your account, profile picture, the iPhone home-screen app, and the Claude connector (make or turn off your key).
 
-- Next.js 16 app deployed to Cloudflare Workers through OpenNext.
-- Cloudflare D1 is the production database. SQL migrations live in `migrations/`.
-- Cloudflare Browser Rendering powers cloud scraping. Local dev can fall back to Playwright.
-- Better Auth gates the app and API. Admin-only routes protect export, settings, and automation controls.
-- Gmail OAuth connections are used by the sending engine. Tests and local verification must not send mail or call inbox actions.
-- The autonomous pipeline is first-touch only right now. Follow-ups are intentionally paused in settings and capped at zero in `wrangler.jsonc`.
+Sign-in is by a 6-digit code emailed to Riley's or Aidan's own inbox. Nobody else
+can sign in. The screens follow the phone's light or dark setting.
 
-## Main Surfaces
+## How sending works
 
-- `/dashboard` - operator command center: send capacity, queue load, next effective sends, recent sends, and lead supply.
-- `/automation` - sending console: mailbox readiness, first-touch queue, sent log, diagnostics, intake pause, and emergency stop.
-- `/vault` - source of truth for leads, filtering, CSV export, and manual lead entry.
-- `/clients` - reply and deal pipeline board.
-- `/settings` - authenticated operator profile and mailbox/runtime visibility.
+Read [the campaigns runbook](docs/runbooks/CAMPAIGNS.md) before changing anything about sending. In short:
 
-## Pipeline Rules
+- Nothing goes to anyone until the campaign is live and the contact's batch was approved by the
+  campaign's named approver, for exactly the words it was approved on.
+- A tick runs every minute in the send hours. Each inbox sends one email at a time, 1 to 3
+  minutes apart, never above its safe daily amount for all campaigns together: half before
+  12:30, the rest only if that inbox had 1 bounce or fewer.
+- Follow-ups go before first emails, in the same thread, from the same inbox.
+- Before every email: the do-not-email list, and whether anyone at the organisation replied.
+- A campaign pauses itself when 3 of its own emails bounce in a day, on a Google warning, or
+  when Gmail refuses a send or a login. An inbox with 3 bounces in a day rests until morning.
+- Every hour from 7:00 to 21:00 the inboxes are read for replies (read-only), and both
+  founders get one email per hour that found real ones.
+- Every 15 minutes a health check emails both founders about an automatic pause, an inbox
+  resting, a live campaign that is silent, or a reply check that stopped. On Mondays at 8:00
+  both get last week's numbers for every campaign.
 
-Autonomous outreach should only send to qualified recipients:
+FCC's own sender ([its runbook](docs/runbooks/FCC_CAMPAIGN.md)) is still in the code, paused for good.
 
-- owner email confidence must be at least `0.50`
-- staff email confidence must be at least `0.65`
-- generic, role, scraper-artifact, and malformed addresses are blocked
-- chain/non-customer entities and businesses with >800 reviews are hard-disqualified before autonomous send
-- follow-up sends remain disabled until deliberately re-enabled
+## Code
 
-The dashboard and automation queue show projected effective send times based on mailbox cooldown and capacity. They should not show stale scheduled dates as if they were live next-send times.
+| What | Where |
+| --- | --- |
+| Worker entry: schedules, request time limit, alert emails | `worker.mjs` |
+| FCC (ended): wording and versions | `src/lib/fcc-campaign.ts` |
+| FCC (ended): who got what, and when | `src/lib/fcc-campaign-sender.ts`, `src/lib/fcc-campaign-tick.ts` |
+| Reply checks | `src/lib/outreach/outreach-replies.ts` (hourly, campaigns), `src/lib/fcc-campaign-replies.ts` (daily, FCC) |
+| Monday numbers email | `src/lib/fcc-weekly-numbers.ts` (every campaign; the name is from FCC's days) |
+| Campaigns: lists, words, inbox limits, sending | `src/lib/outreach/` |
+| What Today, Replies, Inboxes and the do-not-email list show | `src/lib/outreach/outreach-today.ts`, `outreach-reply-list.ts`, `outreach-inbox-health.ts`, `outreach-lookup.ts`, `outreach-week.ts` |
+| Health check | `src/lib/ops/health.ts` |
+| Local preview with made-up data | `scripts/demo-data.ts`, `docs/runbooks/LOCAL_PREVIEW.md` |
+| Gmail over SMTP and IMAP | `src/lib/revenue-engine/smtp-client.ts`, `imap-client.ts` |
+| Screens | `src/app/dashboard` (Today), `replies`, `campaigns`, `inboxes`, `do-not-email`, `fcc` (archive), `settings`; building blocks in `src/components/owner/kit.tsx` |
+| Claude connector: a founder's Claude reads the engine and can run a campaign for them, approvals included (`docs/runbooks/CLAUDE_CONNECTOR.md`) | `src/lib/connector/`, `src/app/api/mcp` |
+| Contact lists, go and pause SQL | `scripts/fcc-campaign.ts`, `scripts/outreach.ts` |
+| Database changes | `migrations/` (next free number: 0093) |
 
-## Operator interface
-
-The Ops 04 interface is built for dense, repeated operational work: calm graphite surfaces, one mint status accent, shared page headers, compact metrics, keyboard search, responsive mobile navigation, and reduced-motion support. Authentication, Vault, Clients, Automation, and Settings use the same visual hierarchy and error language.
-
-The interface is deliberately restrained. Status colour communicates meaning; decorative animation does not compete with queue health, send safety, replies, or revenue signals.
-
-## Local Setup
-
-```bash
-npm install
-copy .env.example .env.development
-copy .dev.vars.example .dev.vars
-npm run db:migrate:local
-npm run dev
-```
-
-Open `http://localhost:3000/sign-in`.
-
-Use `npm run preview` only when you need a Cloudflare-shaped local run with OpenNext bindings and local D1.
-
-## Environment
-
-Required app/runtime values:
-
-- `APP_BASE_URL`
-- `BETTER_AUTH_SECRET`
-- `AUTH_ALLOWED_EMAILS`
-- `AUTH_ADMIN_EMAILS`
-- `MCP_API_TOKEN`
-
-Server-only secrets:
-
-- `GEMINI_API_KEY`
-- Gmail OAuth client secrets used by the existing auth/Gmail flow
-
-Operational controls in `wrangler.jsonc`:
-
-- `AUTONOMOUS_INTAKE_ENABLED`
-- `AUTONOMOUS_QUEUE_ENABLED`
-- `AUTONOMOUS_SEND_ENABLED`
-- `AUTONOMOUS_MAX_SENDS_PER_DAY`
-- `AUTONOMOUS_MAX_FOLLOW_UP_SENDS_PER_DAY`
-- scrape/runtime rate limits
-
-## Cloudflare Operations
-
-Production deploy and remote migration commands are intentionally blocked while
-the configured Worker and D1 still point at the legacy production resources.
-Use local migrations and dry-run checks for development; production release
-requires an isolated target and a separately verified release path.
-
-Remote migrations are blocked until production has an isolated D1 target and a
-verified backup and rollback path. `npm run db:migrate:remote` currently exits
-before invoking Wrangler.
-
-Use `npm run db:migrate:local` for local development.
-
-Generate Cloudflare types:
+## Working on it
 
 ```bash
-npm run cf:typegen
-```
-
-Build for Cloudflare:
-
-```bash
-npm run build:cloudflare
-```
-
-Production deployment is blocked until the Worker and D1 target are isolated
-and the release gate is verified. `npm run deploy` currently exits before
-invoking Wrangler.
-
-Use dry-run deploy checks for release validation.
-
-Check recent deployments:
-
-```bash
-npx wrangler deployments list --json
-```
-
-Do not run live cron, scheduler, Gmail send, or inbox-sync actions as a test. Use unit tests, typecheck, lint, build, and dry-run deploy checks for maintenance work.
-
-## Verification
-
-Run these before merging operational changes:
-
-```bash
+npm ci
 npm test
 npm run typecheck
 npm run lint
 npm run build:cloudflare
-npx wrangler deploy --dry-run --autoconfig false
-npm audit --omit=dev
 ```
 
-`npm run typecheck` clears stale generated Next route types before TypeScript runs. This prevents deleted routes from poisoning source-only checks.
+The live branch is `codex/revenue-engine-production`; `main` is months behind and
+must not be deployed. Releases go only through `scripts/release-production.mjs`
+(fresh backup, live-settings check, smoke test, automatic rollback), after the day's
+last send. Each release is written up at the top of [docs/STATUS.md](docs/STATUS.md).
+Lessons that cost time are in [docs/GOTCHAS.md](docs/GOTCHAS.md).
 
-## Notes For Maintainers
-
-- Keep production secrets out of Git. Use Cloudflare secrets or local `.dev.vars`.
-- Keep autonomous send policy and dashboard SQL predicates aligned.
-- If a feature is removed from the API, remove matching UI buttons, command-palette entries, cron budget fields, tests, and README references in the same change.
-- Prefer CSV export. XLSX export was removed to reduce dependency weight and the transitive `uuid` audit surface.
-- Cloudflare may print "preview database" for D1 because the configured preview and production D1 IDs are the same. Verify `served_by: v3-prod` in command metadata when checking production D1.
+This repository is public. Contact lists, the mailing address and app passwords
+never go in it: they live in the gitignored `outreach/` folder or in Cloudflare's
+secret store.

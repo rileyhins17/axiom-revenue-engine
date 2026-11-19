@@ -27,7 +27,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 /**
  * Serves an iOS Configuration Profile (.mobileconfig) that installs the
- * Axiom Pipeline Engine as a full-screen Home Screen Web Clip — custom icon,
+ * Axiom Revenue Engine as a full-screen Home Screen Web Clip — custom icon,
  * no Safari address bar. The clip URL is always the canonical APP_BASE_URL, so
  * it can never point at a stale/404 path (the failure mode of hand-rolled
  * profiles from third-party generators).
@@ -64,11 +64,11 @@ export async function GET() {
 ${iconEntry}      <key>IsRemovable</key>
       <true/>
       <key>Label</key>
-      <string>Axiom Ops</string>
+      <string>Axiom Revenue</string>
       <key>PayloadDescription</key>
-      <string>Adds the Axiom Pipeline Engine to your Home Screen.</string>
+      <string>Adds the Axiom Revenue Engine to your Home Screen.</string>
       <key>PayloadDisplayName</key>
-      <string>Axiom Ops Web Clip</string>
+      <string>Axiom Revenue Web Clip</string>
       <key>PayloadIdentifier</key>
       <string>${WEBCLIP_IDENTIFIER}</string>
       <key>PayloadType</key>
@@ -84,9 +84,9 @@ ${iconEntry}      <key>IsRemovable</key>
     </dict>
   </array>
   <key>PayloadDescription</key>
-  <string>Installs the Axiom Pipeline Engine as a full-screen Home Screen app.</string>
+  <string>Installs the Axiom Revenue Engine as a full-screen Home Screen app.</string>
   <key>PayloadDisplayName</key>
-  <string>Axiom Pipeline Engine</string>
+  <string>Axiom Revenue Engine</string>
   <key>PayloadIdentifier</key>
   <string>${PROFILE_IDENTIFIER}</string>
   <key>PayloadRemovalDisallowed</key>

@@ -1,0 +1,55 @@
+// The live config: the FCC email engine on the axiom-ops-omniscient Worker and D1.
+// Deployed only through scripts/release-production.mjs (backup, checks, auto-rollback).
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "axiom-ops-omniscient",
+  "account_id": "fe468a56a5b8c7f8fc5d39e265c2f791",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-16",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env",
+    "global_fetch_strictly_public"
+  ],
+  "minify": true,
+  // Some settings live only on the Worker. keep_vars stops a deploy from this file
+  // from silently removing them.
+  "keep_vars": true,
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [],
+  "send_email": [
+    { "name": "LOGIN_EMAIL", "allowed_destination_addresses": ["rileyhinsperger@gmail.com", "aidanmageebusiness@gmail.com"] }
+  ],
+  "triggers": {
+    "crons": ["*/15 * * * *", "* 14-19 * * *"]
+  },
+  "vars": {
+    "APP_BASE_URL": "https://operations.getaxiom.ca/",
+    "FCC_SENDER_ADDRESS": "aidanmageebusiness@gmail.com",
+    "FCC_SENDER_NAME": "Aidan Magee",
+    "FCC_SENDER2_ADDRESS": "rileyhinspergerbusiness@gmail.com",
+    "FCC_SENDER2_NAME": "Riley Hinsperger",
+    "FCC_SMTP_HOST": "smtp.gmail.com",
+    "FCC_IMAP_HOST": "imap.gmail.com",
+    "AUTH_PASSWORD_SIGNIN": "false",
+    "AUTH_ALLOWED_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
+    "AUTH_ADMIN_EMAILS": "aidan@getaxiom.ca,riley@getaxiom.ca",
+    "AUTH_ALLOWED_ORIGINS": "https://operations.getaxiom.ca,https://axiom-ops-omniscient.aidan-magee2.workers.dev",
+    "RATE_LIMIT_WINDOW_SECONDS": "60",
+    "RATE_LIMIT_MAX_AUTH": "50"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "axiom-ops-omniscient",
+      "database_id": "e42f3d48-5813-4d18-86c4-4471b55aa65e",
+      "migrations_dir": "./migrations"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Fraunces, Inter } from "next/font/google";
 
 import { AppShell } from "@/components/app-shell";
 import { PwaServiceWorker } from "@/components/pwa-service-worker";
@@ -8,14 +9,17 @@ import { PerformanceProvider } from "@/lib/ui/performance";
 
 import "./globals.css";
 
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap", axes: ["opsz"] });
+
 export const metadata: Metadata = {
-  title: "Axiom Pipeline Engine",
-  description: "Axiom Pipeline Engine for lead extraction, enrichment, outreach, and operations control.",
-  applicationName: "Axiom Pipeline Engine",
+  title: "Axiom Revenue Engine",
+  description: "Evidence-first lead quality, outreach review, and revenue operations for Axiom Web.",
+  applicationName: "Axiom Revenue Engine",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Axiom Ops",
+    title: "Axiom",
     statusBarStyle: "black-translucent",
   },
   icons: {
@@ -38,8 +42,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0a0b0e",
-  colorScheme: "dark",
+  // The bar behind the clock is obsidian in both appearances, so one theme colour serves both.
+  themeColor: "#0a0a0a",
+  // Dark follows the phone: see "Dark appearance" at the end of globals.css.
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({
@@ -48,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className={`${inter.variable} ${fraunces.variable}`}>
       <body className="font-sans antialiased">
         <PerformanceProvider>
           <TooltipProvider delayDuration={0}>

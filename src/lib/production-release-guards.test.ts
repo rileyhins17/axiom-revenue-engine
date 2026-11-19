@@ -8,8 +8,8 @@ import assert from "node:assert/strict";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 for (const [script, expected] of [
-  ["scripts/production-deploy-guard.mjs", /legacy production Worker and D1 database/],
-  ["scripts/production-migration-guard.mjs", /legacy production D1 database/],
+  ["scripts/production-deploy-guard.mjs", /Plain deploys are blocked/],
+  ["scripts/production-migration-guard.mjs", /Remote database migrations are blocked/],
 ] as const) {
   test(`${script} fails closed before contacting Cloudflare`, () => {
     const result = spawnSync(process.execPath, [path.join(repoRoot, script)], { encoding: "utf8" });

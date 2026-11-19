@@ -1,63 +1,18 @@
-import { SettingsClient } from "./SettingsClient";
+import type { Metadata } from "next";
+import { headers } from "next/headers";
 
-import { getDatabase } from "@/lib/cloudflare";
-import { getServerEnv } from "@/lib/env";
-import { getAutomationSettings, syncMailboxesForGmailConnections } from "@/lib/outreach-automation";
-import { getPrisma } from "@/lib/prisma";
+import { SettingsAccount, SettingsConnector } from "./SettingsClient";
+
+import { OwnerPage, PageHeader } from "@/components/owner/kit";
+import { engineSetting } from "@/lib/engine-settings";
+import { ownerForAccount } from "@/lib/owner-login";
 import { requireSession } from "@/lib/session";
-import { isSendableMailbox } from "@/lib/ui/data-accuracy";
 
 export const dynamic = "force-dynamic";
-
-async function listConnectedMailboxes(): Promise<Array<{ gmailAddress: string; status: string | null; gmailConnectionId: string | null }>> {
-  const result = await getDatabase()
-    .prepare(
-      `SELECT LOWER("gmailAddress") AS gmailAddress, "status", "gmailConnectionId"
-       FROM "OutreachMailbox"
-       ORDER BY "updatedAt" DESC`,
-    )
-    .all<{ gmailAddress: string; status: string | null; gmailConnectionId: string | null }>();
-  return result.results ?? [];
-}
+export const metadata: Metadata = { title: "Settings | Axiom Revenue Engine" };
 
 export default async function SettingsPage() {
   const session = await requireSession();
-  const env = getServerEnv();
-  const prisma = getPrisma();
-  const automationSettings = await getAutomationSettings(prisma).catch(() => ({
-    emergencyPaused: false,
-    emergencyPausedAt: null,
-    emergencyPausedBy: null,
-    emergencyPauseReason: null,
-  }));
-
-  const [connections, syncedMailboxes, directMailboxes] = await Promise.all([
-    prisma.gmailConnection
-      .findMany({ select: { gmailAddress: true } })
-      .catch(() => [] as Array<{ gmailAddress: string }>),
-    syncMailboxesForGmailConnections().catch(
-      () => [] as Array<{ gmailAddress: string; status: string }>,
-    ),
-    listConnectedMailboxes().catch(() => [] as Array<{ gmailAddress: string; status: string | null; gmailConnectionId: string | null }>),
-  ]);
-
-  const connectedAddresses = new Set(
-    connections.map((connection) => connection.gmailAddress.toLowerCase()),
-  );
-
-  const expected = ["aidan@getaxiom.ca", "riley@getaxiom.ca"] as const;
-  const mailboxes = expected.map((email) => {
-    const synced = syncedMailboxes.find((m) => m.gmailAddress.toLowerCase() === email);
-    const direct = directMailboxes.find((m) => (m.gmailAddress || "").toLowerCase() === email);
-    const found = synced ?? direct;
-    return {
-      email,
-      connected: connectedAddresses.has(email) || Boolean(found && isSendableMailbox(found)),
-      status: found?.status ?? null,
-    };
-  });
-
-  const isAdmin = session.user.role === "admin";
 
   const userProfile = {
     id: session.user.id,
@@ -66,22 +21,17 @@ export default async function SettingsPage() {
     image: (session.user as Record<string, unknown>).image as string | null ?? null,
     role: session.user.role ?? "user",
   };
+  // The Claude connector's setup lines use this app's own address: the APP_BASE_URL setting, or the address the page was asked at.
+  const asked = await headers();
+  const host = asked.get("x-forwarded-host") ?? asked.get("host");
+  const baseUrl = (engineSetting("APP_BASE_URL") || (host ? `${asked.get("x-forwarded-proto") ?? "https"}://${host}` : "")).replace(/\/+$/, "");
+  const founder = ownerForAccount(session.user.email ?? "")?.name ?? null;
 
   return (
-    <SettingsClient
-      userProfile={userProfile}
-      isAdmin={isAdmin}
-      runtimeStatus={{
-        currentUserEmail: session.user.email,
-        globalDailySendCap: env.AUTONOMOUS_MAX_SENDS_PER_DAY,
-      }}
-      mailboxes={mailboxes}
-      emergencyControl={{
-        emergencyPaused: automationSettings.emergencyPaused,
-        emergencyPausedAt: automationSettings.emergencyPausedAt ? automationSettings.emergencyPausedAt.toISOString() : null,
-        emergencyPausedBy: automationSettings.emergencyPausedBy,
-        emergencyPauseReason: automationSettings.emergencyPauseReason,
-      }}
-    />
+    <OwnerPage>
+      <PageHeader eyebrow="Settings" title="Settings" description="Your account and the phone app. Campaigns are paused and resumed on their own screens." />
+      <SettingsAccount userProfile={userProfile} />
+      <SettingsConnector founder={founder} baseUrl={baseUrl} />
+    </OwnerPage>
   );
 }
