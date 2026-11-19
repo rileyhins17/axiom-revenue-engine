@@ -78,7 +78,8 @@ export async function loadList(db: ProspectDb, input: LoadInput, context: LoadCo
   if (mail.unreadable.length) return { ok: false, error: `Couldn't look up the mail servers of ${mail.unreadable.join(", ")}. Nothing was loaded; try again in a minute.` };
 
   const inboxes = await readInboxes(db);
-  const firstInbox = campaign.inboxes[0]?.address ?? "";
+  // The list-check samples are first emails: from the first inbox that sends new first emails (a share above 0).
+  const firstInbox = (campaign.inboxes.find((share) => share.perDay > 0) ?? campaign.inboxes[0])?.address ?? "";
   const sender: Sender = { name: inboxes.find((inbox) => inbox.address === firstInbox)?.name ?? "Axiom", address: firstInbox };
   const plan = planImport(withWords, table, {
     batchId: `b-${context.newId()}`, name, source: "the Campaigns screen", loadedBy: context.loadedBy, now: context.now, newId: context.newId,

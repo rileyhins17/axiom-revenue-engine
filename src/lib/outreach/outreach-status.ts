@@ -5,7 +5,7 @@
 import { torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
 import { torontoMinute } from "@/lib/fcc-campaign-tick";
 import { readCampaignRun, type RunNote } from "@/lib/outreach/outreach-control";
-import { inboxCapNow, inboxDayMax, inboxRef, inboxSentToday } from "@/lib/outreach/outreach-inboxes";
+import { inboxAllowance, inboxCapNow, inboxDayMax, inboxRef, inboxSentToday } from "@/lib/outreach/outreach-inboxes";
 import { readCampaign, readCampaigns, readInboxes, type Campaign, type Inbox } from "@/lib/outreach/outreach-model";
 import { withSignatures } from "@/lib/outreach/outreach-signature";
 import { renderEmail, type CampaignWords, type RenderedEmail } from "@/lib/outreach/outreach-words";
@@ -32,7 +32,11 @@ export type BatchDetail = BatchRow & {
 };
 export type FollowUpDay = { day: string; people: number };
 export type PersonRow = { email: string; label: string; at: string | null; note: string | null; inbox?: string | null };
-export type InboxToday = { address: string; name: string; perDay: number; sentByCampaign: number; inboxSent: number; inboxDayMax: number; inboxCapNow: number };
+/**
+ * One of a campaign's inboxes today. At a share (perDay) of 0 it sends no new first emails for the campaign, only the
+ * follow-ups it owes: mostToday is then the sender's ceiling for those, and owedDue how many are due now.
+ */
+export type InboxToday = { address: string; name: string; perDay: number; sentByCampaign: number; inboxSent: number; inboxDayMax: number; inboxCapNow: number; mostToday: number; owedDue: number };
 
 export type CampaignSummary = { campaign: Campaign; counts: CampaignCounts; lastRun: RunNote | null; nextSend: string };
 export type CampaignDetail = CampaignSummary & {
@@ -139,6 +143,11 @@ export async function campaignDetail(db: ProspectDb, key: string, fccFirstInbox:
       sentByCampaign: n((await db.prepare(`SELECT COUNT(*) AS n FROM "OutreachSend" WHERE "campaignKey" = ? AND "sendDay" = ? AND "senderAddress" = ? AND "kind" = 'real' AND "status" IN ('CLAIMED','SENT')`)
         .bind(key, day, share.address).first<{ n: number }>())?.n),
       inboxSent: await inboxSentToday(db, day, inboxRef(share.address, fccFirstInbox)), inboxDayMax: dayMax, inboxCapNow: inboxCapNow(dayMax, minute),
+      mostToday: inboxAllowance(share.perDay),
+      // Read only for a share of 0, where the follow-ups it owes are all the inbox sends for the campaign.
+      owedDue: share.perDay > 0 || campaign.followUps <= 0 ? 0 : n((await db.prepare(`SELECT COUNT(*) AS n FROM "OutreachContact"
+          WHERE "campaignKey" = ? AND "senderAddress" = ? AND "status" = 'sent' AND "stepsSent" >= 1 AND "nextDueDay" <= ? AND "firstMessageId" IS NOT NULL`)
+        .bind(key, share.address, day).first<{ n: number }>())?.n),
     };
   }));
   const { results: batches } = await db.prepare(`SELECT b."id", b."name", b."source", b."loadedBy", b."loadedAt", b."status", b."approvedBy", b."approvedAt", b."approvedWords", b."wordsVersion",
@@ -213,7 +222,9 @@ export async function batchReview(db: ProspectDb, batchId: string, mailingAddres
     try { words = JSON.parse(String(row.wordsJson)) as CampaignWords; } catch { words = { steps: [] }; }
   }
   const inboxes = await readInboxes(db);
-  const senders = campaign.inboxes.map((share) => inboxes.find((inbox) => inbox.address === share.address)).filter((inbox): inbox is Inbox => Boolean(inbox));
+  // Samples are first emails, so they come from the inboxes that send new first emails (a share above 0) when there is one.
+  const firstEmailShares = campaign.inboxes.filter((share) => share.perDay > 0);
+  const senders = (firstEmailShares.length ? firstEmailShares : campaign.inboxes).map((share) => inboxes.find((inbox) => inbox.address === share.address)).filter((inbox): inbox is Inbox => Boolean(inbox));
   const { results: ready } = await db.prepare(`SELECT "rowNumber","email","fieldsJson" FROM "OutreachContact" WHERE "batchId" = ? AND "status" IN ('ready','sent','done') ORDER BY "rowNumber" LIMIT ?`)
     .bind(batchId, size).all<{ rowNumber: number; email: string; fieldsJson: string }>();
   // Samples and test emails show exactly what goes out, the signature included.

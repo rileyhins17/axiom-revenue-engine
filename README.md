@@ -44,7 +44,8 @@ Read [the campaigns runbook](docs/runbooks/CAMPAIGNS.md) before changing anythin
   minutes apart, never above its safe daily amount for all campaigns together: half before
   12:30, the rest only if that inbox had 1 bounce or fewer.
 - Follow-ups go before first emails, in the same thread, from the same inbox. An inbox whose share
-  of a campaign is 0 sends no new first emails for it but still sends the follow-ups it owes.
+  of a campaign is 0 sends no new first emails for it but still sends the follow-ups it owes, up to 30 a day.
+  On a day it owes none, that inbox has nothing to do with the campaign. To stop them too, take the inbox off the campaign.
 - Before every email: the do-not-email list, and whether anyone at the organisation replied.
 - A campaign pauses itself when 3 of its own emails bounce in a day, on a Google warning, or
   when Gmail refuses a send or a login. An inbox with 3 bounces in a day rests until morning.

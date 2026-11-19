@@ -81,7 +81,9 @@ export async function runHealthChecks(db: ProspectDb, env: HealthEnv, now = new 
     const sendDay = campaign.sendDays.includes(torontoWeekday(now)) && (!campaign.startDay || torontoDay(now) >= campaign.startDay) && (!campaign.endDay || torontoDay(now) <= campaign.endDay);
     const quiet = sendDay && campaign.state === "live" && !campaign.problem && counts.ready + counts.followUpsDue > 0 && counts.sentToday === 0
       && minute >= campaign.windowStart + 60 && minute < campaign.windowEnd;
-    const silent = quiet && (await Promise.all(campaign.inboxes.map((entry) => hasRoom(entry.address)))).some(Boolean);
+    // An inbox at a share of 0 sends only the follow-ups it owes, so its room counts only when follow-ups are due.
+    const senders = campaign.inboxes.filter((entry) => entry.perDay > 0 || counts.followUpsDue > 0);
+    const silent = quiet && (await Promise.all(senders.map((entry) => hasRoom(entry.address)))).some(Boolean);
     add(`campaign-sending:${campaign.key}`, !silent,
       `No ${campaign.name} emails have gone out today, though it is live and ${counts.ready + counts.followUpsDue} ${counts.ready + counts.followUpsDue === 1 ? "is" : "are"} waiting.`,
       `Look at "Last check" on its Campaigns screen for the reason, then ask Claude to read the Worker logs.`);

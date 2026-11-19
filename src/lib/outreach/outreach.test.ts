@@ -13,7 +13,7 @@ import { parseCsv } from "@/lib/outreach/outreach-csv";
 import { importSql, importToDb, planImport } from "@/lib/outreach/outreach-import";
 import { inboxDayMax, inboxRef } from "@/lib/outreach/outreach-inboxes";
 import { readCampaign, readInboxes, type Inbox } from "@/lib/outreach/outreach-model";
-import { addBusinessDays, runOutreachTick, type OutreachInboxConfig, type OutreachTickResult } from "@/lib/outreach/outreach-sender";
+import { OWED_FOLLOW_UPS_PER_DAY, addBusinessDays, runOutreachTick, type OutreachInboxConfig, type OutreachTickResult } from "@/lib/outreach/outreach-sender";
 import { batchReview } from "@/lib/outreach/outreach-status";
 import { findLink, parseStepText, renderEmail, wordsVersion, type CampaignWords } from "@/lib/outreach/outreach-words";
 import { PermanentEmailError, type OutgoingEmail } from "@/lib/revenue-engine/engine-email";
@@ -360,11 +360,141 @@ test("an inbox whose share drops to 0 sends no new first emails but still sends 
   const fromAidan = later.sent.filter((send) => send.from === AIDAN);
   const fromRiley = later.sent.filter((send) => send.from === RILEY);
   assert.deepEqual(fromAidan.map((send) => send.to).sort(), ["clerk1@city1.gov", "clerk2@city2.gov", "clerk3@city3.gov", "clerk4@city4.gov"]);
-  assert.ok(fromAidan.every((send) => /^Re: /.test(send.subject) && send.headers["In-Reply-To"] === `<ax-us-cities-contact-${send.to.match(/clerk(\d)@/)![1]}-1@gmail.com>`),
+  const firstIdOf = (send: { to: string }) => `<ax-us-cities-contact-${send.to.match(/clerk(\d+)@/)![1]}-1@gmail.com>`;
+  assert.ok(fromAidan.every((send) => /^Re: /.test(send.subject) && send.headers["In-Reply-To"] === firstIdOf(send) && send.headers.References === firstIdOf(send)),
     "only follow-ups, each in its own thread");
   assert.deepEqual(fromRiley.map((send) => send.to).sort(), ["clerk5@city5.gov", "clerk6@city6.gov"]);
   assert.ok(fromRiley.every((send) => !send.headers["In-Reply-To"]), "the new first emails go from the inbox that has a share");
   assert.equal(count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact" WHERE "status" = 'done'`), 4, "the 4 owed follow-ups are sent and done");
+});
+
+test("a share of 0 never sends a first email: with follow-ups owed only they go, and with nothing owed the inbox has nothing to do with the campaign", async () => {
+  const zeroShare = JSON.stringify([{ address: AIDAN, perDay: 0 }]);
+  {
+    // Nothing owed, 4 first emails ready, and no other inbox on the campaign: a whole send day and nothing goes.
+    const { raw, db } = database();
+    await setUpCities(raw, db, { rows: 4 });
+    raw.prepare(`UPDATE "OutreachCampaign" SET "inboxesJson" = ? WHERE "key" = 'us-cities'`).run(zeroShare);
+    // A Google warning in that inbox pauses nothing either: on this day the campaign is none of its business.
+    const fake = fakeInbox({ warning: "Google sent a critical security alert" });
+    const { minute, run } = await harness(db, fake);
+    const result = await minute(MON_9AM);
+    assert.deepEqual(result[AIDAN]!.campaign, { status: "SKIPPED", reason: "no campaign sends from this inbox now" });
+    await run(MON_9AM, MON_9AM + 330 * MINUTE);
+    assert.equal(fake.sent.length, 0);
+    assert.equal((await readCampaign(db, "us-cities"))!.state, "live", "an inbox that owes the campaign nothing can't pause it");
+    assert.equal(count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact" WHERE "status" = 'ready'`), 4);
+  }
+  {
+    // 4 follow-ups owed and 2 new first emails ready, still no other inbox: the 4 follow-ups go, the 2 first emails wait.
+    const { raw, db } = database();
+    await setUpCities(raw, db, { rows: 4 });
+    const first = await harness(db, fakeInbox());
+    await first.run(MON_9AM, MON_9AM + 30 * MINUTE);
+    raw.prepare(`UPDATE "OutreachCampaign" SET "inboxesJson" = ? WHERE "key" = 'us-cities'`).run(zeroShare);
+    let ids = 100;
+    const plan = planImport((await readCampaign(db, "us-cities"))!, [HEADERS, cityRow(5), cityRow(6)].join("\n"), {
+      batchId: "batch-2", name: "Cities batch 2", loadedBy: "Riley's Claude", now: new Date("2026-11-10T15:00:00Z"), newId: () => `contact-${++ids}`,
+      sender: { name: "Aidan Magee", address: AIDAN }, mailingAddress: ADDRESS,
+    });
+    assert.deepEqual(plan.errors, []);
+    await importToDb(db, plan);
+    assert.deepEqual(await approveBatch(db, "batch-2", "Aidan", null, new Date("2026-11-10T16:00:00Z")), { ok: true });
+    const later = fakeInbox();
+    const second = await harness(db, later);
+    await second.run(Date.parse("2026-11-16T14:00:00Z"), Date.parse("2026-11-16T19:30:00Z"));
+    assert.deepEqual(later.sent.map((send) => send.to).sort(), ["clerk1@city1.gov", "clerk2@city2.gov", "clerk3@city3.gov", "clerk4@city4.gov"]);
+    assert.ok(later.sent.every((send) => /^Re: /.test(send.subject)), "follow-ups only");
+    assert.equal(count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact" WHERE "status" = 'ready' AND "batchId" = 'batch-2'`), 2, "the first emails wait for an inbox with a share");
+    // The day after, with nothing owed any more, the inbox is out of the campaign again.
+    await second.run(Date.parse("2026-11-17T14:00:00Z"), Date.parse("2026-11-17T19:30:00Z"));
+    assert.equal(later.sent.length, 4);
+  }
+  {
+    // The one minute a first email could slip out: every follow-up it owes turns out to be stopped (they wrote back),
+    // so the minute is free. It still sends no first email.
+    const { raw, db } = database();
+    await setUpCities(raw, db, { rows: 2 });
+    // One harness for both days, so its send ids carry on. A new one would start them again, and a first email's claim
+    // would then be dropped for reusing a Monday id, which would hide the very thing this checks.
+    const state = { replied: [] as string[] };
+    const fake = fakeInbox(state);
+    const both = await harness(db, fake);
+    await both.run(MON_9AM, MON_9AM + 30 * MINUTE);
+    assert.equal(fake.sent.length, 2);
+    raw.prepare(`UPDATE "OutreachCampaign" SET "inboxesJson" = ? WHERE "key" = 'us-cities'`).run(zeroShare);
+    let ids = 100;
+    const plan = planImport((await readCampaign(db, "us-cities"))!, [HEADERS, cityRow(5), cityRow(6)].join("\n"), {
+      batchId: "batch-2", name: "Cities batch 2", loadedBy: "Riley's Claude", now: new Date("2026-11-10T15:00:00Z"), newId: () => `contact-${++ids}`,
+      sender: { name: "Aidan Magee", address: AIDAN }, mailingAddress: ADDRESS,
+    });
+    assert.deepEqual(plan.errors, []);
+    await importToDb(db, plan);
+    assert.deepEqual(await approveBatch(db, "batch-2", "Aidan", null, new Date("2026-11-10T16:00:00Z")), { ok: true });
+    state.replied.push("clerk1@city1.gov", "clerk2@city2.gov");
+    fake.sent.length = 0;
+    await both.run(Date.parse("2026-11-16T14:00:00Z"), Date.parse("2026-11-16T19:30:00Z"));
+    assert.equal(fake.sent.length, 0, "both follow-ups were stopped by a reply, and no first email took the free minute");
+    assert.equal(count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact" WHERE "status" = 'replied'`), 2);
+    assert.equal(count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact" WHERE "status" = 'ready' AND "batchId" = 'batch-2'`), 2);
+  }
+  {
+    // While it owes a follow-up that is due, the campaign is the inbox's business like any other: a Google warning pauses it.
+    const { raw, db } = database();
+    await setUpCities(raw, db, { rows: 2 });
+    const first = await harness(db, fakeInbox());
+    await first.run(MON_9AM, MON_9AM + 30 * MINUTE);
+    raw.prepare(`UPDATE "OutreachCampaign" SET "inboxesJson" = ? WHERE "key" = 'us-cities'`).run(zeroShare);
+    const warned = fakeInbox({ warning: "Google sent a critical security alert" });
+    const { minute } = await harness(db, warned);
+    assert.equal((await minute(Date.parse("2026-11-16T14:00:00Z")))[AIDAN]!.campaign.status, "PAUSED");
+    assert.equal(warned.sent.length, 0);
+    assert.equal((await readCampaign(db, "us-cities"))!.state, "paused");
+  }
+});
+
+test("a share of 0 sends at most 30 owed follow-ups a day, and the rest the next send day", async () => {
+  const { raw, db } = database();
+  // 35 first emails in one day from Aidan's inbox: a daily limit of 60 and a share of 40 (the inbox's own day is 60).
+  raw.prepare(`UPDATE "OutreachCampaign" SET "dailyLimit" = 60, "inboxesJson" = ? WHERE "key" = 'us-cities'`).run(JSON.stringify([{ address: AIDAN, perDay: 40 }]));
+  await setUpCities(raw, db, { rows: 35 });
+  const fake = fakeInbox();
+  const first = await harness(db, fake);
+  await first.run(MON_9AM, MON_9AM + 330 * MINUTE);
+  assert.equal(fake.sent.length, 35);
+  raw.prepare(`UPDATE "OutreachCampaign" SET "inboxesJson" = ? WHERE "key" = 'us-cities'`).run(JSON.stringify([{ address: AIDAN, perDay: 0 }]));
+  // Mon Nov 16, the whole send day: all 35 are due, the campaign's 60 and the inbox's 60 have room, and still only 30 go.
+  const later = fakeInbox();
+  const second = await harness(db, later);
+  await second.run(Date.parse("2026-11-16T14:00:00Z"), Date.parse("2026-11-16T19:30:00Z"));
+  assert.equal(OWED_FOLLOW_UPS_PER_DAY, 30);
+  assert.equal(later.sent.length, 30, "30 owed follow-ups a day from an inbox at a share of 0");
+  assert.ok(later.sent.every((send) => /^Re: /.test(send.subject) && send.from === AIDAN));
+  // Tue Nov 17: the last 5.
+  await second.run(Date.parse("2026-11-17T14:00:00Z"), Date.parse("2026-11-17T19:30:00Z"));
+  assert.equal(later.sent.length, 35);
+  assert.equal(new Set(later.sent.map((send) => send.to)).size, 35, "each person gets one follow-up");
+  assert.equal(count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact" WHERE "status" = 'done'`), 35);
+});
+
+test("the stops that stay total: a daily limit of 0, a paused campaign, or an inbox the campaign no longer lists sends none of the follow-ups it owes", async () => {
+  const stops: Array<[string, (raw: Database.Database) => void]> = [
+    ["a daily limit of 0", (raw) => { raw.prepare(`UPDATE "OutreachCampaign" SET "dailyLimit" = 0, "inboxesJson" = ? WHERE "key" = 'us-cities'`).run(JSON.stringify([{ address: AIDAN, perDay: 0 }])); }],
+    ["paused", (raw) => { raw.prepare(`UPDATE "OutreachCampaign" SET "state" = 'paused', "inboxesJson" = ? WHERE "key" = 'us-cities'`).run(JSON.stringify([{ address: AIDAN, perDay: 0 }])); }],
+    ["the inbox is off the campaign's list", (raw) => { raw.prepare(`UPDATE "OutreachCampaign" SET "inboxesJson" = ? WHERE "key" = 'us-cities'`).run(JSON.stringify([{ address: RILEY, perDay: 30 }])); }],
+  ];
+  for (const [name, apply] of stops) {
+    const { raw, db } = database();
+    await setUpCities(raw, db, { rows: 2 });
+    const first = await harness(db, fakeInbox());
+    await first.run(MON_9AM, MON_9AM + 30 * MINUTE);
+    assert.equal(count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact" WHERE "status" = 'sent' AND "nextDueDay" = '2026-11-16'`), 2);
+    apply(raw);
+    const later = fakeInbox();
+    const second = await harness(db, later);
+    await second.run(Date.parse("2026-11-16T14:00:00Z"), Date.parse("2026-11-16T19:30:00Z"));
+    assert.equal(later.sent.length, 0, name);
+  }
 });
 
 test("a Google warning, 3 bounces in a day or a refused send pauses the campaign until a founder resumes it", async () => {

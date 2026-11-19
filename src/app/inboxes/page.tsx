@@ -73,7 +73,7 @@ export default async function InboxesPage() {
           {inbox.campaigns.length ? <ul className="owner-rows">{inbox.campaigns.map((campaign) => <li key={campaign.key}>
             <Link href={`/campaigns/${campaign.key}` as Route} className="owner-row">
               <span className="min-w-0"><span className="owner-row-title">{campaign.name}{campaign.state === "paused" ? <Badge tone="warning">Paused</Badge> : null}</span></span>
-              <span className="owner-meta owner-num flex-none">{campaign.perDay > 0 ? `${campaign.sentToday} of ${campaign.perDay} today` : `${campaign.sentToday} today, follow-ups only`}</span>
+              <span className="owner-meta owner-num flex-none">{campaign.perDay > 0 ? `${campaign.sentToday} of ${campaign.perDay} today` : `follow-ups only: ${campaign.sentToday} sent today, ${campaign.owedDue} due`}</span>
             </Link>
           </li>)}</ul> : <Empty>No campaign sends from it.</Empty>}
         </div>
