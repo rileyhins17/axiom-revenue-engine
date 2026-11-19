@@ -8,7 +8,8 @@
  *   the campaign's current words; a mailing address is set; the inbox has its password.
  * - Limits: the campaign's daily limit and its share of each inbox; the inbox's own day (all campaigns
  *   and FCC together; half before 12:30, the rest after only if it had at most 1 bounce);
- *   1 to 3 minutes between any two emails from the inbox.
+ *   1 to 3 minutes between any two emails from the inbox. An inbox whose share is 0 sends no new first
+ *   emails for the campaign but still sends the follow-ups it owes (OWED_FOLLOW_UPS_PER_DAY).
  * - Order: due follow-ups first (oldest first), then first emails (batch order, then CSV row order).
  * - Checks before every email: the do-not-email list (and anyone who bounced or said "no thanks" in
  *   any campaign); someone else at the same organisation already replied; before a follow-up, the
@@ -85,6 +86,17 @@ export function addBusinessDays(day: string, count: number) {
   return current;
 }
 
+/**
+ * A follow-up only goes in the same thread from the inbox that sent the first email. So an inbox a campaign still lists with
+ * a share of 0 (no new first emails from it) keeps sending the follow-ups it owes, up to this many a day, inside the
+ * campaign's daily limit and the inbox's own day. Why (Nov 19): Aidan's Gmail sent about 30 studio first emails on Nov 18, then its
+ * share went to 0 when Aidan's studio emails moved to aidan@getaxiom.ca, and their follow-ups would never have gone.
+ * An inbox the campaign does not list at all sends nothing for it.
+ */
+export const OWED_FOLLOW_UPS_PER_DAY = 30;
+/** The most this inbox sends for the campaign today: its share, or for a share of 0, only the follow-ups it owes. */
+const inboxAllowance = (perDay: number) => (perDay > 0 ? perDay : OWED_FOLLOW_UPS_PER_DAY);
+
 /** Why the campaign can't send from this inbox at this moment, or null. */
 export function campaignClosed(campaign: Campaign, inbox: string, now: Date, mailingAddress: string | null | undefined): string | null {
   if (campaign.problem) return `settings can't be used: ${campaign.problem}`;
@@ -92,7 +104,7 @@ export function campaignClosed(campaign: Campaign, inbox: string, now: Date, mai
   if (!campaign.wordsVersion || !campaign.words.steps[0]?.subject) return "no email words";
   if ((mailingAddress ?? "").trim().length < 10) return "no mailing address";
   const share = campaign.inboxes.find((entry) => entry.address === inbox);
-  if (!share || share.perDay <= 0 || campaign.dailyLimit <= 0) return "doesn't send from this inbox";
+  if (!share || campaign.dailyLimit <= 0) return "doesn't send from this inbox";
   const day = torontoDay(now);
   if (campaign.startDay && day < campaign.startDay) return `starts ${campaign.startDay}`;
   if (campaign.endDay && day > campaign.endDay) return `ended ${campaign.endDay}`;
@@ -219,9 +231,11 @@ export async function runOutreachTick(db: ProspectDb, config: OutreachInboxConfi
   for (const campaign of campaigns) {
     const share = campaign.inboxes.find((entry) => entry.address === inbox)!;
     if (await sentTodayBy(db, campaign.key, day) >= campaign.dailyLimit) continue;
-    if (await sentTodayBy(db, campaign.key, day, inbox) >= share.perDay) continue;
+    if (await sentTodayBy(db, campaign.key, day, inbox) >= inboxAllowance(share.perDay)) continue;
     const due = await dueContacts(db, campaign, inbox, day);
-    if (due.followUps.length || due.firsts.length) { chosen = { campaign, ...due }; break; }
+    // A share of 0: only the follow-ups this inbox owes, never a new first email.
+    const firsts = share.perDay > 0 ? due.firsts : [];
+    if (due.followUps.length || firsts.length) { chosen = { campaign, followUps: due.followUps, firsts }; break; }
   }
   if (!chosen) return { status: "SKIPPED", reason: "nothing due" };
   const { campaign } = chosen;
@@ -307,7 +321,7 @@ export async function runOutreachTick(db: ProspectDb, config: OutreachInboxConfi
         sendId, campaign.key, contact.id, step, contact.email, inbox, day, messageId, rendered.email.subject, claimedAt,
         ...inboxSent.binds, capNow,
         campaign.key, day, campaign.dailyLimit,
-        campaign.key, day, inbox, share.perDay,
+        campaign.key, day, inbox, inboxAllowance(share.perDay),
         ...recent.binds,
         campaign.key,
         contact.id, step === 1 ? "ready" : "sent", step - 1,

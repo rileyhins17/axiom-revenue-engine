@@ -335,6 +335,38 @@ test("the follow-up goes 5 business days later in the same thread from the same 
   assert.equal(later.sent.length, 2);
 });
 
+test("an inbox whose share drops to 0 sends no new first emails but still sends the follow-ups it owes, in their threads", async () => {
+  const { raw, db } = database();
+  await setUpCities(raw, db, { rows: 4 });
+  const fake = fakeInbox();
+  const first = await harness(db, fake);
+  await first.run(MON_9AM, MON_9AM + 30 * MINUTE);
+  assert.equal(fake.sent.length, 4);
+  assert.ok(fake.sent.every((send) => send.from === AIDAN));
+  // Nov 18's case: the campaign's new first emails move to another inbox, and the first inbox's share goes to 0.
+  raw.prepare(`UPDATE "OutreachCampaign" SET "inboxesJson" = ? WHERE "key" = 'us-cities'`).run(JSON.stringify([{ address: AIDAN, perDay: 0 }, { address: RILEY, perDay: 30 }]));
+  let ids = 100;
+  const plan = planImport((await readCampaign(db, "us-cities"))!, [HEADERS, cityRow(5), cityRow(6)].join("\n"), {
+    batchId: "batch-2", name: "Cities batch 2", loadedBy: "Riley's Claude", now: new Date("2026-11-10T15:00:00Z"), newId: () => `contact-${++ids}`,
+    sender: { name: "Riley Hinsperger", address: RILEY }, mailingAddress: ADDRESS,
+  });
+  assert.deepEqual(plan.errors, []);
+  await importToDb(db, plan);
+  assert.deepEqual(await approveBatch(db, "batch-2", "Aidan", null, new Date("2026-11-10T16:00:00Z")), { ok: true });
+  // Mon Nov 16: Aidan's inbox sends only the 4 follow-ups it owes; the 2 new first emails go from Riley's inbox.
+  const later = fakeInbox();
+  const second = await harness(db, later);
+  await second.run(Date.parse("2026-11-16T14:00:00Z"), Date.parse("2026-11-16T15:30:00Z"));
+  const fromAidan = later.sent.filter((send) => send.from === AIDAN);
+  const fromRiley = later.sent.filter((send) => send.from === RILEY);
+  assert.deepEqual(fromAidan.map((send) => send.to).sort(), ["clerk1@city1.gov", "clerk2@city2.gov", "clerk3@city3.gov", "clerk4@city4.gov"]);
+  assert.ok(fromAidan.every((send) => /^Re: /.test(send.subject) && send.headers["In-Reply-To"] === `<ax-us-cities-contact-${send.to.match(/clerk(\d)@/)![1]}-1@gmail.com>`),
+    "only follow-ups, each in its own thread");
+  assert.deepEqual(fromRiley.map((send) => send.to).sort(), ["clerk5@city5.gov", "clerk6@city6.gov"]);
+  assert.ok(fromRiley.every((send) => !send.headers["In-Reply-To"]), "the new first emails go from the inbox that has a share");
+  assert.equal(count(raw, `SELECT COUNT(*) AS n FROM "OutreachContact" WHERE "status" = 'done'`), 4, "the 4 owed follow-ups are sent and done");
+});
+
 test("a Google warning, 3 bounces in a day or a refused send pauses the campaign until a founder resumes it", async () => {
   {
     const { raw, db } = database();
