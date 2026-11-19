@@ -9,12 +9,16 @@
 import { torontoDay, torontoWeekday } from "@/lib/fcc-campaign-sender";
 import { torontoMinute } from "@/lib/fcc-campaign-tick";
 import { readKv } from "@/lib/outreach/outreach-control";
-import { AFTERNOON_FROM, AFTERNOON_MAX_BOUNCES, PAUSE_BOUNCES, gapAfter, inboxCapNow, inboxDayMax, mailboxOwner } from "@/lib/outreach/outreach-inboxes";
+import { AFTERNOON_FROM, AFTERNOON_MAX_BOUNCES, PAUSE_BOUNCES, gapAfter, inboxAllowance, inboxCapNow, inboxDayMax, mailboxOwner } from "@/lib/outreach/outreach-inboxes";
 import { readInboxes, type Campaign, type Inbox } from "@/lib/outreach/outreach-model";
 import { OUTREACH_REPLY_STATE } from "@/lib/outreach/outreach-replies";
 import type { ProspectDb } from "@/lib/revenue-engine/engine-prospects-d1";
 
-export type InboxCampaignUse = { key: string; name: string; state: "live" | "paused"; perDay: number; sentToday: number };
+/**
+ * One campaign on one inbox today. `perDay` is the inbox's share; at 0 it sends no new first emails for the campaign,
+ * only the follow-ups it owes (`mostToday` is then the sender's ceiling for those, `owedDue` how many are due now).
+ */
+export type InboxCampaignUse = { key: string; name: string; state: "live" | "paused"; perDay: number; sentToday: number; mostToday: number; owedDue: number };
 
 export type InboxNext =
   | { kind: "off" }
@@ -81,7 +85,8 @@ export function campaignNextWindow(campaign: Pick<Campaign, "sendDays" | "window
   return null;
 }
 
-type Wanting = { campaign: Campaign; perDay: number; sentFromInbox: number; sentAll: number; due: boolean };
+/** `owedDue`: follow-ups due from this inbox for the campaign. At a share of 0 they are all it sends for it. */
+type Wanting = { campaign: Campaign; perDay: number; sentFromInbox: number; sentAll: number; due: boolean; owedDue?: number };
 
 /**
  * When the inbox's next email can go, by the sender's rules in the sender's order: the inbox's own day and bounces
@@ -94,9 +99,11 @@ export function inboxNext(input: {
   const minute = torontoMinute(now);
   if (!input.enabled || input.dayMax <= 0) return { kind: "off" };
   if (input.bouncesToday >= PAUSE_BOUNCES) return { kind: "resting", bounces: input.bouncesToday };
-  const live = input.wanting.filter((item) => item.campaign.state === "live" && !item.campaign.problem && item.perDay > 0 && item.campaign.dailyLimit > 0);
-  if (live.length === 0) return { kind: input.wanting.length ? "paused" : "nothing-due" };
-  const withWork = live.filter((item) => item.due);
+  // The sender's rule for a share of 0: the campaign is this inbox's business only while it owes a follow-up that is due.
+  const mine = input.wanting.filter((item) => item.perDay > 0 || (item.owedDue ?? 0) > 0);
+  const live = mine.filter((item) => item.campaign.state === "live" && !item.campaign.problem && item.campaign.dailyLimit > 0);
+  if (live.length === 0) return { kind: mine.length ? "paused" : "nothing-due" };
+  const withWork = live.filter((item) => (item.perDay > 0 ? item.due : true));
   if (withWork.length === 0) return { kind: "nothing-due" };
 
   // Tomorrow's (or a later day's) first open window, for when today is done.
@@ -109,7 +116,7 @@ export function inboxNext(input: {
   };
 
   const openToday = withWork.map((item) => ({ item, window: campaignNextWindow(item.campaign, now) }))
-    .filter((row) => row.window !== null && row.window.day === today && row.item.sentFromInbox < row.item.perDay && row.item.sentAll < row.item.campaign.dailyLimit);
+    .filter((row) => row.window !== null && row.window.day === today && row.item.sentFromInbox < inboxAllowance(row.item.perDay) && row.item.sentAll < row.item.campaign.dailyLimit);
   if (openToday.length === 0) return later();
 
   if (input.sentToday >= input.dayMax) return input.sentToday > 0 ? { kind: "day-full" } : later();
@@ -155,7 +162,7 @@ export async function inboxHealth(db: ProspectDb, campaigns: Array<{ campaign: C
   const first = (fccFirstInbox ?? "").trim().toLowerCase();
   // FCC's rows name its first inbox "" (older rows) and any other by address: fold both tables onto the address.
   const fccAddress = `CASE WHEN lower(COALESCE("senderAddress",'')) = '' THEN ? ELSE lower("senderAddress") END`;
-  const [inboxes, sent, lastSends, bounces, byCampaign, replyState] = await Promise.all([
+  const [inboxes, sent, lastSends, bounces, byCampaign, owed, replyState] = await Promise.all([
     readInboxes(db),
     db.prepare(`SELECT address, SUM(n) AS n FROM (
         SELECT ${fccAddress} AS address, COUNT(*) AS n FROM "FccCampaignSend" WHERE "sendDay" = ? AND "status" IN ('CLAIMED','SENT') GROUP BY 1
@@ -173,12 +180,17 @@ export async function inboxHealth(db: ProspectDb, campaigns: Array<{ campaign: C
       ) GROUP BY address`).bind(first, day, day).all<{ address: string; n: number }>(),
     db.prepare(`SELECT "campaignKey" AS key, "senderAddress" AS address, COUNT(*) AS n FROM "OutreachSend"
       WHERE "sendDay" = ? AND "kind" = 'real' AND "status" IN ('CLAIMED','SENT') GROUP BY 1, 2`).bind(day).all<{ key: string; address: string; n: number }>(),
+    // Follow-ups due from each inbox, by campaign: what an inbox at a share of 0 still sends (the sender's own test,
+    // without its batch-approval join, so a batch stopped since can show a few more here than will go).
+    db.prepare(`SELECT "campaignKey" AS key, "senderAddress" AS address, COUNT(*) AS n FROM "OutreachContact"
+      WHERE "status" = 'sent' AND "stepsSent" >= 1 AND "nextDueDay" <= ? AND "firstMessageId" IS NOT NULL GROUP BY 1, 2`).bind(day).all<{ key: string; address: string; n: number }>(),
     replyCheck === undefined ? readReplyCheck(db) : Promise.resolve(replyCheck),
   ]);
   const sentBy = new Map(sent.results.map((row) => [row.address, n(row.n)]));
   const lastBy = new Map(lastSends.results.map((row) => [row.address, row]));
   const bouncesBy = new Map(bounces.results.map((row) => [row.address, n(row.n)]));
   const campaignSent = (key: string, address: string) => n(byCampaign.results.find((row) => row.key === key && row.address === address)?.n);
+  const owedDue = (campaign: Campaign, address: string) => (campaign.followUps > 0 ? n(owed.results.find((row) => row.key === campaign.key && row.address === address)?.n) : 0);
 
   return inboxes.map((inbox: Inbox): InboxHealth => {
     const dayMax = inboxDayMax(inbox, day);
@@ -187,6 +199,7 @@ export async function inboxHealth(db: ProspectDb, campaigns: Array<{ campaign: C
     const using = campaigns.filter(({ campaign }) => campaign.inboxes.some((share) => share.address === inbox.address));
     const wanting: Wanting[] = using.map(({ campaign, due, sentToday: sentAll }) => ({
       campaign, due, sentAll, perDay: campaign.inboxes.find((share) => share.address === inbox.address)!.perDay, sentFromInbox: campaignSent(campaign.key, inbox.address),
+      owedDue: owedDue(campaign, inbox.address),
     }));
     const last = lastBy.get(inbox.address);
     const next = inboxNext({ enabled: inbox.enabled, dayMax, sentToday, bouncesToday, lastSendAt: last?.createdAt ?? null, lastSendId: last?.sendId ?? null, wanting }, now);
@@ -197,7 +210,8 @@ export async function inboxHealth(db: ProspectDb, campaigns: Array<{ campaign: C
       address: inbox.address, name: inbox.name, firstName: firstNameOf(inbox.name, inbox.address), enabled: inbox.enabled,
       sentToday, dayMax, capNow: inboxCapNow(dayMax, minute), fullMax: inbox.dailyMax, ramp: ramping ? { steps: inbox.ramp, from: inbox.rampFrom! } : null,
       bouncesToday, resting: bouncesToday >= PAUSE_BOUNCES, next, nextText: inboxNextText(next, day),
-      campaigns: wanting.map((item) => ({ key: item.campaign.key, name: item.campaign.name, state: item.campaign.state, perDay: item.perDay, sentToday: item.sentFromInbox })),
+      campaigns: wanting.map((item) => ({ key: item.campaign.key, name: item.campaign.name, state: item.campaign.state, perDay: item.perDay, sentToday: item.sentFromInbox,
+        mostToday: inboxAllowance(item.perDay), owedDue: item.owedDue ?? 0 })),
       replyCheck: { lastReadAt: replyState?.inboxes?.[readAddress] ?? null, couldOpen: !(replyState?.unread ?? []).includes(readAddress) },
       readsVia: owner && owner.address !== inbox.address ? owner.address : null,
       gmail: /(^|\.)gmail\.com$/i.test(inbox.imapHost.trim()) || /(^|\.)gmail\.com$/i.test((owner?.imapHost ?? "").trim()),

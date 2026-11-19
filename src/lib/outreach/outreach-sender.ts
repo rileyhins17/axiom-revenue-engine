@@ -8,7 +8,8 @@
  *   the campaign's current words; a mailing address is set; the inbox has its password.
  * - Limits: the campaign's daily limit and its share of each inbox; the inbox's own day (all campaigns
  *   and FCC together; half before 12:30, the rest after only if it had at most 1 bounce);
- *   1 to 3 minutes between any two emails from the inbox.
+ *   1 to 3 minutes between any two emails from the inbox. An inbox whose share is 0 sends no new first
+ *   emails for the campaign but still sends the follow-ups it owes (OWED_FOLLOW_UPS_PER_DAY).
  * - Order: due follow-ups first (oldest first), then first emails (batch order, then CSV row order).
  * - Checks before every email: the do-not-email list (and anyone who bounced or said "no thanks" in
  *   any campaign); someone else at the same organisation already replied; before a follow-up, the
@@ -24,8 +25,8 @@ import { torontoMinute } from "@/lib/fcc-campaign-tick";
 import { addressBlocked, suppress } from "@/lib/outreach/outreach-blocked";
 import { noteCampaignRun, pauseCampaign, readKv, writeKv } from "@/lib/outreach/outreach-control";
 import {
-  AFTERNOON_FROM, AFTERNOON_MAX_BOUNCES, GAP_MIN_MS, PAUSE_BOUNCES, gapAfter, inboxBouncesToday, inboxCapNow, inboxClaimedSinceSql, inboxDayMax, inboxLastSend,
-  inboxSentSql, inboxSentToday, type InboxRef,
+  AFTERNOON_FROM, AFTERNOON_MAX_BOUNCES, GAP_MIN_MS, OWED_FOLLOW_UPS_PER_DAY, PAUSE_BOUNCES, gapAfter, inboxAllowance, inboxBouncesToday, inboxCapNow, inboxClaimedSinceSql,
+  inboxDayMax, inboxLastSend, inboxSentSql, inboxSentToday, type InboxRef,
 } from "@/lib/outreach/outreach-inboxes";
 import { readCampaigns, type Campaign, type Inbox } from "@/lib/outreach/outreach-model";
 import { renderEmail, type CampaignWords, type Sender } from "@/lib/outreach/outreach-words";
@@ -85,14 +86,20 @@ export function addBusinessDays(day: string, count: number) {
   return current;
 }
 
-/** Why the campaign can't send from this inbox at this moment, or null. */
+// A share of 0: the inbox still sends the follow-ups it owes (outreach-inboxes.ts says why and how many a day).
+export { OWED_FOLLOW_UPS_PER_DAY };
+
+/**
+ * Why the campaign can't send from this inbox at this moment, or null. A campaign that lists the inbox at a share of 0
+ * passes here; runOutreachTick then keeps it only while the inbox owes it a follow-up that is due (owesFollowUp).
+ */
 export function campaignClosed(campaign: Campaign, inbox: string, now: Date, mailingAddress: string | null | undefined): string | null {
   if (campaign.problem) return `settings can't be used: ${campaign.problem}`;
   if (campaign.state !== "live") return "paused";
   if (!campaign.wordsVersion || !campaign.words.steps[0]?.subject) return "no email words";
   if ((mailingAddress ?? "").trim().length < 10) return "no mailing address";
   const share = campaign.inboxes.find((entry) => entry.address === inbox);
-  if (!share || share.perDay <= 0 || campaign.dailyLimit <= 0) return "doesn't send from this inbox";
+  if (!share || campaign.dailyLimit <= 0) return "doesn't send from this inbox";
   const day = torontoDay(now);
   if (campaign.startDay && day < campaign.startDay) return `starts ${campaign.startDay}`;
   if (campaign.endDay && day > campaign.endDay) return `ended ${campaign.endDay}`;
@@ -106,12 +113,27 @@ export function campaignClosed(campaign: Campaign, inbox: string, now: Date, mai
  * The contacts with an email due: follow-ups from this inbox first, then first emails. Only approved batches, each on the
  * words it was approved on: its own (every batch loaded since Nov 5), or the campaign's for an older batch.
  */
+const APPROVED_BATCH = `JOIN "OutreachBatch" b ON b."id" = c."batchId" AND b."status" = 'approved' AND b."approvedWords" = COALESCE(b."wordsVersion", ?)`;
+/** A follow-up this inbox owes that is due. Binds: campaign key, inbox, day, the campaign's number of follow-ups. */
+const FOLLOW_UP_DUE = `c."campaignKey" = ? AND c."status" = 'sent' AND c."senderAddress" = ? AND c."nextDueDay" <= ? AND c."stepsSent" BETWEEN 1 AND ?
+        AND c."firstMessageId" IS NOT NULL`;
+
+/**
+ * Whether this inbox owes the campaign a follow-up that is due now. It is what keeps a campaign open to an inbox it
+ * lists at a share of 0: on every other day that inbox has nothing to do with the campaign, so a problem in the inbox
+ * (a Google warning, a refused login) can't pause it.
+ */
+async function owesFollowUp(db: ProspectDb, campaign: Campaign, inbox: string, day: string) {
+  if (campaign.followUps <= 0) return false;
+  return Boolean(await db.prepare(`SELECT 1 AS hit FROM "OutreachContact" c ${APPROVED_BATCH} WHERE ${FOLLOW_UP_DUE} LIMIT 1`)
+    .bind(campaign.wordsVersion, campaign.key, inbox, day, campaign.followUps).first<{ hit: number }>());
+}
+
 async function dueContacts(db: ProspectDb, campaign: Campaign, inbox: string, day: string) {
   const columns = `c."id", c."campaignKey", c."email", c."fieldsJson", c."status", c."stepsSent", c."firstSentAt", c."firstMessageId", c."firstSubject", c."lastMessageId", b."wordsJson" AS "batchWords"`;
-  const approved = `JOIN "OutreachBatch" b ON b."id" = c."batchId" AND b."status" = 'approved' AND b."approvedWords" = COALESCE(b."wordsVersion", ?)`;
+  const approved = APPROVED_BATCH;
   const { results: followUps } = campaign.followUps > 0 ? await db.prepare(`SELECT ${columns} FROM "OutreachContact" c ${approved}
-      WHERE c."campaignKey" = ? AND c."status" = 'sent' AND c."senderAddress" = ? AND c."nextDueDay" <= ? AND c."stepsSent" BETWEEN 1 AND ?
-        AND c."firstMessageId" IS NOT NULL
+      WHERE ${FOLLOW_UP_DUE}
       ORDER BY c."nextDueDay", b."sendOrder", c."rowNumber" LIMIT 25`).bind(campaign.wordsVersion, campaign.key, inbox, day, campaign.followUps).all<ContactRow>()
     : { results: [] as ContactRow[] };
   const { results: firsts } = await db.prepare(`SELECT ${columns} FROM "OutreachContact" c ${approved}
@@ -155,12 +177,19 @@ export async function runOutreachTick(db: ProspectDb, config: OutreachInboxConfi
   const random = options.random ?? Math.random;
   const inbox = config.ref.address;
   if (!config.transport || !config.mailbox) return { status: "SKIPPED", reason: "inbox has no password" };
-  const campaigns = (await readCampaigns(db)).filter((campaign) => campaignClosed(campaign, inbox, now, config.mailingAddress) === null);
+  const day = torontoDay(now);
+  // The campaigns this inbox sends for at this moment. One that lists it at a share of 0 counts only while the inbox
+  // owes it a follow-up that is due: everything below (the pauses, the rest notes, the pick) is about these campaigns.
+  const campaigns: Campaign[] = [];
+  for (const campaign of await readCampaigns(db)) {
+    if (campaignClosed(campaign, inbox, now, config.mailingAddress) !== null) continue;
+    const share = campaign.inboxes.find((entry) => entry.address === inbox)!;
+    if (share.perDay > 0 || await owesFollowUp(db, campaign, inbox, day)) campaigns.push(campaign);
+  }
   if (campaigns.length === 0) return { status: "SKIPPED", reason: "no campaign sends from this inbox now" };
 
   // The founder's full signature on a signed inbox (outreach-signature.ts); everyone else keeps the plain footer.
   const [sender = config.sender] = await withSignatures(db, [config.sender]);
-  const day = torontoDay(now);
   const minute = torontoMinute(now);
   const firstName = config.sender.name.trim().split(/\s+/)[0] || inbox;
   const label = `${firstName}'s inbox: `;
@@ -219,9 +248,11 @@ export async function runOutreachTick(db: ProspectDb, config: OutreachInboxConfi
   for (const campaign of campaigns) {
     const share = campaign.inboxes.find((entry) => entry.address === inbox)!;
     if (await sentTodayBy(db, campaign.key, day) >= campaign.dailyLimit) continue;
-    if (await sentTodayBy(db, campaign.key, day, inbox) >= share.perDay) continue;
+    if (await sentTodayBy(db, campaign.key, day, inbox) >= inboxAllowance(share.perDay)) continue;
     const due = await dueContacts(db, campaign, inbox, day);
-    if (due.followUps.length || due.firsts.length) { chosen = { campaign, ...due }; break; }
+    // A share of 0: only the follow-ups this inbox owes, never a new first email.
+    const firsts = share.perDay > 0 ? due.firsts : [];
+    if (due.followUps.length || firsts.length) { chosen = { campaign, followUps: due.followUps, firsts }; break; }
   }
   if (!chosen) return { status: "SKIPPED", reason: "nothing due" };
   const { campaign } = chosen;
@@ -307,7 +338,7 @@ export async function runOutreachTick(db: ProspectDb, config: OutreachInboxConfi
         sendId, campaign.key, contact.id, step, contact.email, inbox, day, messageId, rendered.email.subject, claimedAt,
         ...inboxSent.binds, capNow,
         campaign.key, day, campaign.dailyLimit,
-        campaign.key, day, inbox, share.perDay,
+        campaign.key, day, inbox, inboxAllowance(share.perDay),
         ...recent.binds,
         campaign.key,
         contact.id, step === 1 ? "ready" : "sent", step - 1,

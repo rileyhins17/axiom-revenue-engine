@@ -199,7 +199,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         { label: "Send days", value: `${campaign.sendDays.join(", ")}, ${clock(campaign.windowStart)} to ${clock(campaign.windowEnd)} Toronto time` },
         ...(campaign.startDay || campaign.endDay ? [{ label: "Runs", value: `${campaign.startDay ? `from ${dayText(campaign.startDay)}` : ""}${campaign.endDay ? ` to ${dayText(campaign.endDay)}` : ""}`.trim() }] : []),
         { label: "Daily limit", value: `${campaign.dailyLimit} emails, follow-ups included` },
-        ...data.inboxes.map((inbox) => ({ label: `${inbox.name.split(" ")[0]}'s inbox`, value: `${inbox.sentByCampaign} of ${inbox.perDay} today (the whole inbox: ${inbox.inboxSent} of ${inbox.inboxDayMax})` })),
+        ...data.inboxes.map((inbox) => ({ label: `${inbox.name.split(" ")[0]}'s inbox`, value: `${inbox.perDay > 0 ? `${inbox.sentByCampaign} of ${inbox.perDay} today` : `follow-ups it owes only, no new first emails: ${inbox.sentByCampaign} sent today, ${inbox.owedDue} due (up to ${inbox.mostToday} a day)`} (the whole inbox: ${inbox.inboxSent} of ${inbox.inboxDayMax})` })),
         { label: "Follow-up", value: campaign.followUps ? `${campaign.followUps}, ${campaign.followUpBusinessDays} business days after the email before` : "None" },
         { label: "Approved by", value: approvers },
         { label: "A row is held when", value: [...rules, "a blank the words use is empty", campaign.rules.noLinksInFirst ? "the first email would carry a link" : null, "its domain has no mail server", "the address is on the do-not-email list"].filter(Boolean).join("; ") },

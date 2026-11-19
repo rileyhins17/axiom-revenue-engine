@@ -20,6 +20,17 @@ export const PAUSE_BOUNCES = 3;
 export const GAP_MIN_MS = 60_000;
 export const GAP_MAX_MS = 180_000;
 
+/**
+ * A follow-up only goes in the same thread from the inbox that sent the first email. So an inbox a campaign still lists with
+ * a share of 0 (no new first emails from it) keeps sending the follow-ups it owes, up to this many a day, inside the
+ * campaign's daily limit and the inbox's own day. Why (Nov 19): Aidan's Gmail sent about 30 studio first emails on Nov 18, then its
+ * share went to 0 when Aidan's studio emails moved to aidan@getaxiom.ca, and their follow-ups would never have gone.
+ * An inbox the campaign does not list at all sends nothing for it.
+ */
+export const OWED_FOLLOW_UPS_PER_DAY = 30;
+/** The most an inbox sends for a campaign in a day: its share, or for a share of 0, only the follow-ups it owes. */
+export const inboxAllowance = (perDay: number) => (perDay > 0 ? perDay : OWED_FOLLOW_UPS_PER_DAY);
+
 export type InboxRef = { address: string; fccKey: string };
 
 /** `address` as both tables name it. `fccFirstInbox` is FCC_SENDER_ADDRESS, whose FCC rows carry no address. */

@@ -163,7 +163,9 @@ const inboxLine = (inbox: InboxHealth) => ({
   sentToday: inbox.sentToday, limitToday: inbox.dayMax, limitRightNow: inbox.capNow, fullLimit: inbox.fullMax, ramp: inbox.ramp,
   bouncesToday: inbox.bouncesToday, resting: inbox.resting, nextSend: inbox.nextText,
   lastReplyCheckAt: inbox.replyCheck.lastReadAt, replyCheckCouldOpenIt: inbox.replyCheck.couldOpen, repliesReadIn: inbox.readsVia,
-  campaigns: inbox.campaigns.map((use) => ({ key: use.key, name: use.name, state: use.state, mostPerDay: use.perDay, sentToday: use.sentToday })),
+  // mostPerDay 0: no new first emails from this inbox for the campaign, only the follow-ups it owes (followUpsOnly).
+  campaigns: inbox.campaigns.map((use) => ({ key: use.key, name: use.name, state: use.state, mostPerDay: use.perDay, sentToday: use.sentToday,
+    ...(use.perDay > 0 ? {} : { followUpsOnly: true, mostFollowUpsPerDay: use.mostToday, followUpsDueNow: use.owedDue }) })),
 });
 const replyLine = (reply: ReplyRow) => ({ ...reply, successLabel: reply.successLabel || null });
 
@@ -283,7 +285,10 @@ export const TOOLS: Tool[] = [
         limits: {
           dailyLimit: campaign.dailyLimit, followUps: campaign.followUps, businessDaysBeforeAFollowUp: campaign.followUpBusinessDays,
           inboxes: detail.inboxes.map((inbox) => ({ address: inbox.address, name: inbox.name, mostPerDayForThisCampaign: inbox.perDay, sentTodayForThisCampaign: inbox.sentByCampaign,
-            inboxSentTodayInAll: inbox.inboxSent, inboxLimitToday: inbox.inboxDayMax, inboxLimitRightNow: inbox.inboxCapNow })),
+            inboxSentTodayInAll: inbox.inboxSent, inboxLimitToday: inbox.inboxDayMax, inboxLimitRightNow: inbox.inboxCapNow,
+            // A share of 0 is not "off": the inbox sends no new first emails here but still sends the follow-ups it owes.
+            ...(inbox.perDay > 0 ? {} : { followUpsOnly: true, mostFollowUpsPerDay: inbox.mostToday, followUpsDueNow: inbox.owedDue,
+              note: "A share of 0: no new first emails from this inbox, but it still sends the follow-ups it owes, in their threads. Taking the inbox off the campaign's list is what stops those." }) })),
         },
         words: {
           version: campaign.wordsVersion, firstEmail: first ? { subject: first.subject ?? null, body: first.body } : null, followUps: followUps.map((step) => step.body),
