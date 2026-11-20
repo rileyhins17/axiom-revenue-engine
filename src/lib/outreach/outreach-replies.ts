@@ -89,6 +89,10 @@ export async function runOutreachReplyCheck(db: ProspectDb, config: OutreachRepl
 
   const unreadInboxes: string[] = [];
   const found: Found[] = [];
+  // One row per email. Gmail numbers the same message again in each folder it sits in: a reply caught in Spam and
+  // later moved out shows up again under All Mail with a new number, and was recorded (and told) twice (Nov 20, 2026).
+  const sameEmail = (contactId: string, from: string, date: string | null) => `${contactId}|${from}|${date ?? ""}`;
+  const taken = new Set<string>();
   let messages = 0;
   const readAt: Record<string, string> = {};
   for (const { address, open } of config.inboxes) {
@@ -104,6 +108,11 @@ export async function runOutreachReplyCheck(db: ProspectDb, config: OutreachRepl
           if (message.date && Date.parse(message.date) < Date.parse(contact.firstSentAt) - 60_000) continue;
           const id = `${address}:${message.folder}:${message.uid}:${contact.id}`;
           if (await db.prepare(`SELECT 1 AS hit FROM "OutreachReply" WHERE "id" = ?`).bind(id).first()) continue;
+          const key = sameEmail(contact.id, from, message.date);
+          if (taken.has(key)) continue;
+          if (message.date && await db.prepare(`SELECT 1 AS hit FROM "OutreachReply" WHERE "contactId" = ? AND lower("fromAddress") = ? AND "receivedAt" = ?`)
+            .bind(contact.id, from, message.date).first()) continue;
+          taken.add(key);
           const quote = await inbox.replyText(message).catch(() => "");
           const kind: Found["kind"] = message.automatic ? "automatic" : NO_THANKS.test(quote) ? "no_thanks" : "reply";
           found.push({ id, contact, message: { ...message, inbox: address }, kind, quote, subject: null });

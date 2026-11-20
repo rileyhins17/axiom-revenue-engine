@@ -448,6 +448,37 @@ test("the hourly reply check reads every inbox, stops whoever wrote back, puts a
   assert.deepEqual((await runOutreachReplyCheck(db, config, new Date("2026-11-09T22:20:00Z"))).status, "SKIPPED", "once an hour");
 });
 
+test("a reply seen in Spam and again under All Mail (a new number in each folder) is one reply, told once", async () => {
+  const { raw, db } = database();
+  await setUpCities(raw, db, { rows: 2 });
+  const fake = fakeInbox();
+  await (await harness(db, fake)).run(MON_9AM, MON_9AM + 30 * MINUTE);
+  raw.prepare(`UPDATE "OutreachContact" SET "firstSentAt" = ? WHERE "firstSentAt" IS NOT NULL`).run(new Date(MON_9AM).toISOString());
+  const reply = { from: "clerk1@city1.gov", date: "2026-11-09T18:00:00.000Z", automatic: false, text: "Not right now." };
+  let list = [{ ...reply, folder: "[Gmail]/Spam", uid: 358 }];
+  const open = async () => ({
+    async messagesSince() { return list.map(({ folder, uid, from, date, automatic }) => ({ folder, uid, from, date, automatic })); },
+    async replyText(message: { uid: number }) { return list.find((item) => item.uid === message.uid)!.text; },
+    async close() {},
+  });
+  const told: Array<{ subject: string; text: string }> = [];
+  const config = { screenUrl: "https://operations.getaxiom.ca/campaigns", inboxes: [{ address: AIDAN, open }], tellFounders: async (mail: { subject: string; text: string }) => { told.push(mail); } };
+  const { runOutreachReplyCheck } = await import("@/lib/outreach/outreach-replies");
+  const count = () => (raw.prepare(`SELECT COUNT(*) AS n FROM "OutreachReply"`).get() as { n: number }).n;
+  await runOutreachReplyCheck(db, config, new Date("2026-11-09T20:05:00Z"));
+  assert.equal(count(), 1);
+  assert.equal(told.length, 1);
+  // Moved out of Spam: Gmail shows it under All Mail with a new number. Still one reply, and nobody is told again.
+  list = [{ ...reply, folder: "[Gmail]/All Mail", uid: 10125 }, { ...reply, folder: "[Gmail]/Spam", uid: 358 }];
+  await runOutreachReplyCheck(db, config, new Date("2026-11-09T21:05:00Z"));
+  assert.equal(count(), 1, "the same email is one reply, whatever folder it is in");
+  assert.equal(told.length, 1, "nobody is told twice");
+  // Both copies seen for the first time in the same hour: still one.
+  raw.prepare(`DELETE FROM "OutreachReply"`).run();
+  await runOutreachReplyCheck(db, config, new Date("2026-11-09T22:05:00Z"));
+  assert.equal(count(), 1);
+});
+
 test("loading checks that every domain takes mail: no mail server, a null MX or no such domain holds the row; a lookup that keeps failing stops the load", async () => {
   const { checkMailServers } = await import("@/lib/outreach/outreach-mail-servers");
   const calls: string[] = [];
